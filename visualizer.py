@@ -7,6 +7,7 @@ tile_distribution_encoding structures used in the Composable Kernels library.
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+from matplotlib.collections import PatchCollection
 import networkx as nx
 import numpy as np
 from typing import Dict, List, Any, Tuple
@@ -1092,22 +1093,43 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
     thread_area_width = 0.55
     code_area_width = 0.45
     
-    # Define the display regions
-    warps_region_height = 0.7  # Height for the warp/thread display
+    # Define the display regions (restored)
+    # warps_region_height = 0.7  # Original fixed value, will be recalculated
     
-    # Create left side vertical color bar
+    # Create left side vertical color bar (restored variable)
     color_bar_width = 0.05
     
     # The top of the warp drawing area (and color bar) should be below the new info boxes.
     warp_area_top_y = tpw_box_y - info_y_spacing - 0.01 # Adjusted top for warp area (bottom of info boxes - padding)
     
-    # Recalculate warp_height (restored)
-    warp_height = warps_region_height / max(warps_per_block_m, 1) # This height is for each warp's visual block
+    # --- Revised Y-Layout for Bottom Elements ---
+    bottom_plot_margin = 0.02
+    repeat_box_height_val = 0.08 
+    repeat_box_padding_above = 0.05
 
-    # Draw the color bar on left side (restored and y-positions adjusted)
+    # Y-position for the *bottom* of the RepeatM box
+    repeat_box_actual_y_start = bottom_plot_margin
+    # Y-position for the *top* of the RepeatM box
+    repeat_box_actual_y_end = repeat_box_actual_y_start + repeat_box_height_val
+    
+    # This is the Y where the padding above the RepeatM box ends / where the warp region bottom aligns
+    repeat_section_padding_end_y = repeat_box_actual_y_end + repeat_box_padding_above
+
+    # Recalculate warps_region_height based on available space
+    warps_region_height = warp_area_top_y - repeat_section_padding_end_y
+    if warps_region_height < 0.1: # Ensure a minimum height for warps
+        warps_region_height = 0.1 
+        # If warps_region_height had to be capped, it implies overlap or insufficient space.
+        # The layout will be squashed, but this prevents negative height.
+        # A more sophisticated solution might involve scaling other elements or providing scrollbars.
+
+    # Recalculate warp_height 
+    warp_height = warps_region_height / max(warps_per_block_m, 1) 
+    # --- End Revised Y-Layout ---
+    
+    # Draw the color bar on left side (y-positions adjusted based on new warp_area_top_y and warp_height)
     for i in range(warps_per_block_m):
         warp_color = warp_colors[i % len(warp_colors)]
-        # Adjust y_pos for color bar segments based on new warp_area_top_y
         y_pos_color_bar = warp_area_top_y - (i + 1) * warp_height
         
         color_rect = patches.Rectangle(
@@ -1120,13 +1142,10 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
         )
         ax.add_patch(color_rect)
     
-    # Reserve space for the RepeatM section at the bottom (restored and y-positions adjusted)
-    repeat_section_top = warp_area_top_y - warps_per_block_m * warp_height - 0.05
-    
-    # Draw the RepeatM section at the bottom with clear separation (restored)
+    # Draw the RepeatM section at the bottom with clear separation
     repeat_box = patches.Rectangle(
-        (0.02, repeat_section_top - 0.08), 
-        0.3, 0.08,
+        (0.02, repeat_box_actual_y_start), # Use new Y start for the box
+        0.3, repeat_box_height_val, # Use defined height
         linewidth=1, 
         edgecolor='white', 
         facecolor='#1E90FF', # DodgerBlue
@@ -1134,86 +1153,91 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
     )
     ax.add_patch(repeat_box)
     repeat_val = hierarchical_structure.get('Repeat', [4])[0] if hierarchical_structure.get('Repeat') and len(hierarchical_structure.get('Repeat')) > 0 else 4
-    # Using short names for values in RepeatM text for conciseness
-    ax.text(0.17, repeat_section_top - 0.04, f"{repeat_val} × ({wpb_m_display_val}W × {tpw_m_val}R × {tpw_n_val}C × {vec_k_val}V)\\nRepeatM", 
-           fontsize=9, ha='center', va='center', color='white') # Reduced fontsize for potentially long text
+    # Center text in the new RepeatM box position
+    ax.text(0.02 + 0.3/2, repeat_box_actual_y_start + repeat_box_height_val/2, 
+           f"{repeat_val} × ({wpb_m_display_val}W × {tpw_m_val}R × {tpw_n_val}C × {vec_k_val}V)\\nRepeatM", 
+           fontsize=9, ha='center', va='center', color='white')
     
+    # Initialize lists for batch drawing thread cells
+    all_thread_rects = []
+    all_thread_facecolors = []
+    # Initialize lists for batch drawing warp containers
+    all_warp_rects = []
+    all_warp_facecolors_for_container = [] 
+
     # Draw warps and threads in the center section
     for warp_idx, (warp_key, warp_data) in enumerate(thread_blocks.items()):
         warp_color = warp_colors[warp_idx % len(warp_colors)]
         
-        # Y position for this warp block, relative to new warp_area_top_y
         y_pos_warp_block = warp_area_top_y - (warp_idx + 1) * warp_height
         
-        # Draw warp label on the left
         ax.text(color_bar_width + 0.02, y_pos_warp_block + warp_height/2, f"Warp{warp_idx}", 
                fontsize=10, ha='left', va='center', color='white')
         
-        # Create grid layout for threads
         thread_grid_width = thread_area_width - color_bar_width - 0.05
         thread_grid_height = warp_height * 0.9
         
-        # Draw warp container
-        warp_box = patches.Rectangle(
+        # Create warp container for collection
+        warp_container_rect = patches.Rectangle(
             (color_bar_width + 0.04, y_pos_warp_block + 0.01), 
-            thread_grid_width, thread_grid_height,
-            linewidth=1, 
-            edgecolor='white', 
-            facecolor=warp_color,
-            alpha=0.3
+            thread_grid_width, thread_grid_height
         )
-        ax.add_patch(warp_box)
+        all_warp_rects.append(warp_container_rect)
+        all_warp_facecolors_for_container.append(warp_color) 
         
-        # Calculate cell dimensions for threads - reversed to show correct grid layout
-        # For a 16x4 layout (16 rows, 4 columns), we divide width by columns and height by rows
-        cell_width = thread_grid_width / max(threads_per_warp_n, 1)  # Width for each column
-        cell_height = thread_grid_height / max(threads_per_warp_m, 1)  # Height for each row
+        cell_width = thread_grid_width / max(threads_per_warp_n, 1)
+        cell_height = thread_grid_height / max(threads_per_warp_m, 1)
         
-        # Draw thread cells
         for thread_key, thread_data in warp_data.items():
             thread_pos = thread_data.get('position', [0, 0])
             thread_id = thread_data.get('global_id', 0)
             
-            # Calculate position for this thread cell with safe indexing
-            row_idx = thread_pos[0] if len(thread_pos) > 0 else 0  # This is the row
-            col_idx = thread_pos[1] if len(thread_pos) > 1 else 0  # This is the column
+            row_idx = thread_pos[0] if len(thread_pos) > 0 else 0
+            col_idx = thread_pos[1] if len(thread_pos) > 1 else 0
             
-            # Position calculation with proper row/column layout
-            # For column index, multiply by cell_width
-            # For row index, calculate from bottom to top (threads_per_warp_m - row_idx - 1)
             cell_x = color_bar_width + 0.04 + col_idx * cell_width
             cell_y = y_pos_warp_block + 0.01 + (threads_per_warp_m - row_idx - 1) * cell_height
             
-            # Draw thread cell
-            thread_box = patches.Rectangle(
+            thread_rect = patches.Rectangle(
                 (cell_x, cell_y),
-                cell_width, cell_height,
-                linewidth=1,
-                edgecolor='white',
-                facecolor=warp_color,
-                alpha=0.7
+                cell_width, cell_height
             )
-            ax.add_patch(thread_box)
+            all_thread_rects.append(thread_rect)
+            all_thread_facecolors.append(warp_color)
             
-            # Add thread ID
             ax.text(cell_x + cell_width/2, cell_y + cell_height/2, f"T{thread_id}",
                    fontsize=8, ha='center', va='center', color='white')
     
+    # After looping, add the collection of warp container rectangles
+    if all_warp_rects:
+        warp_container_collection = PatchCollection(
+            all_warp_rects,
+            facecolors=all_warp_facecolors_for_container, 
+            edgecolor='white',
+            linewidth=1,
+            alpha=0.3 # Alpha for the warp containers
+        )
+        ax.add_collection(warp_container_collection)
+
+    # After looping through all warps and threads, add the collection of thread rectangles
+    if all_thread_rects:
+        thread_collection = PatchCollection(
+            all_thread_rects,
+            facecolors=all_thread_facecolors, 
+            edgecolor='white',
+            linewidth=1,
+            alpha=0.7 # Alpha for the thread cells
+        )
+        ax.add_collection(thread_collection)
+
     # Draw C++ code on the right side if provided
     if code_snippet:
-        code_x = thread_area_width + 0.05  # Start of code area
-        # Align top of code text area with top of info boxes
-        code_text_area_top_y = info_y_start 
+        code_x = thread_area_width + 0.05
         
-        # Draw code background
-        # Adjust y and height of code_box to fit available space
-        # Code box should be below title, and its top can align with info_y_start or slightly below
-        # Let's make the code box span from just below info boxes down to near RepeatM, if possible
-        code_box_top_y = tpw_box_y - info_y_spacing - 0.01 # Align with warp_area_top_y for neatness
-        code_box_bottom_y = repeat_section_top # Align bottom with top of RepeatM box, or slightly above
+        code_box_top_y = warp_area_top_y 
+        code_box_bottom_y = repeat_section_padding_end_y 
         
-        # Ensure code_box_bottom_y is above a minimum y (e.g. 0.1) if RepeatM is very low
-        code_box_bottom_y = max(code_box_bottom_y, 0.15) 
+        code_box_bottom_y = max(code_box_bottom_y, bottom_plot_margin)
         code_box_effective_height = code_box_top_y - code_box_bottom_y
 
         if code_box_effective_height > 0.1 : # Only draw if there's reasonable height
