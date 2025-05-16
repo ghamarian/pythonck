@@ -185,7 +185,7 @@ class TileDistribution:
             code: Source code string
         """
         self.source_code = code
-        
+    
     def get_visualization_data(self) -> Dict[str, Any]:
         """
         Get data needed for visualization.
@@ -236,73 +236,123 @@ class TileDistribution:
             'DimensionValues': []       # Values for dimensions (for code annotations)
         }
         
-        # First parse hs_lengthss structure which contains the hierarchy information
+        # Get the sequences, P mappings, and Y mappings
         h_sequences = self.hs_lengthss if self.hs_lengthss else []
+        p_major = self.ps_to_rhs_major
+        p_minor = self.ps_to_rhs_minor
+        y_major = self.ys_to_rhs_major
+        y_minor = self.ys_to_rhs_minor
         
-        # Ensure hierarchical_info has some default values if hs_lengthss is empty or malformed
-        if not h_sequences:
-            # Set sensible defaults if no sequence data is available
+        # Ensure hierarchical_info has some default values if necessary data is missing
+        if not h_sequences or not p_major or not p_minor:
+            # Set sensible defaults if no proper data is available
             hierarchical_info['ThreadPerWarp'] = [16, 4]  # Default thread dimensions
             hierarchical_info['WarpPerBlock'] = [4]       # Default warps per block
             hierarchical_info['VectorDimensions'] = [8]   # Default vector size
             hierarchical_info['Repeat'] = [4]            # Default repeat factor
-        elif len(h_sequences) >= 1:
-            # H0 typically contains information like [RepeatM, WarpPerBlockM, ThreadPerWarpM, VectorM]
-            h0 = h_sequences[0]
-            if h0 and len(h0) >= 4:
-                hierarchical_info['Repeat'].append(h0[0])
-                hierarchical_info['WarpPerBlock'].append(h0[1])
-                hierarchical_info['ThreadPerWarp'].append(h0[2])
-                hierarchical_info['VectorDimensions'].append(h0[3])
+        else:
+            # Correctly map the P and Y indices to H sequence values
+            
+            # 1. Process P1 for ThreadPerWarp (if exists)
+            # P1 maps from highest index to lowest for ThreadPerWarp
+            if len(p_major) > 1 and len(p_minor) > 1:
+                p1_values = []
+                for maj, min_idx in zip(p_major[1], p_minor[1]):
+                    # Major index determines which H sequence (0 = R, 1 = H0, 2 = H1, etc.)
+                    if maj == 0:  # R sequence
+                        if min_idx < len(self.rs_lengths):
+                            p1_values.append(self.rs_lengths[min_idx])
+                    elif maj > 0 and maj-1 < len(h_sequences):  # H sequences
+                        h_idx = maj - 1
+                        if min_idx < len(h_sequences[h_idx]):
+                            p1_values.append(h_sequences[h_idx][min_idx])
                 
-                # Store dimension values for visualization annotations
-                for val in h0:
-                    if isinstance(val, int) or (isinstance(val, str) and val in self.variables):
-                        resolved_val = self.variables.get(val, val) if isinstance(val, str) else val
-                        hierarchical_info['DimensionValues'].append(resolved_val)
-            elif h0 and len(h0) >= 2:
-                # Simplified case with fewer dimensions
-                hierarchical_info['ThreadPerWarp'] = h0[:2]
-                
-                # Store dimension values for visualization annotations
-                for val in h0:
-                    if isinstance(val, int) or (isinstance(val, str) and val in self.variables):
-                        resolved_val = self.variables.get(val, val) if isinstance(val, str) else val
-                        hierarchical_info['DimensionValues'].append(resolved_val)
-                        
-                # Add defaults for missing values
-                if 'WarpPerBlock' not in hierarchical_info or not hierarchical_info['WarpPerBlock']:
-                    hierarchical_info['WarpPerBlock'] = [4]
-                if 'VectorDimensions' not in hierarchical_info or not hierarchical_info['VectorDimensions']:
-                    hierarchical_info['VectorDimensions'] = [8]
-                if 'Repeat' not in hierarchical_info or not hierarchical_info['Repeat']:
-                    hierarchical_info['Repeat'] = [4]
+                # Set ThreadPerWarp from P1 values if available
+                # Reverse the order since the rightmost (column) dimension changes fastest
+                if p1_values:
+                    # Ensure the column dimension is second in our representation
+                    # This means rows x columns format
+                    if len(p1_values) >= 2:
+                        hierarchical_info['ThreadPerWarp'] = p1_values
+                    elif len(p1_values) == 1:
+                        # If only one dimension, create a row x column format with 1 column
+                        hierarchical_info['ThreadPerWarp'] = [p1_values[0], 1]
+                else:
+                    hierarchical_info['ThreadPerWarp'] = [16, 4]  # Default if mapping failed
             else:
-                # Set defaults if h0 is empty or invalid
-                hierarchical_info['ThreadPerWarp'] = [16, 4]
-                hierarchical_info['WarpPerBlock'] = [4]
-                hierarchical_info['VectorDimensions'] = [8]
-                hierarchical_info['Repeat'] = [4]
+                hierarchical_info['ThreadPerWarp'] = [16, 4]  # Default if P1 doesn't exist
+            
+            # 2. Process P0 for WarpPerBlock (if exists)
+            if len(p_major) > 0 and len(p_minor) > 0 and len(p_major[0]) > 0 and len(p_minor[0]) > 0:
+                p0_values = []
+                for maj, min_idx in zip(p_major[0], p_minor[0]):
+                    if maj == 0:  # R sequence
+                        if min_idx < len(self.rs_lengths):
+                            p0_values.append(self.rs_lengths[min_idx])
+                    elif maj > 0 and maj-1 < len(h_sequences):  # H sequences
+                        h_idx = maj - 1
+                        if min_idx < len(h_sequences[h_idx]):
+                            p0_values.append(h_sequences[h_idx][min_idx])
                 
-        if len(h_sequences) >= 2:
-            # H1 typically contains information like [RepeatN, WarpPerBlockN, ThreadPerWarpN, VectorN]
-            h1 = h_sequences[1]
-            if h1 and len(h1) >= 4:
-                # Make sure all required lists exist before appending
-                if 'Repeat' not in hierarchical_info:
-                    hierarchical_info['Repeat'] = []
-                if 'WarpPerBlock' not in hierarchical_info:
-                    hierarchical_info['WarpPerBlock'] = []
-                if 'ThreadPerWarp' not in hierarchical_info:
-                    hierarchical_info['ThreadPerWarp'] = []
-                if 'VectorDimensions' not in hierarchical_info:
-                    hierarchical_info['VectorDimensions'] = []
+                # Set WarpPerBlock from P0 values if available
+                if p0_values:
+                    hierarchical_info['WarpPerBlock'] = p0_values
+                else:
+                    hierarchical_info['WarpPerBlock'] = [4]  # Default if mapping failed
+            else:
+                hierarchical_info['WarpPerBlock'] = [4]  # Default if P0 doesn't exist
+            
+            # 3. Use the highest indexed Y for Vector dimensions
+            # (Previously was using Y1 specifically)
+            if y_major and y_minor and len(y_major) > 0 and len(y_minor) > 0:
+                # Get the highest Y index (last Y dimension)
+                highest_y_idx = len(y_major) - 1
+                highest_y_major = y_major[highest_y_idx]
+                highest_y_minor = y_minor[highest_y_idx]
                 
-                # Now append the values safely
-                hierarchical_info['Repeat'].append(h1[0])
-                hierarchical_info['WarpPerBlock'].append(h1[1])
-                hierarchical_info['ThreadPerWarp'].append(h1[2])
-                hierarchical_info['VectorDimensions'].append(h1[3])
+                vector_dim = None
+                if highest_y_major == 0:  # Highest Y maps to R
+                    if highest_y_minor < len(self.rs_lengths):
+                        vector_dim = self.rs_lengths[highest_y_minor]
+                elif highest_y_major > 0 and highest_y_major-1 < len(h_sequences):  # Highest Y maps to H
+                    h_idx = highest_y_major - 1
+                    if highest_y_minor < len(h_sequences[h_idx]):
+                        vector_dim = h_sequences[h_idx][highest_y_minor]
+                
+                if vector_dim is not None:
+                    hierarchical_info['VectorDimensions'] = [vector_dim]
+                else:
+                    hierarchical_info['VectorDimensions'] = [8]  # Default if mapping is invalid
+            else:
+                # Fall back to using the last element of H0 if no Y dimensions exist
+                if len(h_sequences) > 0 and len(h_sequences[0]) > 2:
+                    hierarchical_info['VectorDimensions'] = [h_sequences[0][-1]]
+                else:
+                    hierarchical_info['VectorDimensions'] = [8]  # Default vector size
+            
+            # 4. Process Y0 for Repeat factor (if Y mappings exist)
+            if len(y_major) > 0 and len(y_minor) > 0:
+                y0_major = y_major[0]
+                y0_minor = y_minor[0]
+                
+                if y0_major == 0:  # Y0 maps to R
+                    if y0_minor < len(self.rs_lengths):
+                        hierarchical_info['Repeat'] = [self.rs_lengths[y0_minor]]
+                elif y0_major > 0 and y0_major-1 < len(h_sequences):  # Y0 maps to H
+                    h_idx = y0_major - 1
+                    if y0_minor < len(h_sequences[h_idx]):
+                        hierarchical_info['Repeat'] = [h_sequences[h_idx][y0_minor]]
+                else:
+                    hierarchical_info['Repeat'] = [4]  # Default if mapping is invalid
+            else:
+                hierarchical_info['Repeat'] = [4]  # Default if Y mappings don't exist
+            
+            # Store dimension values for visualization annotations
+            for seq in h_sequences:
+                for val in seq:
+                    if isinstance(val, int) or (isinstance(val, str) and val in self.variables):
+                        resolved_val = self.variables.get(val, val) if isinstance(val, str) else val
+                        hierarchical_info['DimensionValues'].append(resolved_val)
         
         # Calculate block size
         threads_per_warp = hierarchical_info.get('ThreadPerWarp', [16, 4])
@@ -315,9 +365,9 @@ class TileDistribution:
                 threads_per_warp[1]
             ]
         
-        # Generate thread block structure
-        threads_per_warp_m = threads_per_warp[0] if len(threads_per_warp) > 0 else 16
-        threads_per_warp_n = threads_per_warp[1] if len(threads_per_warp) > 1 else 4
+        # Generate thread block structure - columns change fastest (rightmost dimension)
+        threads_per_warp_m = threads_per_warp[0] if len(threads_per_warp) > 0 else 16  # Rows
+        threads_per_warp_n = threads_per_warp[1] if len(threads_per_warp) > 1 else 4   # Columns
         warps_per_block_m = warps_per_block[0] if len(warps_per_block) > 0 else 4
         
         # Create thread blocks with IDs
@@ -328,19 +378,19 @@ class TileDistribution:
             warp_key = f"Warp{warp_idx}"
             thread_blocks[warp_key] = {}
             
-            # Thread level within warp
-            for thread_m in range(threads_per_warp_m):
-                for thread_n in range(threads_per_warp_n):
-                    thread_id = thread_m + thread_n * threads_per_warp_m + warp_idx * threads_per_warp_m * threads_per_warp_n
+            # Thread level within warp - column-major order (column changes fastest)
+            for thread_m in range(threads_per_warp_m):  # Rows
+                for thread_n in range(threads_per_warp_n):  # Columns - inner loop for fastest changing
+                    # Calculate thread ID in column-major order
+                    thread_id = thread_n + thread_m * threads_per_warp_n + warp_idx * threads_per_warp_m * threads_per_warp_n
                     thread_blocks[warp_key][f"T{thread_id}"] = {
-                        "position": [thread_m, thread_n],
+                        "position": [thread_m, thread_n],  # [row, column]
                         "global_id": thread_id
                     }
         
         hierarchical_info['ThreadBlocks'] = thread_blocks
         
         # Get information about the overall calculation structure
-        # For example VectorK = 8 from the example image
         if 'VectorDimensions' in hierarchical_info and len(hierarchical_info['VectorDimensions']) > 0:
             hierarchical_info['VectorK'] = hierarchical_info['VectorDimensions'][0]
         

@@ -490,7 +490,7 @@ class TileDistributionVisualizer:
                     for h_seq_idx, h_elem_idx, h_elem_pos in h_element_boxes:
                         if h_seq_idx == h_idx and h_elem_idx == minor:
                             arrow = patches.FancyArrowPatch(
-                                hidden_bottom, h_elem_pos,
+                                        hidden_bottom, h_elem_pos,
                                 connectionstyle="arc3,rad=0",
                                 arrowstyle=arrow_style,
                                 color='blue', linewidth=1, alpha=0.7, zorder=1
@@ -519,14 +519,14 @@ class TileDistributionVisualizer:
                         for h_seq_idx, h_elem_idx, h_elem_pos in h_element_boxes:
                             if h_seq_idx == h_idx and h_elem_idx == minor:
                                 arrow = patches.FancyArrowPatch(
-                                    p_box, h_elem_pos,
-                                    connectionstyle="arc3,rad=0.2",
-                                    arrowstyle=arrow_style,
-                                    linestyle='dashed',
-                                    color='gray', linewidth=0.7, alpha=0.3, zorder=0
-                                )
-                                ax.add_patch(arrow)
-                                break
+                                        p_box, h_elem_pos,
+                                connectionstyle="arc3,rad=0.2",
+                                arrowstyle=arrow_style,
+                                linestyle='dashed',
+                                        color='gray', linewidth=0.7, alpha=0.3, zorder=0
+                            )
+                            ax.add_patch(arrow)
+                            break
         
         for i in range(num_y_dims):
             if i < len(y_boxes) and i < len(ys_to_rhs_major) and i < len(ys_to_rhs_minor):
@@ -547,11 +547,11 @@ class TileDistributionVisualizer:
                     for h_seq_idx, h_elem_idx, h_elem_pos in h_element_boxes:
                         if h_seq_idx == h_idx and h_elem_idx == minor:
                             arrow = patches.FancyArrowPatch(
-                                y_box, h_elem_pos,
+                                        y_box, h_elem_pos,
                                 connectionstyle="arc3,rad=-0.2",
                                 arrowstyle=arrow_style,
                                 linestyle='dashed',
-                                color='gray', linewidth=0.7, alpha=0.3, zorder=0
+                                        color='gray', linewidth=0.7, alpha=0.3, zorder=0
                             )
                             ax.add_patch(arrow)
                             break
@@ -860,16 +860,16 @@ def visualize_thread_access_pattern(viz_data: Dict[str, Any], frame_idx: int = 0
                 lane_id = thread_id % 32
                 
                 if warp_id in active_warps:
-                    # Active thread in current frame
+                # Active thread in current frame
                     color = warp_colors[warp_id]
-                    alpha = 0.8
+                alpha = 0.8
                     # Add a slight animation effect
-                    if frame_idx % 2 == 0:
+                if frame_idx % 2 == 0:
                         alpha = 0.9
                 else:
-                    # Inactive thread
+                # Inactive thread
                     color = 'lightgray'
-                    alpha = 0.3
+                alpha = 0.3
             else:
                 # No thread assigned
                 color = 'white'
@@ -1043,7 +1043,7 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
         alpha=0.5
     )
     ax.add_patch(tpw_box)
-    ax.text(color_bar_width + 0.12, 0.9, f"{threads_per_warp_m} * {threads_per_warp_n} * ({vector_k})\nThreadPerWarp", 
+    ax.text(color_bar_width + 0.12, 0.9, f"{threads_per_warp_m} rows × {threads_per_warp_n} cols × ({vector_k})\nThreadPerWarp", 
            fontsize=10, ha='center', va='center', color='white')
     
     # WarpPerBlock box below ThreadPerWarp
@@ -1056,7 +1056,7 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
         alpha=0.5
     )
     ax.add_patch(wpb_box)
-    ax.text(color_bar_width + 0.35, 0.9, f"{warps_per_block_m} * ({threads_per_warp_m} * {threads_per_warp_n} * {vector_k})\nWarpPerBlock", 
+    ax.text(color_bar_width + 0.35, 0.9, f"{warps_per_block_m} × ({threads_per_warp_m} rows × {threads_per_warp_n} cols × {vector_k})\nWarpPerBlock", 
            fontsize=10, ha='center', va='center', color='white')
     
     # Draw the color bar on left side
@@ -1090,7 +1090,7 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
     )
     ax.add_patch(repeat_box)
     repeat_val = hierarchical_structure.get('Repeat', [4])[0] if hierarchical_structure.get('Repeat') and len(hierarchical_structure.get('Repeat')) > 0 else 4
-    ax.text(0.17, repeat_section_top - 0.04, f"{repeat_val} * ({warps_per_block_m} * {threads_per_warp_m} * {threads_per_warp_n} * {vector_k})\nRepeatM", 
+    ax.text(0.17, repeat_section_top - 0.04, f"{repeat_val} × ({warps_per_block_m} × {threads_per_warp_m} rows × {threads_per_warp_n} cols × {vector_k})\nRepeatM", 
            fontsize=10, ha='center', va='center', color='white')
     
     # Draw warps and threads in the center section
@@ -1119,9 +1119,10 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
         )
         ax.add_patch(warp_box)
         
-        # Calculate cell dimensions for threads
-        cell_width = thread_grid_width / max(threads_per_warp_m, 1)
-        cell_height = thread_grid_height / max(threads_per_warp_n, 1)
+        # Calculate cell dimensions for threads - reversed to show correct grid layout
+        # For a 16x4 layout (16 rows, 4 columns), we divide width by columns and height by rows
+        cell_width = thread_grid_width / max(threads_per_warp_n, 1)  # Width for each column
+        cell_height = thread_grid_height / max(threads_per_warp_m, 1)  # Height for each row
         
         # Draw thread cells
         for thread_key, thread_data in warp_data.items():
@@ -1129,11 +1130,14 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
             thread_id = thread_data.get('global_id', 0)
             
             # Calculate position for this thread cell with safe indexing
-            x_pos = thread_pos[0] if len(thread_pos) > 0 else 0
-            y_pos_thread = thread_pos[1] if len(thread_pos) > 1 else 0
+            row_idx = thread_pos[0] if len(thread_pos) > 0 else 0  # This is the row
+            col_idx = thread_pos[1] if len(thread_pos) > 1 else 0  # This is the column
             
-            cell_x = color_bar_width + 0.04 + x_pos * cell_width
-            cell_y = y_pos + 0.01 + (threads_per_warp_n - y_pos_thread - 1) * cell_height
+            # Position calculation with proper row/column layout
+            # For column index, multiply by cell_width
+            # For row index, calculate from bottom to top (threads_per_warp_m - row_idx - 1)
+            cell_x = color_bar_width + 0.04 + col_idx * cell_width
+            cell_y = y_pos + 0.01 + (threads_per_warp_m - row_idx - 1) * cell_height
             
             # Draw thread cell
             thread_box = patches.Rectangle(
