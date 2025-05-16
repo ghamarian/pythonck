@@ -1,0 +1,1003 @@
+"""
+Visualizer for tile_distribution_encoding structures in Composable Kernels.
+
+This module contains functions for visualizing C++ template parameters from
+tile_distribution_encoding structures used in the Composable Kernels library.
+"""
+
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+import networkx as nx
+import numpy as np
+from typing import Dict, List, Any, Tuple
+from parser import TileDistributionParser
+
+def display_raw_encoding(encoding: Dict[str, Any]) -> str:
+    """
+    Display the raw encoding structure in a human-readable format with Y_dims mapping.
+    
+    Args:
+        encoding: The parsed tile_distribution_encoding structure
+        
+    Returns:
+        String representation of the encoding with explanations
+    """
+    # Extract key components from encoding
+    rs_lengths = encoding.get('RsLengths', [])
+    hs_lengthss = encoding.get('HsLengthss', [])
+    ps_to_rhs_major = encoding.get('Ps2RHssMajor', [])
+    ps_to_rhs_minor = encoding.get('Ps2RHssMinor', [])
+    ys_to_rhs_major = encoding.get('Ys2RHsMajor', [])
+    ys_to_rhs_minor = encoding.get('Ys2RHsMinor', [])
+    
+    # Build output string
+    output = []
+    output.append("=== RAW ENCODING STRUCTURE ===\n")
+    
+    # RsLengths
+    output.append("RsLengths:       {}".format(rs_lengths))
+    
+    # HsLengthss
+    output.append("HsLengthss:")
+    for i, hs_lengths in enumerate(hs_lengthss):
+        output.append(f"  H{i} (X{i}):     {hs_lengths}")
+    
+    # Ps mappings
+    output.append("\nPs2RHssMajor:")
+    for i, majors in enumerate(ps_to_rhs_major):
+        output.append(f"  P{i} Major:     {majors}")
+    
+    output.append("Ps2RHssMinor:")
+    for i, minors in enumerate(ps_to_rhs_minor):
+        output.append(f"  P{i} Minor:     {minors}")
+    
+    # Ys mappings
+    output.append("\nYs2RHsMajor:     {}".format(ys_to_rhs_major))
+    output.append("Ys2RHsMinor:     {}".format(ys_to_rhs_minor))
+    
+    # Y dimensions interpretation
+    output.append("\n=== Y DIMENSIONS MAPPING ===")
+    for i, (major, minor) in enumerate(zip(ys_to_rhs_major, ys_to_rhs_minor)):
+        y_value = None
+        y_source = None
+        
+        if major == 0:  # R dimension
+            if minor < len(rs_lengths):
+                y_value = rs_lengths[minor]
+                y_source = f"R[{minor}]"
+            else:
+                y_value = "?"
+                y_source = f"R[{minor}] (out of bounds)"
+        else:  # H dimension
+            h_idx = major - 1  # H indices are 1-based in major
+            if h_idx < len(hs_lengthss) and minor < len(hs_lengthss[h_idx]):
+                y_value = hs_lengthss[h_idx][minor]
+                y_source = f"H{h_idx}[{minor}]"
+            else:
+                y_value = "?"
+                y_source = f"H{h_idx}[{minor}] (out of bounds)"
+                
+        output.append(f"Y_{i} = [major={major}, minor={minor}] => {y_source} = {y_value}")
+    
+    # P dimensions interpretation
+    output.append("\n=== P DIMENSIONS MAPPING ===")
+    for p_idx, (majors, minors) in enumerate(zip(ps_to_rhs_major, ps_to_rhs_minor)):
+        if not isinstance(majors, list) or not isinstance(minors, list):
+            output.append(f"P_{p_idx} = Invalid format")
+            continue
+            
+        output.append(f"P_{p_idx} maps to:")
+        
+        for j, (major, minor) in enumerate(zip(majors, minors)):
+            p_value = None
+            p_source = None
+            
+            if major == 0:  # R dimension
+                if minor < len(rs_lengths):
+                    p_value = rs_lengths[minor]
+                    p_source = f"R[{minor}]"
+                else:
+                    p_value = "?"
+                    p_source = f"R[{minor}] (out of bounds)"
+            else:  # H dimension
+                h_idx = major - 1  # H indices are 1-based in major
+                if h_idx < len(hs_lengthss) and minor < len(hs_lengthss[h_idx]):
+                    p_value = hs_lengthss[h_idx][minor]
+                    p_source = f"H{h_idx}[{minor}]"
+                else:
+                    p_value = "?"
+                    p_source = f"H{h_idx}[{minor}] (out of bounds)"
+                    
+            output.append(f"  Mapping {j}: [major={major}, minor={minor}] => {p_source} = {p_value}")
+    
+    return "\n".join(output)
+
+class TileDistributionVisualizer:
+    """Visualizer for tile_distribution_encoding structures."""
+    
+    @staticmethod
+    def hierarchical_view(encoding: Dict[str, Any], figsize=(10, 12), variables: Dict[str, Any] = None):
+        """Creates a hierarchical visualization of tile distribution encoding.
+        
+        Args:
+            encoding: The parsed tile_distribution_encoding structure
+            figsize: Figure size tuple
+            variables: Dictionary mapping variable names to their values
+        """
+        # Initialize variables dictionary if not provided
+        if variables is None:
+            variables = {}
+            
+        fig, ax = plt.subplots(figsize=figsize)
+        
+        # Extract key components from encoding
+        rs_lengths = encoding.get('RsLengths', [])
+        hs_lengthss = encoding.get('HsLengthss', [])
+        ps_to_rhs_major = encoding.get('Ps2RHssMajor', [])
+        ps_to_rhs_minor = encoding.get('Ps2RHssMinor', [])
+        ys_to_rhs_major = encoding.get('Ys2RHsMajor', [])
+        ys_to_rhs_minor = encoding.get('Ys2RHsMinor', [])
+        
+        # Get variables
+        variable_names = encoding.get('variable_names', [])
+        
+        # Determine dimensions
+        num_p_dims = len(ps_to_rhs_major)
+        num_y_dims = len(ys_to_rhs_major)
+        num_r_dims = len(rs_lengths)
+        num_h_dims = len(hs_lengthss)
+        num_x_dims = num_r_dims + num_h_dims
+        
+        # Calculate hierarchy elements and values
+        hidden_ids = []
+        y_values = []  # Store the actual values of Y dimensions
+        
+        # Calculate P to R/H connections
+        if ps_to_rhs_major:
+            for i, (major_list, minor_list) in enumerate(zip(ps_to_rhs_major, ps_to_rhs_minor)):
+                if not isinstance(major_list, list) or not isinstance(minor_list, list):
+                    continue
+                for major, minor in zip(major_list, minor_list):
+                    if major == 0:  # R dimension
+                        if minor < len(rs_lengths):
+                            hidden_ids.append(("P", i, 0, minor))
+                    else:  # H dimension
+                        if major-1 < len(hs_lengthss) and minor < len(hs_lengthss[major-1]):
+                            hidden_ids.append(("P", i, major, minor))
+        
+        # Calculate Y to R/H connections and values
+        if ys_to_rhs_major and ys_to_rhs_minor:
+            for i, (major, minor) in enumerate(zip(ys_to_rhs_major, ys_to_rhs_minor)):
+                # Get the actual value that Y maps to
+                y_value = None
+                y_source = None
+                
+                if major == 0:  # R dimension
+                    if minor < len(rs_lengths):
+                        y_value = rs_lengths[minor]
+                        y_source = f"R[{minor}]"
+                        hidden_ids.append(("Y", i, 0, minor))
+                else:  # H dimension
+                    h_idx = major - 1  # H indices are 1-based in major
+                    if h_idx < len(hs_lengthss) and minor < len(hs_lengthss[h_idx]):
+                        y_value = hs_lengthss[h_idx][minor]
+                        y_source = f"H{h_idx}[{minor}]"
+                        hidden_ids.append(("Y", i, major, minor))
+                
+                y_values.append((y_value, y_source))
+        
+        # Create a mapping for hidden IDs
+        hidden_map = {}
+        for i, (src_type, src_idx, major, minor) in enumerate(hidden_ids):
+            hidden_map[(src_type, src_idx, major, minor)] = i
+        
+        # Define vertical positions for each level
+        top_y = 0.9
+        middle_y = 0.6
+        bottom_y = 0.3
+        section_height = 0.2
+        
+        # TOP SECTION: P dimensions and Y dimensions side by side
+        
+        # Column width and positions
+        p_section_width = 0.45
+        y_section_width = 0.45
+        p_start_x = 0.1
+        y_start_x = 0.55
+        
+        # Section label
+        ax.text(0.05, top_y + 0.05, "Top Ids", color='darkgreen', fontsize=14, 
+                bbox=dict(facecolor='lightgreen', alpha=0.3, boxstyle='round,pad=0.5'))
+        
+        # P_dims container
+        p_container = patches.Rectangle((p_start_x, top_y - section_height), 
+                                     p_section_width, section_height, 
+                                     linewidth=2, edgecolor='red', facecolor='none', zorder=1)
+        ax.add_patch(p_container)
+        ax.text(p_start_x + p_section_width/2, top_y + 0.03, "P_dims", color='red', fontsize=14, 
+               ha='center', va='center')
+        
+        # Y_dims container  
+        y_container = patches.Rectangle((y_start_x, top_y - section_height), 
+                                     y_section_width, section_height, 
+                                     linewidth=2, edgecolor='blue', facecolor='none', zorder=1)
+        ax.add_patch(y_container)
+        ax.text(y_start_x + y_section_width/2, top_y + 0.03, "Y_dims", color='blue', fontsize=14,
+               ha='center', va='center')
+        
+        # P dimension boxes
+        p_box_width = p_section_width / max(num_p_dims, 1) - 0.05
+        p_boxes = []
+        
+        for i in range(num_p_dims):
+            x_pos = p_start_x + 0.025 + i * (p_box_width + 0.05)
+            box = patches.Rectangle((x_pos, top_y - section_height + 0.04), 
+                                  p_box_width, section_height - 0.08, 
+                                  linewidth=1, edgecolor='red', facecolor='lightblue', zorder=2)
+            ax.add_patch(box)
+            ax.text(x_pos + p_box_width/2, top_y - section_height/2, f"P{i}", 
+                   ha='center', va='center', fontsize=12, fontweight='bold', zorder=3)
+            # Store the center bottom of the box for connections
+            p_boxes.append((x_pos + p_box_width/2, top_y - section_height + 0.04))
+        
+        # Y dimension boxes
+        y_box_width = y_section_width / max(num_y_dims, 1) - 0.05
+        y_boxes = []
+        
+        for i in range(num_y_dims):
+            x_pos = y_start_x + 0.025 + i * (y_box_width + 0.05)
+            box = patches.Rectangle((x_pos, top_y - section_height + 0.04), 
+                                  y_box_width, section_height - 0.08, 
+                                  linewidth=1, edgecolor='blue', facecolor='lightyellow', zorder=2)
+            ax.add_patch(box)
+            
+            # Add Y dimension with its mapped value for clarity
+            y_label = f"Y{i}"
+            if i < len(y_values) and y_values[i][0] is not None:
+                y_label = f"Y{i}={y_values[i][0]}"
+                
+            ax.text(x_pos + y_box_width/2, top_y - section_height/2, y_label, 
+                   ha='center', va='center', fontsize=12, fontweight='bold', zorder=3)
+            
+            # Add source info below
+            if i < len(y_values) and y_values[i][1] is not None:
+                ax.text(x_pos + y_box_width/2, top_y - section_height + 0.1, f"from {y_values[i][1]}",
+                       ha='center', va='center', fontsize=8, fontweight='normal', zorder=3)
+                
+            # Store the center bottom of the box for connections
+            y_boxes.append((x_pos + y_box_width/2, top_y - section_height + 0.04))
+        
+        # MIDDLE SECTION: Hidden Ids
+        
+        # Label for hidden section
+        ax.text(0.05, middle_y + 0.05, "Hidden Ids", color='darkgreen', fontsize=14,
+                bbox=dict(facecolor='lightgreen', alpha=0.3, boxstyle='round,pad=0.5'))
+        
+        # Group hidden ids by their values
+        hidden_values = {}
+        for i, (src_type, src_idx, major, minor) in enumerate(hidden_ids):
+            # Get the value (variable name or number)
+            if major == 0:  # R dimension
+                if minor < len(rs_lengths):
+                    value = rs_lengths[minor]
+                else:
+                    value = "?"
+            else:  # H dimension
+                if major-1 < len(hs_lengthss) and minor < len(hs_lengthss[major-1]):
+                    try:
+                        value = hs_lengthss[major-1][minor]
+                    except:
+                        value = "?"
+                else:
+                    value = "?"
+            
+            if isinstance(value, str) and value in variable_names:
+                if value not in hidden_values:
+                    hidden_values[value] = []
+                hidden_values[value].append((i, src_type, src_idx, major, minor))
+            else:
+                # Use numerical value as key
+                value_key = f"{value}_{src_type}{src_idx}{major}{minor}"
+                hidden_values[value_key] = [(i, src_type, src_idx, major, minor)]
+        
+        # Draw hidden boxes evenly distributed
+        hidden_box_width = 0.12
+        hidden_box_height = section_height - 0.05
+        num_hidden_boxes = len(hidden_values)
+        hidden_boxes = []
+        hidden_section_width = 0.8
+        hidden_start_x = 0.1
+        
+        # Place hidden boxes evenly
+        sorted_values = sorted(hidden_values.keys())
+        for i, value_key in enumerate(sorted_values):
+            value_instances = hidden_values[value_key]
+            x_pos = hidden_start_x + (hidden_section_width / max(num_hidden_boxes, 1)) * (i + 0.5) - hidden_box_width/2
+            
+            # Display the value (variable name or number)
+            value = value_key.split('_')[0] if '_' in value_key else value_key
+            
+            box = patches.Rectangle((x_pos, middle_y - hidden_box_height), 
+                                  hidden_box_width, hidden_box_height, 
+                                  linewidth=1, edgecolor='blue', facecolor='white', zorder=2)
+            ax.add_patch(box)
+            
+            # Add label with both symbolic and numeric values if it's a variable
+            if value in variables:
+                # Show both symbolic name and numeric value
+                ax.text(x_pos + hidden_box_width/2, middle_y - hidden_box_height/2 + 0.02, f"{value}", 
+                       ha='center', va='center', fontsize=12, fontweight='bold', zorder=3)
+                ax.text(x_pos + hidden_box_width/2, middle_y - hidden_box_height/2 - 0.02, f"({variables[value]})", 
+                       ha='center', va='center', fontsize=10, zorder=3)
+            else:
+                ax.text(x_pos + hidden_box_width/2, middle_y - hidden_box_height/2, f"{value}", 
+                       ha='center', va='center', fontsize=12, fontweight='bold', zorder=3)
+            
+            # Update hidden_map and store box positions
+            box_top = (x_pos + hidden_box_width/2, middle_y)
+            box_bottom = (x_pos + hidden_box_width/2, middle_y - hidden_box_height)
+            
+            for instance_idx, src_type, src_idx, major, minor in value_instances:
+                hidden_boxes.append((box_top, box_bottom))
+                hidden_map[(src_type, src_idx, major, minor)] = len(hidden_boxes) - 1
+        
+        # BOTTOM SECTION: X dimensions (R and H)
+        
+        # Label for X section
+        ax.text(0.05, bottom_y + 0.05, "Bottom Ids", color='darkgreen', fontsize=14,
+                bbox=dict(facecolor='lightgreen', alpha=0.3, boxstyle='round,pad=0.5'))
+        
+        # X_dims container
+        x_container = patches.Rectangle((0.1, bottom_y - section_height), 
+                                      0.8, section_height, 
+                                      linewidth=2, edgecolor='purple', facecolor='none', zorder=1)
+        ax.add_patch(x_container)
+        ax.text(0.1, bottom_y - section_height - 0.03, "X_dims", color='purple', fontsize=14)
+        
+        # R_dims container (left side of X)
+        r_container_width = 0.25
+        r_container = patches.Rectangle((0.15, bottom_y - section_height + 0.04), 
+                                      r_container_width, section_height - 0.08, 
+                                      linewidth=1, edgecolor='orange', facecolor='none', zorder=2)
+        ax.add_patch(r_container)
+        ax.text(0.15, bottom_y - 0.03, "R_dims", color='orange', fontsize=12)
+        
+        # H_dims container (right side of X)
+        h_container_width = 0.45
+        h_container = patches.Rectangle((0.45, bottom_y - section_height + 0.04), 
+                                      h_container_width, section_height - 0.08, 
+                                      linewidth=1, edgecolor='brown', facecolor='none', zorder=2)
+        ax.add_patch(h_container)
+        ax.text(0.45, bottom_y - 0.03, "H_dims", color='brown', fontsize=12)
+        
+        # R dimension boxes
+        r_box_width = r_container_width - 0.05
+        r_box_height = section_height - 0.12
+        r_boxes = []
+        
+        for i in range(num_r_dims):
+            x_pos = 0.175
+            y_pos = bottom_y - section_height + 0.08
+            value = rs_lengths[i] if i < len(rs_lengths) else "?"
+            box = patches.Rectangle((x_pos, y_pos), 
+                                  r_box_width, r_box_height, 
+                                  linewidth=1, edgecolor='orange', facecolor='lightyellow', zorder=3)
+            ax.add_patch(box)
+            ax.text(x_pos + r_box_width/2, y_pos + r_box_height/2, f"R{i}={value}", 
+                   ha='center', va='center', fontsize=12, zorder=4)
+            r_boxes.append((x_pos + r_box_width/2, y_pos + r_box_height))
+        
+        # Create individual H0 and H1 element boxes instead of just H0 and H1 boxes
+        h_element_boxes = []  # Will store positions for each individual H element
+        
+        for h_idx, h_seq in enumerate(hs_lengthss):
+            # Create a label for this H sequence
+            h_seq_label_x = 0.5 + h_idx * 0.25
+            ax.text(h_seq_label_x, bottom_y - 0.05, f"H{h_idx}", 
+                   ha='center', va='center', fontsize=12, fontweight='bold', color='brown')
+            
+            # Create boxes for each element in this H sequence
+            element_box_width = 0.08
+            element_box_height = 0.08
+            element_spacing = 0.1
+            
+            for elem_idx, elem_val in enumerate(h_seq):
+                # Calculate position
+                x_pos = 0.5 + h_idx * 0.25 - (len(h_seq) * element_spacing / 2) + elem_idx * element_spacing
+                y_pos = bottom_y - section_height + 0.1
+                
+                # Create box
+                box = patches.Rectangle((x_pos - element_box_width/2, y_pos), 
+                                      element_box_width, element_box_height, 
+                                      linewidth=1, edgecolor='brown', facecolor='lightgreen', zorder=3)
+                ax.add_patch(box)
+                
+                # Add label with both symbolic and numeric values if it's a variable
+                if elem_val in variables:
+                    # Show both symbolic name and numeric value (more compact)
+                    ax.text(x_pos, y_pos + element_box_height/2, f"{elem_val}", 
+                           ha='center', va='center', fontsize=8, zorder=4)
+                    ax.text(x_pos, y_pos + element_box_height/4, f"({variables[elem_val]})", 
+                           ha='center', va='center', fontsize=6, zorder=4)
+                else:
+                    ax.text(x_pos, y_pos + element_box_height/2, f"{elem_val}", 
+                           ha='center', va='center', fontsize=8, zorder=4)
+                
+                # Add index label below
+                ax.text(x_pos, y_pos, f"[{elem_idx}]", 
+                       ha='center', va='bottom', fontsize=7, zorder=4, color='brown')
+                
+                # Store box position for arrows (center, top)
+                h_element_boxes.append((h_idx, elem_idx, (x_pos, y_pos + element_box_height)))
+        
+        # CONNECTIONS
+        
+        # Arrow style for all connections
+        arrow_style = patches.ArrowStyle.Simple(head_length=6, head_width=3)
+        
+        # 1. Top (P) to Hidden connections
+        for i in range(num_p_dims):
+            if i < len(p_boxes) and ps_to_rhs_major and ps_to_rhs_minor and i < len(ps_to_rhs_major) and i < len(ps_to_rhs_minor):
+                p_box = p_boxes[i]
+                for major, minor in zip(ps_to_rhs_major[i], ps_to_rhs_minor[i]):
+                    hidden_key = ("P", i, major, minor)
+                    if hidden_key in hidden_map:
+                        hidden_idx = hidden_map[hidden_key]
+                        if hidden_idx < len(hidden_boxes):
+                            hidden_top = hidden_boxes[hidden_idx][0]
+                            arrow = patches.FancyArrowPatch(
+                                p_box, hidden_top,
+                                connectionstyle="arc3,rad=0.1",
+                                arrowstyle=arrow_style,
+                                color='blue', linewidth=1, alpha=0.7, zorder=1
+                            )
+                            ax.add_patch(arrow)
+        
+        # 2. Top (Y) to Hidden connections
+        for i in range(num_y_dims):
+            if i < len(y_boxes) and i < len(ys_to_rhs_major) and i < len(ys_to_rhs_minor):
+                y_box = y_boxes[i]
+                major, minor = ys_to_rhs_major[i], ys_to_rhs_minor[i]
+                hidden_key = ("Y", i, major, minor)
+                if hidden_key in hidden_map:
+                    hidden_idx = hidden_map[hidden_key]
+                    if hidden_idx < len(hidden_boxes):
+                        hidden_top = hidden_boxes[hidden_idx][0]
+                        arrow = patches.FancyArrowPatch(
+                            y_box, hidden_top,
+                            connectionstyle="arc3,rad=-0.1",
+                            arrowstyle=arrow_style,
+                            color='blue', linewidth=1, alpha=0.7, zorder=1
+                        )
+                        ax.add_patch(arrow)
+        
+        # 3. Hidden to Bottom (R and H) connections
+        for i, (src_type, src_idx, major, minor) in enumerate(hidden_ids):
+            if i < len(hidden_boxes):
+                hidden_bottom = hidden_boxes[i][1]
+                if major == 0 and minor < len(r_boxes):  # R dimension
+                    r_box = r_boxes[minor]
+                    arrow = patches.FancyArrowPatch(
+                        hidden_bottom, r_box,
+                        connectionstyle="arc3,rad=0",
+                        arrowstyle=arrow_style,
+                        color='blue', linewidth=1, alpha=0.7, zorder=1
+                    )
+                    ax.add_patch(arrow)
+                elif major > 0:  # H dimension (connect to specific elements)
+                    h_idx = major - 1
+                    # Find the corresponding H element box
+                    for h_seq_idx, h_elem_idx, h_elem_pos in h_element_boxes:
+                        if h_seq_idx == h_idx and h_elem_idx == minor:
+                            arrow = patches.FancyArrowPatch(
+                                hidden_bottom, h_elem_pos,
+                                connectionstyle="arc3,rad=0",
+                                arrowstyle=arrow_style,
+                                color='blue', linewidth=1, alpha=0.7, zorder=1
+                            )
+                            ax.add_patch(arrow)
+                            break
+
+        # 4. Direct Top to Bottom connections (P/Y to R/H) for reference
+        # Use dashed lines for direct connections
+        for i in range(num_p_dims):
+            if i < len(p_boxes) and ps_to_rhs_major and ps_to_rhs_minor and i < len(ps_to_rhs_major) and i < len(ps_to_rhs_minor):
+                p_box = p_boxes[i]
+                for major, minor in zip(ps_to_rhs_major[i], ps_to_rhs_minor[i]):
+                    if major == 0 and minor < len(r_boxes):  # P to R
+                        r_box = r_boxes[minor]
+                        arrow = patches.FancyArrowPatch(
+                            p_box, r_box,
+                            connectionstyle="arc3,rad=0.2",
+                            arrowstyle=arrow_style,
+                            linestyle='dashed',
+                            color='gray', linewidth=0.7, alpha=0.3, zorder=0
+                        )
+                        ax.add_patch(arrow)
+                    elif major > 0:  # P to H (specific element)
+                        h_idx = major - 1
+                        for h_seq_idx, h_elem_idx, h_elem_pos in h_element_boxes:
+                            if h_seq_idx == h_idx and h_elem_idx == minor:
+                                arrow = patches.FancyArrowPatch(
+                                    p_box, h_elem_pos,
+                                    connectionstyle="arc3,rad=0.2",
+                                    arrowstyle=arrow_style,
+                                    linestyle='dashed',
+                                    color='gray', linewidth=0.7, alpha=0.3, zorder=0
+                                )
+                                ax.add_patch(arrow)
+                                break
+        
+        for i in range(num_y_dims):
+            if i < len(y_boxes) and i < len(ys_to_rhs_major) and i < len(ys_to_rhs_minor):
+                y_box = y_boxes[i]
+                major, minor = ys_to_rhs_major[i], ys_to_rhs_minor[i]
+                if major == 0 and minor < len(r_boxes):  # Y to R
+                    r_box = r_boxes[minor]
+                    arrow = patches.FancyArrowPatch(
+                        y_box, r_box,
+                        connectionstyle="arc3,rad=-0.2",
+                        arrowstyle=arrow_style,
+                        linestyle='dashed',
+                        color='gray', linewidth=0.7, alpha=0.3, zorder=0
+                    )
+                    ax.add_patch(arrow)
+                elif major > 0:  # Y to H (specific element)
+                    h_idx = major - 1
+                    for h_seq_idx, h_elem_idx, h_elem_pos in h_element_boxes:
+                        if h_seq_idx == h_idx and h_elem_idx == minor:
+                            arrow = patches.FancyArrowPatch(
+                                y_box, h_elem_pos,
+                                connectionstyle="arc3,rad=-0.2",
+                                arrowstyle=arrow_style,
+                                linestyle='dashed',
+                                color='gray', linewidth=0.7, alpha=0.3, zorder=0
+                            )
+                            ax.add_patch(arrow)
+                            break
+        
+        # Remove axes
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+        ax.axis('off')
+        
+        plt.title("Tile Distribution Encoding Hierarchy", fontsize=16)
+        plt.tight_layout()
+        return fig
+
+    @staticmethod
+    def graph_view(encoding: Dict[str, Any], figsize=(8, 10)):
+        """Creates a graph visualization of tile distribution encoding.
+        
+        Args:
+            encoding: The parsed tile_distribution_encoding structure
+            figsize: Figure size tuple
+        """
+        # Create directed graph
+        G = nx.DiGraph()
+        
+        # Extract key components from encoding
+        rs_lengths = encoding.get('RsLengths', [])
+        hs_lengthss = encoding.get('HsLengthss', [])
+        ps_to_rhs_major = encoding.get('Ps2RHssMajor', [])
+        ps_to_rhs_minor = encoding.get('Ps2RHssMinor', [])
+        ys_to_rhs_major = encoding.get('Ys2RHsMajor', [])
+        ys_to_rhs_minor = encoding.get('Ys2RHsMinor', [])
+        
+        # Add nodes
+        # X dimensions
+        for i in range(len(hs_lengthss)):
+            dims = "*".join(str(x) for x in hs_lengthss[i] if x != "?")
+            if not dims:
+                dims = "?"
+            G.add_node(f"X{i}", type="X", label=f"X{i}", value=dims)
+        
+        # R dimension
+        for i, r_len in enumerate(rs_lengths):
+            G.add_node(f"R{i}", type="R", label=f"R", value=r_len)
+        
+        # P dimensions
+        for i in range(len(ps_to_rhs_major)):
+            G.add_node(f"P{i}", type="P", label=f"P{i}")
+        
+        # Y dimensions
+        for i in range(len(ys_to_rhs_major)):
+            G.add_node(f"Y{i}", type="Y", label=f"Y{i}")
+        
+        # Add edges
+        # P to R/H connections
+        for i, (majors, minors) in enumerate(zip(ps_to_rhs_major, ps_to_rhs_minor)):
+            if isinstance(majors, list) and isinstance(minors, list):
+                for major, minor in zip(majors, minors):
+                    if major == 0:  # R dimension
+                        G.add_edge(f"P{i}", f"R{minor}", label=f"[{major}][{minor}]")
+                    else:  # H dimension
+                        G.add_edge(f"P{i}", f"X{major-1}", label=f"H[{minor}]")
+        
+        # Y to R/H connections
+        for i, (major, minor) in enumerate(zip(ys_to_rhs_major, ys_to_rhs_minor)):
+            if major == 0:  # R dimension
+                G.add_edge(f"Y{i}", f"R{minor}", label=f"[{major}][{minor}]")
+            else:  # H dimension
+                G.add_edge(f"Y{i}", f"X{major-1}", label=f"H[{minor}]")
+        
+        # R to X connection (typically R feeds into X)
+        if len(rs_lengths) > 0 and len(hs_lengthss) > 0:
+            G.add_edge(f"R0", f"X0", label="feeds")
+        
+        # Create positions (layout)
+        pos = {}
+        
+        # Position X nodes at the bottom
+        x_nodes = [n for n in G.nodes() if n.startswith("X")]
+        for i, node in enumerate(sorted(x_nodes)):
+            pos[node] = (0, i * 1.5)
+        
+        # Position R nodes above X
+        r_nodes = [n for n in G.nodes() if n.startswith("R")]
+        for i, node in enumerate(sorted(r_nodes)):
+            pos[node] = (0, len(x_nodes) * 1.5 + i * 1.5 + 1)
+        
+        # Position P nodes above R
+        p_nodes = [n for n in G.nodes() if n.startswith("P")]
+        for i, node in enumerate(sorted(p_nodes)):
+            pos[node] = (0, len(x_nodes) * 1.5 + len(r_nodes) * 1.5 + i * 1.5 + 2)
+        
+        # Position Y nodes above P
+        y_nodes = [n for n in G.nodes() if n.startswith("Y")]
+        for i, node in enumerate(sorted(y_nodes)):
+            pos[node] = (0, len(x_nodes) * 1.5 + len(r_nodes) * 1.5 + len(p_nodes) * 1.5 + i * 1.5 + 3)
+        
+        # Create the plot
+        fig, ax = plt.subplots(figsize=figsize)
+        
+        # Node colors based on type
+        node_colors = {
+            'X': 'lightgreen',
+            'R': 'lightblue',
+            'P': 'pink',
+            'Y': 'lightyellow'
+        }
+        
+        colors = [node_colors.get(G.nodes[n]['type'], 'white') for n in G.nodes()]
+        
+        # Draw the graph
+        nx.draw_networkx_nodes(G, pos, node_size=1500, node_color=colors, alpha=0.8, ax=ax)
+        nx.draw_networkx_labels(G, pos, font_size=12, font_weight='bold', ax=ax)
+        
+        # Draw edges with labels
+        nx.draw_networkx_edges(G, pos, width=1.5, alpha=0.5, arrows=True, ax=ax, 
+                              arrowstyle='->', arrowsize=15)
+        
+        # Add edge labels
+        edge_labels = {(u, v): G.edges[u, v]['label'] for u, v in G.edges()}
+        nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=10, ax=ax)
+        
+        # Add node annotations (values)
+        for node in G.nodes():
+            if 'value' in G.nodes[node]:
+                value = G.nodes[node]['value']
+                node_pos = pos[node]
+                ax.annotate(f"{value}", 
+                           (node_pos[0], node_pos[1]-0.2),
+                           fontsize=10,
+                           ha='center')
+        
+        plt.title("Tile Distribution Encoding Graph", fontsize=16)
+        plt.axis('off')
+        plt.tight_layout()
+        return fig
+
+def visualize_encoding_structure(encoding: Dict[str, Any], variables: Dict[str, int] = None, figsize=(10, 8)):
+    """
+    Creates a visualization of the tile_distribution_encoding structure.
+    
+    Args:
+        encoding: The parsed tile_distribution_encoding structure
+        variables: Dictionary mapping variable names to their values
+        figsize: Figure size tuple
+        
+    Returns:
+        Matplotlib figure with the visualization
+    """
+    visualizer = TileDistributionVisualizer()
+    return visualizer.hierarchical_view(encoding, figsize, variables)
+
+def visualize_tile_distribution(viz_data: Dict[str, Any], figsize=(10, 8)):
+    """
+    Visualize a tile distribution showing thread mapping to data.
+    
+    Args:
+        viz_data: Visualization data from TileDistribution
+        figsize: Size of the figure to create
+        
+    Returns:
+        Matplotlib figure object
+    """
+    fig, ax = plt.subplots(figsize=figsize)
+    
+    # Extract data
+    tile_shape = viz_data.get('tile_shape', [])
+    thread_mapping = viz_data.get('thread_mapping', {})
+    
+    if not tile_shape or not thread_mapping:
+        ax.text(0.5, 0.5, "No tile data available", 
+                ha='center', va='center', fontsize=14)
+        ax.axis('off')
+        return fig
+    
+    # Draw tile grid (simplified example)
+    tile_dims = tile_shape[:2] if len(tile_shape) >= 2 else (1, 1)
+    rows, cols = tile_dims
+    
+    # Create color map for threads
+    threads = set()
+    for pos, thread_id in thread_mapping.items():
+        threads.add(thread_id)
+    
+    thread_colors = {}
+    colormap = plt.cm.tab20
+    for i, thread_id in enumerate(sorted(threads)):
+        thread_colors[thread_id] = colormap(i % 20)
+    
+    # Draw cells with thread mapping
+    cell_size = min(8 / max(rows, cols), 0.5)
+    
+    for i in range(rows):
+        for j in range(cols):
+            pos_key = f"{i},{j}"
+            thread_id = thread_mapping.get(pos_key, -1)
+            
+            if thread_id >= 0:
+                color = thread_colors.get(thread_id, 'white')
+                rect = patches.Rectangle(
+                    (j * cell_size, rows * cell_size - (i+1) * cell_size),
+                    cell_size, cell_size, 
+                    linewidth=1, edgecolor='black', facecolor=color, alpha=0.7
+                )
+                ax.add_patch(rect)
+                
+                # Add thread ID as text
+                ax.text(
+                    j * cell_size + cell_size/2, 
+                    rows * cell_size - (i+1) * cell_size + cell_size/2,
+                    f"T{thread_id}", 
+                    ha='center', va='center', fontsize=8
+                )
+    
+    # Set limits and remove ticks
+    ax.set_xlim(0, cols * cell_size)
+    ax.set_ylim(0, rows * cell_size)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    
+    # Add legend for threads
+    handles = []
+    for thread_id, color in sorted(thread_colors.items()):
+        patch = patches.Patch(color=color, label=f"Thread {thread_id}")
+        handles.append(patch)
+    
+    # If there are many threads, use a compact legend
+    if len(handles) > 10:
+        ax.legend(handles=handles[:10], loc='upper right', 
+                 title="Threads (showing 10 of {})".format(len(handles)))
+    else:
+        ax.legend(handles=handles, loc='upper right', title="Threads")
+    
+    plt.title("Tile Distribution Thread Mapping", fontsize=16)
+    plt.tight_layout()
+    return fig
+
+def visualize_thread_access_pattern(viz_data: Dict[str, Any], frame_idx: int = 0, 
+                                   num_frames: int = 10, figsize=(10, 8)):
+    """
+    Visualize thread access patterns over time.
+    
+    Args:
+        viz_data: Visualization data from TileDistribution
+        frame_idx: Current animation frame index
+        num_frames: Total number of frames
+        figsize: Size of the figure to create
+        
+    Returns:
+        Matplotlib figure object
+    """
+    fig, ax = plt.subplots(figsize=figsize)
+    
+    # Extract data
+    tile_shape = viz_data.get('tile_shape', [])
+    thread_mapping = viz_data.get('thread_mapping', {})
+    dimensions = viz_data.get('dimensions', {})
+    
+    if not tile_shape or not thread_mapping:
+        ax.text(0.5, 0.5, "No thread access data available", 
+                ha='center', va='center', fontsize=14)
+        ax.axis('off')
+        return fig
+    
+    # Draw tile grid (simplified example)
+    tile_dims = tile_shape[:2] if len(tile_shape) >= 2 else (1, 1)
+    rows, cols = tile_dims
+    
+    # Create simulated thread access pattern
+    threads = sorted(list(set(thread_mapping.values())))
+    
+    # Organize threads into warps (groups of 32 threads)
+    warps = {}
+    for thread_id in threads:
+        warp_id = thread_id // 32
+        if warp_id not in warps:
+            warps[warp_id] = []
+        warps[warp_id].append(thread_id)
+    
+    # Generate a sequence of active threads for each frame
+    frame_progress = frame_idx / max(1, num_frames - 1)
+    
+    # Determine active warps for this frame
+    active_warps = []
+    warp_progress = min(1.0, frame_progress * 1.5)  # Scale to make animation complete before end
+    active_warp_count = max(1, int(warp_progress * len(warps)))
+    
+    for warp_id in sorted(warps.keys())[:active_warp_count]:
+        active_warps.append(warp_id)
+    
+    # Create a colormap for warps
+    warp_colors = {}
+    colormap = plt.cm.tab10
+    for i, warp_id in enumerate(sorted(warps.keys())):
+        warp_colors[warp_id] = colormap(i % 10)
+    
+    # Draw cells with thread mapping
+    cell_size = min(8 / max(rows, cols), 0.5)
+    
+    for i in range(rows):
+        for j in range(cols):
+            pos_key = f"{i},{j}"
+            thread_id = thread_mapping.get(pos_key, -1)
+            
+            if thread_id >= 0:
+                warp_id = thread_id // 32
+                lane_id = thread_id % 32
+                
+                if warp_id in active_warps:
+                    # Active thread in current frame
+                    color = warp_colors[warp_id]
+                    alpha = 0.8
+                    # Add a slight animation effect
+                    if frame_idx % 2 == 0:
+                        alpha = 0.9
+                else:
+                    # Inactive thread
+                    color = 'lightgray'
+                    alpha = 0.3
+            else:
+                # No thread assigned
+                color = 'white'
+                alpha = 0.1
+                
+            rect = patches.Rectangle(
+                (j * cell_size, rows * cell_size - (i+1) * cell_size),
+                cell_size, cell_size, 
+                linewidth=1, edgecolor='black', facecolor=color, alpha=alpha
+            )
+            ax.add_patch(rect)
+            
+            if thread_id >= 0:
+                warp_id = thread_id // 32
+                lane_id = thread_id % 32
+                
+                # Use different text for active vs inactive threads
+                if warp_id in active_warps:
+                    text = f"W{warp_id}\nL{lane_id}"
+                    fontsize = 7
+                    color = 'black'
+                else:
+                    text = f"{thread_id}"
+                    fontsize = 6
+                    color = 'gray'
+                
+                # Add thread ID as text
+                ax.text(
+                    j * cell_size + cell_size/2, 
+                    rows * cell_size - (i+1) * cell_size + cell_size/2,
+                    text, 
+                    ha='center', va='center', fontsize=fontsize, color=color
+                )
+    
+    # Set limits and remove ticks
+    ax.set_xlim(0, cols * cell_size)
+    ax.set_ylim(0, rows * cell_size)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    
+    # Add dimension labels
+    if dimensions:
+        dim_text = []
+        for dim_name, dim_size in dimensions.items():
+            dim_text.append(f"{dim_name}: {dim_size}")
+        
+        ax.text(0.02, 0.98, "\n".join(dim_text), 
+                transform=ax.transAxes, va='top', fontsize=10,
+                bbox=dict(facecolor='white', alpha=0.7, edgecolor='gray', boxstyle='round,pad=0.5'))
+    
+    # Add progress indicator
+    ax.set_title(f"Thread Access Pattern (Frame {frame_idx+1}/{num_frames})", fontsize=16)
+    ax.text(0.5, -0.05, f"Execution Progress: {frame_progress:.0%}", 
+            transform=ax.transAxes, ha='center', fontsize=12)
+    
+    # Add legend for warps
+    legend_elements = []
+    for warp_id in sorted(warp_colors.keys()):
+        if warp_id in active_warps:
+            patch = patches.Patch(facecolor=warp_colors[warp_id], edgecolor='black', 
+                                 alpha=0.8, label=f'Warp {warp_id} (Threads {warp_id*32}-{warp_id*32+31})')
+            legend_elements.append(patch)
+    
+    if not active_warps:
+        legend_elements.append(patches.Patch(facecolor='lightgray', edgecolor='black', 
+                                           alpha=0.3, label='No Active Warps'))
+    
+    # Add legend with scrollable box if too many warps
+    if len(legend_elements) > 5:
+        ax.legend(handles=legend_elements[:5], loc='upper right', 
+                 title=f"Active Warps (showing 5 of {len(active_warps)})")
+    else:
+        ax.legend(handles=legend_elements, loc='upper right', title="Active Warps")
+    
+    # Add execution information
+    info_text = (
+        f"Total Threads: {len(threads)}\n"
+        f"Total Warps: {len(warps)}\n"
+        f"Active Warps: {len(active_warps)}"
+    )
+    ax.text(0.98, 0.02, info_text, 
+            transform=ax.transAxes, ha='right', va='bottom', fontsize=10,
+            bbox=dict(facecolor='white', alpha=0.7, edgecolor='gray', boxstyle='round,pad=0.5'))
+    
+    plt.tight_layout()
+    return fig
+
+if __name__ == "__main__":
+    # Example usage
+    example_code = """
+    tile_distribution_encoding<
+        sequence<1>,                           // 0 R
+        tuple<sequence<Nr_y, Nr_p, Nw>,        // H 
+              sequence<Kr_y, Kr_p, Kw, Kv>>,
+        tuple<sequence<1, 2>,                  // p major
+              sequence<2, 1>>,
+        tuple<sequence<1, 1>,                  // p minor
+              sequence<2, 2>>,
+        sequence<1, 2, 2>,                     // Y major
+        sequence<0, 0, 3>>{}                   // y minor
+    """
+    
+    parser = TileDistributionParser()
+    result = parser.parse_tile_distribution_encoding(example_code)
+    print("Parsed Structure:")
+    print(result)
+    
+    # Create visualizations
+    fig1 = visualize_encoding_structure(result)
+    plt.savefig("encoding_structure.png", dpi=150, bbox_inches='tight')
+    
+    # Simple mock data for visualization
+    mock_viz_data = {
+        'tile_shape': [4, 4],
+        'thread_mapping': {
+            '0,0': 0, '0,1': 1, '0,2': 2, '0,3': 3,
+            '1,0': 4, '1,1': 5, '1,2': 6, '1,3': 7,
+            '2,0': 8, '2,1': 9, '2,2': 10, '2,3': 11,
+            '3,0': 12, '3,1': 13, '3,2': 14, '3,3': 15
+        },
+        'occupancy': 0.85,
+        'utilization': 0.92
+    }
+    
+    fig2 = visualize_tile_distribution(mock_viz_data)
+    plt.savefig("tile_distribution.png", dpi=150, bbox_inches='tight')
+    
+    fig3 = visualize_thread_access_pattern(mock_viz_data, 3, 10)
+    plt.savefig("thread_access.png", dpi=150, bbox_inches='tight')
+    
+    plt.show() 
