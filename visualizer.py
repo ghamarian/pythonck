@@ -305,7 +305,6 @@ class TileDistributionVisualizer:
         hidden_box_width = 0.12
         hidden_box_height = section_height - 0.05
         num_hidden_boxes = len(hidden_values)
-        hidden_boxes = []
         hidden_section_width = 0.8
         hidden_start_x = 0.1
         
@@ -1032,10 +1031,10 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
     # Define layout for the new 2x2 info boxes
     info_y_start = 0.95  # Top edge of the info box area
     info_x_start = 0.07  # Left edge
-    info_box_height = 0.06
+    info_box_height = 0.055 # Reduced from 0.06
     info_box_width = 0.19
-    info_x_spacing = 0.02 # Horizontal spacing between boxes in a row
-    info_y_spacing = 0.015 # Vertical spacing between rows of boxes
+    info_x_spacing = 0.02 # Restored: Horizontal spacing between boxes in a row
+    info_y_spacing = 0.01   # Reduced from 0.015 (space between info box rows)
     info_text_color = 'white'
     info_edge_color = 'white'
     info_alpha = 0.6
@@ -1100,12 +1099,16 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
     color_bar_width = 0.05
     
     # The top of the warp drawing area (and color bar) should be below the new info boxes.
-    warp_area_top_y = tpw_box_y - info_y_spacing - 0.01 # Adjusted top for warp area (bottom of info boxes - padding)
+    # tpw_box_y is the y-coordinate of the bottom of the tpw_box (lowest info box).
+    # Effective padding below info boxes reduced from (old info_y_spacing + 0.01 = 0.015 + 0.01 = 0.025)
+    # to new desired total padding of 0.015.
+    padding_below_info_area = 0.015
+    warp_area_top_y = tpw_box_y - padding_below_info_area
     
     # --- Revised Y-Layout for Bottom Elements ---
     bottom_plot_margin = 0.02
     repeat_box_height_val = 0.08 
-    repeat_box_padding_above = 0.05
+    repeat_box_padding_above = 0.025 # Reduced from 0.05
 
     # Y-position for the *bottom* of the RepeatM box
     repeat_box_actual_y_start = bottom_plot_margin
@@ -1165,6 +1168,9 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
     all_warp_rects = []
     all_warp_facecolors_for_container = [] 
 
+    # Threshold for rendering thread ID text to improve performance for dense layouts
+    min_cell_dim_for_text = 0.01 # If cell width or height is less than 1% of figure dim, skip text
+
     # Draw warps and threads in the center section
     for warp_idx, (warp_key, warp_data) in enumerate(thread_blocks.items()):
         warp_color = warp_colors[warp_idx % len(warp_colors)]
@@ -1205,8 +1211,10 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
             all_thread_rects.append(thread_rect)
             all_thread_facecolors.append(warp_color)
             
-            ax.text(cell_x + cell_width/2, cell_y + cell_height/2, f"T{thread_id}",
-                   fontsize=8, ha='center', va='center', color='white')
+            # Conditionally add thread ID text to avoid clutter and improve performance
+            if cell_width > min_cell_dim_for_text and cell_height > min_cell_dim_for_text:
+                ax.text(cell_x + cell_width/2, cell_y + cell_height/2, f"T{thread_id}",
+                       fontsize=8, ha='center', va='center', color='white')
     
     # After looping, add the collection of warp container rectangles
     if all_warp_rects:
