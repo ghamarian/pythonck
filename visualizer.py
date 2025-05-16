@@ -1001,6 +1001,14 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
     warps_per_block_m = warp_per_block[0] if warp_per_block and len(warp_per_block) > 0 else 4
     vector_k = vector_dimensions[0] if vector_dimensions and len(vector_dimensions) > 0 else 8
     
+    # Extracted values for prominent display
+    bs_m_val = block_size[0] if block_size and len(block_size) > 0 else '?'
+    bs_n_val = block_size[1] if block_size and len(block_size) > 1 else '?'
+    tpw_m_val = thread_per_warp[0] if thread_per_warp and len(thread_per_warp) > 0 else '?'
+    tpw_n_val = thread_per_warp[1] if thread_per_warp and len(thread_per_warp) > 1 else '?'
+    wpb_m_display_val = warps_per_block_m # Assuming warps_per_block_m is the count for M-dim
+    vec_k_val = vector_dimensions[0] if vector_dimensions and len(vector_dimensions) > 0 else '?'
+
     # Set darker background for the plot
     fig.patch.set_facecolor('black')
     ax.set_facecolor('black')
@@ -1020,8 +1028,67 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
         '#FF4500'   # Orange red
     ]
     
+    # Define layout for the new 2x2 info boxes
+    info_y_start = 0.95  # Top edge of the info box area
+    info_x_start = 0.07  # Left edge
+    info_box_height = 0.06
+    info_box_width = 0.19
+    info_x_spacing = 0.02 # Horizontal spacing between boxes in a row
+    info_y_spacing = 0.015 # Vertical spacing between rows of boxes
+    info_text_color = 'white'
+    info_edge_color = 'white'
+    info_alpha = 0.6
+    info_fontsize = 8
+
+    # Box 1.1: BlockSize
+    bs_box_y = info_y_start - info_box_height
+    bs_box = patches.Rectangle(
+        (info_x_start, bs_box_y),
+        info_box_width, info_box_height,
+        linewidth=1, edgecolor=info_edge_color, facecolor='#FF6347', alpha=info_alpha # Tomato
+    )
+    ax.add_patch(bs_box)
+    ax.text(info_x_start + info_box_width / 2, bs_box_y + info_box_height / 2,
+           f"Block: {bs_m_val}M×{bs_n_val}N",
+           fontsize=info_fontsize, ha='center', va='center', color=info_text_color)
+
+    # Box 1.2: WarpsPerBlock
+    wpb_box_x = info_x_start + info_box_width + info_x_spacing
+    wpb_box = patches.Rectangle(
+        (wpb_box_x, bs_box_y), # Same Y as BlockSize box
+        info_box_width, info_box_height,
+        linewidth=1, edgecolor=info_edge_color, facecolor='#32CD32', alpha=info_alpha # LimeGreen
+    )
+    ax.add_patch(wpb_box)
+    ax.text(wpb_box_x + info_box_width / 2, bs_box_y + info_box_height / 2,
+           f"Warps/Blk: {wpb_m_display_val}M",
+           fontsize=info_fontsize, ha='center', va='center', color=info_text_color)
+
+    # Box 2.1: ThreadPerWarp
+    tpw_box_y = bs_box_y - info_y_spacing - info_box_height # Y position for the second row of info boxes
+    tpw_box = patches.Rectangle(
+        (info_x_start, tpw_box_y), # Same X as BlockSize box
+        info_box_width, info_box_height,
+        linewidth=1, edgecolor=info_edge_color, facecolor='#00BFFF', alpha=info_alpha # DeepSkyBlue
+    )
+    ax.add_patch(tpw_box)
+    ax.text(info_x_start + info_box_width / 2, tpw_box_y + info_box_height / 2,
+           f"Thrd/Warp: {tpw_m_val}R×{tpw_n_val}C",
+           fontsize=info_fontsize, ha='center', va='center', color=info_text_color)
+
+    # Box 2.2: VectorDimension
+    vec_box_x = info_x_start + info_box_width + info_x_spacing
+    vec_box = patches.Rectangle(
+        (vec_box_x, tpw_box_y), # Same Y as ThreadPerWarp box, Same X as WarpsPerBlock box
+        info_box_width, info_box_height,
+        linewidth=1, edgecolor=info_edge_color, facecolor='#FFD700', alpha=info_alpha # Gold
+    )
+    ax.add_patch(vec_box)
+    ax.text(vec_box_x + info_box_width / 2, tpw_box_y + info_box_height / 2,
+           f"Vector(K): {vec_k_val}",
+           fontsize=info_fontsize, ha='center', va='center', color=info_text_color)
+    
     # Set up layout dimensions
-    # We'll use the left side (0-0.55) for thread blocks and the right side (0.55-1.0) for code
     thread_area_width = 0.55
     code_area_width = 0.45
     
@@ -1030,43 +1097,21 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
     
     # Create left side vertical color bar
     color_bar_width = 0.05
-    warp_height = warps_region_height / max(warps_per_block_m, 1)
     
-    # Draw ThreadPerWarp, WarpPerBlock labels and boxes on left side
-    # ThreadPerWarp box at top-left
-    tpw_box = patches.Rectangle(
-        (color_bar_width + 0.02, 0.85), 
-        0.2, 0.1,
-        linewidth=1, 
-        edgecolor='white', 
-        facecolor='#00BFFF',
-        alpha=0.5
-    )
-    ax.add_patch(tpw_box)
-    ax.text(color_bar_width + 0.12, 0.9, f"{threads_per_warp_m} rows × {threads_per_warp_n} cols × ({vector_k})\nThreadPerWarp", 
-           fontsize=10, ha='center', va='center', color='white')
+    # The top of the warp drawing area (and color bar) should be below the new info boxes.
+    warp_area_top_y = tpw_box_y - info_y_spacing - 0.01 # Adjusted top for warp area (bottom of info boxes - padding)
     
-    # WarpPerBlock box below ThreadPerWarp
-    wpb_box = patches.Rectangle(
-        (color_bar_width + 0.23, 0.85), 
-        0.25, 0.1,
-        linewidth=1, 
-        edgecolor='white', 
-        facecolor='#32CD32',
-        alpha=0.5
-    )
-    ax.add_patch(wpb_box)
-    ax.text(color_bar_width + 0.35, 0.9, f"{warps_per_block_m} × ({threads_per_warp_m} rows × {threads_per_warp_n} cols × {vector_k})\nWarpPerBlock", 
-           fontsize=10, ha='center', va='center', color='white')
-    
-    # Draw the color bar on left side
+    # Recalculate warp_height (restored)
+    warp_height = warps_region_height / max(warps_per_block_m, 1) # This height is for each warp's visual block
+
+    # Draw the color bar on left side (restored and y-positions adjusted)
     for i in range(warps_per_block_m):
         warp_color = warp_colors[i % len(warp_colors)]
-        y_pos = 0.8 - (i+1) * warp_height
+        # Adjust y_pos for color bar segments based on new warp_area_top_y
+        y_pos_color_bar = warp_area_top_y - (i + 1) * warp_height
         
-        # Draw vertical color bar
         color_rect = patches.Rectangle(
-            (0.02, y_pos), 
+            (0.02, y_pos_color_bar), 
             color_bar_width - 0.01, warp_height,
             linewidth=1, 
             edgecolor='white', 
@@ -1075,33 +1120,33 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
         )
         ax.add_patch(color_rect)
     
-    # Reserve space for the RepeatM section at the bottom
-    # The previous thread blocks will end at 0.8 - warps_per_block_m * warp_height
-    repeat_section_top = 0.8 - warps_per_block_m * warp_height - 0.05
+    # Reserve space for the RepeatM section at the bottom (restored and y-positions adjusted)
+    repeat_section_top = warp_area_top_y - warps_per_block_m * warp_height - 0.05
     
-    # Draw the RepeatM section at the bottom with clear separation
+    # Draw the RepeatM section at the bottom with clear separation (restored)
     repeat_box = patches.Rectangle(
         (0.02, repeat_section_top - 0.08), 
         0.3, 0.08,
         linewidth=1, 
         edgecolor='white', 
-        facecolor='#1E90FF',
+        facecolor='#1E90FF', # DodgerBlue
         alpha=0.5
     )
     ax.add_patch(repeat_box)
     repeat_val = hierarchical_structure.get('Repeat', [4])[0] if hierarchical_structure.get('Repeat') and len(hierarchical_structure.get('Repeat')) > 0 else 4
-    ax.text(0.17, repeat_section_top - 0.04, f"{repeat_val} × ({warps_per_block_m} × {threads_per_warp_m} rows × {threads_per_warp_n} cols × {vector_k})\nRepeatM", 
-           fontsize=10, ha='center', va='center', color='white')
+    # Using short names for values in RepeatM text for conciseness
+    ax.text(0.17, repeat_section_top - 0.04, f"{repeat_val} × ({wpb_m_display_val}W × {tpw_m_val}R × {tpw_n_val}C × {vec_k_val}V)\\nRepeatM", 
+           fontsize=9, ha='center', va='center', color='white') # Reduced fontsize for potentially long text
     
     # Draw warps and threads in the center section
     for warp_idx, (warp_key, warp_data) in enumerate(thread_blocks.items()):
         warp_color = warp_colors[warp_idx % len(warp_colors)]
         
-        # Y position for this warp block
-        y_pos = 0.8 - (warp_idx + 1) * warp_height
+        # Y position for this warp block, relative to new warp_area_top_y
+        y_pos_warp_block = warp_area_top_y - (warp_idx + 1) * warp_height
         
         # Draw warp label on the left
-        ax.text(color_bar_width + 0.02, y_pos + warp_height/2, f"Warp{warp_idx}", 
+        ax.text(color_bar_width + 0.02, y_pos_warp_block + warp_height/2, f"Warp{warp_idx}", 
                fontsize=10, ha='left', va='center', color='white')
         
         # Create grid layout for threads
@@ -1110,7 +1155,7 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
         
         # Draw warp container
         warp_box = patches.Rectangle(
-            (color_bar_width + 0.04, y_pos + 0.01), 
+            (color_bar_width + 0.04, y_pos_warp_block + 0.01), 
             thread_grid_width, thread_grid_height,
             linewidth=1, 
             edgecolor='white', 
@@ -1137,7 +1182,7 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
             # For column index, multiply by cell_width
             # For row index, calculate from bottom to top (threads_per_warp_m - row_idx - 1)
             cell_x = color_bar_width + 0.04 + col_idx * cell_width
-            cell_y = y_pos + 0.01 + (threads_per_warp_m - row_idx - 1) * cell_height
+            cell_y = y_pos_warp_block + 0.01 + (threads_per_warp_m - row_idx - 1) * cell_height
             
             # Draw thread cell
             thread_box = patches.Rectangle(
@@ -1157,95 +1202,111 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
     # Draw C++ code on the right side if provided
     if code_snippet:
         code_x = thread_area_width + 0.05  # Start of code area
-        code_y = 0.85  # Top of code area
+        # Align top of code text area with top of info boxes
+        code_text_area_top_y = info_y_start 
         
         # Draw code background
-        code_box = patches.Rectangle(
-            (code_x, 0.25), 
-            0.42, 0.6,
-            linewidth=1,
-            edgecolor='white',
-            facecolor='#222222',
-            alpha=0.7
-        )
-        ax.add_patch(code_box)
+        # Adjust y and height of code_box to fit available space
+        # Code box should be below title, and its top can align with info_y_start or slightly below
+        # Let's make the code box span from just below info boxes down to near RepeatM, if possible
+        code_box_top_y = tpw_box_y - info_y_spacing - 0.01 # Align with warp_area_top_y for neatness
+        code_box_bottom_y = repeat_section_top # Align bottom with top of RepeatM box, or slightly above
         
-        # Define colors for syntax highlighting
-        syntax_colors = {
-            'keyword': '#569CD6',    # Blue
-            'type': '#4EC9B0',       # Teal
-            'namespace': '#9CDCFE',  # Light blue
-            'function': '#DCDCAA',   # Yellow
-            'comment': '#6A9955',    # Green
-            'number': '#B5CEA8',     # Light green
-            'operator': '#D4D4D4',   # Light gray
-            'string': '#CE9178',     # Orange
-            'default': '#D4D4D4'     # Light gray
-        }
-        
-        # Keywords to color
-        keywords = ['template', 'typename', 'constexpr', 'static', 'return', 'using', 'if', 'else', 'for', 'while']
-        types = ['index_t', 'tuple', 'sequence', 'Problem', 'int', 'float', 'double', 'bool']
-        
-        # Split the code into lines
-        code_lines = code_snippet.split('\n')
-        
-        # Add code text with syntax highlighting
-        for i, line in enumerate(code_lines):
-            if i >= 20:  # Limit to 20 lines to prevent overflow
-                break
-                
-            # Position for this line
-            y_pos = code_y - 0.025 * i
+        # Ensure code_box_bottom_y is above a minimum y (e.g. 0.1) if RepeatM is very low
+        code_box_bottom_y = max(code_box_bottom_y, 0.15) 
+        code_box_effective_height = code_box_top_y - code_box_bottom_y
+
+        if code_box_effective_height > 0.1 : # Only draw if there's reasonable height
+            code_box = patches.Rectangle(
+                (code_x, code_box_bottom_y), 
+                0.42, code_box_effective_height, 
+                linewidth=1,
+                edgecolor='white',
+                facecolor='#222222',
+                alpha=0.7
+            )
+            ax.add_patch(code_box)
+
+            # Define colors for syntax highlighting (Restored)
+            syntax_colors = {
+                'keyword': '#569CD6',    # Blue
+                'type': '#4EC9B0',       # Teal
+                'namespace': '#9CDCFE',  # Light blue
+                'function': '#DCDCAA',   # Yellow
+                'comment': '#6A9955',    # Green
+                'number': '#B5CEA8',     # Light green
+                'operator': '#D4D4D4',   # Light gray
+                'string': '#CE9178',     # Orange
+                'default': '#D4D4D4'     # Light gray
+            }
             
-            # Skip completely if line is too long
-            if len(line) > 70:
-                parts = []
-                current_part = ""
-                for word in line.split():
-                    if len(current_part + " " + word) > 70:
-                        parts.append(current_part)
-                        current_part = word
-                    else:
-                        current_part += (" " + word if current_part else word)
-                if current_part:
-                    parts.append(current_part)
+            # Keywords to color (Restored)
+            keywords = ['template', 'typename', 'constexpr', 'static', 'return', 'using', 'if', 'else', 'for', 'while']
+            types = ['index_t', 'tuple', 'sequence', 'Problem', 'int', 'float', 'double', 'bool']
+            
+            code_lines = code_snippet.split('\n') # Restored for clarity, or use split in loop directly
+
+            # Add code text with syntax highlighting
+            # Position text lines from the top of the code_box (code_box_top_y)
+            for i, line in enumerate(code_lines):
+                # Calculate how many lines can fit
+                num_fittable_lines = int((code_box_effective_height - 0.02) / 0.025) # 0.02 top/bottom margin
+                if i >= max(0, num_fittable_lines): 
+                    break
                     
-                for j, part in enumerate(parts):
-                    sub_y_pos = code_y - 0.025 * (i + j * 0.8)
-                    ax.text(code_x + 0.01, sub_y_pos, part, 
-                           fontsize=8, ha='left', va='center', 
-                           family='monospace', color=syntax_colors['default'])
-                continue
-            
-            # Comments handling
-            if "//" in line:
-                comment_parts = line.split("//")
-                if len(comment_parts) >= 2:
-                    # Draw code part and comment part separately
-                    ax.text(code_x + 0.01, y_pos, comment_parts[0], 
-                           fontsize=8, ha='left', va='center', 
-                           family='monospace', color=syntax_colors['default'])
-                    ax.text(code_x + 0.01 + len(comment_parts[0]) * 0.005, y_pos, 
-                           '//' + comment_parts[1], 
-                           fontsize=8, ha='left', va='center', 
-                           family='monospace', color=syntax_colors['comment'])
-                    continue
-            
-            # Simple syntax highlighting for other lines
-            line_color = syntax_colors['default']
-            if any(keyword in line.split() for keyword in keywords):
-                line_color = syntax_colors['keyword']
-            elif any(type_name in line.split() for type_name in types):
-                line_color = syntax_colors['type']
-            elif "ck_tile::" in line or "::" in line:
-                line_color = syntax_colors['namespace']
-            elif "(" in line and ")" in line and not "=" in line:
-                line_color = syntax_colors['function']
+                # Position for this line, from top of code box
+                text_line_y = code_box_top_y - 0.015 - (0.025 * i) # Start first line below top of box
                 
-            ax.text(code_x + 0.01, y_pos, line, 
-                   fontsize=8, ha='left', va='center', 
-                   family='monospace', color=line_color)
+                # Skip completely if line is too long
+                if len(line) > 70: # Simple estimate for characters fitting in 0.42 width
+                    parts = []
+                    current_part = ""
+                    for word in line.split():
+                        if len(current_part + " " + word) > 70:
+                            parts.append(current_part)
+                            current_part = word
+                        else:
+                            current_part += (" " + word if current_part else word)
+                    if current_part:
+                        parts.append(current_part)
+                        
+                    for j, part in enumerate(parts):
+                        # Ensure wrapped lines also check fittable lines
+                        if (i + j * 0.8) >= max(0, num_fittable_lines) : break 
+                        sub_y_pos = code_box_top_y - 0.015 - (0.025 * (i + j * 0.8))
+                        ax.text(code_x + 0.01, sub_y_pos, part, 
+                               fontsize=8, ha='left', va='center', 
+                               family='monospace', color=syntax_colors['default'])
+                    continue # Move to next original line
+                
+                # Comments handling
+                if "//" in line:
+                    comment_parts = line.split("//")
+                    if len(comment_parts) >= 2:
+                        # Draw code part and comment part separately
+                        ax.text(code_x + 0.01, text_line_y, comment_parts[0], 
+                               fontsize=8, ha='left', va='center', 
+                               family='monospace', color=syntax_colors['default'])
+                        ax.text(code_x + 0.01 + len(comment_parts[0]) * 0.005, text_line_y, # Estimate length for positioning
+                               '//' + comment_parts[1], 
+                               fontsize=8, ha='left', va='center', 
+                               family='monospace', color=syntax_colors['comment'])
+                        continue
+                
+                # Simple syntax highlighting for other lines
+                line_color = syntax_colors['default']
+                if any(keyword in line.split() for keyword in keywords):
+                    line_color = syntax_colors['keyword']
+                elif any(type_name in line.split() for type_name in types):
+                    line_color = syntax_colors['type']
+                elif "ck_tile::" in line or "::" in line:
+                    line_color = syntax_colors['namespace']
+                elif "(" in line and ")" in line and not "=" in line: # Basic function detection
+                    line_color = syntax_colors['function']
+                    
+                ax.text(code_x + 0.01, text_line_y, line, 
+                       fontsize=8, ha='left', va='center', 
+                       family='monospace', color=line_color)
         
         # Add dimension annotations based on detected values in the code
         dimension_values = hierarchical_structure.get('DimensionValues', [])

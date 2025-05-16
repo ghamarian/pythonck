@@ -237,70 +237,71 @@ def main():
         try:
             if st.session_state.tile_distribution is not None:
                 viz_data = st.session_state.tile_distribution.get_visualization_data()
-                
+                hierarchical_structure = viz_data.get("hierarchical_structure", {})
+
+                # --- ALWAYS VISIBLE HIERARCHICAL INFO ---
+                if hierarchical_structure:
+                    # Display summary information (Moved from debug h_tabs[0])
+                    st.write("#### Tile Structure Overview")
+                    
+                    thread_per_warp = hierarchical_structure.get('ThreadPerWarp', [])
+                    warp_per_block = hierarchical_structure.get('WarpPerBlock', [])
+                    vector_dimensions = hierarchical_structure.get('VectorDimensions', [])
+                    block_size = hierarchical_structure.get('BlockSize', [])
+                    
+                    col1, col2, col3 = st.columns(3)
+                    
+                    with col1:
+                        st.metric("ThreadPerWarp", 
+                                 f"{thread_per_warp[0]}x{thread_per_warp[1]}" if len(thread_per_warp) >= 2 else "N/A")
+                    
+                    with col2:
+                        st.metric("WarpPerBlock", 
+                                 f"{warp_per_block[0]}" if warp_per_block else "N/A")
+                    
+                    with col3:
+                        st.metric("Vector Dimensions", 
+                                 f"{vector_dimensions[0]}" if vector_dimensions else "N/A")
+                    
+                    st.metric("Block Size", 
+                             f"{block_size[0]}x{block_size[1]}" if len(block_size) >= 2 else "N/A")
+                    
+                    # Display a formatted description of the structure (Moved from debug h_tabs[0])
+                    if thread_per_warp and warp_per_block and vector_dimensions:
+                        threads_per_warp_m = thread_per_warp[0] if len(thread_per_warp) > 0 else 0
+                        threads_per_warp_n = thread_per_warp[1] if len(thread_per_warp) > 1 else 0
+                        warps_per_block_m = warp_per_block[0] if len(warp_per_block) > 0 else 0
+                        vector_k = vector_dimensions[0] if len(vector_dimensions) > 0 else 0
+                        
+                        st.write(f"""
+                        ### Thread Hierarchy
+                        - **ThreadPerWarp**: {threads_per_warp_m} x {threads_per_warp_n} threads per warp
+                        - **WarpPerBlock**: {warps_per_block_m} warps per block
+                        - **Vector Dimensions**: {vector_k}
+                        - **Total Thread Count**: {threads_per_warp_m * threads_per_warp_n * warps_per_block_m} threads
+                        - **Total Elements**: {threads_per_warp_m * threads_per_warp_n * warps_per_block_m * vector_k} elements
+                        """)
+                else:
+                    # This message is shown if hierarchical_structure itself is empty
+                    st.write("No hierarchical structure data available to display overview.")
+                # --- END ALWAYS VISIBLE HIERARCHICAL INFO ---
+
                 if st.session_state.debug_mode:
-                    # In debug mode, display the raw hierarchical structure data
-                    hierarchical_structure = viz_data.get("hierarchical_structure", {})
+                    # In debug mode, display the raw hierarchical structure data and other debug tabs
                     if hierarchical_structure:
-                        # Create a tabbed view for different aspects of the hierarchical structure
-                        h_tabs = st.tabs(
-                            ["Overview", "Thread Blocks", "Raw Data"]
+                        # Create a tabbed view for *additional* debug aspects
+                        h_debug_tabs = st.tabs(
+                            ["Thread Blocks (Debug)", "Raw Data (Debug)"]
                         )
                         
-                        with h_tabs[0]:
-                            # Display summary information
-                            st.write("#### Tile Structure Overview")
-                            
-                            # Extract key parameters for a summary display
-                            thread_per_warp = hierarchical_structure.get('ThreadPerWarp', [])
-                            warp_per_block = hierarchical_structure.get('WarpPerBlock', [])
-                            vector_dimensions = hierarchical_structure.get('VectorDimensions', [])
-                            block_size = hierarchical_structure.get('BlockSize', [])
-                            
-                            col1, col2, col3 = st.columns(3)
-                            
-                            with col1:
-                                st.metric("ThreadPerWarp", 
-                                         f"{thread_per_warp[0]}x{thread_per_warp[1]}" if len(thread_per_warp) >= 2 else "N/A")
-                            
-                            with col2:
-                                st.metric("WarpPerBlock", 
-                                         f"{warp_per_block[0]}" if warp_per_block else "N/A")
-                            
-                            with col3:
-                                st.metric("Vector Dimensions", 
-                                         f"{vector_dimensions[0]}" if vector_dimensions else "N/A")
-                            
-                            st.metric("Block Size", 
-                                     f"{block_size[0]}x{block_size[1]}" if len(block_size) >= 2 else "N/A")
-                            
-                            # Display a formatted description of the structure
-                            if thread_per_warp and warp_per_block and vector_dimensions:
-                                threads_per_warp_m = thread_per_warp[0] if len(thread_per_warp) > 0 else 0
-                                threads_per_warp_n = thread_per_warp[1] if len(thread_per_warp) > 1 else 0
-                                warps_per_block_m = warp_per_block[0] if len(warp_per_block) > 0 else 0
-                                vector_k = vector_dimensions[0] if len(vector_dimensions) > 0 else 0
-                                
-                                st.write(f"""
-                                ### Thread Hierarchy
-                                - **ThreadPerWarp**: {threads_per_warp_m} x {threads_per_warp_n} threads per warp
-                                - **WarpPerBlock**: {warps_per_block_m} warps per block
-                                - **Vector Dimensions**: {vector_k}
-                                - **Total Thread Count**: {threads_per_warp_m * threads_per_warp_n * warps_per_block_m} threads
-                                - **Total Elements**: {threads_per_warp_m * threads_per_warp_n * warps_per_block_m * vector_k} elements
-                                """)
-                        
-                        with h_tabs[1]:
+                        with h_debug_tabs[0]: # Was h_tabs[1]
                             # Display thread block organization
-                            st.write("#### Thread Block Organization")
+                            st.write("#### Thread Block Organization (Debug)")
                             thread_blocks = hierarchical_structure.get('ThreadBlocks', {})
                             
                             if thread_blocks:
-                                # Display warp-by-warp organization
                                 for warp_key, warp_threads in thread_blocks.items():
                                     st.write(f"**{warp_key}**")
-                                    
-                                    # Create a dataframe for better visualization
                                     thread_data = []
                                     for thread_id, details in warp_threads.items():
                                         thread_data.append({
@@ -308,23 +309,21 @@ def main():
                                             "Position": f"{details.get('position', [0, 0])}",
                                             "Global ID": details.get('global_id', 0)
                                         })
-                                    
                                     if thread_data:
-                                        # Show first 10 threads per warp to avoid cluttering
                                         st.dataframe(thread_data[:10])
                                         if len(thread_data) > 10:
                                             st.write(f"... and {len(thread_data) - 10} more threads")
                             else:
-                                st.write("No thread block data available")
+                                st.write("No thread block data available for debug.")
                         
-                        with h_tabs[2]:
+                        with h_debug_tabs[1]: # Was h_tabs[2]
                             # Display raw data for debugging
-                            st.write("#### Raw Hierarchical Structure Data")
+                            st.write("#### Raw Hierarchical Structure Data (Debug)")
                             st.json(hierarchical_structure)
                     else:
-                        st.write("No hierarchical structure data available")
+                        st.write("No detailed hierarchical structure data available for debug tabs.")
                 
-                # Display the hierarchical tile visualization
+                # Display the hierarchical tile visualization (THE PLOT - this part remains)
                 if viz_data.get("hierarchical_structure"):
                     try:
                         # First validate the hierarchical structure data
