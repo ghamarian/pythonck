@@ -448,15 +448,17 @@ def debug_indexing_relationships(parsed_encoding: Dict[str, Any], variables: Dic
         mappings = []
         for j, (maj, min_idx) in enumerate(zip(p_major, p_minor)):
             # Determine target (R or H)
+            # Major index determines the target sequence: 0->R, 1->H0, 2->H1, etc.
             if maj == 0:  # R dimension
                 target = "R"
                 orig_value = r_orig_values[min_idx] if 0 <= min_idx < len(r_orig_values) else None
                 numeric_value = r_values[min_idx] if 0 <= min_idx < len(r_values) else None
             else:  # H dimension
-                target = f"H{maj-1}"
-                if 0 <= maj-1 < len(h_orig_values) and 0 <= min_idx < len(h_orig_values[maj-1]):
-                    orig_value = h_orig_values[maj-1][min_idx]
-                    numeric_value = h_values[maj-1][min_idx]
+                h_idx = maj - 1  # Convert 1-based to 0-based index
+                target = f"H{h_idx}"
+                if 0 <= h_idx < len(h_orig_values) and 0 <= min_idx < len(h_orig_values[h_idx]):
+                    orig_value = h_orig_values[h_idx][min_idx]
+                    numeric_value = h_values[h_idx][min_idx]
                 else:
                     orig_value = None
                     numeric_value = None
@@ -472,36 +474,38 @@ def debug_indexing_relationships(parsed_encoding: Dict[str, Any], variables: Dic
         result["IndexMapping"][p_key] = mappings
     
     # Add Y0, Y1, etc. information
-    for i in range(len(ys_rhs_major)):
+    for i in range(len(ys_rhs_major) if len(ys_rhs_major) == len(ys_rhs_minor) else min(len(ys_rhs_major), len(ys_rhs_minor))):
         y_key = f"Y{i}"
         
         # Record Y to R/H mappings
         mappings = []
-        if i < len(ys_rhs_major) and i < len(ys_rhs_minor):
-            maj = ys_rhs_major[i]
-            min_idx = ys_rhs_minor[i]
+        
+        maj = ys_rhs_major[i]
+        min_idx = ys_rhs_minor[i]
+        
+        # Determine target (R or H)
+        # Major index determines the target sequence: 0->R, 1->H0, 2->H1, etc.
+        if maj == 0:  # R dimension (explicit)
+            target = "R"
+            orig_value = r_orig_values[min_idx] if 0 <= min_idx < len(r_orig_values) else None
+            numeric_value = r_values[min_idx] if 0 <= min_idx < len(r_values) else None
+        else:  # H dimension
+            h_idx = maj - 1  # Convert 1-based to 0-based index
+            target = f"H{h_idx}"
+            if 0 <= h_idx < len(h_orig_values) and 0 <= min_idx < len(h_orig_values[h_idx]):
+                orig_value = h_orig_values[h_idx][min_idx]
+                numeric_value = h_values[h_idx][min_idx]
+            else:
+                orig_value = None
+                numeric_value = None
             
-            # Determine target (R or H)
-            if maj == 0:  # R dimension
-                target = "R"
-                orig_value = r_orig_values[min_idx] if 0 <= min_idx < len(r_orig_values) else None
-                numeric_value = r_values[min_idx] if 0 <= min_idx < len(r_values) else None
-            else:  # H dimension
-                target = f"H{maj-1}"
-                if 0 <= maj-1 < len(h_orig_values) and 0 <= min_idx < len(h_orig_values[maj-1]):
-                    orig_value = h_orig_values[maj-1][min_idx]
-                    numeric_value = h_values[maj-1][min_idx]
-                else:
-                    orig_value = None
-                    numeric_value = None
-                
-            mappings.append({
-                "Target": target,
-                "MajorIndex": maj,
-                "MinorIndex": min_idx,
-                "SymbolicValue": orig_value,  # Original symbolic value (variable name)
-                "Value": numeric_value  # Numeric value if variable was resolved
-            })
+        mappings.append({
+            "Target": target,
+            "MajorIndex": maj,
+            "MinorIndex": min_idx,
+            "SymbolicValue": orig_value,  # Original symbolic value (variable name)
+            "Value": numeric_value  # Numeric value if variable was resolved
+        })
             
         result["IndexMapping"][y_key] = mappings
     

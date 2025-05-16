@@ -409,26 +409,26 @@ class TileDistributionVisualizer:
                 # Create box
                 box = patches.Rectangle((x_pos - element_box_width/2, y_pos), 
                                       element_box_width, element_box_height, 
-                                      linewidth=1, edgecolor='brown', facecolor='lightgreen', zorder=3)
-                ax.add_patch(box)
+                                  linewidth=1, edgecolor='brown', facecolor='lightgreen', zorder=3)
+            ax.add_patch(box)
                 
                 # Add label with both symbolic and numeric values if it's a variable
-                if elem_val in variables:
-                    # Show both symbolic name and numeric value (more compact)
-                    ax.text(x_pos, y_pos + element_box_height/2, f"{elem_val}", 
-                           ha='center', va='center', fontsize=8, zorder=4)
-                    ax.text(x_pos, y_pos + element_box_height/4, f"({variables[elem_val]})", 
-                           ha='center', va='center', fontsize=6, zorder=4)
-                else:
-                    ax.text(x_pos, y_pos + element_box_height/2, f"{elem_val}", 
-                           ha='center', va='center', fontsize=8, zorder=4)
-                
-                # Add index label below
-                ax.text(x_pos, y_pos, f"[{elem_idx}]", 
-                       ha='center', va='bottom', fontsize=7, zorder=4, color='brown')
-                
-                # Store box position for arrows (center, top)
-                h_element_boxes.append((h_idx, elem_idx, (x_pos, y_pos + element_box_height)))
+            if elem_val in variables:
+                # Show both symbolic name and numeric value (more compact)
+                ax.text(x_pos, y_pos + element_box_height/2, f"{elem_val}", 
+                        ha='center', va='center', fontsize=8, zorder=4)
+                ax.text(x_pos, y_pos + element_box_height/4, f"({variables[elem_val]})", 
+                        ha='center', va='center', fontsize=6, zorder=4)
+            else:
+                ax.text(x_pos, y_pos + element_box_height/2, f"{elem_val}", 
+                        ha='center', va='center', fontsize=8, zorder=4)
+            
+            # Add index label below
+            ax.text(x_pos, y_pos, f"[{elem_idx}]", 
+                    ha='center', va='bottom', fontsize=7, zorder=4, color='brown')
+            
+            # Store box position for arrows (center, top)
+            h_element_boxes.append((h_idx, elem_idx, (x_pos, y_pos + element_box_height)))
         
         # CONNECTIONS
         
@@ -497,7 +497,7 @@ class TileDistributionVisualizer:
                             )
                             ax.add_patch(arrow)
                             break
-
+        
         # 4. Direct Top to Bottom connections (P/Y to R/H) for reference
         # Use dashed lines for direct connections
         for i in range(num_p_dims):
@@ -957,6 +957,325 @@ def visualize_thread_access_pattern(viz_data: Dict[str, Any], frame_idx: int = 0
     plt.tight_layout()
     return fig
 
+def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), code_snippet: str = None, show_arrows=False):
+    """
+    Visualize hierarchical tile structure showing block, warp, and thread organization.
+    
+    This creates a visualization showing:
+    - ThreadPerWarp structure
+    - WarpPerBlock structure 
+    - Overall layout with thread IDs
+    - Vector dimensions
+    
+    Args:
+        viz_data: Visualization data from TileDistribution
+        figsize: Size of the figure to create
+        code_snippet: Optional source code that generated this tile distribution
+        show_arrows: Whether to show dimension arrows
+        
+    Returns:
+        Matplotlib figure object
+    """
+    fig, ax = plt.subplots(figsize=figsize)
+    
+    # Extract hierarchical structure
+    hierarchical_structure = viz_data.get('hierarchical_structure', {})
+    
+    if not hierarchical_structure:
+        ax.text(0.5, 0.5, "No hierarchical tile data available", 
+                ha='center', va='center', fontsize=14)
+        ax.axis('off')
+        return fig
+    
+    # Extract key parameters with safe defaults
+    thread_per_warp = hierarchical_structure.get('ThreadPerWarp', [16, 4])
+    warp_per_block = hierarchical_structure.get('WarpPerBlock', [4])
+    vector_dimensions = hierarchical_structure.get('VectorDimensions', [8])
+    block_size = hierarchical_structure.get('BlockSize', [64, 4])
+    thread_blocks = hierarchical_structure.get('ThreadBlocks', {})
+    tile_name = hierarchical_structure.get('TileName', "Tile Distribution")
+    
+    # Determine dimensions for display with safe defaults
+    threads_per_warp_m = thread_per_warp[0] if thread_per_warp and len(thread_per_warp) > 0 else 16
+    threads_per_warp_n = thread_per_warp[1] if thread_per_warp and len(thread_per_warp) > 1 else 4
+    warps_per_block_m = warp_per_block[0] if warp_per_block and len(warp_per_block) > 0 else 4
+    vector_k = vector_dimensions[0] if vector_dimensions and len(vector_dimensions) > 0 else 8
+    
+    # Set darker background for the plot
+    fig.patch.set_facecolor('black')
+    ax.set_facecolor('black')
+    
+    # Draw title in white
+    plt.title(tile_name, fontsize=20, pad=20, color='white', fontweight='bold')
+    
+    # Define colors for different levels
+    warp_colors = [
+        '#00BFFF',  # Deep sky blue
+        '#00FF7F',  # Spring green
+        '#FFFF00',  # Yellow
+        '#FF0000',  # Red
+        '#1E90FF',  # Dodger blue
+        '#32CD32',  # Lime green
+        '#FFD700',  # Gold
+        '#FF4500'   # Orange red
+    ]
+    
+    # Set up layout dimensions
+    # We'll use the left side (0-0.55) for thread blocks and the right side (0.55-1.0) for code
+    thread_area_width = 0.55
+    code_area_width = 0.45
+    
+    # Define the display regions
+    warps_region_height = 0.7  # Height for the warp/thread display
+    
+    # Create left side vertical color bar
+    color_bar_width = 0.05
+    warp_height = warps_region_height / max(warps_per_block_m, 1)
+    
+    # Draw ThreadPerWarp, WarpPerBlock labels and boxes on left side
+    # ThreadPerWarp box at top-left
+    tpw_box = patches.Rectangle(
+        (color_bar_width + 0.02, 0.85), 
+        0.2, 0.1,
+        linewidth=1, 
+        edgecolor='white', 
+        facecolor='#00BFFF',
+        alpha=0.5
+    )
+    ax.add_patch(tpw_box)
+    ax.text(color_bar_width + 0.12, 0.9, f"{threads_per_warp_m} * {threads_per_warp_n} * ({vector_k})\nThreadPerWarp", 
+           fontsize=10, ha='center', va='center', color='white')
+    
+    # WarpPerBlock box below ThreadPerWarp
+    wpb_box = patches.Rectangle(
+        (color_bar_width + 0.23, 0.85), 
+        0.25, 0.1,
+        linewidth=1, 
+        edgecolor='white', 
+        facecolor='#32CD32',
+        alpha=0.5
+    )
+    ax.add_patch(wpb_box)
+    ax.text(color_bar_width + 0.35, 0.9, f"{warps_per_block_m} * ({threads_per_warp_m} * {threads_per_warp_n} * {vector_k})\nWarpPerBlock", 
+           fontsize=10, ha='center', va='center', color='white')
+    
+    # Draw the color bar on left side
+    for i in range(warps_per_block_m):
+        warp_color = warp_colors[i % len(warp_colors)]
+        y_pos = 0.8 - (i+1) * warp_height
+        
+        # Draw vertical color bar
+        color_rect = patches.Rectangle(
+            (0.02, y_pos), 
+            color_bar_width - 0.01, warp_height,
+            linewidth=1, 
+            edgecolor='white', 
+            facecolor=warp_color,
+            alpha=0.8
+        )
+        ax.add_patch(color_rect)
+    
+    # Reserve space for the RepeatM section at the bottom
+    # The previous thread blocks will end at 0.8 - warps_per_block_m * warp_height
+    repeat_section_top = 0.8 - warps_per_block_m * warp_height - 0.05
+    
+    # Draw the RepeatM section at the bottom with clear separation
+    repeat_box = patches.Rectangle(
+        (0.02, repeat_section_top - 0.08), 
+        0.3, 0.08,
+        linewidth=1, 
+        edgecolor='white', 
+        facecolor='#1E90FF',
+        alpha=0.5
+    )
+    ax.add_patch(repeat_box)
+    repeat_val = hierarchical_structure.get('Repeat', [4])[0] if hierarchical_structure.get('Repeat') and len(hierarchical_structure.get('Repeat')) > 0 else 4
+    ax.text(0.17, repeat_section_top - 0.04, f"{repeat_val} * ({warps_per_block_m} * {threads_per_warp_m} * {threads_per_warp_n} * {vector_k})\nRepeatM", 
+           fontsize=10, ha='center', va='center', color='white')
+    
+    # Draw warps and threads in the center section
+    for warp_idx, (warp_key, warp_data) in enumerate(thread_blocks.items()):
+        warp_color = warp_colors[warp_idx % len(warp_colors)]
+        
+        # Y position for this warp block
+        y_pos = 0.8 - (warp_idx + 1) * warp_height
+        
+        # Draw warp label on the left
+        ax.text(color_bar_width + 0.02, y_pos + warp_height/2, f"Warp{warp_idx}", 
+               fontsize=10, ha='left', va='center', color='white')
+        
+        # Create grid layout for threads
+        thread_grid_width = thread_area_width - color_bar_width - 0.05
+        thread_grid_height = warp_height * 0.9
+        
+        # Draw warp container
+        warp_box = patches.Rectangle(
+            (color_bar_width + 0.04, y_pos + 0.01), 
+            thread_grid_width, thread_grid_height,
+            linewidth=1, 
+            edgecolor='white', 
+            facecolor=warp_color,
+            alpha=0.3
+        )
+        ax.add_patch(warp_box)
+        
+        # Calculate cell dimensions for threads
+        cell_width = thread_grid_width / max(threads_per_warp_m, 1)
+        cell_height = thread_grid_height / max(threads_per_warp_n, 1)
+        
+        # Draw thread cells
+        for thread_key, thread_data in warp_data.items():
+            thread_pos = thread_data.get('position', [0, 0])
+            thread_id = thread_data.get('global_id', 0)
+            
+            # Calculate position for this thread cell with safe indexing
+            x_pos = thread_pos[0] if len(thread_pos) > 0 else 0
+            y_pos_thread = thread_pos[1] if len(thread_pos) > 1 else 0
+            
+            cell_x = color_bar_width + 0.04 + x_pos * cell_width
+            cell_y = y_pos + 0.01 + (threads_per_warp_n - y_pos_thread - 1) * cell_height
+            
+            # Draw thread cell
+            thread_box = patches.Rectangle(
+                (cell_x, cell_y),
+                cell_width, cell_height,
+                linewidth=1,
+                edgecolor='white',
+                facecolor=warp_color,
+                alpha=0.7
+            )
+            ax.add_patch(thread_box)
+            
+            # Add thread ID
+            ax.text(cell_x + cell_width/2, cell_y + cell_height/2, f"T{thread_id}",
+                   fontsize=8, ha='center', va='center', color='white')
+    
+    # Draw C++ code on the right side if provided
+    if code_snippet:
+        code_x = thread_area_width + 0.05  # Start of code area
+        code_y = 0.85  # Top of code area
+        
+        # Draw code background
+        code_box = patches.Rectangle(
+            (code_x, 0.25), 
+            0.42, 0.6,
+            linewidth=1,
+            edgecolor='white',
+            facecolor='#222222',
+            alpha=0.7
+        )
+        ax.add_patch(code_box)
+        
+        # Define colors for syntax highlighting
+        syntax_colors = {
+            'keyword': '#569CD6',    # Blue
+            'type': '#4EC9B0',       # Teal
+            'namespace': '#9CDCFE',  # Light blue
+            'function': '#DCDCAA',   # Yellow
+            'comment': '#6A9955',    # Green
+            'number': '#B5CEA8',     # Light green
+            'operator': '#D4D4D4',   # Light gray
+            'string': '#CE9178',     # Orange
+            'default': '#D4D4D4'     # Light gray
+        }
+        
+        # Keywords to color
+        keywords = ['template', 'typename', 'constexpr', 'static', 'return', 'using', 'if', 'else', 'for', 'while']
+        types = ['index_t', 'tuple', 'sequence', 'Problem', 'int', 'float', 'double', 'bool']
+        
+        # Split the code into lines
+        code_lines = code_snippet.split('\n')
+        
+        # Add code text with syntax highlighting
+        for i, line in enumerate(code_lines):
+            if i >= 20:  # Limit to 20 lines to prevent overflow
+                break
+                
+            # Position for this line
+            y_pos = code_y - 0.025 * i
+            
+            # Skip completely if line is too long
+            if len(line) > 70:
+                parts = []
+                current_part = ""
+                for word in line.split():
+                    if len(current_part + " " + word) > 70:
+                        parts.append(current_part)
+                        current_part = word
+                    else:
+                        current_part += (" " + word if current_part else word)
+                if current_part:
+                    parts.append(current_part)
+                    
+                for j, part in enumerate(parts):
+                    sub_y_pos = code_y - 0.025 * (i + j * 0.8)
+                    ax.text(code_x + 0.01, sub_y_pos, part, 
+                           fontsize=8, ha='left', va='center', 
+                           family='monospace', color=syntax_colors['default'])
+                continue
+            
+            # Comments handling
+            if "//" in line:
+                comment_parts = line.split("//")
+                if len(comment_parts) >= 2:
+                    # Draw code part and comment part separately
+                    ax.text(code_x + 0.01, y_pos, comment_parts[0], 
+                           fontsize=8, ha='left', va='center', 
+                           family='monospace', color=syntax_colors['default'])
+                    ax.text(code_x + 0.01 + len(comment_parts[0]) * 0.005, y_pos, 
+                           '//' + comment_parts[1], 
+                           fontsize=8, ha='left', va='center', 
+                           family='monospace', color=syntax_colors['comment'])
+                    continue
+            
+            # Simple syntax highlighting for other lines
+            line_color = syntax_colors['default']
+            if any(keyword in line.split() for keyword in keywords):
+                line_color = syntax_colors['keyword']
+            elif any(type_name in line.split() for type_name in types):
+                line_color = syntax_colors['type']
+            elif "ck_tile::" in line or "::" in line:
+                line_color = syntax_colors['namespace']
+            elif "(" in line and ")" in line and not "=" in line:
+                line_color = syntax_colors['function']
+                
+            ax.text(code_x + 0.01, y_pos, line, 
+                   fontsize=8, ha='left', va='center', 
+                   family='monospace', color=line_color)
+        
+        # Add dimension annotations based on detected values in the code
+        dimension_values = hierarchical_structure.get('DimensionValues', [])
+        
+        # Only show dimension arrows if explicitly requested
+        if show_arrows and dimension_values:
+            # Define arrow parameters
+            arrow_y = 0.2  # Even lower position to ensure they're below the code
+            start_x = code_x + 0.1
+            arrow_spacing = 0.07  # Increase spacing between arrows
+            
+            # Draw dimension values evenly spaced
+            for i, value in enumerate(dimension_values[:6]):  # Limit to 6 dimensions
+                x_pos = start_x + i * arrow_spacing
+                
+                # Draw number
+                ax.text(x_pos, arrow_y, str(value), 
+                       fontsize=12, ha='center', va='center', 
+                       color='red', fontweight='bold')
+                
+                # Draw an arrow pointing to the number
+                arr_len = 0.03
+                ax.annotate("", xy=(x_pos, arrow_y - arr_len), 
+                          xytext=(x_pos, arrow_y - 0.06),
+                          arrowprops=dict(arrowstyle="->", color='red', lw=1.5))
+    
+    # Remove axes
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.axis('off')
+    
+    plt.tight_layout()
+    return fig
+
 if __name__ == "__main__":
     # Example usage
     example_code = """
@@ -999,5 +1318,8 @@ if __name__ == "__main__":
     
     fig3 = visualize_thread_access_pattern(mock_viz_data, 3, 10)
     plt.savefig("thread_access.png", dpi=150, bbox_inches='tight')
+    
+    fig4 = visualize_hierarchical_tiles(mock_viz_data)
+    plt.savefig("hierarchical_tiles.png", dpi=150, bbox_inches='tight')
     
     plt.show() 

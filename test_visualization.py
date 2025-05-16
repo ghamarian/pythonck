@@ -71,27 +71,31 @@ def create_indexing_visualization(indexing_debug, variables):
     ax.add_patch(y_container)
     ax.text(0.725, y_container_rect[1] + y_container_height + 0.01, "Y_dims", color='blue', fontsize=14, ha='center', va='bottom')
     
-    # Y0, Y1, Y2 boxes
-    y0_box = patches.Rectangle((0.575, p_dims_y - 0.08), 
-                            0.08, 0.1, 
-                            linewidth=1, edgecolor='blue', facecolor='lightyellow', zorder=2)
-    ax.add_patch(y0_box)
-    ax.text(0.615, p_dims_y - 0.03, "Y0", fontsize=12, ha='center')
-    y0_pos = (0.615, p_dims_y - 0.08)
+    # Dynamically find Y dimensions from the index_mapping
+    y_keys = [key for key in index_mapping.keys() if key.startswith("Y")]
+    num_y_dims = len(y_keys)
     
-    y1_box = patches.Rectangle((0.685, p_dims_y - 0.08), 
-                            0.08, 0.1, 
-                            linewidth=1, edgecolor='blue', facecolor='lightyellow', zorder=2)
-    ax.add_patch(y1_box)
-    ax.text(0.725, p_dims_y - 0.03, "Y1", fontsize=12, ha='center')
-    y1_pos = (0.725, p_dims_y - 0.08)
-    
-    y2_box = patches.Rectangle((0.795, p_dims_y - 0.08), 
-                            0.08, 0.1, 
-                            linewidth=1, edgecolor='blue', facecolor='lightyellow', zorder=2)
-    ax.add_patch(y2_box)
-    ax.text(0.835, p_dims_y - 0.03, "Y2", fontsize=12, ha='center')
-    y2_pos = (0.835, p_dims_y - 0.08)
+    # Position Y boxes dynamically
+    y_box_positions = {}
+    if num_y_dims > 0:
+        # Calculate spacing based on number of Y dimensions
+        y_box_width = 0.08
+        y_spacing = min(0.09, 0.30 / max(num_y_dims, 1))
+        y_start_x = 0.575
+        
+        for i, y_key in enumerate(sorted(y_keys)):
+            # Calculate position
+            x_pos = y_start_x + i * y_spacing
+            
+            # Create box
+            y_box = patches.Rectangle((x_pos, p_dims_y - 0.08), 
+                                  y_box_width, 0.1, 
+                                  linewidth=1, edgecolor='blue', facecolor='lightyellow', zorder=2)
+            ax.add_patch(y_box)
+            ax.text(x_pos + y_box_width/2, p_dims_y - 0.03, y_key, fontsize=12, ha='center')
+            
+            # Store position for arrows
+            y_box_positions[y_key] = (x_pos + y_box_width/2, p_dims_y - 0.08)
     
     # Middle section - Hidden Ids
     ax.text(0.05, hidden_y + 0.05, "Hidden Ids", color='darkgreen', fontsize=14,
@@ -288,13 +292,12 @@ def create_indexing_visualization(indexing_debug, variables):
     
     # Draw arrows from Y dimensions to H0/H1 elements
     for y_key, mappings in y_mappings.items():
-        y_idx = int(y_key[1:])  # Get Y index (0, 1, or 2)
-        if y_idx == 0:
-            y_start = y0_pos
-        elif y_idx == 1:
-            y_start = y1_pos
+        # Use the dynamically calculated positions
+        if y_key in y_box_positions:
+            y_start = y_box_positions[y_key]
         else:
-            y_start = y2_pos
+            # Skip this Y dimension if we don't have a position for it
+            continue
         
         for i, mapping in enumerate(mappings):
             target = mapping.get("Target")
@@ -495,6 +498,74 @@ def test_variable_based_template():
         print(f"Error creating visualization: {str(e)}")
         raise
 
+def test_custom_encoding():
+    """Test visualization with a custom template for testing relationship mapping."""
+    # Example code with specific pattern to test
+    example_code = """
+    tile_distribution_encoding<
+        sequence<1>,                            // 0 R
+        tuple<sequence<M0, M1, M2>,             // H
+              sequence<K0, K1>>,                // H
+        tuple<sequence<1>,                      // p major
+              sequence<1,2>>,                   // p minor
+        tuple<sequence<1>,                      // p minor
+              sequence<2, 0>>,                  // p minor
+        sequence<1, 2>,                         // Y major
+        sequence<0, 1>>{}                       // y minor
+    """
+    
+    # Parse the encoding
+    parser = TileDistributionParser()
+    encoding = parser.parse_tile_distribution_encoding(example_code)
+    
+    # Set variable values
+    variables = {
+        "M0": 2,
+        "M1": 8,
+        "M2": 4,
+        "K0": 4,
+        "K1": 4
+    }
+    
+    # Generate indexing debug information
+    indexing_debug = debug_indexing_relationships(encoding, variables)
+    print("\nIndexing Relationships for Custom Encoding:")
+    print(json.dumps(indexing_debug, indent=2))
+    
+    # Create and save the indexing visualization
+    print("\nGenerating indexing visualization for custom encoding...")
+    fig0 = create_indexing_visualization(indexing_debug, variables)
+    plt.figure(fig0.number)
+    plt.savefig("custom_indexing_visualization.png", dpi=200, bbox_inches='tight')
+    
+    # Create and display tile distribution visualization
+    try:
+        tile_dist = TileDistribution(encoding, variables)
+        viz_data = tile_dist.get_visualization_data()
+        
+        print("\nTile Distribution Data:")
+        print(f"- Tile Shape: {viz_data.get('tile_shape')}")
+        print(f"- Threads: {len(set(viz_data.get('thread_mapping', {}).values()))}")
+        
+        # Tile distribution visualization
+        print("\nGenerating tile distribution visualization...")
+        fig2 = visualizer.visualize_tile_distribution(viz_data)
+        plt.figure(fig2.number)
+        plt.savefig("custom_tile_distribution.png", dpi=150, bbox_inches='tight')
+        
+        # Display the visualization
+        plt.figure(fig0.number)
+        plt.show()
+        
+    except Exception as e:
+        print(f"Error creating visualization: {str(e)}")
+        raise
+
 if __name__ == "__main__":
     print("Testing tile distribution visualization")
-    test_variable_based_template() 
+    # Original test
+    test_variable_based_template()
+    
+    # New custom test
+    print("\n===== Testing Custom Encoding =====")
+    test_custom_encoding() 

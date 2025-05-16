@@ -26,6 +26,7 @@ class TileDistribution:
         """
         self.encoding = encoding
         self.variables = variables or {}
+        self.source_code = None
         
         # Extract key dimensions
         self.rs_lengths = self._resolve_values(encoding.get('RsLengths', []))
@@ -167,6 +168,24 @@ class TileDistribution:
         efficiency = 0.95  # Example efficiency factor
         return occupancy * efficiency
     
+    def set_tile_name(self, name: str):
+        """
+        Set a custom name for this tile distribution.
+        
+        Args:
+            name: The name to display in the visualization
+        """
+        self.encoding['_tile_name'] = name
+        
+    def set_source_code(self, code: str):
+        """
+        Set the source code for this tile distribution to show in the visualization.
+        
+        Args:
+            code: Source code string
+        """
+        self.source_code = code
+        
     def get_visualization_data(self) -> Dict[str, Any]:
         """
         Get data needed for visualization.
@@ -174,6 +193,9 @@ class TileDistribution:
         Returns:
             Dictionary with visualization data
         """
+        # Calculate hierarchical tile structure
+        hierarchical_structure = self.calculate_hierarchical_tile_structure()
+        
         return {
             'tile_shape': self.tile_shape,
             'thread_mapping': self.thread_mapping,
@@ -183,8 +205,146 @@ class TileDistribution:
                 'x_dims': self.x_dims
             },
             'occupancy': self.get_occupancy(),
-            'utilization': self.get_utilization()
+            'utilization': self.get_utilization(),
+            'hierarchical_structure': hierarchical_structure,
+            'source_code': self.source_code
         }
+        
+    def calculate_hierarchical_tile_structure(self) -> Dict[str, Any]:
+        """
+        Calculate the hierarchical structure of tiles for visualization.
+        
+        This calculates the detailed structure of:
+        - BlockSize (M, N) dimensions  
+        - ThreadsPerWarp
+        - WarpsPerBlock
+        - VectorDimensions
+        - Repeat factors
+        
+        Returns:
+            Dictionary with hierarchical tile information
+        """
+        # Extract and resolve key dimensions from encoding
+        hierarchical_info = {
+            'BlockSize': [],            # Overall block dimensions
+            'ThreadPerWarp': [],        # ThreadPerWarp dimensions (typically 16x4 in example)
+            'WarpPerBlock': [],         # WarpsPerBlock dimensions (typically 4 in example) 
+            'VectorDimensions': [],     # Vector dimensions (typically 8 in example)
+            'Repeat': [],               # Repeat factors
+            'ThreadBlocks': {},         # Thread layout in blocks with IDs
+            'TileName': self.encoding.get('_tile_name', "Tile Distribution"),  # Name of the tile distribution
+            'DimensionValues': []       # Values for dimensions (for code annotations)
+        }
+        
+        # First parse hs_lengthss structure which contains the hierarchy information
+        h_sequences = self.hs_lengthss if self.hs_lengthss else []
+        
+        # Ensure hierarchical_info has some default values if hs_lengthss is empty or malformed
+        if not h_sequences:
+            # Set sensible defaults if no sequence data is available
+            hierarchical_info['ThreadPerWarp'] = [16, 4]  # Default thread dimensions
+            hierarchical_info['WarpPerBlock'] = [4]       # Default warps per block
+            hierarchical_info['VectorDimensions'] = [8]   # Default vector size
+            hierarchical_info['Repeat'] = [4]            # Default repeat factor
+        elif len(h_sequences) >= 1:
+            # H0 typically contains information like [RepeatM, WarpPerBlockM, ThreadPerWarpM, VectorM]
+            h0 = h_sequences[0]
+            if h0 and len(h0) >= 4:
+                hierarchical_info['Repeat'].append(h0[0])
+                hierarchical_info['WarpPerBlock'].append(h0[1])
+                hierarchical_info['ThreadPerWarp'].append(h0[2])
+                hierarchical_info['VectorDimensions'].append(h0[3])
+                
+                # Store dimension values for visualization annotations
+                for val in h0:
+                    if isinstance(val, int) or (isinstance(val, str) and val in self.variables):
+                        resolved_val = self.variables.get(val, val) if isinstance(val, str) else val
+                        hierarchical_info['DimensionValues'].append(resolved_val)
+            elif h0 and len(h0) >= 2:
+                # Simplified case with fewer dimensions
+                hierarchical_info['ThreadPerWarp'] = h0[:2]
+                
+                # Store dimension values for visualization annotations
+                for val in h0:
+                    if isinstance(val, int) or (isinstance(val, str) and val in self.variables):
+                        resolved_val = self.variables.get(val, val) if isinstance(val, str) else val
+                        hierarchical_info['DimensionValues'].append(resolved_val)
+                        
+                # Add defaults for missing values
+                if 'WarpPerBlock' not in hierarchical_info or not hierarchical_info['WarpPerBlock']:
+                    hierarchical_info['WarpPerBlock'] = [4]
+                if 'VectorDimensions' not in hierarchical_info or not hierarchical_info['VectorDimensions']:
+                    hierarchical_info['VectorDimensions'] = [8]
+                if 'Repeat' not in hierarchical_info or not hierarchical_info['Repeat']:
+                    hierarchical_info['Repeat'] = [4]
+            else:
+                # Set defaults if h0 is empty or invalid
+                hierarchical_info['ThreadPerWarp'] = [16, 4]
+                hierarchical_info['WarpPerBlock'] = [4]
+                hierarchical_info['VectorDimensions'] = [8]
+                hierarchical_info['Repeat'] = [4]
+                
+        if len(h_sequences) >= 2:
+            # H1 typically contains information like [RepeatN, WarpPerBlockN, ThreadPerWarpN, VectorN]
+            h1 = h_sequences[1]
+            if h1 and len(h1) >= 4:
+                # Make sure all required lists exist before appending
+                if 'Repeat' not in hierarchical_info:
+                    hierarchical_info['Repeat'] = []
+                if 'WarpPerBlock' not in hierarchical_info:
+                    hierarchical_info['WarpPerBlock'] = []
+                if 'ThreadPerWarp' not in hierarchical_info:
+                    hierarchical_info['ThreadPerWarp'] = []
+                if 'VectorDimensions' not in hierarchical_info:
+                    hierarchical_info['VectorDimensions'] = []
+                
+                # Now append the values safely
+                hierarchical_info['Repeat'].append(h1[0])
+                hierarchical_info['WarpPerBlock'].append(h1[1])
+                hierarchical_info['ThreadPerWarp'].append(h1[2])
+                hierarchical_info['VectorDimensions'].append(h1[3])
+        
+        # Calculate block size
+        threads_per_warp = hierarchical_info.get('ThreadPerWarp', [16, 4])
+        warps_per_block = hierarchical_info.get('WarpPerBlock', [4])
+        
+        if len(threads_per_warp) >= 2 and len(warps_per_block) >= 1:
+            # Calculate block dimensions
+            hierarchical_info['BlockSize'] = [
+                threads_per_warp[0] * warps_per_block[0],
+                threads_per_warp[1]
+            ]
+        
+        # Generate thread block structure
+        threads_per_warp_m = threads_per_warp[0] if len(threads_per_warp) > 0 else 16
+        threads_per_warp_n = threads_per_warp[1] if len(threads_per_warp) > 1 else 4
+        warps_per_block_m = warps_per_block[0] if len(warps_per_block) > 0 else 4
+        
+        # Create thread blocks with IDs
+        thread_blocks = {}
+        
+        # Warp level organization
+        for warp_idx in range(warps_per_block_m):
+            warp_key = f"Warp{warp_idx}"
+            thread_blocks[warp_key] = {}
+            
+            # Thread level within warp
+            for thread_m in range(threads_per_warp_m):
+                for thread_n in range(threads_per_warp_n):
+                    thread_id = thread_m + thread_n * threads_per_warp_m + warp_idx * threads_per_warp_m * threads_per_warp_n
+                    thread_blocks[warp_key][f"T{thread_id}"] = {
+                        "position": [thread_m, thread_n],
+                        "global_id": thread_id
+                    }
+        
+        hierarchical_info['ThreadBlocks'] = thread_blocks
+        
+        # Get information about the overall calculation structure
+        # For example VectorK = 8 from the example image
+        if 'VectorDimensions' in hierarchical_info and len(hierarchical_info['VectorDimensions']) > 0:
+            hierarchical_info['VectorK'] = hierarchical_info['VectorDimensions'][0]
+        
+        return hierarchical_info
 
 def interleave_bits(x: int, y: int, n: int) -> List[int]:
     """Interleave the bits of x and y to create a z-order curve.
