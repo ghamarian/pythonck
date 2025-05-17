@@ -302,53 +302,85 @@ class TileDistributionVisualizer:
                 hidden_values[value_key] = [(i, src_type, src_idx, major, minor)]
         
         # Draw hidden boxes evenly distributed
-        hidden_box_width = 0.12
         hidden_box_height = section_height - 0.05
         num_hidden_boxes = len(hidden_values)
-        hidden_boxes_positions = [] # Renamed to avoid confusion, this will store top/bottom for arrows
+        hidden_boxes_positions = [] 
 
         hidden_section_width = 0.8
         hidden_start_x = 0.1
         
-        text_nudge_x = 0.006 # Increased nudge to the right for internal Hidden Id text
-        text_nudge_y = 0.005 # Nudge upwards for internal Hidden Id text
+        # Adaptive settings for hidden boxes
+        hidden_label_fontsize = 10
+        hidden_value_fontsize = 8
+        min_sensible_box_width = 0.06
+        max_sensible_box_width = 0.12
+        desired_gap_between_boxes = 0.015
+
+        if num_hidden_boxes > 6:
+            hidden_label_fontsize = 8
+            hidden_value_fontsize = 6
+        elif num_hidden_boxes > 4:
+            hidden_label_fontsize = 9
+            hidden_value_fontsize = 7
+
+        if num_hidden_boxes <= 0: # Should not happen if hidden_values is populated
+            actual_hidden_box_width = max_sensible_box_width
+            actual_gap = 0
+        elif num_hidden_boxes == 1:
+            actual_hidden_box_width = min(max_sensible_box_width, hidden_section_width)
+            actual_gap = 0
+        else:
+            # Calculate width based on fitting them with desired gap
+            width_if_gaps_present = (hidden_section_width - (num_hidden_boxes - 1) * desired_gap_between_boxes) / num_hidden_boxes
+            
+            if width_if_gaps_present < min_sensible_box_width:
+                actual_hidden_box_width = min_sensible_box_width
+                actual_gap = (hidden_section_width - num_hidden_boxes * actual_hidden_box_width) / (num_hidden_boxes - 1)
+                if actual_gap < 0: actual_gap = 0 # Ensure no negative gap, boxes might touch
+            else:
+                actual_hidden_box_width = min(max_sensible_box_width, width_if_gaps_present)
+                actual_gap = desired_gap_between_boxes
+        
+        text_nudge_x = 0.006 
+        text_nudge_y = 0.005 
         
         arrow_label_fontsize = 7
-        arrow_label_nudge_x = 0.025 # Nudge for arrow labels (right)
-        arrow_label_nudge_y = 0.015 # Nudge for arrow labels (up)
+        arrow_label_nudge_x = 0.025 
+        arrow_label_nudge_y = 0.015 
 
         # Place hidden boxes evenly
+        current_x_offset = hidden_start_x
         sorted_values = sorted(hidden_values.keys())
         for i, value_key in enumerate(sorted_values):
             value_instances = hidden_values[value_key]
-            x_pos = hidden_start_x + (hidden_section_width / max(num_hidden_boxes, 1)) * (i + 0.5) - hidden_box_width/2
+            # x_pos = hidden_start_x + (hidden_section_width / max(num_hidden_boxes, 1)) * (i + 0.5) - actual_hidden_box_width / 2 # Old centering
+            x_pos = current_x_offset # Position box start
             
-            # Display the value (variable name or number)
-            value = value_key.split('_')[0] if '_' in value_key else value_key
+            value = value_key.split('_')[0] if '_' in value_key and not value_key.startswith("S::") else value_key # Handle S:: names correctly
             
             box = patches.Rectangle((x_pos, middle_y - hidden_box_height), 
-                                  hidden_box_width, hidden_box_height, 
+                                  actual_hidden_box_width, hidden_box_height, 
                                   linewidth=1, edgecolor='blue', facecolor='white', zorder=2)
             ax.add_patch(box)
             
             # Add label with both symbolic and numeric values if it's a variable
             if value in variables:
-                # Show both symbolic name and numeric value
-                ax.text(x_pos + hidden_box_width/2 + text_nudge_x, middle_y - hidden_box_height/2 + 0.02 + text_nudge_y, f"{value}", 
-                       ha='center', va='center', fontsize=12, fontweight='bold', zorder=3)
-                ax.text(x_pos + hidden_box_width/2 + text_nudge_x, middle_y - hidden_box_height/2 - 0.02 + text_nudge_y, f"({variables[value]})", 
-                       ha='center', va='center', fontsize=10, zorder=3)
+                ax.text(x_pos + actual_hidden_box_width/2 + text_nudge_x, middle_y - hidden_box_height/2 + 0.02 + text_nudge_y, f"{value}", 
+                       ha='center', va='center', fontsize=hidden_label_fontsize, fontweight='bold', zorder=3)
+                ax.text(x_pos + actual_hidden_box_width/2 + text_nudge_x, middle_y - hidden_box_height/2 - 0.02 + text_nudge_y, f"({variables[value]})", 
+                       ha='center', va='center', fontsize=hidden_value_fontsize, zorder=3)
             else:
-                ax.text(x_pos + hidden_box_width/2 + text_nudge_x, middle_y - hidden_box_height/2 + text_nudge_y, f"{value}", 
-                       ha='center', va='center', fontsize=12, fontweight='bold', zorder=3)
+                ax.text(x_pos + actual_hidden_box_width/2 + text_nudge_x, middle_y - hidden_box_height/2 + text_nudge_y, f"{value}", 
+                       ha='center', va='center', fontsize=hidden_label_fontsize, fontweight='bold', zorder=3)
             
-            # Update hidden_map and store box positions
-            box_top = (x_pos + hidden_box_width/2, middle_y)
-            box_bottom = (x_pos + hidden_box_width/2, middle_y - hidden_box_height)
+            box_top = (x_pos + actual_hidden_box_width/2, middle_y)
+            box_bottom = (x_pos + actual_hidden_box_width/2, middle_y - hidden_box_height)
             
             for instance_idx, src_type, src_idx, major, minor in value_instances:
-                hidden_boxes_positions.append((box_top, box_bottom)) # Storing positions for each instance for arrow mapping
-                hidden_map[(src_type, src_idx, major, minor)] = len(hidden_boxes_positions) - 1 # Map to index in hidden_boxes_positions
+                hidden_boxes_positions.append((box_top, box_bottom)) 
+                hidden_map[(src_type, src_idx, major, minor)] = len(hidden_boxes_positions) - 1 
+            
+            current_x_offset += actual_hidden_box_width + actual_gap # Advance x for next box
         
         # BOTTOM SECTION: X dimensions (R and H)
         

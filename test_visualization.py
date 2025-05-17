@@ -12,10 +12,11 @@ import numpy as np
 from parser import TileDistributionParser, debug_indexing_relationships
 import visualizer
 from tiler import TileDistribution
+from typing import Dict, Any
 
-def create_indexing_visualization(indexing_debug, variables):
+def create_indexing_visualization(indexing_debug, variables, figsize=(16, 10)):
     """Create a visual representation of the indexing relationships."""
-    fig, ax = plt.subplots(figsize=(14, 10))
+    fig, ax = plt.subplots(figsize=figsize)
     
     # Define vertical positions for each level
     title_height = 0.95
@@ -124,57 +125,69 @@ def create_indexing_visualization(indexing_debug, variables):
 
     # Create boxes for each element in H0
     h0_boxes = []
+    h0_element_box_width = 0.06  # Reduced from 0.08
+    h0_element_box_height = 0.07 # Reduced from 0.1
+    h0_element_spacing = 0.08   # Reduced from 0.12
+    h0_label_fontsize = 8       # Reduced from 9
+    h0_value_fontsize = 7       # Reduced from 8
+    h0_index_fontsize = 7       # Reduced from 8
+
     for i, val in enumerate(h0_values):
         # Calculate position within the H0 container
-        box_width = 0.08
-        h0_start_x = 0.15
-        spacing = 0.12
-        x_pos = h0_start_x + i * spacing
+        h0_start_x = 0.15 # Start X for the first H0 element box center
+        x_pos = h0_start_x + i * h0_element_spacing
         
         # Create box
-        box = patches.Rectangle((x_pos - 0.04, hidden_y - 0.08), 
-                              box_width, 0.1, 
+        box = patches.Rectangle((x_pos - h0_element_box_width/2, hidden_y - h0_element_box_height + 0.01), # Adjusted Y for new height
+                              h0_element_box_width, h0_element_box_height, 
                               linewidth=1, edgecolor='blue', facecolor='white', zorder=2)
         ax.add_patch(box)
         
         # Add label with both symbolic and numeric values
         symbolic_val = val
         numeric_val = variables.get(symbolic_val, symbolic_val)
-        ax.text(x_pos, hidden_y, f"{symbolic_val}", fontsize=9, ha='center', va='center')
-        ax.text(x_pos, hidden_y - 0.04, f"({numeric_val})", fontsize=8, ha='center', va='center')
+        # Adjust text Y positions relative to new box center/height
+        ax.text(x_pos, hidden_y - h0_element_box_height/2 + 0.01 + 0.015, f"{symbolic_val}", fontsize=h0_label_fontsize, ha='center', va='center')
+        ax.text(x_pos, hidden_y - h0_element_box_height/2 + 0.01 - 0.015, f"({numeric_val})", fontsize=h0_value_fontsize, ha='center', va='center')
         
-        # Add index label
-        ax.text(x_pos, hidden_y - 0.08, f"[{i}]", fontsize=8, ha='center', va='top', color='blue')
+        # Add index label at the bottom of the box
+        ax.text(x_pos, hidden_y - h0_element_box_height + 0.01, f"[{i}]", fontsize=h0_index_fontsize, ha='center', va='bottom', color='blue')
         
         # Store box position (center of the box's top edge) for incoming arrows
-        h0_boxes.append((x_pos, hidden_y - 0.08 + 0.1)) # Target top-center of the small box
+        h0_boxes.append((x_pos, hidden_y - h0_element_box_height + 0.01 + h0_element_box_height)) 
     
     # Create boxes for each element in H1
     h1_boxes = []
+    h1_element_box_width = 0.06  # Reduced from 0.08
+    h1_element_box_height = 0.07 # Reduced from 0.1
+    h1_element_spacing = 0.08   # Reduced from 0.1 (or 0.09 based on previous examples)
+    h1_label_fontsize = 8       # Reduced from 9
+    h1_value_fontsize = 7       # Reduced from 8
+    h1_index_fontsize = 7       # Reduced from 8
+
     for i, val in enumerate(h1_values):
         # Calculate position within the H1 container
-        box_width = 0.08
-        h1_start_x = 0.55
-        spacing = 0.1
-        x_pos = h1_start_x + i * spacing
+        h1_start_x = 0.55 # Start X for the first H1 element box center
+        x_pos = h1_start_x + i * h1_element_spacing
         
         # Create box
-        box = patches.Rectangle((x_pos - 0.04, hidden_y - 0.08), 
-                              box_width, 0.1, 
+        box = patches.Rectangle((x_pos - h1_element_box_width/2, hidden_y - h1_element_box_height + 0.01), # Adjusted Y for new height
+                              h1_element_box_width, h1_element_box_height, 
                               linewidth=1, edgecolor='red', facecolor='white', zorder=2)
         ax.add_patch(box)
         
         # Add label with both symbolic and numeric values
         symbolic_val = val
         numeric_val = variables.get(symbolic_val, symbolic_val)
-        ax.text(x_pos, hidden_y, f"{symbolic_val}", fontsize=9, ha='center', va='center')
-        ax.text(x_pos, hidden_y - 0.04, f"({numeric_val})", fontsize=8, ha='center', va='center')
+        # Adjust text Y positions relative to new box center/height
+        ax.text(x_pos, hidden_y - h1_element_box_height/2 + 0.01 + 0.015, f"{symbolic_val}", fontsize=h1_label_fontsize, ha='center', va='center')
+        ax.text(x_pos, hidden_y - h1_element_box_height/2 + 0.01 - 0.015, f"({numeric_val})", fontsize=h1_value_fontsize, ha='center', va='center')
         
-        # Add index label
-        ax.text(x_pos, hidden_y - 0.08, f"[{i}]", fontsize=8, ha='center', va='top', color='red')
+        # Add index label at the bottom of the box
+        ax.text(x_pos, hidden_y - h1_element_box_height + 0.01, f"[{i}]", fontsize=h1_index_fontsize, ha='center', va='bottom', color='red')
         
         # Store box position (center of the box's top edge) for incoming arrows
-        h1_boxes.append((x_pos, hidden_y - 0.08 + 0.1)) # Target top-center of the small box
+        h1_boxes.append((x_pos, hidden_y - h1_element_box_height + 0.01 + h1_element_box_height))
     
     # Bottom section - R and H boxes
     ax.text(0.05, r_h_dims_y + 0.05, "Bottom Ids", color='darkgreen', fontsize=14,
@@ -353,19 +366,15 @@ def create_indexing_visualization(indexing_debug, variables):
     
     h0_element_source_positions = []
     for i, val in enumerate(h0_values):
-        box_width = 0.08
-        h0_start_x = 0.15
-        spacing = 0.12
-        x_pos = h0_start_x + i * spacing
-        h0_element_source_positions.append((x_pos, hidden_y - 0.08)) # Bottom-center of small box
+        # Use the new size/spacing parameters for consistency
+        x_pos = h0_start_x + i * h0_element_spacing 
+        h0_element_source_positions.append((x_pos, hidden_y - h0_element_box_height + 0.01)) # Bottom-center of small box
 
     h1_element_source_positions = []
     for i, val in enumerate(h1_values):
-        box_width = 0.08
-        h1_start_x = 0.55
-        spacing = 0.1
-        x_pos = h1_start_x + i * spacing
-        h1_element_source_positions.append((x_pos, hidden_y - 0.08)) # Bottom-center of small box
+        # Use the new size/spacing parameters for consistency
+        x_pos = h1_start_x + i * h1_element_spacing
+        h1_element_source_positions.append((x_pos, hidden_y - h1_element_box_height + 0.01)) # Bottom-center of small box
 
     for i, h0_source_pos in enumerate(h0_element_source_positions):
         arrow = patches.FancyArrowPatch(
