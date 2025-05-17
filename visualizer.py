@@ -305,9 +305,18 @@ class TileDistributionVisualizer:
         hidden_box_width = 0.12
         hidden_box_height = section_height - 0.05
         num_hidden_boxes = len(hidden_values)
+        hidden_boxes_positions = [] # Renamed to avoid confusion, this will store top/bottom for arrows
+
         hidden_section_width = 0.8
         hidden_start_x = 0.1
         
+        text_nudge_x = 0.006 # Increased nudge to the right for internal Hidden Id text
+        text_nudge_y = 0.005 # Nudge upwards for internal Hidden Id text
+        
+        arrow_label_fontsize = 7
+        arrow_label_nudge_x = 0.025 # Nudge for arrow labels (right)
+        arrow_label_nudge_y = 0.015 # Nudge for arrow labels (up)
+
         # Place hidden boxes evenly
         sorted_values = sorted(hidden_values.keys())
         for i, value_key in enumerate(sorted_values):
@@ -325,12 +334,12 @@ class TileDistributionVisualizer:
             # Add label with both symbolic and numeric values if it's a variable
             if value in variables:
                 # Show both symbolic name and numeric value
-                ax.text(x_pos + hidden_box_width/2, middle_y - hidden_box_height/2 + 0.02, f"{value}", 
+                ax.text(x_pos + hidden_box_width/2 + text_nudge_x, middle_y - hidden_box_height/2 + 0.02 + text_nudge_y, f"{value}", 
                        ha='center', va='center', fontsize=12, fontweight='bold', zorder=3)
-                ax.text(x_pos + hidden_box_width/2, middle_y - hidden_box_height/2 - 0.02, f"({variables[value]})", 
+                ax.text(x_pos + hidden_box_width/2 + text_nudge_x, middle_y - hidden_box_height/2 - 0.02 + text_nudge_y, f"({variables[value]})", 
                        ha='center', va='center', fontsize=10, zorder=3)
             else:
-                ax.text(x_pos + hidden_box_width/2, middle_y - hidden_box_height/2, f"{value}", 
+                ax.text(x_pos + hidden_box_width/2 + text_nudge_x, middle_y - hidden_box_height/2 + text_nudge_y, f"{value}", 
                        ha='center', va='center', fontsize=12, fontweight='bold', zorder=3)
             
             # Update hidden_map and store box positions
@@ -338,8 +347,8 @@ class TileDistributionVisualizer:
             box_bottom = (x_pos + hidden_box_width/2, middle_y - hidden_box_height)
             
             for instance_idx, src_type, src_idx, major, minor in value_instances:
-                hidden_boxes.append((box_top, box_bottom))
-                hidden_map[(src_type, src_idx, major, minor)] = len(hidden_boxes) - 1
+                hidden_boxes_positions.append((box_top, box_bottom)) # Storing positions for each instance for arrow mapping
+                hidden_map[(src_type, src_idx, major, minor)] = len(hidden_boxes_positions) - 1 # Map to index in hidden_boxes_positions
         
         # BOTTOM SECTION: X dimensions (R and H)
         
@@ -438,43 +447,57 @@ class TileDistributionVisualizer:
         # 1. Top (P) to Hidden connections
         for i in range(num_p_dims):
             if i < len(p_boxes) and ps_to_rhs_major and ps_to_rhs_minor and i < len(ps_to_rhs_major) and i < len(ps_to_rhs_minor):
-                p_box = p_boxes[i]
-                for major, minor in zip(ps_to_rhs_major[i], ps_to_rhs_minor[i]):
+                p_box_start_coord = p_boxes[i]
+                for map_idx, (major, minor) in enumerate(zip(ps_to_rhs_major[i], ps_to_rhs_minor[i])):
                     hidden_key = ("P", i, major, minor)
                     if hidden_key in hidden_map:
                         hidden_idx = hidden_map[hidden_key]
-                        if hidden_idx < len(hidden_boxes):
-                            hidden_top = hidden_boxes[hidden_idx][0]
+                        if hidden_idx < len(hidden_boxes_positions):
+                            hidden_top_coord = hidden_boxes_positions[hidden_idx][0]
                             arrow = patches.FancyArrowPatch(
-                                p_box, hidden_top,
+                                p_box_start_coord, hidden_top_coord,
                                 connectionstyle="arc3,rad=0.1",
                                 arrowstyle=arrow_style,
                                 color='blue', linewidth=1, alpha=0.7, zorder=1
                             )
                             ax.add_patch(arrow)
-        
+
+                            # Add P-arrow label
+                            target_label_p = f"{'R' if major == 0 else 'H'}{'' if major == 0 else major-1}[{minor}]"
+                            label_text_p = f"P{i}[{map_idx}]→{target_label_p}"
+                            mid_x_p = (p_box_start_coord[0] + hidden_top_coord[0]) / 2 + arrow_label_nudge_x
+                            mid_y_p = (p_box_start_coord[1] + hidden_top_coord[1]) / 2 + arrow_label_nudge_y
+                            ax.text(mid_x_p, mid_y_p, label_text_p, fontsize=arrow_label_fontsize, color='blue', ha='center', va='bottom', zorder=4)
+
         # 2. Top (Y) to Hidden connections
         for i in range(num_y_dims):
             if i < len(y_boxes) and i < len(ys_to_rhs_major) and i < len(ys_to_rhs_minor):
-                y_box = y_boxes[i]
+                y_box_start_coord = y_boxes[i]
                 major, minor = ys_to_rhs_major[i], ys_to_rhs_minor[i]
                 hidden_key = ("Y", i, major, minor)
                 if hidden_key in hidden_map:
                     hidden_idx = hidden_map[hidden_key]
-                    if hidden_idx < len(hidden_boxes):
-                        hidden_top = hidden_boxes[hidden_idx][0]
+                    if hidden_idx < len(hidden_boxes_positions):
+                        hidden_top_coord = hidden_boxes_positions[hidden_idx][0]
                         arrow = patches.FancyArrowPatch(
-                            y_box, hidden_top,
+                            y_box_start_coord, hidden_top_coord,
                             connectionstyle="arc3,rad=-0.1",
                             arrowstyle=arrow_style,
-                            color='blue', linewidth=1, alpha=0.7, zorder=1
+                            color='red', linewidth=1, alpha=0.7, zorder=1 # Changed to red
                         )
                         ax.add_patch(arrow)
-        
+
+                        # Add Y-arrow label
+                        target_label_y = f"{'R' if major == 0 else 'H'}{'' if major == 0 else major-1}[{minor}]"
+                        label_text_y = f"Y{i}→{target_label_y}"
+                        mid_x_y = (y_box_start_coord[0] + hidden_top_coord[0]) / 2 + arrow_label_nudge_x
+                        mid_y_y = (y_box_start_coord[1] + hidden_top_coord[1]) / 2 + arrow_label_nudge_y
+                        ax.text(mid_x_y, mid_y_y, label_text_y, fontsize=arrow_label_fontsize, color='red', ha='center', va='bottom', zorder=4)
+
         # 3. Hidden to Bottom (R and H) connections
         for i, (src_type, src_idx, major, minor) in enumerate(hidden_ids):
-            if i < len(hidden_boxes):
-                hidden_bottom = hidden_boxes[i][1]
+            if i < len(hidden_boxes_positions): # Ensure index is valid for hidden_boxes_positions
+                hidden_bottom = hidden_boxes_positions[i][1]
                 if major == 0 and minor < len(r_boxes):  # R dimension
                     r_box = r_boxes[minor]
                     arrow = patches.FancyArrowPatch(
