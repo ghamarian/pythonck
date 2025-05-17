@@ -16,7 +16,7 @@ from typing import Dict, List, Tuple, Any, Optional
 
 # Import local modules
 from parser import TileDistributionParser, debug_indexing_relationships
-from tiler import TileDistribution
+from tiler_pedantic import TileDistributionPedantic as TileDistribution
 import visualizer
 from test_visualization import create_indexing_visualization
 from visualizer import visualize_hierarchical_tiles
@@ -374,47 +374,58 @@ def main():
         # --- Explanation for Hierarchical Parameters ---
         with st.expander("Understanding Hierarchical Parameters (Vector Size, Thread/Warp, Warps/Block)"):
             st.markdown("""
-            The `tile_distribution_encoding` (like the C++ snippet you might input) primarily defines how logical problem dimensions (P-dims for thread mapping, Y-dims for spatial/output mapping) relate to hardware-oriented dimensions (H-sequences and R-sequences).
+This visualizer, now using `tiler_pedantic.py`, aims to faithfully represent the tile distribution logic from C++ `tile_distribution.hpp` and `tile_distribution_encoding.hpp`. The hierarchical parameters like Vector Size, Thread/Warp, and Warps/Block are crucial for understanding how a computation is mapped to GPU hardware.
 
-            Parameters like **Vector Size (K)**, **Thread/Warp (e.g., 16x4)**, and **Warps/Block (e.g., 4)** are part of a specific **distribution strategy** for mapping a computation onto GPU hardware. In Composable Kernel, these are typically found in a `DistributionOrder` within a `Problem` definition, providing explicit C++ template sequences like `ThreadPerWarp_`, `WarpPerBlock_`, `Repeat_`, and `VectorK_` (or similar).
+**Derivation of Hierarchical Parameters in `tiler_pedantic.py`:**
 
-            **How the Visualizer Derives/Infers These Values When Explicit Sequences Are Missing:**
-            - The `TileDistribution` class (in `tiler.py`) processes your input. If it finds explicit distribution strategy sequences (`ThreadPerWarp_`, etc.), it directly uses them.
-            - **If you only provide the raw `tile_distribution_encoding` snippet** (without the full `Problem` or `DistributionOrder`), the `TileDistribution` class attempts to **infer** these hierarchical parameters based on the structure of your encoding, common Composable Kernel patterns, and the H-dimensions you've defined and mapped via P and Y.
-            - The "Hierarchical Tile Structure" visualization then displays these derived/inferred or explicitly provided values.
+The `TileDistributionPedantic` class (in `tiler_pedantic.py`) calculates these parameters in its `calculate_hierarchical_tile_structure` method. It prioritizes hints you can provide in the input encoding dictionary, but will infer them if hints are absent:
 
-            **Examples of Inference Based on Your H-Dimensions and P/Y Mappings:**
-            Consider your example encoding with H-dims like `H0 = <Nr_y, Nr_p, Nw>` and `H1 = <Kr_y, Kr_p, Kw, Kv>`:
+1.  **`visualization_hints` in your input `encoding_dict`**:
+    *   You can guide the visualizer by adding a `visualization_hints` dictionary to your main input.
+    *   `vector_dim_ys_index`: (integer) The index of the YS-dimension that represents the vector length.
+    *   `thread_per_warp_p_indices`: (list of integers) P-dimension index(es) whose component lengths\\' product defines Thread/Warp.
+        *   One index `[pM]` results in `ThreadPerWarp = [product(lengths(P_pM)), 1]`.
+        *   Two indices `[pM, pN]` result in `ThreadPerWarp = [product(lengths(P_pM)), product(lengths(P_pN))]`.
+    *   `warp_per_block_p_indices`: (list of integers) P-dimension index(es) for Warps/Block.
+        *   One index `[pM]` results in `WarpPerBlock = [product(lengths(P_pM)), 1]`.
+        *   Two indices `[pM, pN]` result in `WarpPerBlock = [product(lengths(P_pM)), product(lengths(P_pN))]`.
+    *   `repeat_factor_ys_index`: (integer) YS-dimension index for the repeat factor (currently visualized as `Repeat = [length, 1]`).
 
-            - **Vector Size (K)**: 
-                - The system looks for H-dimension elements that typically represent vectorized operations, often found at the end of an H-sequence. 
-                - In your P/Y mapping `Y2: ["H1[3] = Kv (4)"]`, `Kv` is a strong candidate. The `TileDistribution` class would likely infer the **Vector Size (K) to be the current numeric value of `Kv`** (e.g., 4 from your example mapping).
-                - If multiple H-elements seem like vector candidates (e.g., `Kw` also), heuristics might be used, or it might pick one consistently (e.g., the one mapped by a Y-dim if that convention is followed).
+2.  **Inference Logic (if hints are not provided or insufficient)**:
+    The system uses the number of P-dimensions (`NDimPs`) and Y-dimensions (`NDimYs`) along with their mapped R/H component lengths. The `_get_lengths_for_p_dim_component(p_idx)` method is key, as it determines the R/H lengths associated with a given P-dimension.
 
-            - **Thread/Warp (e.g., M rows x N columns of threads per warp)**:
-                - This is inferred by looking at H-dimension elements that P-dimensions (which often represent thread indices or components of thread work) map to, and which conventionally define the extent of a warp's tile.
-                - For instance, if your P-mappings show `P0` mapping to `H0[1] = Nr_p` (e.g., value 4) for M-like work, and `P1` mapping to `H0[2] = Nw` (e.g., value 8) for N-like work, the system might infer **`threads_per_warp_m` from `Nr_p` (so, 4)** and **`threads_per_warp_n` from `Nw` (so, 8)**. Thus, Thread/Warp could be inferred as `[4, 8]`.
-                - The exact H-elements chosen depend on the `tiler.py` logic matching patterns in your P/Y mappings to conventional roles of H-dimensions (e.g., identifying which H-dims contribute to the M, N, or K logical dimensions of the problem).
+    *   **VectorDimensions (`[K]`)**:
+        *   Uses `vector_dim_ys_index` hint if available.
+        *   Otherwise, if `NDimYs > 0`, it checks the length of the *last* YS-dimension (`ys_lengths_[-1]`). If this length is between 2 and 16 (inclusive), it\\'s inferred as the vector dimension.
+        *   Defaults to `[1]`.
 
-            - **Warps/Block (e.g., M warps x N warps in a block)**:
-                - This is inferred from H-dimensions that represent tiling *above* the individual warp level but *within* a block. 
-                - If, after accounting for `ThreadPerWarp`, remaining parts of the problem dimensions (M or N, as covered by P/Y mappings to H-dims) are tiled by other H-dimension elements, these would inform `Warps/Block`. For example, if an H-dim like `WarpTileM` was mapped and had a value of 4, `warps_per_block_m` could be 4.
-                - In your specific `tile_distribution_encoding` snippet, there isn't an explicitly named H-dimension that directly screams "Warps per Block M-dimension". 
-                - If the `tiler.py` logic cannot clearly infer this from a specific H-dimension in your P/Y mappings, it might then fall back to a **common default** (e.g., 4 warps in the M-dimension, 1 in N, so `[4,1]`).
+    *   **ThreadPerWarp (`[threads_m, threads_n]`)**:
+        *   Uses `thread_per_warp_p_indices` hint if available.
+        *   Otherwise:
+            *   `threads_m` is inferred from the product of component lengths of `P0` (if `NDimPs >= 1`).
+            *   `threads_n` is inferred from the product of component lengths of `P1` (if `NDimPs >= 2`).
+            *   If a P-dim is not available, its contribution defaults to 1.
+        *   Defaults to `[1, 1]`.
 
-            - **Repeat_ (e.g., repeating the warp/block pattern M times x N times)**:
-                - This is often the hardest to infer without explicit `Repeat_` sequences or designated H-dimensions for repetition counts.
-                - If the total span of your problem (as implied by P/Y to H-dim mappings) is larger than what `ThreadPerWarp * WarpPerBlock` covers, the remainder might be attributed to `Repeat_`.
-                - If not clearly inferable, this often **defaults to `[1,1]`** (no further repetition).
+    *   **WarpPerBlock (`[warps_m, warps_n]`)**:
+        *   Uses `warp_per_block_p_indices` hint if available.
+        *   Otherwise (assuming P0 and P1 might have been used for ThreadPerWarp):
+            *   `warps_m` is inferred from the product of component lengths of `P2` (if `NDimPs >= 3`).
+            *   `warps_n` is inferred from the product of component lengths of `P3` (if `NDimPs >= 4`).
+            *   If a P-dim is not available, its contribution defaults to 1.
+        *   **Heuristic Default**: If `WarpPerBlock` remains `[1, 1]` after the above, AND `NDimPs >= 1`, AND `ThreadPerWarp` is non-trivial (i.e., `threads_m * threads_n > 1`), then `WarpPerBlock` is set to `[4, 1]` for a more common visualization.
+        *   Defaults to `[1, 1]`.
 
-            The "Tile Structure Overview" section (BlockSize, Warps/Block, Thread/Warp, Vector(K)) in this visualizer shows these values as derived or inferred by the `TileDistribution` class.
+    *   **Repeat (`[R]`)**:
+        *   Uses `repeat_factor_ys_index` hint if available.
+        *   No specific inference beyond hints currently.
+        *   Defaults to `[1]`. (Note: `Repeat` is often `[R_m, R_n]` conceptually, but current visualization might simplify).
 
-            **Block Size Calculation:**
-            Once `ThreadPerWarp` (M and N components), `WarpPerBlock` (M and N components), and `Repeat_` (M and N components) are determined (either explicitly, inferred, or defaulted), the overall **Block Size** is calculated as:
-            - `Block M = threads_per_warp_m * warps_per_block_m * repeat_m`
-            - `Block N = threads_per_warp_n * warps_per_block_n * repeat_n`
+3.  **BlockSize Calculation**:
+    Once `ThreadPerWarp = [tpw_m, tpw_n]` and `WarpPerBlock = [wpb_m, wpb_n]` are determined:
+    *   `BlockSize = [tpw_m * wpb_m, tpw_n * wpb_n]`
 
-            This visualizer aims to show a structural interpretation based on the information provided. The P/Y mapping section always shows the direct H-dimension sources. The hierarchical display then shows one plausible structural arrangement based on the inferred (or explicitly provided) distribution parameters.
+This explanation clarifies how the visualizer, powered by `tiler_pedantic.py`, arrives at the hierarchical parameters, prioritizing explicit hints and falling back to rule-based inference.
             """)
         # --- End Explanation ---
 

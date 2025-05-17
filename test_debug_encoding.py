@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
-from ck_tile.visualisation.parser import TileDistributionParser
-from ck_tile.visualisation.visualizer import display_raw_encoding, visualize_encoding_structure
+from parser import TileDistributionParser
+from visualizer import display_raw_encoding, visualize_encoding_structure
 import matplotlib.pyplot as plt
 
 # Example from the user
