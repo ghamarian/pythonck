@@ -1171,9 +1171,10 @@ class TileDistributionPedantic:
         # Initialize with defaults that can be overridden by hints
         hierarchical_info = {
             'BlockSize': [], 'ThreadPerWarp': [1, 1], 'WarpPerBlock': [1, 1], 
-            'VectorDimensions': [1], 'Repeat': [1], 'ThreadBlocks': {},
+            'VectorDimensions': [1], 'Repeat': [1, 1], 'ThreadBlocks': {},
             'TileName': self.encoding_input_dict.get('_tile_name', "Pedantic Tile Distribution"),
-            'DimensionValues': []
+            'DimensionValues': [],
+            'VectorDimensionYSIndex': -1 # NEW: To store which YS dim is the vector
         }
 
         # Populate DimensionValues from HsLengthss (raw, for annotation)
@@ -1214,12 +1215,14 @@ class TileDistributionPedantic:
             if vec_ys_idx_hint < len(self.DstrEncode.detail.get('ys_lengths_', [])):
                  val = self.DstrEncode.detail['ys_lengths_'][vec_ys_idx_hint]
                  hierarchical_info['VectorDimensions'] = [val if val > 0 else 1]
+                 hierarchical_info['VectorDimensionYSIndex'] = vec_ys_idx_hint if (val if val > 0 else 1) > 1 else -1 # Store hint index if vector is non-scalar
         elif self.NDimYs > 0 and self.DstrEncode.detail.get('ys_lengths_'):
             # INFERENCE: Assume last YS dim is vector if its length is typical (e.g. <= 16 and > 1)
             last_ys_len = self.DstrEncode.detail['ys_lengths_'][-1]
             if 1 < last_ys_len <= 16:
                 hierarchical_info['VectorDimensions'] = [last_ys_len]
-            # else, default to [1] is already set
+                hierarchical_info['VectorDimensionYSIndex'] = self.NDimYs - 1 # Index of the last YS dim
+            # else, default to [1] is already set, VectorDimensionYSIndex remains -1
 
         # --- Process ThreadPerWarp ---
         tpw_p_indices_hint = hints.get('thread_per_warp_p_indices')
@@ -1237,17 +1240,33 @@ class TileDistributionPedantic:
                 hierarchical_info['ThreadPerWarp'] = [product(m_lengths) if m_lengths else 1, product(n_lengths) if n_lengths else 1]
             # else: uses default [1,1] initialized above
         elif self.NDimPs >= 1: # INFERENCE for ThreadPerWarp
+            # Default to [1,1] initially
             tpw_m_len = 1
             tpw_n_len = 1
-            p0_contrib_lens = self._get_lengths_for_p_dim_component(0)
-            if p0_contrib_lens: tpw_m_len = product(p0_contrib_lens)
-            
-            if self.NDimPs >= 2:
-                p1_contrib_lens = self._get_lengths_for_p_dim_component(1)
-                if p1_contrib_lens: tpw_n_len = product(p1_contrib_lens)
+
+            if self.NDimPs >= 2: # Use P1 for ThreadPerWarp
+                p1_contrib_lens = self._get_lengths_for_p_dim_component(1) # Get all lengths P1 maps to
+                if p1_contrib_lens:
+                    tpw_m_len = p1_contrib_lens[0] # First component for M-dim
+                    if len(p1_contrib_lens) > 1:
+                        tpw_n_len = p1_contrib_lens[1] # Second component for N-dim
+                    else:
+                        tpw_n_len = 1 # If P1 maps to only one, N-dim is 1
+                # If p1_contrib_lens is empty, tpw_m_len/tpw_n_len remain 1
+            elif self.NDimPs == 1: # Only P0 exists, less common for TPW, but use P0
+                p0_contrib_lens = self._get_lengths_for_p_dim_component(0)
+                if p0_contrib_lens:
+                    tpw_m_len = p0_contrib_lens[0]
+                    if len(p0_contrib_lens) > 1:
+                        tpw_n_len = p0_contrib_lens[1]
+                    else:
+                        tpw_n_len = 1
             
             hierarchical_info['ThreadPerWarp'] = [max(1,tpw_m_len), max(1,tpw_n_len)]
-            # else: default [1,1] already set
+            # Default [1,1] is already set if NDimPs = 0 or components are not found
+            # For NDimPs < 2 (i.e. only P0 or no P's), if the user expects TPW from P0, 
+            # they might need a hint if this P1-centric logic isn't desired.
+            # This matches tiler.py's P1-driven TPW.
 
         # --- Process WarpPerBlock ---
         wpb_p_indices_hint = hints.get('warp_per_block_p_indices')
@@ -1260,37 +1279,31 @@ class TileDistributionPedantic:
                 current_hint_val = [current_hint_val]
             
             wpb_combined_lengths_m = []
-            wpb_combined_lengths_n = [] # For 2D WPB hint
+            wpb_combined_lengths_n = [] 
 
-            if len(current_hint_val) == 1: # Assume it's for M-dim of WPB
+            if len(current_hint_val) == 1: 
                  wpb_combined_lengths_m.extend(self._get_lengths_for_p_dim_component(current_hint_val[0]))
-            elif len(current_hint_val) >= 2: # Assume first for M, second for N
+            elif len(current_hint_val) >= 2: 
                  wpb_combined_lengths_m.extend(self._get_lengths_for_p_dim_component(current_hint_val[0]))
                  wpb_combined_lengths_n.extend(self._get_lengths_for_p_dim_component(current_hint_val[1]))
 
             if wpb_combined_lengths_m: wpb_m_len = product(wpb_combined_lengths_m)
             if wpb_combined_lengths_n: wpb_n_len = product(wpb_combined_lengths_n)
             hierarchical_info['WarpPerBlock'] = [max(1,wpb_m_len), max(1,wpb_n_len)]
-             # Ensure it's at least [1] if only one value meaningful
-            if not wpb_combined_lengths_m and not wpb_combined_lengths_n: # Hint didn't resolve to lengths
-                hierarchical_info['WarpPerBlock'] = [1, 1] # Fallback to default [1,1]
+            if not wpb_combined_lengths_m and not wpb_combined_lengths_n:
+                hierarchical_info['WarpPerBlock'] = [1, 1]
 
-        elif self.NDimPs >= 3: # INFERENCE for WarpPerBlock (after TPW might have used P0, P1)
-            # If P2 exists, assume it contributes to M-dimension of WPB
-            p2_contrib_lens = self._get_lengths_for_p_dim_component(2)
-            if p2_contrib_lens: wpb_m_len = product(p2_contrib_lens)
-            
-            if self.NDimPs >= 4:
-                # If P3 exists, assume it contributes to N-dimension of WPB
-                p3_contrib_lens = self._get_lengths_for_p_dim_component(3)
-                if p3_contrib_lens: wpb_n_len = product(p3_contrib_lens)
-            
+        elif self.NDimPs >= 1: # INFERENCE for WarpPerBlock using P0 (aligns with tiler.py)
+            p0_contrib_lens = self._get_lengths_for_p_dim_component(0)
+            if p0_contrib_lens:
+                wpb_m_len = p0_contrib_lens[0] # First component for M-dim
+                if len(p0_contrib_lens) > 1:
+                    wpb_n_len = p0_contrib_lens[1] # Second component for N-dim (less common for WPB)
+                else:
+                    wpb_n_len = 1 # If P0 maps to only one, N-dim is 1 for WPB
+            # If p0_contrib_lens is empty, wpb_m_len/n_len remain 1
             hierarchical_info['WarpPerBlock'] = [max(1,wpb_m_len), max(1,wpb_n_len)]
-            # if hierarchical_info['WarpPerBlock'][1] == 1: # REMOVE THIS BLOCK
-            #      hierarchical_info['WarpPerBlock'] = [hierarchical_info['WarpPerBlock'][0]] # REMOVE THIS BLOCK
-        # else: default [1,1] already set for WarpPerBlock (from initialization)
-        # Ensure WarpPerBlock is at least [1] if logic results in [1,1] or similar non-single element default for 1D case
-        # if hierarchical_info['WarpPerBlock'] == [1,1]: hierarchical_info['WarpPerBlock'] = [1] # REMOVE THIS LINE
+        # else: default [1,1] already set for WarpPerBlock (from initialization if NDimPs = 0)
 
         # If WPB is still [1,1] after hints/inference, and we have some P-dims,
         # apply a more common default for visualization (e.g., 4 warps in M-dim).
@@ -1303,17 +1316,30 @@ class TileDistributionPedantic:
                  hierarchical_info['WarpPerBlock'] = [4, 1]
 
 
-        # --- Process Repeat --- (Kept simple, defaults to [1,1] if no hint)
+        # --- Process Repeat --- (Relies on hint, otherwise defaults to [1,1])
         rep_ys_idx_hint = hints.get('repeat_factor_ys_index')
+        # Default repeat is [1,1] (set at initialization)
         if rep_ys_idx_hint is not None and 0 <= rep_ys_idx_hint < self.NDimYs:
             if rep_ys_idx_hint < len(self.DstrEncode.detail.get('ys_lengths_', [])):
                 val = self.DstrEncode.detail['ys_lengths_'][rep_ys_idx_hint]
-                hierarchical_info['Repeat'] = [val if val > 0 else 1]
+                # Current hint logic applies hint value to M-dimension of Repeat, N-dim remains 1.
+                hierarchical_info['Repeat'] = [max(1, val), 1] 
+        # Removed the automatic inference block that checked Y0->H0[0] and Y2->H1[0]
+        # Repeat remains [1,1] unless the hint above changes it.
         
         # Calculate BlockSize from derived/default TPW and WPB
         tpw_m, tpw_n = hierarchical_info['ThreadPerWarp']
         wpb_m, wpb_n = hierarchical_info['WarpPerBlock']
-        hierarchical_info['BlockSize'] = [tpw_m * wpb_m, tpw_n * wpb_n]
+        
+        # Assuming hierarchical_info['Repeat'] is like [val], applying to M-dimension of repeat by default
+        # repeat_val_m = hierarchical_info['Repeat'][0] if hierarchical_info['Repeat'] and len(hierarchical_info['Repeat']) > 0 else 1
+        # repeat_val_n = 1 # Default N-dimension repeat to 1, unless Repeat becomes a 2-element list in future
+        repeat_val_m, repeat_val_n = hierarchical_info['Repeat'] # Now Repeat is [m,n]
+        
+        hierarchical_info['BlockSize'] = [
+            tpw_m * wpb_m * repeat_val_m,
+            tpw_n * wpb_n * repeat_val_n
+        ]
 
         # ThreadBlocks visualization (Placeholder: generic grid, not pedantic P-coords per thread)
         thread_blocks_viz = {}
@@ -1816,72 +1842,77 @@ class TileDistributionPedantic:
 
 # Example usage (similar to tiler.py)
 if __name__ == "__main__":
+    # User's specific example:
     example_encoding_dict = {
-        "RsLengths": [1], # R0_len = 1
+        "RsLengths": [1],
         "HsLengthss": [
-            ["Nr_y", "Nr_p", "Nw"],         # H0: Nr_y, Nr_p, Nw
-            ["Kr_y", "Kr_p", "Kw", "Kv"]    # H1: Kr_y, Kr_p, Kw, Kv
+            ["M0", "M1", "M2"],      # H0
+            ["K0", "K1"]             # H1
         ],
-        # P0 maps to (H0[1], H1[1]) -> (Nr_p, Kr_p)
-        # P1 maps to (H1[2], H0[2]) -> (Kw, Nw)
-        "Ps2RHssMajor": [[1, 2], [2, 1]], # P0: (H0, H1), P1: (H1, H0) (using 1-based for H idx)
-        "Ps2RHssMinor": [[1, 1], [2, 2]], # P0: (idx1, idx1), P1: (idx2, idx2)
-        
-        # Y0 maps to H0[0] (Nr_y)
-        # Y1 maps to H1[0] (Kr_y)
-        # Y2 maps to H1[3] (Kv)
-        "Ys2RHsMajor": [1, 2, 2], # Y0:H0, Y1:H1, Y2:H1
-        "Ys2RHsMinor": [0, 0, 3]  # Y0:idx0, Y1:idx0, Y2:idx3
+        "Ps2RHssMajor": [ # P0 maps to H0[1], P1 maps to H0[2] and H1[0]
+            [1],                     # P0 Major: H0
+            [1, 2]                   # P1 Major: H0, H1
+        ],
+        "Ps2RHssMinor": [
+            [1],                     # P0 Minor: H0[1] (M1)
+            [2, 0]                   # P1 Minor: H0[2] (M2), H1[0] (K0)
+        ],
+        "Ys2RHsMajor": [1, 2],       # Y0 -> H0, Y1 -> H1
+        "Ys2RHsMinor": [0, 1],       # Y0 -> H0[0] (M0), Y1 -> H1[1] (K1)
+        "PsLengths": [1,1] # Example, assuming NDimP=2 from Ps2RHssMajor
     }
     
     example_variables = {
-        "Nr_y": 4, "Nr_p": 8, "Nw": 2,
-        "Kr_y": 8, "Kr_p": 4, "Kw": 2, "Kv": 4
+        "M0": 4, "M1": 4, "M2": 16,
+        "K0": 4, "K1": 8
     }
 
-    print("--- Pedantic TileDistribution ---")
+    print("--- Pedantic TileDistribution with User's Example ---")
     pedantic_tile_dist = TileDistributionPedantic(example_encoding_dict, example_variables)
     
-    print("\\n--- Encoding Details ---")
-    pedantic_tile_dist.DstrEncode.print_encoding()
+    # print("\n--- Encoding Details ---")
+    # pedantic_tile_dist.DstrEncode.print_encoding()
 
-    print("\\n--- Distribution Details ---")
-    pedantic_tile_dist.print_distribution()
+    # print("\n--- Distribution Details ---")
+    # pedantic_tile_dist.print_distribution()
 
-    print("\\n--- Visualization Data (Pedantic) ---")
+    print("\n--- Visualization Data (Pedantic) ---")
     viz_data_pedantic = pedantic_tile_dist.get_visualization_data()
-    print("Tile Shape:", viz_data_pedantic['tile_shape'])
-    print("Occupancy:", viz_data_pedantic['occupancy'])
-    print("Utilization:", viz_data_pedantic['utilization'])
-    print("Hierarchical Structure:")
-    for key, value in viz_data_pedantic['hierarchical_structure'].items():
+    # print("Tile Shape:", viz_data_pedantic['tile_shape'])
+    # print("Occupancy:", viz_data_pedantic['occupancy'])
+    # print("Utilization:", viz_data_pedantic['utilization'])
+    print("Hierarchical Structure (from get_visualization_data):")
+    hier_struct = viz_data_pedantic.get('hierarchical_structure', {})
+    for key, value in hier_struct.items():
         if key == 'ThreadBlocks':
             print(f"  {key}: {{...omitted for brevity...}}")
         else:
             print(f"  {key}: {value}")
 
-    # Further testing of specific calculation methods would go here.
-    # For example, testing parts of DstrEncode.detail or DstrEncode.PsYs2XsAdaptor logic.
+    # Directly call calculate_hierarchical_tile_structure for its debug prints
+    print("\n--- Direct call to calculate_hierarchical_tile_structure ---")
+    direct_hier_struct = pedantic_tile_dist.calculate_hierarchical_tile_structure()
+    print("Hierarchical Structure (from direct call):")
+    for key, value in direct_hier_struct.items():
+        if key == 'ThreadBlocks':
+            print(f"  {key}: {{...omitted for brevity...}}")
+        else:
+            print(f"  {key}: {value}")
 
-    print("\\n--- Example from tiler.py for comparison ---")
-    # To run this, you'd need to import TileDistribution from tiler.py
-    # from tiler import TileDistribution 
-    # original_tile_dist = TileDistribution(example_encoding_dict, example_variables)
-    # print("Original Tile Shape:", original_tile_dist.tile_shape)
-    # viz_data_original = original_tile_dist.get_visualization_data()
-    # print("Original Hierarchical ThreadPerWarp:", viz_data_original['hierarchical_structure']['ThreadPerWarp'])
-    # print("Original Hierarchical WarpPerBlock:", viz_data_original['hierarchical_structure']['WarpPerBlock'])
-    # print("Original Hierarchical VectorDimensions:", viz_data_original['hierarchical_structure']['VectorDimensions'])
-    # print("Original Hierarchical Repeat:", viz_data_original['hierarchical_structure']['Repeat'])
 
     # --- Specific tests for TileDistributionEncodingPedantic.detail (from before) ---
-    detail = pedantic_tile_dist.DstrEncode.detail # Using the original complex example
-    print(f"\\nCalculated detail.ys_lengths_: {detail['ys_lengths_']}")
-    assert detail['ys_lengths_'] == [4, 8, 4]
-    print(f"Calculated detail.rhs_major_minor_to_ys_: (MaxMinor: {detail['max_ndim_rh_minor_']})")
-    expected_rhs_major_minor_to_ys = [[-1] * 4, [-1] * 4, [-1] * 4]
-    expected_rhs_major_minor_to_ys[1][0] = 0 
-    expected_rhs_major_minor_to_ys[2][0] = 1 
-    expected_rhs_major_minor_to_ys[2][3] = 2 
-    assert detail['rhs_major_minor_to_ys_'] == expected_rhs_major_minor_to_ys
-    print("\\nInitial detail structure tests passed.") 
+    # detail = pedantic_tile_dist.DstrEncode.detail # Using the user's example
+    # print(f"\nCalculated detail.ys_lengths_: {detail['ys_lengths_']}")
+    # Expected YsLengths: Y0->H0[0](M0=4), Y1->H1[1](K1=8) -> [4,8]
+    # assert detail['ys_lengths_'] == [4, 8] 
+    # print(f"Calculated detail.rhs_major_minor_to_ys_: (MaxMinor: {detail['max_ndim_rh_minor_']})")
+    # H0 has 3 components (M0,M1,M2), H1 has 2 (K0,K1). MaxMinor should be 3.
+    # R has 1 component.
+    # num_rh_major_ = NDimX+1 = 2+1 = 3
+    # expected_rhs_major_minor_to_ys = [[-1]*3 for _ in range(3)] # MaxMinor is 3, NDimRHMajor is 3
+    # Y0 (idx 0) maps to H0[0] (rh_major=1, rh_minor=0)
+    # expected_rhs_major_minor_to_ys[1][0] = 0 
+    # Y1 (idx 1) maps to H1[1] (rh_major=2, rh_minor=1)
+    # expected_rhs_major_minor_to_ys[2][1] = 1
+    # assert detail['rhs_major_minor_to_ys_'] == expected_rhs_major_minor_to_ys
+    # print("\nInitial detail structure tests passed for user example.")

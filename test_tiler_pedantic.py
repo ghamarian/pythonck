@@ -520,21 +520,27 @@ def test_calculate_hierarchical_structure_no_hints(sample_encoding_data):
     td = TileDistributionPedantic(encoding_dict, variables)
     hier_info = td.calculate_hierarchical_tile_structure()
     assert hier_info['TileName'] == "Pedantic Tile Distribution" # Default name
-    assert hier_info['ThreadPerWarp'] == [1,1] # Default
-    assert hier_info['WarpPerBlock'] == [1]    # Default
-    assert hier_info['VectorDimensions'] == [1] # Default
-    assert hier_info['Repeat'] == [1]           # Default
-    assert hier_info['BlockSize'] == [1,1]      # 1*1, 1
+    # Based on SAMPLE_ENCODING_1 and current inference:
+    # P1 (idx 1) maps to H1[2] (Kw=2), H0[2] (Nw=2) -> _get_lengths_for_p_dim_component(1) = [2,2] -> TPW = [2,2]
+    # P0 (idx 0) maps to H0[1] (Nr_p=8), H1[1] (Kr_p=4) -> _get_lengths_for_p_dim_component(0) = [8,4] -> WPB = [8,4]
+    # Ys_lengths = [4,8,4] (Nr_y, Kr_y, Kv). Last YS Kv=4 is inferred for Vector.
+    # Repeat defaults to [1,1]
+    # BlockSize = [TPW_M*WPB_M*Rep_M, TPW_N*WPB_N*Rep_N] = [2*8*1, 2*4*1] = [16,8]
+    assert hier_info['ThreadPerWarp'] == [2,2]
+    assert hier_info['WarpPerBlock'] == [8,4]
+    assert hier_info['VectorDimensions'] == [4] # Inferred from last YS (Kv=4)
+    assert hier_info['Repeat'] == [1,1]           # Default
+    assert hier_info['BlockSize'] == [16,8]
     assert 'Warp0' in hier_info['ThreadBlocks']
     assert 'T0' in hier_info['ThreadBlocks']['Warp0']
 
 def test_calculate_hierarchical_structure_with_hints():
     encoding_dict, variables = SAMPLE_ENCODING_1.copy(), SAMPLE_VARIABLES_1.copy()
     encoding_dict["visualization_hints"] = {
-        "thread_per_warp_p_indices": [0],  # Use P0 for TPW. P0 maps to H0[1]=8, H1[1]=4. Product = 32. So TPW=[32,1]
-        "warp_per_block_p_indices": 1,   # Use P1 for WPB. P1 maps to H1[2]=2, H0[2]=2. Product = 4. So WPB=[4]
+        "thread_per_warp_p_indices": [0],  # Use P0 for TPW. P0 maps to H0[1]=8, H1[1]=4. get_lengths_for_p_dim_component(0) -> [8,4]. TPW hint one idx -> [prod, 1] -> [32,1]
+        "warp_per_block_p_indices": [1],   # Use P1 for WPB. P1 maps to H1[2]=2, H0[2]=2. get_lengths_for_p_dim_component(1) -> [2,2]. WPB hint one idx -> [prod, 1] -> [4,1]
         "vector_dim_ys_index": 2,          # Use Y2 for Vec. Y2 maps to H1[3]=Kv=4. So Vec=[4]
-        "repeat_factor_ys_index": 0        # Use Y0 for Rep. Y0 maps to H0[0]=Nr_y=4. So Rep=[4]
+        "repeat_factor_ys_index": 0        # Use Y0 for Rep. Y0 maps to H0[0]=Nr_y=4. So Rep=[4,1] (M-dim set, N-dim is 1)
     }
     encoding_dict["_tile_name"] = "Hinted Tile"
 
@@ -542,17 +548,19 @@ def test_calculate_hierarchical_structure_with_hints():
     hier_info = td_hints.calculate_hierarchical_tile_structure()
 
     assert hier_info['TileName'] == "Hinted Tile"
-    # P0 maps to H0[1] (len 8) and H1[1] (len 4). get_lengths_for_p_indices([0]) gives [8*4=32]
+    # P0 maps to H0[1] (len 8) and H1[1] (len 4). _get_lengths_for_p_dim_component(0) gives [8,4]. Product 32. Hint is single index, so TPW=[32,1]
     assert hier_info['ThreadPerWarp'] == [32, 1]
-    # P1 maps to H1[2] (len 2) and H0[2] (len 2). get_lengths_for_p_indices([1]) gives [2*2=4]
-    assert hier_info['WarpPerBlock'] == [4]
+    # P1 maps to H1[2] (len 2) and H0[2] (len 2). _get_lengths_for_p_dim_component(1) gives [2,2]. Product 4. Hint is single index, so WPB=[4,1]
+    assert hier_info['WarpPerBlock'] == [4, 1]
     # YS[2] (Kv) has length 4
     assert hier_info['VectorDimensions'] == [4]
-    # YS[0] (Nr_y) has length 4
-    assert hier_info['Repeat'] == [4]
-    # BlockSize = (32*4, 1) = [128,1]
-    assert hier_info['BlockSize'] == [128, 1]
+    # YS[0] (Nr_y) has length 4. Repeat hint sets M-dim.
+    assert hier_info['Repeat'] == [4, 1]
+    # BlockSize = (TPW_M*WPB_M*Rep_M, TPW_N*WPB_N*Rep_N) = (32*4*4, 1*1*1) = [512,1]
+    assert hier_info['BlockSize'] == [512, 1]
+    # num_warps_to_iterate = product(hierarchical_info['WarpPerBlock']) = 4 * 1 = 4
     assert len(hier_info['ThreadBlocks']) == 4 # 4 warps
+    # threads_m_in_warp = hierarchical_info['ThreadPerWarp'][0] = 32
     assert len(hier_info['ThreadBlocks']['Warp0']) == 32 # 32 threads in warp0
 
 # Placeholder tests for tensor adaptor helpers from original test_tiler_pedantic
@@ -599,127 +607,6 @@ def test_calculate_hierarchical_structure_with_hints():
 #     # B = C % len(B) = 4 % 3 = 1
 #     # A = C // len(B) = 4 // 3 = 1
 #     assert td._invert_tensor_adaptor_transformations([4], adaptor) == [1,1]
-# // DUPLICATE END - REMOVED THE ABOVE BLOCK (lines 623-724)
-
-# Minimal tests for Split and Embed can be added similarly if needed for basic coverage
-# For now, focusing on the main TileDistributionPedantic methods.
-
-# Add more tests using complex_encoding_data later, especially for calculate_index 
-
-# --- Tests for Core Calculation Methods (with mocked/simplified adaptors) ---
-
-# def test_calculate_index_simple_merge_passthrough(sample_encoding_data): // DUPLICATE START - REMOVING
-#     """Test calculate_index with a simple, manually defined adaptor structure."""
-#     # Use a dummy TileDistributionPedantic instance primarily to call the method.
-#     # We will override its NDim attributes and provide mock adaptors.
-#     encoding_dict, variables = sample_encoding_data # Base for dummy init
-#     td = TileDistributionPedantic(encoding_dict, variables)
-
-#     Lp0, Ly0 = 2, 3
-#     td.NDimPs = 1
-#     td.NDimYs = 1
-
-#     # Mock PsYs2XsAdaptor: Merges P0 and Y0 into X0
-#     # X0 = P0 * Ly0 + Y0
-#     td.PsYs2XsAdaptor = {
-#         'top_tensor_view': {'dims': [['P0_abs', 0, Lp0], ['Y0_abs', 0, Ly0]]},
-#         'bottom_tensor_view': {'dims': [['X0_abs', 0, Lp0 * Ly0]]},
-#         'transforms': [
-#             {'type': 'Merge', 'top_ids_':['P0_abs', 'Y0_abs'], 'bottom_ids_':['X0_abs'],
-#              'parameters': {'lengths_of_inputs':[Lp0, Ly0], 'merged_dim_id': 'X0_abs', 
-#                             'dims_to_merge_ids':['P0_abs','Y0_abs']}}
-#         ]
-#     }
-
-#     # Mock Ys2DDescriptor: Passes Y0 through to D
-#     # D = Y0
-#     td.Ys2DDescriptor = {
-#         'adaptor_encoding': {
-#             'top_tensor_view': {'dims': [['Y0_d_abs', 0, Ly0]]},
-#             'bottom_tensor_view': {'dims': [['D_abs', 0, Ly0]]},
-#             'transforms': [
-#                 {'type': 'PassThrough', 'top_ids_':['Y0_d_abs'], 'bottom_ids_':['D_abs'], 'parameters': {}}
-#             ]
-#         },
-#         'd_length': Ly0
-#     }
-
-#     idx_p = [1]  # p0 = 1
-#     idx_y = [2]  # y0 = 2
-
-#     # Expected calculations:
-#     # input_coords_psys for PsYs2XsAdaptor = [p0, y0] = [1, 2]
-#     # x_idx = [p0 * Ly0 + y0] = [1 * 3 + 2] = [5]
-#     # x_lengths = [Lp0 * Ly0] = [6]
-#     # flattened_x_offset = 5
-#     # product_of_x_lengths = 6
-
-#     # input_coords_ys_d for Ys2DAdaptor = [y0] = [2]
-#     # d_idx_scalar = y0 = 2
-
-#     # final_index = d_idx_scalar * product_of_x_lengths + flattened_x_offset
-#     #             = 2 * 6 + 5 = 12 + 5 = 17
-#     final_index = td.calculate_index(idx_p, idx_y)
-#     assert final_index == 17
-
-# def test_get_y_indices_from_distributed_indices_simple_passthrough(sample_encoding_data):
-#     """Test get_y_indices_from_distributed_indices with a simple passthrough."""
-#     encoding_dict, variables = sample_encoding_data
-#     td = TileDistributionPedantic(encoding_dict, variables)
-
-#     Ly0 = 3
-#     td.NDimYs = 1
-#     # Mock Ys2DDescriptor: Passes Y0 through to D (and D to Y0 for inverse)
-#     td.Ys2DDescriptor = {
-#         'adaptor_encoding': {
-#             'top_tensor_view': {'dims': [['Y0_d_abs', 0, Ly0]]}, # This is the YS coord we want
-#             'bottom_tensor_view': {'dims': [['D_abs', 0, Ly0]]}, # This is the D coord input
-#             'transforms': [
-#                 {'type': 'PassThrough', 'top_ids_':['Y0_d_abs'], 'bottom_ids_':['D_abs'], 'parameters': {}}
-#             ]
-#         },
-#         'd_length': Ly0
-#     }
-
-#     d_scalar_idx = 2
-#     # Expected: Since it's a passthrough from Y to D, inverse D to Y should give same coord.
-#     # target_coords for inversion is [d_scalar_idx] = [2]
-#     # inverted_coords should be [y0] = [2]
-#     ys_idx = td.get_y_indices_from_distributed_indices(d_scalar_idx)
-#     assert ys_idx == [2]
-
-# def test_get_y_indices_from_distributed_indices_simple_merge(sample_encoding_data):
-#     """Test get_y_indices_from_distributed_indices with an inverted merge."""
-#     encoding_dict, variables = sample_encoding_data
-#     td = TileDistributionPedantic(encoding_dict, variables)
-
-#     Ly0, Ly1 = 2, 3 # Lengths of Y0, Y1
-#     td.NDimYs = 2
-
-#     # Adaptor merges Y0, Y1 into D.  D = Y0 * Ly1 + Y1
-#     td.Ys2DDescriptor = {
-#         'adaptor_encoding': {
-#             'top_tensor_view': {'dims': [['Y0abs', 0, Ly0], ['Y1abs', 0, Ly1]]},
-#             'bottom_tensor_view': {'dims': [['Dabs', 0, Ly0 * Ly1]]},
-#             'transforms': [
-#                 {'type': 'Merge', 'top_ids_':['Y0abs', 'Y1abs'], 'bottom_ids_':['Dabs'],
-#                  'parameters': {'lengths_of_inputs':[Ly0, Ly1], 'merged_dim_id': 'Dabs', 
-#                                 'dims_to_merge_ids':['Y0abs','Y1abs']}}
-#             ]
-#         },
-#         'd_length': Ly0 * Ly1
-#     }
-    
-#     # If D = Y0 * Ly1 + Y1. Example: Y0=1, Y1=2. Ly1=3. D = 1*3 + 2 = 5.
-#     d_scalar_idx = 5 
-    
-#     # Expected inverse:
-#     # target_coords = [5]
-#     # Y1 = D % Ly1 = 5 % 3 = 2
-#     # Y0 = D // Ly1 = 5 // 3 = 1
-#     # ys_idx = [Y0, Y1] = [1, 2]
-#     ys_idx = td.get_y_indices_from_distributed_indices(d_scalar_idx)
-#     assert ys_idx == [1, 2]
 # // DUPLICATE END - REMOVED THE ABOVE BLOCK (lines 623-724)
 
 # Add more tests using complex_encoding_data later 

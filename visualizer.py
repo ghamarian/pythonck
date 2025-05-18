@@ -10,7 +10,7 @@ import matplotlib.patches as patches
 from matplotlib.collections import PatchCollection
 import networkx as nx
 import numpy as np
-from typing import Dict, List, Any, Tuple
+from typing import Dict, List, Any, Tuple, Optional
 from parser import TileDistributionParser
 
 def display_raw_encoding(encoding: Dict[str, Any]) -> str:
@@ -1475,3 +1475,127 @@ if __name__ == "__main__":
     plt.savefig("hierarchical_tiles.png", dpi=150, bbox_inches='tight')
     
     plt.show() 
+
+def visualize_y_space_structure(
+    ys_lengths: List[int],
+    ys_names: List[str],
+    vector_dim_idx: Optional[int] = -1,
+    title: str = "P-Tile Local Data Layout (Y-Dimensions)"
+) -> plt.Figure:
+    """
+    Visualizes the Y-space structure as a 2D grid.
+    Highlights the vector dimension if specified.
+    If NDimY > 2, it visualizes Y0 vs Y1.
+    If NDimY = 1, it visualizes a 1D strip.
+    """
+    fig, ax = plt.subplots(figsize=(8, 6))
+    ax.set_title(title)
+
+    n_dim_y = len(ys_lengths)
+
+    if n_dim_y == 0:
+        ax.text(0.5, 0.5, "No Y-Dimensions", ha='center', va='center')
+        ax.set_xticks([])
+        ax.set_yticks([])
+        return fig
+
+    dim1_len = 1
+    dim2_len = 1
+    dim1_idx = -1
+    dim2_idx = -1
+    dim1_name = ""
+    dim2_name = ""
+
+    if n_dim_y == 1:
+        dim1_len = ys_lengths[0]
+        dim1_idx = 0
+        dim1_name = ys_names[0]
+        # Visualize as a horizontal strip, so dim2_len remains 1
+        # Let dim1 be "columns" and dim2 be "rows" for plotting
+        plot_cols, plot_rows = dim1_len, dim2_len
+        x_label, y_label = dim1_name, ""
+        x_ticks_labels = range(dim1_len)
+        y_ticks_labels = []
+
+    elif n_dim_y >= 2:
+        dim1_len = ys_lengths[0] # Typically Y0
+        dim2_len = ys_lengths[1] # Typically Y1
+        dim1_idx = 0
+        dim2_idx = 1
+        dim1_name = ys_names[0]
+        dim2_name = ys_names[1]
+        # Let dim1 be "columns" (x-axis) and dim2 be "rows" (y-axis)
+        plot_cols, plot_rows = dim1_len, dim2_len
+        x_label, y_label = dim1_name, dim2_name
+        x_ticks_labels = range(dim1_len)
+        y_ticks_labels = range(dim2_len)
+        if n_dim_y > 2:
+            ax.set_title(f"{title}\\n(Showing {ys_names[0]} vs {ys_names[1]}, {len(ys_names)-2} other Y-dims not shown)")
+
+
+    cell_width = 1.0
+    cell_height = 1.0
+    
+    for r in range(plot_rows): # Iterate over Y-dim for rows
+        for c in range(plot_cols): # Iterate over Y-dim for columns
+            cell_x = c * cell_width
+            cell_y = (plot_rows - 1 - r) * cell_height # Y-axis inverted for typical matrix display
+
+            is_vector_cell_dim1 = (vector_dim_idx == dim1_idx)
+            is_vector_cell_dim2 = (vector_dim_idx == dim2_idx and n_dim_y > 1) # Only if dim2 actually exists
+
+            # Default cell properties
+            face_color = 'white'
+            edge_color = 'black'
+            text_val = ""
+            
+            if n_dim_y == 1: # 1D case
+                if is_vector_cell_dim1: # If the single Y-dim is the vector dim
+                    face_color = 'lightcoral'
+                    text_val = f"V{c}"
+                else:
+                    text_val = f"{c}" # Just index
+            elif n_dim_y >=2: # 2D case
+                text_val = f"({c},{r})" # (dim1_coord, dim2_coord)
+                is_part_of_vector_highlight = False
+                
+                if vector_dim_idx == dim1_idx: # Vector is along dim1 (columns)
+                    face_color = 'lightcoral'
+                    text_val = f"(V{c},{r})"
+                elif vector_dim_idx == dim2_idx: # Vector is along dim2 (rows)
+                    face_color = 'lightskyblue'
+                    text_val = f"({c},V{r})"
+                
+                # If vector_dim_idx is neither dim1_idx nor dim2_idx but exists (i.e., n_dim_y > 2 and vector_dim_idx > 1)
+                # then all cells shown are part of "other" dimensions relative to the vector.
+                # No specific cell highlight unless we choose to show vector elements if vector_dim_idx is 0 or 1.
+
+            rect = patches.Rectangle((cell_x, cell_y), cell_width, cell_height,
+                                     linewidth=1, edgecolor=edge_color, facecolor=face_color, alpha=0.7)
+            ax.add_patch(rect)
+            ax.text(cell_x + cell_width / 2, cell_y + cell_height / 2, text_val,
+                    ha='center', va='center', fontsize=8)
+
+    ax.set_xlim(0, plot_cols * cell_width)
+    ax.set_ylim(0, plot_rows * cell_height)
+    ax.set_aspect('equal', adjustable='box')
+
+    ax.set_xlabel(x_label)
+    ax.set_xticks([i * cell_width + cell_width / 2 for i in range(plot_cols)])
+    ax.set_xticklabels(x_ticks_labels)
+    
+    if y_label or y_ticks_labels : # Only set if they are meaningful
+        ax.set_ylabel(y_label)
+        ax.set_yticks([i * cell_height + cell_height / 2 for i in range(plot_rows)])
+        ax.set_yticklabels(reversed(y_ticks_labels)) # Match visual layout
+    else:
+        ax.set_yticks([])
+
+
+    if n_dim_y > 0 and vector_dim_idx != -1:
+        legend_patches = [patches.Patch(facecolor='lightcoral' if vector_dim_idx == dim1_idx or n_dim_y == 1 else ('lightskyblue' if vector_dim_idx == dim2_idx else 'grey'), 
+                                        label=f'Vector Elements (along {ys_names[vector_dim_idx]})')]
+        ax.legend(handles=legend_patches, loc='upper right', bbox_to_anchor=(1.4, 1))
+
+    plt.tight_layout()
+    return fig

@@ -20,6 +20,7 @@ from tiler_pedantic import TileDistributionPedantic as TileDistribution
 import visualizer
 from test_visualization import create_indexing_visualization
 from visualizer import visualize_hierarchical_tiles
+from visualizer import visualize_y_space_structure
 from examples import get_examples, get_default_variables
 
 # Set page config
@@ -248,8 +249,9 @@ def main():
                     warp_per_block = hierarchical_structure.get('WarpPerBlock', [])
                     vector_dimensions = hierarchical_structure.get('VectorDimensions', [])
                     block_size = hierarchical_structure.get('BlockSize', [])
+                    repeat_factor = hierarchical_structure.get('Repeat', [1, 1])
                     
-                    col1, col2, col3 = st.columns(3)
+                    col1, col2, col3, col4 = st.columns(4)
                     
                     with col1:
                         st.metric("ThreadPerWarp", 
@@ -257,29 +259,42 @@ def main():
                     
                     with col2:
                         st.metric("WarpPerBlock", 
-                                 f"{warp_per_block[0]}" if warp_per_block else "N/A")
+                                 f"{warp_per_block[0]}x{warp_per_block[1]}" if len(warp_per_block) >= 2 else "N/A")
                     
                     with col3:
                         st.metric("Vector Dimensions", 
                                  f"{vector_dimensions[0]}" if vector_dimensions else "N/A")
                     
-                    st.metric("Block Size", 
+                    with col4:
+                        st.metric("Repeat Factor",
+                                 f"{repeat_factor[0]}x{repeat_factor[1]}" if len(repeat_factor) >= 2 else "1x1")
+                    
+                    st.metric("Block Size (Total Threads)", 
                              f"{block_size[0]}x{block_size[1]}" if len(block_size) >= 2 else "N/A")
                     
                     # Display a formatted description of the structure (Moved from debug h_tabs[0])
-                    if thread_per_warp and warp_per_block and vector_dimensions:
+                    if thread_per_warp and warp_per_block and vector_dimensions and block_size and repeat_factor:
                         threads_per_warp_m = thread_per_warp[0] if len(thread_per_warp) > 0 else 0
                         threads_per_warp_n = thread_per_warp[1] if len(thread_per_warp) > 1 else 0
                         warps_per_block_m = warp_per_block[0] if len(warp_per_block) > 0 else 0
+                        warps_per_block_n = warp_per_block[1] if len(warp_per_block) > 1 else 0
                         vector_k = vector_dimensions[0] if len(vector_dimensions) > 0 else 0
+                        repeat_val_m = repeat_factor[0] if len(repeat_factor) > 0 else 1
+                        repeat_val_n = repeat_factor[1] if len(repeat_factor) > 1 else 1
                         
+                        total_threads_m = block_size[0]
+                        total_threads_n = block_size[1]
+                        total_threads = total_threads_m * total_threads_n
+                        total_elements = total_threads * vector_k
+
                         st.write(f"""
                         ### Thread Hierarchy
                         - **ThreadPerWarp**: {threads_per_warp_m} x {threads_per_warp_n} threads per warp
-                        - **WarpPerBlock**: {warps_per_block_m} warps per block
-                        - **Vector Dimensions**: {vector_k}
-                        - **Total Thread Count**: {threads_per_warp_m * threads_per_warp_n * warps_per_block_m} threads
-                        - **Total Elements**: {threads_per_warp_m * threads_per_warp_n * warps_per_block_m * vector_k} elements
+                        - **WarpPerBlock**: {warps_per_block_m} x {warps_per_block_n} warps per block
+                        - **Repeat Factor**: {repeat_val_m}x{repeat_val_n}
+                        - **Vector Dimensions (K)**: {vector_k}
+                        - **Total Thread Count (in Block)**: {total_threads} threads ({total_threads_m} x {total_threads_n})
+                        - **Total Elements (covered by Block)**: {total_elements} elements
                         """)
                 else:
                     # This message is shown if hierarchical_structure itself is empty
@@ -400,34 +415,102 @@ The `TileDistributionPedantic` class (in `tiler_pedantic.py`) calculates these p
         *   Defaults to `[1]`.
 
     *   **ThreadPerWarp (`[threads_m, threads_n]`)**:
-        *   Uses `thread_per_warp_p_indices` hint if available.
-        *   Otherwise:
-            *   `threads_m` is inferred from the product of component lengths of `P0` (if `NDimPs >= 1`).
-            *   `threads_n` is inferred from the product of component lengths of `P1` (if `NDimPs >= 2`).
-            *   If a P-dim is not available, its contribution defaults to 1.
-        *   Defaults to `[1, 1]`.
+        *   Uses `thread_per_warp_p_indices` hint if available (product of components for specified P-dims).
+        *   Otherwise (default inference):
+            *   If `NDimPs >= 2` (i.e., `P0` and `P1` exist):
+                *   `threads_m` is inferred from the length of the *first* R/H component that `P1` maps to.
+                *   `threads_n` is inferred from the length of the *second* R/H component that `P1` maps to. (If `P1` maps to only one component, `threads_n` becomes 1).
+            *   If `NDimPs == 1` (only `P0` exists):
+                *   `threads_m` is inferred from the length of the *first* R/H component `P0` maps to.
+                *   `threads_n` is inferred from the length of the *second* R/H component `P0` maps to (or 1 if `P0` maps to only one component).
+            *   If a P-dimension or its mapped component is not found/valid, the corresponding length defaults to 1.
+        *   Defaults to `[1, 1]` if no P-dims are available or inference doesn't yield specific values.
 
     *   **WarpPerBlock (`[warps_m, warps_n]`)**:
-        *   Uses `warp_per_block_p_indices` hint if available.
-        *   Otherwise (assuming P0 and P1 might have been used for ThreadPerWarp):
-            *   `warps_m` is inferred from the product of component lengths of `P2` (if `NDimPs >= 3`).
-            *   `warps_n` is inferred from the product of component lengths of `P3` (if `NDimPs >= 4`).
-            *   If a P-dim is not available, its contribution defaults to 1.
+        *   Uses `warp_per_block_p_indices` hint if available (product of components for specified P-dims).
+        *   Otherwise (default inference):
+            *   If `NDimPs >= 1` (i.e., `P0` exists):
+                *   `warps_m` is inferred from the length of the *first* R/H component that `P0` maps to.
+                *   `warps_n` is inferred from the length of the *second* R/H component that `P0` maps to. (If `P0` maps to only one component, `warps_n` becomes 1).
+            *   If `P0` or its mapped component is not found/valid, the corresponding length defaults to 1.
         *   **Heuristic Default**: If `WarpPerBlock` remains `[1, 1]` after the above, AND `NDimPs >= 1`, AND `ThreadPerWarp` is non-trivial (i.e., `threads_m * threads_n > 1`), then `WarpPerBlock` is set to `[4, 1]` for a more common visualization.
-        *   Defaults to `[1, 1]`.
+        *   Defaults to `[1, 1]` if no P-dims are available or inference doesn't yield specific values.
 
-    *   **Repeat (`[R]`)**:
-        *   Uses `repeat_factor_ys_index` hint if available.
-        *   No specific inference beyond hints currently.
-        *   Defaults to `[1]`. (Note: `Repeat` is often `[R_m, R_n]` conceptually, but current visualization might simplify).
+    *   **Repeat (`[R_m, R_n]`)**:
+        *   Initialized to `[1, 1]`.
+        *   If a `visualization_hints: {'repeat_factor_ys_index': YS_INDEX}` is provided, the length of the specified YS-dimension will be used to set `R_m` (i.e., `Repeat = [length_of_hinted_YS, 1]`).
+        *   Without this hint, `Repeat` remains `[1, 1]` (no automatic inference is performed for the repeat factor from specific Y-to-H mappings).
 
 3.  **BlockSize Calculation**:
-    Once `ThreadPerWarp = [tpw_m, tpw_n]` and `WarpPerBlock = [wpb_m, wpb_n]` are determined:
-    *   `BlockSize = [tpw_m * wpb_m, tpw_n * wpb_n]`
+    Once `ThreadPerWarp = [tpw_m, tpw_n]`, `WarpPerBlock = [wpb_m, wpb_n]`, and `Repeat = [repeat_m, repeat_n]` are determined:
+    *   `BlockSize = [tpw_m * wpb_m * repeat_m, tpw_n * wpb_n * repeat_n]`
+
+**Role of Y-Dimensions (including "Extra" Y-Dimensions):**
+
+The Y-dimensions (`Ys2RHsMajor/Minor`, leading to `ys_lengths_`) collectively define the shape and internal structure of the data elements that each P-tile is responsible for. They do **not** typically mean multiple GPU blocks.
+
+*   **Vector Dimension (from a Y-dim):** As discussed, one Y-dimension might be inferred or hinted as the `VectorDimensions (K)`.
+*   **Repeat Factor (from a Y-dim, if hinted):** A Y-dimension hinted via `visualization_hints: {'repeat_factor_ys_index': YS_INDEX}` scales the work within the conceptual block (currently, the hint applies to the M-dimension of repeat: `Repeat = [hinted_YS_length, 1]`).
+*   **"Extra" Y-Dimensions:** Any other Y-dimensions contribute to the local data structure *within* each P-tile (and within each repetition if a repeat factor is active). They add more axes to the "within-tile" addressing scheme.
+
+*Example from a Parsed Snippet:*
+Consider an encoding like your last example where Y-dimensions are resolved to `ys_lengths_ = [4, 4]`. 
+*   `Y0` (length 4)
+*   `Y1` (length 4)
+If the system infers `VectorDimensions (K) = 4` (e.g., from Y1, being the last Y-dim of appropriate size), and `Repeat Factor` defaults to `[1,1]` (as no hint is provided for it):
+
+In this case, Y0 (length 4) is an "extra" Y-dimension relative to the main hierarchical parameters shown.
+*   It means that for the work unit defined by a P-tile, there are 4 distinct "sub-units" or "slices" along this Y0 dimension.
+*   Each of these sub-units is then a vector of 4 elements (defined by Y1, the vector dimension).
+*   So, the P-tile processes a local data block conceptually shaped by `Y0_length x Y1_length` (i.e., 4x4 elements in this example).
+*   The `idx_y` coordinates `[y0_coord, y1_coord]` are crucial in `calculate_index` to select a specific element (or vector start) from this local 4x4 data block.
+
+These "extra" Y dimensions are fundamental to:
+1.  **`d_scalar_idx` calculation:** `idx_y` is flattened to `d_scalar_idx` (e.g., `y0_coord * Y1_length + y1_coord`, so `y0_coord * 4 + y1_coord` in the example), which then acts as a high-order index into the X-space.
+2.  **`xs_coords` calculation:** `idx_y` helps select specific elements from R/H components that are directly "owned" by Y-dimensions in the `PsYs2XsAdaptor`.
 
 This explanation clarifies how the visualizer, powered by `tiler_pedantic.py`, arrives at the hierarchical parameters, prioritizing explicit hints and falling back to rule-based inference.
             """)
         # --- End Explanation ---
+
+        # Y-Space Local Data Layout Visualization
+        st.subheader("P-Tile Local Data Layout (Y-Dimensions)")
+        try:
+            if st.session_state.tile_distribution is not None:
+                ys_lengths = st.session_state.tile_distribution.get_ys_lengths()
+                ys_names = [f"Y{i}" for i in range(len(ys_lengths))]
+                
+                # Get VectorDimensionYSIndex from hierarchical_structure
+                # viz_data was already fetched for Hierarchical Tile Structure, reuse if possible or re-fetch
+                if hasattr(st.session_state.tile_distribution, 'get_visualization_data'): # Check if method exists
+                    viz_data = st.session_state.tile_distribution.get_visualization_data()
+                    hierarchical_structure = viz_data.get("hierarchical_structure", {})
+                    vector_dim_ys_idx = hierarchical_structure.get("VectorDimensionYSIndex", -1)
+                else:
+                    vector_dim_ys_idx = -1 # Fallback if data not available
+                    hierarchical_structure = {} # Ensure it exists
+
+                if ys_lengths:
+                    y_space_fig = visualize_y_space_structure(
+                        ys_lengths, 
+                        ys_names, 
+                        vector_dim_ys_idx
+                    )
+                    st.pyplot(y_space_fig)
+                    st.markdown("""
+                    **This visualization shows the structure of the data within a single P-tile, as defined by the Y-dimensions.**
+                    - Each cell represents an element or a base for a vector.
+                    - If a vector dimension is identified, its elements are highlighted.
+                    - For NDimY > 2, this shows a 2D slice (Y0 vs Y1).
+                    """)
+                else:
+                    st.write("No Y-dimensions to visualize for local data layout.")
+            else:
+                st.write("Tile distribution not calculated yet.")
+        except Exception as e:
+            st.error(f"Error displaying Y-space structure: {str(e)}")
+            if st.session_state.debug_mode:
+                st.exception(e)
 
         # Performance metrics
         if st.session_state.tile_distribution is not None:
