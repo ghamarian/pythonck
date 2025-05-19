@@ -86,7 +86,8 @@ class TileDistributionParser:
                 elif "tuple<" in val:
                     result.append(TileDistributionParser.parse_tuple(val))
                 else:
-                    # Must be a variable name
+                    # Must be a variable name (possibly with namespace)
+                    # Keep the full name including namespace if present
                     result.append(val)
                     
         return result
@@ -246,12 +247,14 @@ class TileDistributionParser:
         
         def extract_variables(obj):
             """Recursively extract variable names from parsed structures."""
-            if isinstance(obj, str) and re.match(r'^[A-Za-z][A-Za-z0-9_]*$', obj):
-                # Skip common keywords
-                if obj not in ["sequence", "tuple", "int", "float", "double", "char", "bool", 
-                           "auto", "void", "const", "static", "constexpr", "index_t",
-                           "R", "H", "X0", "X1", "p", "major", "minor", "Y", "y"]:
-                    variables.add(obj)
+            if isinstance(obj, str):
+                # Handle normal variables and namespace-scoped variables like S::Repeat_M
+                if re.match(r'^[A-Za-z][A-Za-z0-9_]*$', obj) or re.match(r'^[A-Za-z][A-Za-z0-9_]*::[A-Za-z][A-Za-z0-9_]*$', obj):
+                    # Skip common keywords
+                    if obj not in ["sequence", "tuple", "int", "float", "double", "char", "bool", 
+                               "auto", "void", "const", "static", "constexpr", "index_t",
+                               "R", "H", "X0", "X1", "p", "major", "minor", "Y", "y"]:
+                        variables.add(obj)
             elif isinstance(obj, list):
                 for item in obj:
                     extract_variables(item)
@@ -286,8 +289,9 @@ class TileDistributionParser:
         for name, value in variable_decls:
             variables[name] = int(value)
         
-        # Look for struct/namespace-scoped variables like S::Repeat_M
-        scoped_vars = re.findall(r'([A-Za-z0-9_]+)::([A-Za-z0-9_]+)', cpp_code)
+        # Look for namespace-scoped variables like S::Repeat_M
+        # Extract them directly from the tile_distribution_encoding template
+        namespaced_vars = re.findall(r'([A-Za-z0-9_]+)::([A-Za-z0-9_]+)', cpp_code)
         
         # Extract all variable references in sequences
         sequence_vars = re.findall(r'sequence<([^>]+)>', cpp_code)
@@ -302,23 +306,22 @@ class TileDistributionParser:
                 try:
                     int(var)
                 except ValueError:
-                    # If it looks like a variable name or scoped variable
-                    if re.match(r'^[A-Za-z0-9_:]+$', var):
+                    # If it looks like a variable name or namespace-scoped variable
+                    if re.match(r'^[A-Za-z0-9_]+(::)?[A-Za-z0-9_]+$', var):
                         all_vars.append(var)
         
-        # Add default values for scoped variables and any vars found in sequences
+        # Add default values for variables found in sequences
         for var in all_vars:
             if var not in variables:
                 if '::' in var:
-                    # Extract the variable name after the scope
-                    var_name = var.split('::')[-1]
+                    # Add namespace-scoped variable with default value
                     variables[var] = 4  # Default value
                 elif re.match(r'^[A-Za-z][A-Za-z0-9_]*$', var):
                     variables[var] = 4  # Default value
         
-        # Also add any scoped variables
-        for scope, var in scoped_vars:
-            scoped_name = f"{scope}::{var}"
+        # Also add any explicitly found namespace-scoped variables if not already present
+        for namespace, var_name in namespaced_vars:
+            scoped_name = f"{namespace}::{var_name}"
             if scoped_name not in variables:
                 variables[scoped_name] = 4  # Default value
         
@@ -360,8 +363,11 @@ def extract_variables_from_encoding(encoding: Dict[str, Any]) -> List[str]:
     def find_variables(obj):
         if isinstance(obj, list):
             for item in obj:
-                if isinstance(item, str) and re.match(r'^[A-Za-z][A-Za-z0-9_]*$', item):
-                    variables.add(item)
+                if isinstance(item, str):
+                    # Handle both regular and namespace-prefixed variables
+                    if (re.match(r'^[A-Za-z][A-Za-z0-9_]*$', item) or 
+                        re.match(r'^[A-Za-z][A-Za-z0-9_]*::[A-Za-z][A-Za-z0-9_]*$', item)):
+                        variables.add(item)
                 elif isinstance(item, (list, dict)):
                     find_variables(item)
         elif isinstance(obj, dict):

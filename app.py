@@ -62,22 +62,37 @@ def main():
         
         # Initialize the selected example in session state if not present
         if 'selected_example' not in st.session_state:
-            st.session_state.selected_example = list(examples.keys())[0]
+            # Default to the first example, but ensure it's a valid choice
+            example_keys = list(examples.keys())
+            if example_keys:
+                st.session_state.selected_example = example_keys[0]
+            else:
+                st.session_state.selected_example = ""
         
         example_keys = list(examples.keys())
         try:
+            # Find the index of the selected example or default to 0
+            selected_index = 0
+            if st.session_state.selected_example in example_keys:
+                selected_index = example_keys.index(st.session_state.selected_example)
+            
             selected_example = st.selectbox(
                 "Example Template:", 
                 example_keys, 
-                index=example_keys.index(st.session_state.selected_example),
+                index=selected_index,
                 key="example_selectbox"
             )
             # Update the session state
             st.session_state.selected_example = selected_example
-        except:
-            # Fallback if there's an issue with the selectbox
-            selected_example = example_keys[0]
-            st.session_state.selected_example = selected_example
+        except Exception as e:
+            # Safer fallback if there's an issue with the selectbox
+            if example_keys:
+                selected_example = example_keys[0]
+                st.session_state.selected_example = selected_example
+            else:
+                st.error(f"No examples available: {str(e)}")
+                selected_example = ""
+                st.session_state.selected_example = ""
         
         # Get the selected example code
         cpp_code = examples[selected_example]
@@ -99,6 +114,14 @@ def main():
             variables = get_default_variables(selected_example)
             
             if encoding:
+                # Also extract any template variables that might be in the code
+                detected_variables = parser.extract_template_variables(edited_code)
+                
+                # Merge the extracted variables with the default ones, giving priority to extracted values
+                for var_name, var_value in detected_variables.items():
+                    if var_name not in variables:
+                        variables[var_name] = var_value
+                
                 st.session_state.encoding = encoding
                 st.session_state.variables = variables
                 st.session_state.cpp_code = edited_code  # Save the code for visualization
@@ -661,13 +684,21 @@ def display_variable_controls():
         # Get current value if exists, otherwise default to 4
         current_value = st.session_state.variables.get(var, 4)
         
+        # Format display name for namespace-prefixed variables
+        if '::' in var:
+            namespace, var_name = var.split('::')
+            display_name = f"{namespace}::{var_name}"
+        else:
+            display_name = var
+        
         # Create a slider for this variable
         value = st.slider(
-            f"{var}",
+            display_name,
             min_value=1,
             max_value=32,
             value=current_value,
-            step=1
+            step=1,
+            key=f"slider_{var}"  # Use unique key to prevent conflicts
         )
         
         variables[var] = value
