@@ -1212,16 +1212,69 @@ class TileDistributionPedantic:
         # --- Process VectorDimensions --- 
         vec_ys_idx_hint = hints.get('vector_dim_ys_index')
         if vec_ys_idx_hint is not None and 0 <= vec_ys_idx_hint < self.NDimYs:
+            # Use explicit hint if provided
             if vec_ys_idx_hint < len(self.DstrEncode.detail.get('ys_lengths_', [])):
                  val = self.DstrEncode.detail['ys_lengths_'][vec_ys_idx_hint]
                  hierarchical_info['VectorDimensions'] = [val if val > 0 else 1]
                  hierarchical_info['VectorDimensionYSIndex'] = vec_ys_idx_hint if (val if val > 0 else 1) > 1 else -1 # Store hint index if vector is non-scalar
-        elif self.NDimYs > 0 and self.DstrEncode.detail.get('ys_lengths_'):
-            # INFERENCE: Assume last YS dim is vector if its length is typical (e.g. <= 16 and > 1)
-            last_ys_len = self.DstrEncode.detail['ys_lengths_'][-1]
-            if 1 < last_ys_len <= 16:
-                hierarchical_info['VectorDimensions'] = [last_ys_len]
-                hierarchical_info['VectorDimensionYSIndex'] = self.NDimYs - 1 # Index of the last YS dim
+        elif self.NDimYs > 0:
+            # IMPROVED INFERENCE: Find Ys that map to the highest/last position in H sequences
+            # Group vector dimensions by which H sequence they belong to (for M/N dimensions)
+            vector_dimensions_by_h = {}  # Maps H-idx to list of (value, y_idx)
+            
+            # Find Y dimensions that map to the last position of an H sequence
+            for y_idx in range(self.NDimYs):
+                if y_idx < len(self.DstrEncode.Ys2RHsMajor) and y_idx < len(self.DstrEncode.Ys2RHsMinor):
+                    y_major = self.DstrEncode.Ys2RHsMajor[y_idx]
+                    y_minor = self.DstrEncode.Ys2RHsMinor[y_idx]
+                    
+                    # If Y maps to H sequence (major > 0)
+                    if y_major > 0 and y_major <= len(self.DstrEncode.HsLengthss):
+                        h_idx = y_major - 1  # Convert to 0-based index
+                        h_seq = self.DstrEncode.HsLengthss[h_idx]
+                        
+                        # Check if it maps to the last element of the H sequence
+                        if y_minor == len(h_seq) - 1:
+                            val = h_seq[y_minor]
+                            if val > 0:
+                                if h_idx not in vector_dimensions_by_h:
+                                    vector_dimensions_by_h[h_idx] = []
+                                vector_dimensions_by_h[h_idx].append((val, y_idx))
+            
+            # Use the found vector dimensions, or fall back to prior heuristic
+            if vector_dimensions_by_h:
+                # Process each H sequence's vector dimensions
+                all_vector_values = []
+                all_vector_y_indices = []
+                
+                # Sort by H-index to have consistent ordering (H0 first, then H1, etc.)
+                for h_idx in sorted(vector_dimensions_by_h.keys()):
+                    # For each H, combine its vector dimensions (usually just one per H)
+                    h_vectors = vector_dimensions_by_h[h_idx]
+                    h_combined_value = 1
+                    for val, y_idx in h_vectors:
+                        h_combined_value *= val
+                        all_vector_y_indices.append(y_idx)
+                    
+                    all_vector_values.append(h_combined_value)
+                
+                # Store multi-dimensional vector information
+                hierarchical_info['VectorDimensions'] = all_vector_values
+                hierarchical_info['VectorDimensionYSIndex'] = all_vector_y_indices[0] if all_vector_y_indices else -1
+                # Still calculate combined value for compatibility
+                combined_vector_value = 1
+                for val in all_vector_values:
+                    combined_vector_value *= val
+                hierarchical_info['VectorK'] = combined_vector_value  # Total vector elements
+                
+                print(f"DEBUG: Found vector dimensions from Ys mapping to last H positions by H sequence: {vector_dimensions_by_h}")
+                print(f"DEBUG: Vector dimensions: {all_vector_values}")
+            elif self.DstrEncode.detail.get('ys_lengths_'):
+                # Fall back to old heuristic - use last Y if its length is typical for vectors
+                last_ys_len = self.DstrEncode.detail['ys_lengths_'][-1]
+                if 1 < last_ys_len <= 16:
+                    hierarchical_info['VectorDimensions'] = [last_ys_len]
+                    hierarchical_info['VectorDimensionYSIndex'] = self.NDimYs - 1 # Index of the last YS dim
             # else, default to [1] is already set, VectorDimensionYSIndex remains -1
 
         # --- Process ThreadPerWarp ---
@@ -1316,16 +1369,54 @@ class TileDistributionPedantic:
                  hierarchical_info['WarpPerBlock'] = [4, 1]
 
 
-        # --- Process Repeat --- (Relies on hint, otherwise defaults to [1,1])
+        # --- Process Repeat --- 
         rep_ys_idx_hint = hints.get('repeat_factor_ys_index')
         # Default repeat is [1,1] (set at initialization)
         if rep_ys_idx_hint is not None and 0 <= rep_ys_idx_hint < self.NDimYs:
+            # Use explicit hint if provided
             if rep_ys_idx_hint < len(self.DstrEncode.detail.get('ys_lengths_', [])):
                 val = self.DstrEncode.detail['ys_lengths_'][rep_ys_idx_hint]
                 # Current hint logic applies hint value to M-dimension of Repeat, N-dim remains 1.
-                hierarchical_info['Repeat'] = [max(1, val), 1] 
-        # Removed the automatic inference block that checked Y0->H0[0] and Y2->H1[0]
-        # Repeat remains [1,1] unless the hint above changes it.
+                hierarchical_info['Repeat'] = [max(1, val), 1]
+        else:
+            # IMPROVED INFERENCE: Find Ys that map to the first position in H sequences
+            repeat_y_indices = []
+            repeat_values = []
+            
+            for y_idx in range(self.NDimYs):
+                if y_idx < len(self.DstrEncode.Ys2RHsMajor) and y_idx < len(self.DstrEncode.Ys2RHsMinor):
+                    y_major = self.DstrEncode.Ys2RHsMajor[y_idx]
+                    y_minor = self.DstrEncode.Ys2RHsMinor[y_idx]
+                    
+                    # If Y maps to H sequence (major > 0)
+                    if y_major > 0 and y_major <= len(self.DstrEncode.HsLengthss):
+                        h_idx = y_major - 1  # Convert to 0-based index
+                        
+                        # Check if it maps to the first element of the H sequence
+                        if y_minor == 0:
+                            h_seq = self.DstrEncode.HsLengthss[h_idx]
+                            val = h_seq[y_minor]
+                            if val > 0:
+                                repeat_y_indices.append(y_idx)
+                                repeat_values.append(val)
+            
+            # Use found repeat factors if available
+            if repeat_y_indices:
+                # For now, use up to 2 repeat factors for M and N dimensions
+                repeat_m = 1
+                repeat_n = 1
+                
+                # Sort by index to ensure consistent assignment
+                sorted_repeats = sorted(zip(repeat_y_indices, repeat_values))
+                
+                if len(sorted_repeats) >= 1:
+                    repeat_m = sorted_repeats[0][1]
+                if len(sorted_repeats) >= 2:
+                    repeat_n = sorted_repeats[1][1]
+                
+                hierarchical_info['Repeat'] = [max(1, repeat_m), max(1, repeat_n)]
+                print(f"DEBUG: Found repeat factors from Ys mapping to first H positions: {sorted_repeats}")
+            # Otherwise, it stays at default [1,1]
         
         # Calculate BlockSize from derived/default TPW and WPB
         tpw_m, tpw_n = hierarchical_info['ThreadPerWarp']
@@ -1368,8 +1459,17 @@ class TileDistributionPedantic:
         hierarchical_info['ThreadBlocks'] = thread_blocks_viz
         
         # Final check for VectorK from tiler.py, if needed by visualizer
-        if hierarchical_info['VectorDimensions'] and hierarchical_info['VectorDimensions'][0] > 0:
-            hierarchical_info['VectorK'] = hierarchical_info['VectorDimensions'][0]
+        # VectorK should already be calculated for multi-dimensional vectors
+        if 'VectorK' not in hierarchical_info and hierarchical_info['VectorDimensions']:
+            if len(hierarchical_info['VectorDimensions']) == 1:
+                # Single dimension case
+                hierarchical_info['VectorK'] = hierarchical_info['VectorDimensions'][0]
+            else:
+                # Multi-dimensional case
+                combined_value = 1
+                for val in hierarchical_info['VectorDimensions']:
+                    combined_value *= val
+                hierarchical_info['VectorK'] = combined_value
 
         return hierarchical_info
 

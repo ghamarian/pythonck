@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import json
 import numpy as np
+import textwrap
 from parser import TileDistributionParser, debug_indexing_relationships
 import visualizer
 from tiler import TileDistribution
@@ -210,9 +211,9 @@ def create_indexing_visualization(indexing_debug, variables, figsize=(16, 10)):
     ax.text(0.2, r_h_dims_y - 0.03, "R0=1", fontsize=12, ha='center')
     r0_pos = (0.2, r_h_dims_y + 0.05)
     
-    # H box container
-    h_container_rect = (0.35, r_h_dims_y - 0.1)
-    h_container_height = 0.15
+    # H box container - make it taller to fit wrapped text
+    h_container_rect = (0.35, r_h_dims_y - 0.12)
+    h_container_height = 0.18
     h_container = patches.Rectangle(h_container_rect, 
                                   0.55, h_container_height, 
                                   linewidth=2, edgecolor='brown', facecolor='none', zorder=1)
@@ -220,24 +221,45 @@ def create_indexing_visualization(indexing_debug, variables, figsize=(16, 10)):
     ax.text(0.625, h_container_rect[1] + h_container_height + 0.01, "H_dims", color='brown', fontsize=14, ha='center', va='bottom')
     
     # H0 box - show the variables
-    h0_inner_box_rect = patches.Rectangle((0.4, r_h_dims_y - 0.08), 
-                            0.2, 0.1, 
+    h0_inner_box_rect = patches.Rectangle((0.4, r_h_dims_y - 0.1), 
+                            0.2, 0.12, 
                             linewidth=1, edgecolor='brown', facecolor='lightgreen', zorder=2)
     ax.add_patch(h0_inner_box_rect)
-    h0_vars = ", ".join(str(x) for x in minor_indices.get("H0", []))
-    ax.text(0.5, r_h_dims_y - 0.03, f"H0=[{h0_vars}]", fontsize=8, ha='center')
+    h0_vars = minor_indices.get("H0", [])
+    
+    # Wrap long text by splitting into multiple lines if needed
+    if len(h0_vars) <= 4:
+        h0_text = ", ".join(str(x) for x in h0_vars)
+        ax.text(0.5, r_h_dims_y - 0.04, f"H0=[{h0_text}]", fontsize=8, ha='center')
+    else:
+        # Create a wrapped text display for longer sequences
+        h0_text_wrapped = "H0=[\n"
+        h0_text_wrapped += "\n".join(textwrap.wrap(", ".join(str(x) for x in h0_vars), width=20))
+        h0_text_wrapped += "\n]"
+        ax.text(0.5, r_h_dims_y - 0.05, h0_text_wrapped, fontsize=7, ha='center', va='center')
+    
     # Target for arrows from Hidden H0 elements should be the top-center of this inner box
-    h0_target_pos = (0.5, r_h_dims_y - 0.08 + 0.1) 
+    h0_target_pos = (0.5, r_h_dims_y - 0.1 + 0.12) 
     
     # H1 box - show the variables
-    h1_inner_box_rect = patches.Rectangle((0.65, r_h_dims_y - 0.08), 
-                            0.2, 0.1, 
+    h1_inner_box_rect = patches.Rectangle((0.65, r_h_dims_y - 0.1), 
+                            0.2, 0.12, 
                             linewidth=1, edgecolor='brown', facecolor='lightgreen', zorder=2)
     ax.add_patch(h1_inner_box_rect)
-    h1_vars = ", ".join(str(x) for x in minor_indices.get("H1", []))
-    ax.text(0.75, r_h_dims_y - 0.03, f"H1=[{h1_vars}]", fontsize=8, ha='center')
+    h1_vars = minor_indices.get("H1", [])
+    
+    # Wrap long text by splitting into multiple lines if needed
+    if len(h1_vars) <= 4:
+        h1_text = ", ".join(str(x) for x in h1_vars)
+        ax.text(0.75, r_h_dims_y - 0.04, f"H1=[{h1_text}]", fontsize=8, ha='center')
+    else:
+        # Create a wrapped text display for longer sequences
+        h1_text_wrapped = "H1=[\n"
+        h1_text_wrapped += "\n".join(textwrap.wrap(", ".join(str(x) for x in h1_vars), width=20))
+        h1_text_wrapped += "\n]"
+        ax.text(0.75, r_h_dims_y - 0.05, h1_text_wrapped, fontsize=7, ha='center', va='center')
     # Target for arrows from Hidden H1 elements should be the top-center of this inner box
-    h1_target_pos = (0.75, r_h_dims_y - 0.08 + 0.1)
+    h1_target_pos = (0.75, r_h_dims_y - 0.1 + 0.12)
     
     # Arrow style for connections
     arrow_style = patches.ArrowStyle.Simple(head_length=6, head_width=4)

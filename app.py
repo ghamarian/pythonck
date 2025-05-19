@@ -54,17 +54,68 @@ def main():
     with st.sidebar:
         st.header("Input Options")
         
-        input_method = st.radio(
-            "Select input method:",
-            ["Example Template", "Custom C++ Code", "Load from File"]
+        # Remove the file loading option and simplify to a single input method
+        st.subheader("Code Input")
+        
+        # Get examples and default variables
+        examples = get_examples()
+        
+        # Initialize the selected example in session state if not present
+        if 'selected_example' not in st.session_state:
+            st.session_state.selected_example = list(examples.keys())[0]
+        
+        example_keys = list(examples.keys())
+        try:
+            selected_example = st.selectbox(
+                "Example Template:", 
+                example_keys, 
+                index=example_keys.index(st.session_state.selected_example),
+                key="example_selectbox"
+            )
+            # Update the session state
+            st.session_state.selected_example = selected_example
+        except:
+            # Fallback if there's an issue with the selectbox
+            selected_example = example_keys[0]
+            st.session_state.selected_example = selected_example
+        
+        # Get the selected example code
+        cpp_code = examples[selected_example]
+        
+        # Allow editing the code in a text area
+        edited_code = st.text_area(
+            "Edit Code:",
+            value=cpp_code,
+            height=300,
+            key="code_editor"
         )
         
-        if input_method == "Example Template":
-            load_example_template()
-        elif input_method == "Custom C++ Code":
-            load_custom_code()
-        elif input_method == "Load from File":
-            load_from_file()
+        # Parse button
+        if st.button("Parse Code"):
+            parser = TileDistributionParser()
+            encoding = parser.parse_tile_distribution_encoding(edited_code)
+            
+            # Get default variables for this example
+            variables = get_default_variables(selected_example)
+            
+            if encoding:
+                st.session_state.encoding = encoding
+                st.session_state.variables = variables
+                st.session_state.cpp_code = edited_code  # Save the code for visualization
+                
+                # Extract variables from encoding for sliders
+                if encoding and "variable_names" in encoding:
+                    var_list = encoding["variable_names"]
+                else:
+                    var_list = []
+                    
+                st.session_state.parsed_variables = list(set(
+                    var_list + list(variables.keys())
+                ))
+                
+                st.success("Code parsed successfully!")
+            else:
+                st.error("Failed to parse the code. Check the syntax.")
         
         # Variable sliders (shown only if encoding is parsed)
         if st.session_state.encoding is not None:
@@ -262,8 +313,17 @@ def main():
                                  f"{warp_per_block[0]}x{warp_per_block[1]}" if len(warp_per_block) >= 2 else "N/A")
                     
                     with col3:
-                        st.metric("Vector Dimensions", 
-                                 f"{vector_dimensions[0]}" if vector_dimensions else "N/A")
+                        if vector_dimensions:
+                            if len(vector_dimensions) > 1:
+                                # Show multi-dimensional vector format
+                                st.metric("Vector Dimensions", 
+                                         f"{' × '.join(str(v) for v in vector_dimensions)}")
+                            else:
+                                # Single dimension
+                                st.metric("Vector Dimensions", 
+                                         f"{vector_dimensions[0]}")
+                        else:
+                            st.metric("Vector Dimensions", "N/A")
                     
                     with col4:
                         st.metric("Repeat Factor",
@@ -278,7 +338,15 @@ def main():
                         threads_per_warp_n = thread_per_warp[1] if len(thread_per_warp) > 1 else 0
                         warps_per_block_m = warp_per_block[0] if len(warp_per_block) > 0 else 0
                         warps_per_block_n = warp_per_block[1] if len(warp_per_block) > 1 else 0
-                        vector_k = vector_dimensions[0] if len(vector_dimensions) > 0 else 0
+                        # Handle multi-dimensional vector dimensions
+                        if len(vector_dimensions) > 1:
+                            vector_display = " × ".join(str(v) for v in vector_dimensions)
+                            vector_k = 1
+                            for v in vector_dimensions:
+                                vector_k *= v
+                        else:
+                            vector_display = str(vector_dimensions[0]) if vector_dimensions else "0"
+                            vector_k = vector_dimensions[0] if len(vector_dimensions) > 0 else 0
                         repeat_val_m = repeat_factor[0] if len(repeat_factor) > 0 else 1
                         repeat_val_n = repeat_factor[1] if len(repeat_factor) > 1 else 1
                         
@@ -292,7 +360,8 @@ def main():
                         - **ThreadPerWarp**: {threads_per_warp_m} x {threads_per_warp_n} threads per warp
                         - **WarpPerBlock**: {warps_per_block_m} x {warps_per_block_n} warps per block
                         - **Repeat Factor**: {repeat_val_m}x{repeat_val_n}
-                        - **Vector Dimensions (K)**: {vector_k}
+                        - **Vector Dimensions**: {vector_display}
+                        - **Total Vector Size (K)**: {vector_k}
                         - **Total Thread Count (in Block)**: {total_threads} threads ({total_threads_m} x {total_threads_n})
                         - **Total Elements (covered by Block)**: {total_elements} elements
                         """)
@@ -411,8 +480,12 @@ The `TileDistributionPedantic` class (in `tiler_pedantic.py`) calculates these p
 
     *   **VectorDimensions (`[K]`)**:
         *   Uses `vector_dim_ys_index` hint if available.
-        *   Otherwise, if `NDimYs > 0`, it checks the length of the *last* YS-dimension (`ys_lengths_[-1]`). If this length is between 2 and 16 (inclusive), it\\'s inferred as the vector dimension.
-        *   Defaults to `[1]`.
+        *   Otherwise, the system now uses an improved algorithm to detect multi-dimensional vector sizes:
+            *   The system identifies Y dimensions that map to the last position in H sequences.
+            *   For example, if Y1 maps to H0[3] and Y3 maps to H1[3], both are identified as vector dimensions.
+            *   This allows proper detection of multi-dimensional vectors (e.g., 2×2 or 4×4) rather than just a single value.
+            *   The total vector size (K) is calculated as the product of all vector dimension values.
+        *   Defaults to `[1]` if no vector dimensions are identified.
 
     *   **ThreadPerWarp (`[threads_m, threads_n]`)**:
         *   Uses `thread_per_warp_p_indices` hint if available (product of components for specified P-dims).
@@ -445,6 +518,13 @@ The `TileDistributionPedantic` class (in `tiler_pedantic.py`) calculates these p
     Once `ThreadPerWarp = [tpw_m, tpw_n]`, `WarpPerBlock = [wpb_m, wpb_n]`, and `Repeat = [repeat_m, repeat_n]` are determined:
     *   `BlockSize = [tpw_m * wpb_m * repeat_m, tpw_n * wpb_n * repeat_n]`
 
+4.  **Display Improvements**:
+    The visualizer has been enhanced to:
+    *   Display multi-dimensional vector information properly (e.g., "4 × 4" rather than just "4")
+    *   Calculate the total Vector Size (K) as the product of all vector dimensions
+    *   Optimize the layout to display more warps in the grid without cutoff
+    *   Show how Y dimensions map to vector positions in H sequences
+
 **Role of Y-Dimensions (including "Extra" Y-Dimensions):**
 
 The Y-dimensions (`Ys2RHsMajor/Minor`, leading to `ys_lengths_`) collectively define the shape and internal structure of the data elements that each P-tile is responsible for. They do **not** typically mean multiple GPU blocks.
@@ -453,17 +533,32 @@ The Y-dimensions (`Ys2RHsMajor/Minor`, leading to `ys_lengths_`) collectively de
 *   **Repeat Factor (from a Y-dim, if hinted):** A Y-dimension hinted via `visualization_hints: {'repeat_factor_ys_index': YS_INDEX}` scales the work within the conceptual block (currently, the hint applies to the M-dimension of repeat: `Repeat = [hinted_YS_length, 1]`).
 *   **"Extra" Y-Dimensions:** Any other Y-dimensions contribute to the local data structure *within* each P-tile (and within each repetition if a repeat factor is active). They add more axes to the "within-tile" addressing scheme.
 
-*Example from a Parsed Snippet:*
-Consider an encoding like your last example where Y-dimensions are resolved to `ys_lengths_ = [4, 4]`. 
-*   `Y0` (length 4)
-*   `Y1` (length 4)
-If the system infers `VectorDimensions (K) = 4` (e.g., from Y1, being the last Y-dim of appropriate size), and `Repeat Factor` defaults to `[1,1]` (as no hint is provided for it):
+*Example from a Multi-Dimensional Vector:*
+Consider a tile distribution encoding with this mapping pattern:
+```
+tile_distribution_encoding<
+    sequence<>,                             // Empty R
+    tuple<sequence<S::Repeat_M, S::WarpPerBlock_M, S::ThreadPerWarp_M, S::Vector_M>,
+          sequence<S::Repeat_N, S::WarpPerBlock_N, S::ThreadPerWarp_N, S::Vector_N>>,
+    tuple<sequence<1, 2>, sequence<1, 2>>,
+    tuple<sequence<1, 1>, sequence<2, 2>>,
+    sequence<1, 1, 2, 2>,
+    sequence<0, 3, 0, 3>>{}
+```
 
-In this case, Y0 (length 4) is an "extra" Y-dimension relative to the main hierarchical parameters shown.
-*   It means that for the work unit defined by a P-tile, there are 4 distinct "sub-units" or "slices" along this Y0 dimension.
-*   Each of these sub-units is then a vector of 4 elements (defined by Y1, the vector dimension).
-*   So, the P-tile processes a local data block conceptually shaped by `Y0_length x Y1_length` (i.e., 4x4 elements in this example).
-*   The `idx_y` coordinates `[y0_coord, y1_coord]` are crucial in `calculate_index` to select a specific element (or vector start) from this local 4x4 data block.
+Here, the Y dimensions map to H sequences as follows:
+*   `Y1` maps to H0[3] (the Vector_M position)
+*   `Y3` maps to H1[3] (the Vector_N position)
+
+The new vector dimension detection algorithm correctly identifies:
+*   Both Y1 and Y3 as vector dimensions
+*   If both are 4, then VectorDimensions = [4, 4] (instead of just 4)
+*   Total Vector Size (K) = 4 × 4 = 16
+
+This multi-dimensional vector information is critical for understanding:
+*   The true shape of the data being processed (2D vectors rather than 1D)
+*   How threads access data elements in a structured way
+*   The total computational work performed by each thread
 
 These "extra" Y dimensions are fundamental to:
 1.  **`d_scalar_idx` calculation:** `idx_y` is flattened to `d_scalar_idx` (e.g., `y0_coord * Y1_length + y1_coord`, so `y0_coord * 4 + y1_coord` in the example), which then acts as a high-order index into the X-space.
@@ -555,122 +650,6 @@ This explanation clarifies how the visualizer, powered by `tiler_pedantic.py`, a
         - **Tile Distribution**: Shows thread mapping to tile elements
         - **Thread Access Pattern**: Animates thread access over time
         """)
-
-def load_example_template():
-    """Load an example tile_distribution_encoding template."""
-    # Get examples and default variables from examples.py
-    examples = get_examples()
-    
-    # Initialize the selected example in session state if not present
-    if 'selected_example' not in st.session_state:
-        st.session_state.selected_example = list(examples.keys())[0]
-    
-    example_keys = list(examples.keys())
-    try:
-        selected_example = st.selectbox(
-            "Select an example:", 
-            example_keys, 
-            index=example_keys.index(st.session_state.selected_example),
-            key="example_selectbox"
-        )
-        # Update the session state
-        st.session_state.selected_example = selected_example
-    except:
-        # Fallback if there's an issue with the selectbox
-        selected_example = example_keys[0]
-        st.session_state.selected_example = selected_example
-    
-    cpp_code = examples[selected_example]
-    
-    # Display the code
-    st.code(cpp_code, language="cpp")
-    
-    # Parse the example code
-    parser = TileDistributionParser()
-    encoding = parser.parse_tile_distribution_encoding(cpp_code)
-    
-    # Get default variables for this example
-    variables = get_default_variables(selected_example)
-    
-    # Save to session state
-    st.session_state.encoding = encoding
-    st.session_state.variables = variables
-    st.session_state.cpp_code = cpp_code  # Save the code for visualization
-    
-    # Extract variables from encoding for sliders
-    if encoding and "variable_names" in encoding:
-        var_list = encoding["variable_names"]
-    else:
-        var_list = []
-        
-    st.session_state.parsed_variables = list(set(
-        var_list + list(variables.keys())
-    ))
-
-def load_custom_code():
-    """Parse custom C++ code from a text area."""
-    cpp_code = st.text_area(
-        "Enter tile_distribution_encoding C++ code:",
-        height=200,
-        placeholder="tile_distribution_encoding<...>{}"
-    )
-    
-    if cpp_code:
-        # Parse button
-        if st.button("Parse Code"):
-            parser = TileDistributionParser()
-            encoding = parser.parse_tile_distribution_encoding(cpp_code)
-            variables = parser.extract_template_variables(cpp_code)
-            
-            if encoding:
-                st.session_state.encoding = encoding
-                st.session_state.variables = variables
-                st.session_state.cpp_code = cpp_code  # Save the code for visualization
-                
-                # Extract variables from encoding for sliders
-                st.session_state.parsed_variables = list(set(
-                    encoding.get("variable_names", []) + list(variables.keys())
-                ))
-                
-                st.success("Code parsed successfully!")
-            else:
-                st.error("Failed to parse the code. Check the syntax.")
-
-def load_from_file():
-    """Load tile_distribution_encoding from a file."""
-    file_path = st.text_input(
-        "Enter file path (relative to workspace):",
-        placeholder="/main/example.cpp"
-    )
-    
-    if file_path:
-        if os.path.exists(file_path):
-            if st.button("Load File"):
-                try:
-                    with open(file_path, 'r') as f:
-                        cpp_code = f.read()
-                    
-                    parser = TileDistributionParser()
-                    encoding = parser.parse_tile_distribution_encoding(cpp_code)
-                    variables = parser.extract_template_variables(cpp_code)
-                    
-                    if encoding:
-                        st.session_state.encoding = encoding
-                        st.session_state.variables = variables
-                        st.session_state.cpp_code = cpp_code  # Save the code for visualization
-                        
-                        # Extract variables from encoding for sliders
-                        st.session_state.parsed_variables = list(set(
-                            encoding.get("variable_names", []) + list(variables.keys())
-                        ))
-                        
-                        st.success(f"File '{file_path}' loaded successfully!")
-                    else:
-                        st.error("No tile_distribution_encoding structure found in the file.")
-                except Exception as e:
-                    st.error(f"Error loading file: {str(e)}")
-        else:
-            st.error(f"File '{file_path}' not found.")
 
 def display_variable_controls():
     """Display sliders for adjusting template variables."""

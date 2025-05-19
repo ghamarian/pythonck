@@ -10,6 +10,7 @@ import matplotlib.patches as patches
 from matplotlib.collections import PatchCollection
 import networkx as nx
 import numpy as np
+import textwrap  # Add textwrap for text wrapping
 from typing import Dict, List, Any, Tuple, Optional
 from parser import TileDistributionParser
 
@@ -455,14 +456,28 @@ class TileDistributionVisualizer:
                 
                 # Add label with both symbolic and numeric values if it's a variable
             if elem_val in variables:
-                # Show both symbolic name and numeric value (more compact)
-                ax.text(x_pos, y_pos + element_box_height/2, f"{elem_val}", 
-                        ha='center', va='center', fontsize=8, zorder=4)
+                # Use text wrapping for long variable names
+                if len(str(elem_val)) > 12:
+                    # Wrap long variable names
+                    wrapped_val = textwrap.fill(str(elem_val), width=12)
+                    ax.text(x_pos, y_pos + element_box_height/2 + 0.01, wrapped_val, 
+                           ha='center', va='center', fontsize=8, zorder=4)
+                else:
+                    ax.text(x_pos, y_pos + element_box_height/2, f"{elem_val}", 
+                           ha='center', va='center', fontsize=8, zorder=4)
+                
+                # Show numeric value below
                 ax.text(x_pos, y_pos + element_box_height/4, f"({variables[elem_val]})", 
-                        ha='center', va='center', fontsize=6, zorder=4)
+                       ha='center', va='center', fontsize=6, zorder=4)
             else:
-                ax.text(x_pos, y_pos + element_box_height/2, f"{elem_val}", 
-                        ha='center', va='center', fontsize=8, zorder=4)
+                if len(str(elem_val)) > 12:
+                    # Wrap long non-variable values
+                    wrapped_val = textwrap.fill(str(elem_val), width=12)
+                    ax.text(x_pos, y_pos + element_box_height/2, wrapped_val, 
+                           ha='center', va='center', fontsize=8, zorder=4)
+                else:
+                    ax.text(x_pos, y_pos + element_box_height/2, f"{elem_val}", 
+                           ha='center', va='center', fontsize=8, zorder=4)
             
             # Add index label below
             ax.text(x_pos, y_pos, f"[{elem_idx}]", 
@@ -1013,6 +1028,8 @@ def visualize_thread_access_pattern(viz_data: Dict[str, Any], frame_idx: int = 0
     return fig
 
 def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), code_snippet: str = None, show_arrows=False):
+    # Debug print for vector dimensions
+    print(f"DEBUG: Hierarchical viz_data['hierarchical_structure']: {viz_data.get('hierarchical_structure', {}).get('VectorDimensions')}")
     """
     Visualize hierarchical tile structure showing block, warp, and thread organization.
     
@@ -1157,8 +1174,9 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
            fontsize=info_fontsize, ha='center', va='center', color=info_text_color)
     
     # Set up layout dimensions
-    thread_area_width = 0.65  # Further reduced to prevent overflow
-    code_area_width = 0.35
+    # Use maximum layout width for thread area to prevent column cutoff
+    thread_area_width = 0.95  # Use almost the entire width for thread area
+    code_area_width = 0.05    # Minimize code area to prioritize warp columns
     
     # The top of the warp drawing area should be below the info boxes
     padding_below_info_area = 0.015
@@ -1177,11 +1195,11 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
     # This is the Y where the padding above the RepeatM box ends / where the warp region bottom aligns
     repeat_section_padding_end_y = repeat_box_actual_y_end + repeat_box_padding_above
     
-    # Title spacing
-    title_space = 0.08
+    # Title spacing - reduce for more vertical space
+    title_space = 0.05  # Reduced from 0.08
     
     # Calculate the start x position for the thread grid (leaving space for the color bar)
-    thread_grid_start_x = 0.1  # Start position after color bar
+    thread_grid_start_x = 0.05  # Reduced for more horizontal space
     
     # Recalculate warps_region_height based on available space and title
     warps_region_height = warp_area_top_y - repeat_section_padding_end_y - title_space
@@ -1201,7 +1219,13 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
     
     # Calculate the height and width for each warp
     warp_height = warps_region_height / max(visible_warp_rows, 1)
-    warp_width = (thread_area_width - 0.15) / (visible_warp_cols + 0.5)  # +0.5 to leave space for labels, reduced width
+    
+    # Calculate equal width for all warp columns
+    total_available_width = thread_area_width - 0.05  # Minimal margin to maximize usable space
+    
+    # Ensure there's always enough width for all visible columns
+    equal_warp_width = total_available_width / max(visible_warp_cols, 1)
+    warp_width = equal_warp_width  # Use equal width for all warps
     
     # Min dimensions to ensure warps are visible
     min_warp_height = 0.02  # Reduced from 0.05
@@ -1229,22 +1253,18 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
     repeat_val = hierarchical_structure.get('Repeat', [4])[0] if hierarchical_structure.get('Repeat') and len(hierarchical_structure.get('Repeat')) > 0 else 4
     # Update RepeatM text to better reflect 2D grid structure
     ax.text(0.02 + 0.3/2, repeat_box_actual_y_start + repeat_box_height_val/2, 
-           f"Block Structure: {wpb_m_display_val}×{wpb_n_display_val} Warps\nEach Warp: {tpw_m_val}×{tpw_n_val} Threads\nVector Length: {vec_k_val}", 
+           f"Block Structure: {wpb_m_display_val}×{wpb_n_display_val} Warps\nEach Warp: {tpw_m_val}×{tpw_n_val} Threads\nVector Length: {' × '.join(str(v) for v in vector_dimensions) if len(vector_dimensions) > 1 else vec_k_val}", 
            fontsize=9, ha='center', va='center', color='white')
     
-    # Calculate available space more precisely
-    total_available_width = thread_area_width - 0.15  # Leave margin on both sides
-    
-    # Recalculate dimensions for 2D warp grid with adjusted space
-    warp_width = total_available_width / max(visible_warp_cols, 1)
+    # No need to recalculate space - we already have the warp_width
     
     # Calculate the title positioning to be above the first warp with clear separation
     title_y = warp_area_top_y - title_space/2
     
-    # Add title with a background to make it stand out
+    # Add compact title
     ax.text(thread_grid_start_x + thread_area_width/2, title_y,
-            "Warp Grid (M×N)", ha='center', va='center', fontsize=12, color='white',
-            fontweight='bold', bbox=dict(facecolor='#222222', alpha=0.7, boxstyle='round,pad=0.3'))
+            "Warp Grid (M×N)", ha='center', va='center', fontsize=10, color='white',
+            fontweight='bold', bbox=dict(facecolor='#222222', alpha=0.7, boxstyle='round,pad=0.1'))
     
     # Now calculate warp positions starting below the title
     first_warp_y = warp_area_top_y - title_space
@@ -1272,8 +1292,13 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
             if warp_idx >= total_warps or warps_shown >= MAX_DISPLAY_WARPS:
                 continue
                 
-            # Calculate grid position for this warp with adjusted spacing to keep within bounds
-            warp_x = thread_grid_start_x + n * warp_width
+            # Calculate grid position with adjustment for more than 4 columns
+            column_adjustment = 0
+            if visible_warp_cols > 4:
+                # Compress the spacing a bit when we have many columns
+                column_adjustment = -0.01 * n
+                
+            warp_x = thread_grid_start_x + n * equal_warp_width + column_adjustment
             warp_y = first_warp_y - (m + 1) * warp_height
             
             # Get warp data if available
@@ -1283,8 +1308,8 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
             # Choose color for this warp
             warp_color = warp_colors[warp_idx % len(warp_colors)]
             
-            # Ensure container width stays within bounds
-            container_width = min(warp_width * 0.92, thread_area_width - 0.15 - warp_x)
+            # Use narrower containers to ensure all fit
+            container_width = equal_warp_width * 0.9
             
             # Draw warp container
             warp_container_rect = patches.Rectangle(
@@ -1365,8 +1390,8 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
                bbox=dict(facecolor='#444444', alpha=0.7, boxstyle='round,pad=0.3'))
     
     # Draw C++ code on the right side if provided
-    if code_snippet:
-        code_x = thread_area_width + 0.05
+    if code_snippet and code_area_width > 0.1:  # Only draw code if there's enough space
+        code_x = thread_area_width + 0.01  # Move closer to thread area
         
         code_box_top_y = warp_area_top_y 
         code_box_bottom_y = repeat_section_padding_end_y 
@@ -1377,7 +1402,7 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
         if code_box_effective_height > 0.1 : # Only draw if there's reasonable height
             code_box = patches.Rectangle(
                 (code_x, code_box_bottom_y), 
-                0.42, code_box_effective_height, 
+                0.04, code_box_effective_height,  # Minimal code box width when prioritizing warps 
                 linewidth=1,
                 edgecolor='white',
                 facecolor='#222222',
