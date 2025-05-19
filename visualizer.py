@@ -1060,7 +1060,7 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
     total_warps = warps_per_block_m * warps_per_block_n
     
     # Maximum number of warps to display (for visual clarity)
-    MAX_DISPLAY_WARPS = 16  # We'll display at most this many warps
+    MAX_DISPLAY_WARPS = 64  # Increased from 32
     
     # Determine if we need to sample warps
     display_all_warps = total_warps <= MAX_DISPLAY_WARPS
@@ -1157,27 +1157,18 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
            fontsize=info_fontsize, ha='center', va='center', color=info_text_color)
     
     # Set up layout dimensions
-    thread_area_width = 0.55
-    code_area_width = 0.45
+    thread_area_width = 0.65  # Further reduced to prevent overflow
+    code_area_width = 0.35
     
-    # Define the display regions (restored)
-    # warps_region_height = 0.7  # Original fixed value, will be recalculated
-    
-    # Create left side vertical color bar (restored variable)
-    color_bar_width = 0.05
-    
-    # The top of the warp drawing area (and color bar) should be below the new info boxes.
-    # tpw_box_y is the y-coordinate of the bottom of the tpw_box (lowest info box).
-    # Effective padding below info boxes reduced from (old info_y_spacing + 0.01 = 0.015 + 0.01 = 0.025)
-    # to new desired total padding of 0.015.
+    # The top of the warp drawing area should be below the info boxes
     padding_below_info_area = 0.015
     warp_area_top_y = tpw_box_y - padding_below_info_area
     
     # --- Revised Y-Layout for Bottom Elements ---
     bottom_plot_margin = 0.02
     repeat_box_height_val = 0.08 
-    repeat_box_padding_above = 0.025 # Reduced from 0.05
-
+    repeat_box_padding_above = 0.025
+    
     # Y-position for the *bottom* of the RepeatM box
     repeat_box_actual_y_start = bottom_plot_margin
     # Y-position for the *top* of the RepeatM box
@@ -1185,47 +1176,50 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
     
     # This is the Y where the padding above the RepeatM box ends / where the warp region bottom aligns
     repeat_section_padding_end_y = repeat_box_actual_y_end + repeat_box_padding_above
-
-    # Recalculate warps_region_height based on available space
-    warps_region_height = warp_area_top_y - repeat_section_padding_end_y
     
-    # NEW: Calculate warp height based on the number of warps we want to display
-    warp_height = warps_region_height / max(display_warp_count, 1)
+    # Title spacing
+    title_space = 0.08
     
-    # If warp_height is too small, adjust it to a minimum value
-    min_warp_height = 0.02  # Minimum height for a warp
+    # Calculate the start x position for the thread grid (leaving space for the color bar)
+    thread_grid_start_x = 0.1  # Start position after color bar
+    
+    # Recalculate warps_region_height based on available space and title
+    warps_region_height = warp_area_top_y - repeat_section_padding_end_y - title_space
+    
+    # Calculate dimensions for 2D warp grid
+    # Number of visible warp rows and columns (taking into account maximum display limit)
+    if warps_per_block_n == 1:
+        # Special case for 1D arrangement (e.g., 18x1 or 20x1)
+        visible_warp_rows = min(warps_per_block_m, MAX_DISPLAY_WARPS)
+        visible_warp_cols = 1
+    else:
+        visible_warp_rows = min(warps_per_block_m, int(np.ceil(MAX_DISPLAY_WARPS / warps_per_block_n)))
+        visible_warp_cols = min(warps_per_block_n, MAX_DISPLAY_WARPS // visible_warp_rows)
+    
+    # Track if rows are truncated for warning message
+    rows_truncated = visible_warp_rows < warps_per_block_m
+    
+    # Calculate the height and width for each warp
+    warp_height = warps_region_height / max(visible_warp_rows, 1)
+    warp_width = (thread_area_width - 0.15) / (visible_warp_cols + 0.5)  # +0.5 to leave space for labels, reduced width
+    
+    # Min dimensions to ensure warps are visible
+    min_warp_height = 0.02  # Reduced from 0.05
+    min_warp_width = 0.1    # Minimum width for a warp
+    
+    # Adjust dimensions if too small
     if warp_height < min_warp_height:
         warp_height = min_warp_height
-        # This might mean not all warps we want to display will fit
-        # We'll handle that by showing the pattern and indicating there are more
-    # --- End Revised Y-Layout ---
+        visible_warp_rows = max(1, int(warps_region_height / min_warp_height))
     
-    # Draw the color bar on left side (y-positions adjusted based on new warp_area_top_y and warp_height)
-    for i in range(min(display_warp_count, total_warps)):
-        # For sampling, choose warps at regular intervals if not showing all
-        if display_all_warps:
-            warp_idx = i
-        else:
-            # Sample warps at regular intervals
-            warp_idx = int(i * (total_warps / display_warp_count))
-            
-        warp_color = warp_colors[warp_idx % len(warp_colors)]
-        y_pos_color_bar = warp_area_top_y - (i + 1) * warp_height
-        
-        color_rect = patches.Rectangle(
-            (0.02, y_pos_color_bar), 
-            color_bar_width - 0.01, warp_height,
-            linewidth=1, 
-            edgecolor='white', 
-            facecolor=warp_color,
-            alpha=0.8
-        )
-        ax.add_patch(color_rect)
+    if warp_width < min_warp_width:
+        warp_width = min_warp_width
+        visible_warp_cols = int(thread_area_width / min_warp_width) - 1  # -1.5 to leave space for labels
     
-    # Draw the RepeatM section at the bottom with clear separation
+    # Draw the RepeatM section at the bottom
     repeat_box = patches.Rectangle(
-        (0.02, repeat_box_actual_y_start), # Use new Y start for the box
-        0.3, repeat_box_height_val, # Use defined height
+        (0.02, repeat_box_actual_y_start), 
+        0.3, repeat_box_height_val,
         linewidth=1, 
         edgecolor='white', 
         facecolor='#1E90FF', # DodgerBlue
@@ -1233,10 +1227,27 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
     )
     ax.add_patch(repeat_box)
     repeat_val = hierarchical_structure.get('Repeat', [4])[0] if hierarchical_structure.get('Repeat') and len(hierarchical_structure.get('Repeat')) > 0 else 4
-    # Center text in the new RepeatM box position
+    # Update RepeatM text to better reflect 2D grid structure
     ax.text(0.02 + 0.3/2, repeat_box_actual_y_start + repeat_box_height_val/2, 
-           f"{repeat_val} × ({wpb_m_display_val}W × {tpw_m_val}R × {tpw_n_val}C × {vec_k_val}V)\\nRepeatM", 
+           f"Block Structure: {wpb_m_display_val}×{wpb_n_display_val} Warps\nEach Warp: {tpw_m_val}×{tpw_n_val} Threads\nVector Length: {vec_k_val}", 
            fontsize=9, ha='center', va='center', color='white')
+    
+    # Calculate available space more precisely
+    total_available_width = thread_area_width - 0.15  # Leave margin on both sides
+    
+    # Recalculate dimensions for 2D warp grid with adjusted space
+    warp_width = total_available_width / max(visible_warp_cols, 1)
+    
+    # Calculate the title positioning to be above the first warp with clear separation
+    title_y = warp_area_top_y - title_space/2
+    
+    # Add title with a background to make it stand out
+    ax.text(thread_grid_start_x + thread_area_width/2, title_y,
+            "Warp Grid (M×N)", ha='center', va='center', fontsize=12, color='white',
+            fontweight='bold', bbox=dict(facecolor='#222222', alpha=0.7, boxstyle='round,pad=0.3'))
+    
+    # Now calculate warp positions starting below the title
+    first_warp_y = warp_area_top_y - title_space
     
     # Initialize lists for batch drawing thread cells
     all_thread_rects = []
@@ -1248,100 +1259,111 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
     # Threshold for rendering thread ID text to improve performance for dense layouts
     min_cell_dim_for_text = 0.01 # If cell width or height is less than 1% of figure dim, skip text
 
-    # Draw warps and threads in the center section
+    # Draw warps and threads in a 2D grid with proper spacing
     warps_shown = 0
-    for warp_idx, (warp_key, warp_data) in enumerate(thread_blocks.items()):
-        # For sampling, choose warps at regular intervals if not showing all
-        if not display_all_warps:
-            if warps_shown >= display_warp_count:
-                break
-                
-            # Sample warps at regular intervals
-            if warp_idx != int(warps_shown * (total_warps / display_warp_count)):
-                continue
-        
-        warp_color = warp_colors[warp_idx % len(warp_colors)]
-        
-        y_pos_warp_block = warp_area_top_y - (warps_shown + 1) * warp_height
-        
-        # When sampling, modify the warp label to show the actual warp number
-        if display_all_warps:
-            warp_label = f"Warp{warp_idx}"
-        else:
-            warp_label = f"Warp{warp_idx}" if warps_shown < display_warp_count - 1 else f"... ({total_warps-display_warp_count+1} more warps)"
-        
-        ax.text(color_bar_width + 0.02, y_pos_warp_block + warp_height/2, warp_label, 
-               fontsize=10, ha='left', va='center', color='white')
-        
-        thread_grid_width = thread_area_width - color_bar_width - 0.05
-        thread_grid_height = warp_height * 0.9
-        
-        # Create warp container for collection
-        warp_container_rect = patches.Rectangle(
-            (color_bar_width + 0.04, y_pos_warp_block + 0.01), 
-            thread_grid_width, thread_grid_height
-        )
-        all_warp_rects.append(warp_container_rect)
-        all_warp_facecolors_for_container.append(warp_color) 
-        
-        cell_width = thread_grid_width / max(threads_per_warp_n, 1)
-        cell_height = thread_grid_height / max(threads_per_warp_m, 1)
-        
-        # Only show thread details if the warps are large enough
-        if thread_grid_height > 0.02:  # Only add thread details if warp is tall enough
-            for thread_key, thread_data in warp_data.items():
-                thread_pos = thread_data.get('position', [0, 0])
-                thread_id = thread_data.get('global_id', 0)
-                
-                row_idx = thread_pos[0] if len(thread_pos) > 0 else 0
-                col_idx = thread_pos[1] if len(thread_pos) > 1 else 0
-                
-                cell_x = color_bar_width + 0.04 + col_idx * cell_width
-                cell_y = y_pos_warp_block + 0.01 + (threads_per_warp_m - row_idx - 1) * cell_height
-                
-                thread_rect = patches.Rectangle(
-                    (cell_x, cell_y),
-                    cell_width, cell_height
-                )
-                all_thread_rects.append(thread_rect)
-                all_thread_facecolors.append(warp_color)
-                
-                # Conditionally add thread ID text to avoid clutter and improve performance
-                if cell_width > min_cell_dim_for_text and cell_height > min_cell_dim_for_text:
-                    ax.text(cell_x + cell_width/2, cell_y + cell_height/2, f"T{thread_id}",
-                           fontsize=8, ha='center', va='center', color='white')
-        
-        warps_shown += 1
+    warp_labels = {}  # To track which warp labels we've added
     
-    # After looping, add the collection of warp container rectangles
-    if all_warp_rects:
-        warp_container_collection = PatchCollection(
-            all_warp_rects,
-            facecolors=all_warp_facecolors_for_container, 
-            edgecolor='white',
-            linewidth=1,
-            alpha=0.3 # Alpha for the warp containers
-        )
-        ax.add_collection(warp_container_collection)
-
-    # After looping through all warps and threads, add the collection of thread rectangles
-    if all_thread_rects:
-        thread_collection = PatchCollection(
-            all_thread_rects,
-            facecolors=all_thread_facecolors, 
-            edgecolor='white',
-            linewidth=1,
-            alpha=0.7 # Alpha for the thread cells
-        )
-        ax.add_collection(thread_collection)
+    # Draw the 2D grid of warps
+    for m in range(visible_warp_rows):
+        for n in range(visible_warp_cols):
+            # Calculate the warp index
+            warp_idx = m * warps_per_block_n + n
+            
+            if warp_idx >= total_warps or warps_shown >= MAX_DISPLAY_WARPS:
+                continue
+                
+            # Calculate grid position for this warp with adjusted spacing to keep within bounds
+            warp_x = thread_grid_start_x + n * warp_width
+            warp_y = first_warp_y - (m + 1) * warp_height
+            
+            # Get warp data if available
+            warp_key = f"Warp{warp_idx}"
+            warp_data = thread_blocks.get(warp_key, {})
+            
+            # Choose color for this warp
+            warp_color = warp_colors[warp_idx % len(warp_colors)]
+            
+            # Ensure container width stays within bounds
+            container_width = min(warp_width * 0.92, thread_area_width - 0.15 - warp_x)
+            
+            # Draw warp container
+            warp_container_rect = patches.Rectangle(
+                (warp_x, warp_y), 
+                container_width, warp_height * 0.95,
+                linewidth=1, edgecolor='white', facecolor=warp_color, alpha=0.3
+            )
+            ax.add_patch(warp_container_rect)
+            
+            # Add warp label
+            ax.text(warp_x + container_width * 0.5, warp_y + warp_height * 0.95, 
+                   f"Warp{warp_idx} ({m},{n})", ha='center', va='bottom', fontsize=8, 
+                   color='white', weight='bold')
+            
+            # Mark this warp as labeled
+            warp_labels[warp_idx] = True
+            
+            # Calculate cell dimensions for threads within this warp
+            cell_width = (container_width) / threads_per_warp_n
+            cell_height = (warp_height * 0.95) / threads_per_warp_m
+            
+            # Only show thread details if the cells are large enough
+            if cell_width > min_cell_dim_for_text and cell_height > min_cell_dim_for_text:
+                # Draw threads within this warp
+                for thread_key, thread_data in warp_data.items():
+                    thread_pos = thread_data.get('position', [0, 0])
+                    thread_id = thread_data.get('global_id', 0)
+                    
+                    row_idx = thread_pos[0] if len(thread_pos) > 0 else 0
+                    col_idx = thread_pos[1] if len(thread_pos) > 1 else 0
+                    
+                    cell_x = warp_x + col_idx * cell_width
+                    cell_y = warp_y + (threads_per_warp_m - row_idx - 1) * cell_height
+                    
+                    thread_rect = patches.Rectangle(
+                        (cell_x, cell_y),
+                        cell_width * 0.9, cell_height * 0.9,
+                        linewidth=0.5, edgecolor='white', facecolor=warp_color, alpha=0.7
+                    )
+                    ax.add_patch(thread_rect)
+                    
+                    # Add thread ID if there's room
+                    if cell_width > 0.015 and cell_height > 0.015:
+                        ax.text(cell_x + cell_width * 0.45, cell_y + cell_height * 0.45, 
+                                f"T{thread_id}", ha='center', va='center', fontsize=6, color='white')
+            else:
+                # If threads are too small to display individually, just show a count
+                ax.text(warp_x + warp_width * 0.5, warp_y + warp_height * 0.5,
+                       f"{threads_per_warp_m}×{threads_per_warp_n}\nthreads", 
+                       ha='center', va='center', fontsize=7, color='white')
+                
+            warps_shown += 1
+            
+    # Add a color legend for warps
+    legend_elements = []
+    for i in range(min(8, warps_shown)):
+        patch = patches.Patch(facecolor=warp_colors[i % len(warp_colors)], 
+                             edgecolor='white', alpha=0.7,
+                             label=f'Warp {i}')
+        legend_elements.append(patch)
+        
+    if legend_elements:
+        ax.legend(handles=legend_elements, loc='lower right', 
+                 fontsize=8, title="Warp Colors")
     
     # Add information about sampling if not showing all warps
     if not display_all_warps:
         ax.text(0.02, bottom_plot_margin + repeat_box_height_val + repeat_box_padding_above + 0.02, 
-               f"Showing {display_warp_count} of {total_warps} warps ({warps_per_block_m}×{warps_per_block_n} total)",
+               f"Showing {warps_shown} of {total_warps} warps ({warps_per_block_m}×{warps_per_block_n} total)",
                fontsize=9, ha='left', va='bottom', color='white',
                bbox=dict(facecolor='#444444', alpha=0.7, boxstyle='round,pad=0.3'))
-
+    
+    # Add specific message if rows are truncated
+    if rows_truncated:
+        ax.text(thread_grid_start_x + thread_area_width/2, title_y - 0.03,
+               f"⚠️ Showing only {visible_warp_rows} of {warps_per_block_m} warp rows",
+               fontsize=10, ha='center', va='bottom', color='yellow',
+               bbox=dict(facecolor='#444444', alpha=0.7, boxstyle='round,pad=0.3'))
+    
     # Draw C++ code on the right side if provided
     if code_snippet:
         code_x = thread_area_width + 0.05
@@ -1363,7 +1385,7 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
             )
             ax.add_patch(code_box)
 
-            # Define colors for syntax highlighting (Restored)
+            # Define colors for syntax highlighting
             syntax_colors = {
                 'keyword': '#569CD6',    # Blue
                 'type': '#4EC9B0',       # Teal
@@ -1376,14 +1398,13 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
                 'default': '#D4D4D4'     # Light gray
             }
             
-            # Keywords to color (Restored)
+            # Keywords to color
             keywords = ['template', 'typename', 'constexpr', 'static', 'return', 'using', 'if', 'else', 'for', 'while']
             types = ['index_t', 'tuple', 'sequence', 'Problem', 'int', 'float', 'double', 'bool']
             
-            code_lines = code_snippet.split('\n') # Restored for clarity, or use split in loop directly
+            code_lines = code_snippet.split('\n')
 
             # Add code text with syntax highlighting
-            # Position text lines from the top of the code_box (code_box_top_y)
             for i, line in enumerate(code_lines):
                 # Calculate how many lines can fit
                 num_fittable_lines = int((code_box_effective_height - 0.02) / 0.025) # 0.02 top/bottom margin
@@ -1443,31 +1464,6 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
                 ax.text(code_x + 0.01, text_line_y, line, 
                        fontsize=8, ha='left', va='center', 
                        family='monospace', color=line_color)
-        
-        # Add dimension annotations based on detected values in the code
-        dimension_values = hierarchical_structure.get('DimensionValues', [])
-        
-        # Only show dimension arrows if explicitly requested
-        if show_arrows and dimension_values:
-            # Define arrow parameters
-            arrow_y = 0.2  # Even lower position to ensure they're below the code
-            start_x = code_x + 0.1
-            arrow_spacing = 0.07  # Increase spacing between arrows
-            
-            # Draw dimension values evenly spaced
-            for i, value in enumerate(dimension_values[:6]):  # Limit to 6 dimensions
-                x_pos = start_x + i * arrow_spacing
-                
-                # Draw number
-                ax.text(x_pos, arrow_y, str(value), 
-                       fontsize=12, ha='center', va='center', 
-                       color='red', fontweight='bold')
-                
-                # Draw an arrow pointing to the number
-                arr_len = 0.03
-                ax.annotate("", xy=(x_pos, arrow_y - arr_len), 
-                          xytext=(x_pos, arrow_y - 0.06),
-                          arrowprops=dict(arrowstyle="->", color='red', lw=1.5))
     
     # Remove axes
     ax.set_xlim(0, 1)
