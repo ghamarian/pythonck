@@ -1305,16 +1305,66 @@ class TileDistributionPedantic:
                         tpw_n_len = p1_contrib_lens[1] # Second component for N-dim
                     else:
                         tpw_n_len = 1 # If P1 maps to only one, N-dim is 1
+                else:
+                    # P1 exists but has no valid mappings - keep ThreadPerWarp at [1,1]
+                    print(f"DEBUG: P1 exists but no component lengths are mapped to it. Setting ThreadPerWarp=[1,1].")
+                    tpw_m_len = 1
+                    tpw_n_len = 1
                 # If p1_contrib_lens is empty, tpw_m_len/tpw_n_len remain 1
-            elif self.NDimPs == 1: # Only P0 exists, less common for TPW, but use P0
-                p0_contrib_lens = self._get_lengths_for_p_dim_component(0)
-                if p0_contrib_lens:
-                    tpw_m_len = p0_contrib_lens[0]
-                    if len(p0_contrib_lens) > 1:
-                        tpw_n_len = p0_contrib_lens[1]
-                    else:
-                        tpw_n_len = 1
+            elif self.NDimPs == 1: # Only P0 exists, special care needed
+                # By default, in Composable Kernels when there's only one P dimension (P0),
+                # it's more often used for WarpPerBlock, not ThreadPerWarp, especially when
+                # mapping to R dimensions or the first components in H-sequences.
+                # For examples like:
+                # - sequence<MWarp>, tuple<sequence<NIterPerWarp, NWarp>, sequence<KIterPerWarp>>
+                # - sequence<WarpPerBlock_N>, tuple<sequence<Repeat_M, WarpPerBlock_M>, sequence<Repeat_K>>
+                # ThreadPerWarp should default to [1,1]
+                
+                # Check Encoding for Key Indications:
+                # 1. When only P0 exists and maps to R (major=0) or first H component (minor=0/1)
+                # 2. When the mapped dimensions have names like "Warp", "WarpPerBlock", etc.
+                # 3. When the IndexMapping shows P0 mapping to elements with "Warp" in the name
+                
+                # Explicit check - look at the pattern of P0 mappings
+                p0_maps_to_warp = False
+                
+                # Check if this looks like a WarpPerBlock mapping pattern
+                if self.DstrEncode.Ps2RHssMajor and self.DstrEncode.Ps2RHssMinor:
+                    p0_major_mappings = self.DstrEncode.Ps2RHssMajor[0] if 0 < len(self.DstrEncode.Ps2RHssMajor) else []
+                    p0_minor_mappings = self.DstrEncode.Ps2RHssMinor[0] if 0 < len(self.DstrEncode.Ps2RHssMinor) else []
+                    
+                    # Check if P0 maps primarily to R-dimensions or early H components
+                    r_mappings_count = sum(1 for major in p0_major_mappings if major == 0)
+                    first_h_component_mappings = sum(1 for major, minor in zip(p0_major_mappings, p0_minor_mappings) 
+                                                 if major > 0 and (minor == 0 or minor == 1))
+                    
+                    if r_mappings_count > 0 or first_h_component_mappings > 0:
+                        # This looks like a WarpPerBlock mapping
+                        p0_maps_to_warp = True
+                
+                # For the specific case where P0 maps to components related to WarpPerBlock
+                # or we only have a "warp level" example without thread-level distribution
+                # (detected from P0's mapping pattern), set ThreadPerWarp to [1,1]
+                if p0_maps_to_warp:
+                    print(f"DEBUG: NDimPs=1 (only P0) and mapping pattern suggests WarpPerBlock. Setting ThreadPerWarp=[1,1]")
+                    tpw_m_len = 1
+                    tpw_n_len = 1
+                else:
+                    # Traditional inference from P0 (rare case, typically P1 does ThreadPerWarp)
+                    p0_contrib_lens = self._get_lengths_for_p_dim_component(0)
+                    if p0_contrib_lens:
+                        tpw_m_len = p0_contrib_lens[0]
+                        if len(p0_contrib_lens) > 1:
+                            tpw_n_len = p0_contrib_lens[1]
+                        else:
+                            tpw_n_len = 1
             
+            # If we have a thread_per_warp_p_indices hint with an empty list, explicitly set [1,1]
+            if hints.get('thread_per_warp_p_indices') == []:
+                print(f"DEBUG: Explicit empty thread_per_warp_p_indices hint. Setting ThreadPerWarp=[1,1]")
+                tpw_m_len = 1
+                tpw_n_len = 1
+                
             hierarchical_info['ThreadPerWarp'] = [max(1,tpw_m_len), max(1,tpw_n_len)]
             # Default [1,1] is already set if NDimPs = 0 or components are not found
             # For NDimPs < 2 (i.e. only P0 or no P's), if the user expects TPW from P0, 

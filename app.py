@@ -591,44 +591,6 @@ This explanation clarifies how the visualizer, powered by `tiler_pedantic.py`, a
             """)
         # --- End Explanation ---
 
-        # Y-Space Local Data Layout Visualization
-        st.subheader("P-Tile Local Data Layout (Y-Dimensions)")
-        try:
-            if st.session_state.tile_distribution is not None:
-                ys_lengths = st.session_state.tile_distribution.get_ys_lengths()
-                ys_names = [f"Y{i}" for i in range(len(ys_lengths))]
-                
-                # Get VectorDimensionYSIndex from hierarchical_structure
-                # viz_data was already fetched for Hierarchical Tile Structure, reuse if possible or re-fetch
-                if hasattr(st.session_state.tile_distribution, 'get_visualization_data'): # Check if method exists
-                    viz_data = st.session_state.tile_distribution.get_visualization_data()
-                    hierarchical_structure = viz_data.get("hierarchical_structure", {})
-                    vector_dim_ys_idx = hierarchical_structure.get("VectorDimensionYSIndex", -1)
-                else:
-                    vector_dim_ys_idx = -1 # Fallback if data not available
-                    hierarchical_structure = {} # Ensure it exists
-
-                if ys_lengths:
-                    y_space_fig = visualize_y_space_structure(
-                        ys_lengths, 
-                        ys_names, 
-                        vector_dim_ys_idx
-                    )
-                    st.pyplot(y_space_fig)
-                    st.markdown("""
-                    **This visualization shows the structure of the data within a single P-tile, as defined by the Y-dimensions.**
-                    - Each cell represents an element or a base for a vector.
-                    - If a vector dimension is identified, its elements are highlighted.
-                    - For NDimY > 2, this shows a 2D slice (Y0 vs Y1).
-                    """)
-                else:
-                    st.write("No Y-dimensions to visualize for local data layout.")
-            else:
-                st.write("Tile distribution not calculated yet.")
-        except Exception as e:
-            st.error(f"Error displaying Y-space structure: {str(e)}")
-            if st.session_state.debug_mode:
-                st.exception(e)
 
         # Performance metrics
         if st.session_state.tile_distribution is not None:

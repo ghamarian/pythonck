@@ -81,14 +81,24 @@ EXAMPLES = {
         sequence<0, 3>>{}
     """,
     
-    "Repeat Example": """
+    "WarpPerBlock with Repeat": """
     tile_distribution_encoding<
-        sequence<S::WarpPerBlock_M, S::ThreadPerWarp_M>,
-        tuple<sequence<S::Repeat_N, S::WarpPerBlock_N, S::ThreadPerWarp_N, S::Vector_N>>,
-        tuple<sequence<0, 1>, sequence<0, 1>>,
-        tuple<sequence<0, 1>, sequence<1, 2>>,
-        sequence<1, 1>,
-        sequence<0, 3>>{}
+        sequence<WarpPerBlock_N>,
+        tuple<sequence<Repeat_M, WarpPerBlock_M>, sequence<Repeat_K>>,
+        tuple<sequence<1, 0>>,
+        tuple<sequence<1, 0>>,
+        sequence<1, 2>,
+        sequence<0, 0>>{}
+    """,
+    
+    "MWarp with Iterations": """
+    tile_distribution_encoding<
+        sequence<MWarp>,
+        tuple<sequence<NIterPerWarp, NWarp>, sequence<KIterPerWarp>>,
+        tuple<sequence<0, 1>>,
+        tuple<sequence<0, 1>>,
+        sequence<1, 2>,
+        sequence<0, 0>>{}
     """
 }
 
@@ -128,13 +138,17 @@ DEFAULT_VARIABLES = {
         "S::ThreadPerWarp_N": 8,
         "S::Vector_N": 4
     },
-    "Repeat Example": {
-        "S::WarpPerBlock_M": 2,
-        "S::ThreadPerWarp_M": 8,
-        "S::Repeat_N": 4,
-        "S::WarpPerBlock_N": 2,
-        "S::ThreadPerWarp_N": 8,
-        "S::Vector_N": 4
+    "WarpPerBlock with Repeat": {
+        "WarpPerBlock_N": 4,
+        "Repeat_M": 2,
+        "WarpPerBlock_M": 8,
+        "Repeat_K": 4
+    },
+    "MWarp with Iterations": {
+        "MWarp": 4,
+        "NIterPerWarp": 8,
+        "NWarp": 2,
+        "KIterPerWarp": 4
     }
 }
 
