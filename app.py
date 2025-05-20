@@ -564,56 +564,104 @@ def main():
         # --- Explanation for Hierarchical Parameters ---
         with st.expander("Understanding Hierarchical Parameters (Vector Size, Thread/Warp, Warps/Block)"):
             st.markdown("""
-This visualizer, now using `tiler_pedantic.py`, aims to faithfully represent the tile distribution logic from C++ `tile_distribution.hpp` and `tile_distribution_encoding.hpp`. The hierarchical parameters like Vector Size, Thread/Warp, and Warps/Block are crucial for understanding how a computation is mapped to GPU hardware.
+## How Thread Hierarchy Parameters Are Calculated
 
-**Derivation of Hierarchical Parameters in `tiler_pedantic.py`:**
+This visualizer analyzes your tile distribution encoding to determine how threads are organized. Let's understand how each parameter is calculated:
 
-The `TileDistributionPedantic` class (in `tiler_pedantic.py`) calculates these parameters in its `calculate_hierarchical_tile_structure` method based on the encoding structure:
+### Vector Dimensions
+The system examines which Y-dimensions map to the final positions in H-sequences:
 
-2.  **Inference Logic:**
-    The system uses the number of P-dimensions (`NDimPs`) and Y-dimensions (`NDimYs`) along with their mapped R/H component lengths. The `_get_lengths_for_p_dim_component(p_idx)` method is key, as it determines the R/H lengths associated with a given P-dimension.
+- Y-dimensions that map to the last position in an H-sequence (e.g., Y1 maps to H0[3]) are identified as vector dimensions
+- If multiple Y-dimensions map to last positions in different H-sequences (e.g., Y1 → H0[3] and Y3 → H1[3]), they're all considered vector dimensions
+- The resulting VectorDimensions shows these as a list (e.g., [4, 4])
+- The total vector size (K) is the product of all vector dimension values (e.g., 4 × 4 = 16)
+- If no vector dimensions are found, it defaults to [1]
 
-    *   **VectorDimensions (`[K]`):**
-        *   The system identifies Y dimensions that map to the last position in H sequences.
-        *   For example, if Y1 maps to H0[3] and Y3 maps to H1[3], both are identified as vector dimensions.
-        *   This allows proper detection of multi-dimensional vectors (e.g., 2×2 or 4×4) rather than just a single value.
-        *   The total vector size (K) is calculated as the product of all vector dimension values.
-        *   Defaults to `[1]` if no vector dimensions are identified.
+### ThreadPerWarp [threads_m, threads_n]
+The system uses P1 (the second P-dimension) to determine threads per warp:
 
-    *   **ThreadPerWarp (`[threads_m, threads_n]`):**
-        *   If `NDimPs >= 2` (i.e., `P0` and `P1` exist):
-            *   `threads_m` is inferred from the length of the *first* R/H component that `P1` maps to.
-            *   `threads_n` is inferred from the length of the *second* R/H component that `P1` maps to. (If `P1` maps to only one component, `threads_n` becomes 1).
-        *   If `NDimPs == 1` (only `P0` exists):
-            *   `threads_m` is inferred from the length of the *first* R/H component `P0` maps to.
-            *   `threads_n` is inferred from the length of the *second* R/H component `P0` maps to (or 1 if `P0` maps to only one component).
-        *   If a P-dimension or its mapped component is not found/valid, the corresponding length defaults to 1.
-        *   Defaults to `[1, 1]` if no P-dims are available or inference doesn't yield specific values.
+- P1 is specifically used for ThreadPerWarp organization:
+  - `threads_m` comes from the first R/H component that P1 maps to
+  - `threads_n` comes from the second R/H component that P1 maps to (or 1 if P1 only maps to one component)
+- If P1 doesn't exist or its values can't be determined, defaults to [1, 1]
+- Final result is [threads_m, threads_n] representing a 2D grid of threads in a warp
 
-    *   **WarpPerBlock (`[warps_m, warps_n]`):**
-        *   If `NDimPs >= 1` (i.e., `P0` exists):
-            *   `warps_m` is inferred from the length of the *first* R/H component that `P0` maps to.
-            *   `warps_n` is inferred from the length of the *second* R/H component that `P0` maps to. (If `P0` maps to only one component, `warps_n` becomes 1).
-        *   If `P0` or its mapped component is not found/valid, the corresponding length defaults to 1.
-        *   **Heuristic Default**: If `WarpPerBlock` remains `[1, 1]` after the above, AND `NDimPs >= 1`, AND `ThreadPerWarp` is non-trivial (i.e., `threads_m * threads_n > 1`), then `WarpPerBlock` is set to `[4, 1]` for a more common visualization.
-        *   Defaults to `[1, 1]` if no P-dims are available or inference doesn't yield specific values.
+### WarpPerBlock [warps_m, warps_n]
+The system uses P0 (the first P-dimension) to determine warps per block:
 
-    *   **Repeat (`[R_m, R_n]`):**
-        *   Initialized to `[1, 1]` and defaults to that in most cases.
+- P0 is specifically used for WarpPerBlock organization:
+  - `warps_m` comes from the first R/H component that P0 maps to
+  - `warps_n` comes from the second R/H component that P0 maps to (or 1 if P0 only maps to one component)
+- If P0's values don't yield meaningful results, a default of [4, 1] is used when:
+  - ThreadPerWarp is meaningful (not just [1, 1])
+- Otherwise, defaults to [1, 1]
 
-3.  **BlockSize Calculation**:
-    Once `ThreadPerWarp = [tpw_m, tpw_n]`, `WarpPerBlock = [wpb_m, wpb_n]`, and `Repeat = [repeat_m, repeat_n]` are determined:
-    *   `BlockSize = [tpw_m * wpb_m * repeat_m, tpw_n * wpb_n * repeat_n]`
+### Repeat Factor [repeat_m, repeat_n]
+Initialized to [1, 1] and typically remains at those values unless explicitly specified.
 
-**Role of Y-Dimensions (including "Extra" Y-Dimensions):**
+### BlockSize [total_m, total_n]
+The final BlockSize combines all the above parameters:
+- `total_m = threads_m × warps_m × repeat_m`
+- `total_n = threads_n × warps_n × repeat_n`
 
-The Y-dimensions (`Ys2RHsMajor/Minor`, leading to `ys_lengths_`) collectively define the shape and internal structure of the data elements that each P-tile is responsible for. They do **not** typically mean multiple GPU blocks.
+This represents the complete 2D grid of threads in a block.
 
-*   **Vector Dimension (from a Y-dim):** As discussed, one Y-dimension is inferred as the `VectorDimensions (K)`.
-*   **"Extra" Y-Dimensions:** Any other Y-dimensions contribute to the local data structure *within* each P-tile (and within each repetition if a repeat factor is active). They add more axes to the "within-tile" addressing scheme.
+## Understanding Data Replication (Data View Mode)
 
-*Example from a Multi-Dimensional Vector:*
-Consider a tile distribution encoding with this mapping pattern:
+In Data View mode, the visualizer shows how data is replicated among threads. This replication is determined by RsLengths and how P-dimensions map to R-dimensions:
+
+### How Replication Works
+When a P-dimension maps to an R-dimension (rh_major=0 in Ps2RHssMajor), threads controlled by that P-dimension access replicated data:
+
+1. **If P0 maps to R-dimension (block-level replication)**:
+   - Different warps (rows) in the visualization will share the same data
+   - This creates a pattern where data repeats vertically across warp rows
+   - Example: With RsLengths=[2], every pair of warp rows will share the same data
+
+2. **If P1 maps to R-dimension (thread-level replication)**:
+   - Different threads within the same warp row will share the same data
+   - This creates a pattern where data repeats horizontally within a row
+   - Example: With RsLengths=[1,4], every group of 4 adjacent threads will share the same data
+
+3. **Combined replication (P0 and P1 both map to R)**:
+   - Creates a checkerboard-like pattern of data replication
+   - Data repeats both horizontally and vertically
+
+### Important Notes on Replication:
+- Replication only occurs when RsLengths has values > 1
+- If RsLengths=[1] or empty, each thread accesses unique data (no replication is shown)
+- In the Data View, threads with the same color (data ID) are accessing the same piece of data
+- This replication is key to understanding data sharing in GPU kernels and can help identify:
+  - Where synchronization is/isn't needed
+  - How efficiently memory access patterns are organized
+  - Whether threads are working independently or on shared data
+
+## Understanding Occupancy and Utilization
+
+The visualizer also calculates performance metrics:
+
+- **Occupancy**: Shows what percentage of the tile's cells have valid thread mappings. It's calculated as:
+  ```
+  occupancy = valid_thread_positions / total_positions_in_tile
+  ```
+
+- **Utilization**: Applies a slight efficiency factor to occupancy:
+  ```
+  utilization = occupancy × 0.95
+  ```
+
+Note that these are approximations based on the tile structure, not actual hardware measurements.
+
+## Hardware Considerations
+
+The visualizer infers thread organization based on the encoding structure, not hardware-specific constants. In practice:
+- AMD GPUs use 64 threads per wavefront (AMD's term for warp)
+- NVIDIA GPUs use 32 threads per warp
+
+The visualization may show thread organizations that don't perfectly align with hardware implementations.
+
+## Example: Multi-Dimensional Vector
+Consider this tile distribution encoding:
 ```
 tile_distribution_encoding<
     sequence<>,                             // Empty R
@@ -625,23 +673,10 @@ tile_distribution_encoding<
     sequence<0, 3, 0, 3>>{}
 ```
 
-Here, the Y dimensions map to H sequences as follows:
-*   `Y1` maps to H0[3] (the Vector_M position)
-*   `Y3` maps to H1[3] (the Vector_N position)
-
-The vector dimension detection algorithm correctly identifies:
-*   Both Y1 and Y3 as vector dimensions
-*   If both are 4, then VectorDimensions = [4, 4] (instead of just 4)
-*   Total Vector Size (K) = 4 × 4 = 16
-
-This multi-dimensional vector information is critical for understanding:
-*   The true shape of the data being processed (2D vectors rather than 1D)
-*   How threads access data elements in a structured way
-*   The total computational work performed by each thread
-
-These "extra" Y dimensions are fundamental to:
-1.  **`d_scalar_idx` calculation:** `idx_y` is flattened to `d_scalar_idx` (e.g., `y0_coord * Y1_length + y1_coord`, so `y0_coord * 4 + y1_coord` in the example), which then acts as a high-order index into the X-space.
-2.  **`xs_coords` calculation:** `idx_y` helps select specific elements from R/H components that are directly "owned" by Y-dimensions in the `PsYs2XsAdaptor`.
+Here, Y1 maps to H0[3] (Vector_M) and Y3 maps to H1[3] (Vector_N). If each has value 4, the system will:
+1. Identify both as vector dimensions: VectorDimensions = [4, 4]
+2. Calculate total vector size: K = 4 × 4 = 16
+3. Each thread processes 16 elements in a 4×4 grid
             """)
         # --- End Explanation ---
 
