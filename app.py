@@ -568,75 +568,48 @@ This visualizer, now using `tiler_pedantic.py`, aims to faithfully represent the
 
 **Derivation of Hierarchical Parameters in `tiler_pedantic.py`:**
 
-The `TileDistributionPedantic` class (in `tiler_pedantic.py`) calculates these parameters in its `calculate_hierarchical_tile_structure` method. It prioritizes hints you can provide in the input encoding dictionary, but will infer them if hints are absent:
+The `TileDistributionPedantic` class (in `tiler_pedantic.py`) calculates these parameters in its `calculate_hierarchical_tile_structure` method based on the encoding structure:
 
-1.  **`visualization_hints` in your input `encoding_dict`**:
-    *   You can guide the visualizer by adding a `visualization_hints` dictionary to your main input.
-    *   `vector_dim_ys_index`: (integer) The index of the YS-dimension that represents the vector length.
-    *   `thread_per_warp_p_indices`: (list of integers) P-dimension index(es) whose component lengths\\' product defines Thread/Warp.
-        *   One index `[pM]` results in `ThreadPerWarp = [product(lengths(P_pM)), 1]`.
-        *   Two indices `[pM, pN]` result in `ThreadPerWarp = [product(lengths(P_pM)), product(lengths(P_pN))]`.
-    *   `warp_per_block_p_indices`: (list of integers) P-dimension index(es) for Warps/Block.
-        *   One index `[pM]` results in `WarpPerBlock = [product(lengths(P_pM)), 1]`.
-        *   Two indices `[pM, pN]` result in `WarpPerBlock = [product(lengths(P_pM)), product(lengths(P_pN))]`.
-    *   `repeat_factor_ys_index`: (integer) YS-dimension index for the repeat factor (currently visualized as `Repeat = [length, 1]`).
-
-2.  **Inference Logic (if hints are not provided or insufficient)**:
+2.  **Inference Logic:**
     The system uses the number of P-dimensions (`NDimPs`) and Y-dimensions (`NDimYs`) along with their mapped R/H component lengths. The `_get_lengths_for_p_dim_component(p_idx)` method is key, as it determines the R/H lengths associated with a given P-dimension.
 
-    *   **VectorDimensions (`[K]`)**:
-        *   Uses `vector_dim_ys_index` hint if available.
-        *   Otherwise, the system now uses an improved algorithm to detect multi-dimensional vector sizes:
-            *   The system identifies Y dimensions that map to the last position in H sequences.
-            *   For example, if Y1 maps to H0[3] and Y3 maps to H1[3], both are identified as vector dimensions.
-            *   This allows proper detection of multi-dimensional vectors (e.g., 2×2 or 4×4) rather than just a single value.
-            *   The total vector size (K) is calculated as the product of all vector dimension values.
+    *   **VectorDimensions (`[K]`):**
+        *   The system identifies Y dimensions that map to the last position in H sequences.
+        *   For example, if Y1 maps to H0[3] and Y3 maps to H1[3], both are identified as vector dimensions.
+        *   This allows proper detection of multi-dimensional vectors (e.g., 2×2 or 4×4) rather than just a single value.
+        *   The total vector size (K) is calculated as the product of all vector dimension values.
         *   Defaults to `[1]` if no vector dimensions are identified.
 
-    *   **ThreadPerWarp (`[threads_m, threads_n]`)**:
-        *   Uses `thread_per_warp_p_indices` hint if available (product of components for specified P-dims).
-        *   Otherwise (default inference):
-            *   If `NDimPs >= 2` (i.e., `P0` and `P1` exist):
-                *   `threads_m` is inferred from the length of the *first* R/H component that `P1` maps to.
-                *   `threads_n` is inferred from the length of the *second* R/H component that `P1` maps to. (If `P1` maps to only one component, `threads_n` becomes 1).
-            *   If `NDimPs == 1` (only `P0` exists):
-                *   `threads_m` is inferred from the length of the *first* R/H component `P0` maps to.
-                *   `threads_n` is inferred from the length of the *second* R/H component `P0` maps to (or 1 if `P0` maps to only one component).
-            *   If a P-dimension or its mapped component is not found/valid, the corresponding length defaults to 1.
+    *   **ThreadPerWarp (`[threads_m, threads_n]`):**
+        *   If `NDimPs >= 2` (i.e., `P0` and `P1` exist):
+            *   `threads_m` is inferred from the length of the *first* R/H component that `P1` maps to.
+            *   `threads_n` is inferred from the length of the *second* R/H component that `P1` maps to. (If `P1` maps to only one component, `threads_n` becomes 1).
+        *   If `NDimPs == 1` (only `P0` exists):
+            *   `threads_m` is inferred from the length of the *first* R/H component `P0` maps to.
+            *   `threads_n` is inferred from the length of the *second* R/H component `P0` maps to (or 1 if `P0` maps to only one component).
+        *   If a P-dimension or its mapped component is not found/valid, the corresponding length defaults to 1.
         *   Defaults to `[1, 1]` if no P-dims are available or inference doesn't yield specific values.
 
-    *   **WarpPerBlock (`[warps_m, warps_n]`)**:
-        *   Uses `warp_per_block_p_indices` hint if available (product of components for specified P-dims).
-        *   Otherwise (default inference):
-            *   If `NDimPs >= 1` (i.e., `P0` exists):
-                *   `warps_m` is inferred from the length of the *first* R/H component that `P0` maps to.
-                *   `warps_n` is inferred from the length of the *second* R/H component that `P0` maps to. (If `P0` maps to only one component, `warps_n` becomes 1).
-            *   If `P0` or its mapped component is not found/valid, the corresponding length defaults to 1.
+    *   **WarpPerBlock (`[warps_m, warps_n]`):**
+        *   If `NDimPs >= 1` (i.e., `P0` exists):
+            *   `warps_m` is inferred from the length of the *first* R/H component that `P0` maps to.
+            *   `warps_n` is inferred from the length of the *second* R/H component that `P0` maps to. (If `P0` maps to only one component, `warps_n` becomes 1).
+        *   If `P0` or its mapped component is not found/valid, the corresponding length defaults to 1.
         *   **Heuristic Default**: If `WarpPerBlock` remains `[1, 1]` after the above, AND `NDimPs >= 1`, AND `ThreadPerWarp` is non-trivial (i.e., `threads_m * threads_n > 1`), then `WarpPerBlock` is set to `[4, 1]` for a more common visualization.
         *   Defaults to `[1, 1]` if no P-dims are available or inference doesn't yield specific values.
 
-    *   **Repeat (`[R_m, R_n]`)**:
-        *   Initialized to `[1, 1]`.
-        *   If a `visualization_hints: {'repeat_factor_ys_index': YS_INDEX}` is provided, the length of the specified YS-dimension will be used to set `R_m` (i.e., `Repeat = [length_of_hinted_YS, 1]`).
-        *   Without this hint, `Repeat` remains `[1, 1]` (no automatic inference is performed for the repeat factor from specific Y-to-H mappings).
+    *   **Repeat (`[R_m, R_n]`):**
+        *   Initialized to `[1, 1]` and defaults to that in most cases.
 
 3.  **BlockSize Calculation**:
     Once `ThreadPerWarp = [tpw_m, tpw_n]`, `WarpPerBlock = [wpb_m, wpb_n]`, and `Repeat = [repeat_m, repeat_n]` are determined:
     *   `BlockSize = [tpw_m * wpb_m * repeat_m, tpw_n * wpb_n * repeat_n]`
 
-4.  **Display Improvements**:
-    The visualizer has been enhanced to:
-    *   Display multi-dimensional vector information properly (e.g., "4 × 4" rather than just "4")
-    *   Calculate the total Vector Size (K) as the product of all vector dimensions
-    *   Optimize the layout to display more warps in the grid without cutoff
-    *   Show how Y dimensions map to vector positions in H sequences
-
 **Role of Y-Dimensions (including "Extra" Y-Dimensions):**
 
 The Y-dimensions (`Ys2RHsMajor/Minor`, leading to `ys_lengths_`) collectively define the shape and internal structure of the data elements that each P-tile is responsible for. They do **not** typically mean multiple GPU blocks.
 
-*   **Vector Dimension (from a Y-dim):** As discussed, one Y-dimension might be inferred or hinted as the `VectorDimensions (K)`.
-*   **Repeat Factor (from a Y-dim, if hinted):** A Y-dimension hinted via `visualization_hints: {'repeat_factor_ys_index': YS_INDEX}` scales the work within the conceptual block (currently, the hint applies to the M-dimension of repeat: `Repeat = [hinted_YS_length, 1]`).
+*   **Vector Dimension (from a Y-dim):** As discussed, one Y-dimension is inferred as the `VectorDimensions (K)`.
 *   **"Extra" Y-Dimensions:** Any other Y-dimensions contribute to the local data structure *within* each P-tile (and within each repetition if a repeat factor is active). They add more axes to the "within-tile" addressing scheme.
 
 *Example from a Multi-Dimensional Vector:*
@@ -656,7 +629,7 @@ Here, the Y dimensions map to H sequences as follows:
 *   `Y1` maps to H0[3] (the Vector_M position)
 *   `Y3` maps to H1[3] (the Vector_N position)
 
-The new vector dimension detection algorithm correctly identifies:
+The vector dimension detection algorithm correctly identifies:
 *   Both Y1 and Y3 as vector dimensions
 *   If both are 4, then VectorDimensions = [4, 4] (instead of just 4)
 *   Total Vector Size (K) = 4 × 4 = 16
@@ -669,8 +642,6 @@ This multi-dimensional vector information is critical for understanding:
 These "extra" Y dimensions are fundamental to:
 1.  **`d_scalar_idx` calculation:** `idx_y` is flattened to `d_scalar_idx` (e.g., `y0_coord * Y1_length + y1_coord`, so `y0_coord * 4 + y1_coord` in the example), which then acts as a high-order index into the X-space.
 2.  **`xs_coords` calculation:** `idx_y` helps select specific elements from R/H components that are directly "owned" by Y-dimensions in the `PsYs2XsAdaptor`.
-
-This explanation clarifies how the visualizer, powered by `tiler_pedantic.py`, arrives at the hierarchical parameters, prioritizing explicit hints and falling back to rule-based inference.
             """)
         # --- End Explanation ---
 
