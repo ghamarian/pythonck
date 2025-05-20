@@ -13,6 +13,7 @@ import os
 import re
 import json
 from typing import Dict, List, Tuple, Any, Optional
+import plotly.express as px
 
 # Import local modules
 from parser import TileDistributionParser, debug_indexing_relationships
@@ -309,6 +310,15 @@ def main():
                 
         # Hierarchical tile visualization
         st.subheader("Hierarchical Tile Structure")
+
+        # Add radio button for view selection
+        view_type = st.radio(
+            "View Mode:",
+            ["Thread View", "Data View"],
+            horizontal=True,
+            key="view_type_selector"
+        )
+
         try:
             if st.session_state.tile_distribution is not None:
                 viz_data = st.session_state.tile_distribution.get_visualization_data()
@@ -444,7 +454,64 @@ def main():
                         try:
                             # Pass source code to visualization if available
                             source_code = viz_data.get("source_code")
-                            hierarchical_fig = visualize_hierarchical_tiles(viz_data, code_snippet=source_code, show_arrows=st.session_state.show_dimension_arrows)
+                            
+                            # Add encoding to viz_data for data ID calculation
+                            if st.session_state.encoding:
+                                viz_data['encoding'] = st.session_state.encoding
+                            
+                            # Convert view_type from radio button to the view_mode parameter
+                            view_mode = "data" if view_type == "Data View" else "thread"
+                            
+                            # When using data view mode, explicitly pass encoding and rs_lengths parameters
+                            if view_mode == "data" and st.session_state.encoding:
+                                # Get encoding parameter directly from session state
+                                encoding_param = st.session_state.encoding
+                                
+                                # Get RsLengths from encoding if available
+                                rs_lengths_param = encoding_param.get('RsLengths', [])
+                                
+                                # Resolve any variables in RsLengths
+                                resolved_rs_lengths = []
+                                for val in rs_lengths_param:
+                                    if isinstance(val, str):
+                                        # Try to find the variable in the session variables
+                                        if val in st.session_state.variables:
+                                            resolved_rs_lengths.append(st.session_state.variables[val])
+                                        else:
+                                            # Default if var name is present but value not found
+                                            resolved_rs_lengths.append(1)
+                                    elif isinstance(val, (int, float)):
+                                        resolved_rs_lengths.append(int(val))
+                                    else:
+                                        resolved_rs_lengths.append(1)
+                                
+                                # Show information about replication in debug mode
+                                if st.session_state.debug_mode:
+                                    st.write("**Data View Parameters:**")
+                                    st.write(f"- RsLengths (raw): {rs_lengths_param}")
+                                    st.write(f"- RsLengths (resolved): {resolved_rs_lengths}")
+                                    if not resolved_rs_lengths or (len(resolved_rs_lengths) == 1 and resolved_rs_lengths[0] == 1) or all(r <= 1 for r in resolved_rs_lengths):
+                                        st.write("- No replication will be shown (RsLengths=[1] or empty)")
+                                    else:
+                                        st.write("- Replication will be visualized based on RsLengths")
+                                
+                                # Pass encoding and resolved rs_lengths directly to visualization
+                                hierarchical_fig = visualize_hierarchical_tiles(
+                                    viz_data, 
+                                    code_snippet=source_code, 
+                                    show_arrows=st.session_state.show_dimension_arrows,
+                                    view_mode=view_mode,
+                                    encoding=encoding_param,
+                                    rs_lengths=resolved_rs_lengths
+                                )
+                            else:
+                                # For thread view, no need for encoding/rs_lengths
+                                hierarchical_fig = visualize_hierarchical_tiles(
+                                    viz_data, 
+                                    code_snippet=source_code, 
+                                    show_arrows=st.session_state.show_dimension_arrows,
+                                    view_mode=view_mode
+                                )
                             st.pyplot(hierarchical_fig)
                             
                             # Add explanatory text
@@ -453,6 +520,22 @@ def main():
                             - **Top**: ThreadPerWarp, WarpPerBlock and total element calculations
                             - **Middle**: Thread layout organized by warps with thread IDs
                             - **Right**: The C++ code for this tile distribution
+                            
+                            **View Modes:**
+                            - **Thread View**: Colors threads by warp assignment, showing the physical thread organization
+                            - **Data View**: Colors threads by which data they access. Threads sharing the same color are accessing the same data due to replication.
+                            
+                            **Replication Logic in Data View:**
+                            - Replication occurs when P dimensions map to R dimensions (where rh_major=0) in the tile distribution encoding
+                            - When RsLengths=[1] or empty, each thread accesses unique data (no replication is shown)
+                            - When RsLengths has values > 1, threads are colored based on which data they access:
+                               - Block-level replication: When warp rows share data (RsLengths[0] > 1)
+                               - Thread-level replication: When threads in the same row share data based on column position (RsLengths[1] > 1)
+                            - A combination of both creates a pattern where data is repeated horizontally within rows, and these patterns repeat vertically across warp rows
+                            
+                            In **Data View**, threads with the same color (data ID) have independent copies of the same data element, 
+                            which eliminates the need for synchronization between these threads. This replication pattern is key to 
+                            understanding the data sharing structure in the computation.
                             """)
                         except IndexError as idx_err:
                             st.error(f"Index error in hierarchical tile visualization: {str(idx_err)}")

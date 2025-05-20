@@ -1027,7 +1027,7 @@ def visualize_thread_access_pattern(viz_data: Dict[str, Any], frame_idx: int = 0
     plt.tight_layout()
     return fig
 
-def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), code_snippet: str = None, show_arrows=False):
+def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), code_snippet: str = None, show_arrows=False, view_mode='thread', encoding=None, rs_lengths=None):
     # Debug print for vector dimensions
     print(f"DEBUG: Hierarchical viz_data['hierarchical_structure']: {viz_data.get('hierarchical_structure', {}).get('VectorDimensions')}")
     """
@@ -1044,6 +1044,7 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
         figsize: Size of the figure to create
         code_snippet: Optional source code that generated this tile distribution
         show_arrows: Whether to show dimension arrows
+        view_mode: 'thread' (color by warp) or 'data' (color by data accessed)
         
     Returns:
         Matplotlib figure object
@@ -1279,6 +1280,49 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
     # Threshold for rendering thread ID text to improve performance for dense layouts
     min_cell_dim_for_text = 0.01 # If cell width or height is less than 1% of figure dim, skip text
 
+    # Calculate data IDs if in data view mode - do this BEFORE the warp loop
+    thread_data_ids = {}
+    data_color_map = {}
+    if view_mode == 'data':
+        # Get encoding information for replication dimensions
+        encoding_for_data = encoding or viz_data.get('encoding', {})
+        rs_lengths_for_data = rs_lengths
+        print(f"DEBUG: In 'data' view mode. encoding found: {bool(encoding_for_data)}")
+        print(f"DEBUG: RsLengths: {rs_lengths_for_data}")
+        
+        # Calculate data IDs for ALL threads
+        thread_data_ids = calculate_data_ids(hierarchical_structure, encoding_for_data, rs_lengths_for_data)
+        
+        # Generate a color palette for data IDs
+        unique_data_ids = sorted(set(thread_data_ids.values()))
+        print(f"DEBUG: Found {len(unique_data_ids)} unique data IDs: {unique_data_ids[:10]}...")
+        
+        # Choose color scheme based on number of unique IDs - use more distinct colors for data view
+        if len(unique_data_ids) <= 20:
+            # Use a more distinct palette for better visual differentiation from thread view
+            cmap = plt.cm.get_cmap('tab20c')  # tab20c has very distinct color blocks
+            data_colors = [cmap(i % 20) for i in range(len(unique_data_ids))]
+        else:
+            # Fall back to continuous colormap for even more IDs
+            cmap = plt.cm.get_cmap('rainbow')  # rainbow makes patterns more obvious than viridis
+            data_colors = [cmap(i / max(1, len(unique_data_ids) - 1)) for i in range(len(unique_data_ids))]
+        
+        # Create mapping of data_id to color
+        for i, data_id in enumerate(unique_data_ids):
+            data_color_map[data_id] = data_colors[i % len(data_colors)]
+        
+        # Debug: print a sample of the data ID mapping
+        thread_ids = list(thread_data_ids.keys())
+        print(f"DEBUG: Sample of thread_data_ids mapping:")
+        for tid in thread_ids[:5]:
+            print(f"  Thread {tid} -> Data ID {thread_data_ids.get(tid)}")
+        
+        # Debug: print color map
+        print(f"DEBUG: Sample of data_color_map:")
+        sample_ids = list(data_color_map.keys())[:5]
+        for did in sample_ids:
+            print(f"  Data ID {did} -> Color {data_color_map.get(did)}")
+
     # Draw warps and threads in a 2D grid with proper spacing
     warps_shown = 0
     warp_labels = {}  # To track which warp labels we've added
@@ -1311,18 +1355,34 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
             # Use narrower containers to ensure all fit
             container_width = equal_warp_width * 0.9
             
-            # Draw warp container
-            warp_container_rect = patches.Rectangle(
-                (warp_x, warp_y), 
-                container_width, warp_height * 0.95,
-                linewidth=1, edgecolor='white', facecolor=warp_color, alpha=0.3
-            )
+            # Draw warp container with different styling based on view mode
+            if view_mode == 'data':
+                # In data view mode, use a neutral background for warp containers
+                warp_container_rect = patches.Rectangle(
+                    (warp_x, warp_y), 
+                    container_width, warp_height * 0.95,
+                    linewidth=1, edgecolor='white', facecolor='none', alpha=0.7
+                )
+            else:
+                # Original thread view - keep colored warp background
+                warp_container_rect = patches.Rectangle(
+                    (warp_x, warp_y), 
+                    container_width, warp_height * 0.95,
+                    linewidth=1, edgecolor='white', facecolor=warp_color, alpha=0.3
+                )
             ax.add_patch(warp_container_rect)
             
             # Add warp label
-            ax.text(warp_x + container_width * 0.5, warp_y + warp_height * 0.95, 
-                   f"Warp{warp_idx} ({m},{n})", ha='center', va='bottom', fontsize=8, 
-                   color='white', weight='bold')
+            if view_mode == 'data':
+                # In data view, use a subtle/smaller warp label
+                ax.text(warp_x + container_width * 0.5, warp_y + warp_height * 0.95, 
+                       f"Warp{warp_idx}", ha='center', va='bottom', fontsize=7, 
+                       color='#888888')
+            else:
+                # In thread view, use the full warp label with coordinates
+                ax.text(warp_x + container_width * 0.5, warp_y + warp_height * 0.95, 
+                       f"Warp{warp_idx} ({m},{n})", ha='center', va='bottom', fontsize=8, 
+                       color='white', weight='bold')
             
             # Mark this warp as labeled
             warp_labels[warp_idx] = True
@@ -1344,17 +1404,39 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
                     cell_x = warp_x + col_idx * cell_width
                     cell_y = warp_y + (threads_per_warp_m - row_idx - 1) * cell_height
                     
+                    # Choose color and label based on view mode
+                    if view_mode == 'data':
+                        # Use data ID for coloring and labeling
+                        data_id = thread_data_ids.get(thread_id, 0)
+                        cell_color = data_color_map.get(data_id, warp_color)
+                        cell_label = f"D{data_id}"
+                        
+                        # Debug: print info about data ID and coloring for a few threads
+                        if thread_id < 10:  # Only log first few threads to avoid flooding
+                            print(f"DEBUG: Thread {thread_id} (warp {warp_idx}, pos {thread_pos}) has data_id={data_id}, color={cell_color}")
+                    else:
+                        # Default thread view
+                        cell_color = warp_color
+                        cell_label = f"T{thread_id}"
+                    
                     thread_rect = patches.Rectangle(
                         (cell_x, cell_y),
                         cell_width * 0.9, cell_height * 0.9,
-                        linewidth=0.5, edgecolor='white', facecolor=warp_color, alpha=0.7
+                        linewidth=0.5, edgecolor='white', facecolor=cell_color, alpha=0.7
                     )
                     ax.add_patch(thread_rect)
                     
-                    # Add thread ID if there's room
+                    # Add thread ID or data ID if there's room
                     if cell_width > 0.015 and cell_height > 0.015:
-                        ax.text(cell_x + cell_width * 0.45, cell_y + cell_height * 0.45, 
-                                f"T{thread_id}", ha='center', va='center', fontsize=6, color='white')
+                        if view_mode == 'data':
+                            # Make data ID more prominent with background
+                            ax.text(cell_x + cell_width * 0.45, cell_y + cell_height * 0.45, 
+                                   cell_label, ha='center', va='center', fontsize=7, color='black',
+                                   bbox=dict(facecolor='white', alpha=0.8, boxstyle='round,pad=0.1'))
+                        else:
+                            # Regular thread ID label
+                            ax.text(cell_x + cell_width * 0.45, cell_y + cell_height * 0.45, 
+                                   cell_label, ha='center', va='center', fontsize=6, color='white')
             else:
                 # If threads are too small to display individually, just show a count
                 ax.text(warp_x + warp_width * 0.5, warp_y + warp_height * 0.5,
@@ -1363,17 +1445,46 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
                 
             warps_shown += 1
             
-    # Add a color legend for warps
+    # Add a color legend based on view mode
     legend_elements = []
-    for i in range(min(8, warps_shown)):
-        patch = patches.Patch(facecolor=warp_colors[i % len(warp_colors)], 
-                             edgecolor='white', alpha=0.7,
-                             label=f'Warp {i}')
-        legend_elements.append(patch)
+    if view_mode == 'data':
+        # Create legend for data IDs
+        if thread_data_ids:
+            unique_data_ids = sorted(set(thread_data_ids.values()))
+            
+            # Add explanation text for data view mode at the bottom of the figure
+            ax.text(thread_grid_start_x, 0.02,
+                   "Data View Mode: Colors show which threads access the same data.\n"
+                   "Threads with the same color access identical data (replication).",
+                   fontsize=9, ha='left', va='bottom', color='white',
+                   bbox=dict(facecolor='#444444', alpha=0.7, boxstyle='round,pad=0.3'))
+            
+            # Limit to 12 legend entries to avoid cluttering
+            for i, data_id in enumerate(unique_data_ids[:12]):
+                patch = patches.Patch(facecolor=data_color_map.get(data_id, 'gray'), 
+                                     edgecolor='white', alpha=0.7,
+                                     label=f'Replicated Data {data_id}')
+                legend_elements.append(patch)
+            
+            if len(unique_data_ids) > 12:
+                # Add an entry indicating there are more data IDs
+                patch = patches.Patch(facecolor='gray', 
+                                     edgecolor='white', alpha=0.7,
+                                     label=f'+ {len(unique_data_ids) - 12} more data groups')
+                legend_elements.append(patch)
+    else:
+        # Original legend for warps
+        for i in range(min(8, warps_shown)):
+            patch = patches.Patch(facecolor=warp_colors[i % len(warp_colors)], 
+                                 edgecolor='white', alpha=0.7,
+                                 label=f'Warp {i}')
+            legend_elements.append(patch)
         
     if legend_elements:
-        ax.legend(handles=legend_elements, loc='lower right', 
-                 fontsize=8, title="Warp Colors")
+        legend_title = "Replicated Data Groups" if view_mode == 'data' else "Warp Colors"
+        legend_loc = 'upper right' if view_mode == 'data' else 'lower right'
+        ax.legend(handles=legend_elements, loc=legend_loc, 
+                 fontsize=8, title=legend_title)
     
     # Add information about sampling if not showing all warps
     if not display_all_warps:
@@ -1669,3 +1780,151 @@ def visualize_y_space_structure(
 
     plt.tight_layout()
     return fig
+
+def calculate_data_ids(hierarchical_structure, encoding=None, rs_lengths=None):
+    """
+    Calculate which threads access the same data based on replication dimensions.
+    Returns a dict mapping thread_id -> data_id.
+    
+    Args:
+        hierarchical_structure: The hierarchical structure from visualization data
+        encoding: Optional encoding dictionary with Ps2RHssMajor/Minor for mapping
+        rs_lengths: Optional replication dimension lengths
+        
+    Returns:
+        Dict mapping thread global_id to data_id
+    """
+    thread_blocks = hierarchical_structure.get('ThreadBlocks', {})
+    thread_per_warp = hierarchical_structure.get('ThreadPerWarp', [1, 1])
+    warp_per_block = hierarchical_structure.get('WarpPerBlock', [1, 1])
+    vector_dimensions = hierarchical_structure.get('VectorDimensions', [1])
+    
+    # Get RsLengths from parameters or from hierarchical_structure
+    if rs_lengths is None:
+        rs_lengths = [warp_per_block[0], thread_per_warp[0]]  # Default: R[0]=WarpPerBlock_M, R[1]=ThreadPerWarp_M
+    
+    # Special case: if rs_lengths is [1] or empty or all values are 1, there's no replication
+    if not rs_lengths or (len(rs_lengths) == 1 and rs_lengths[0] == 1) or all(r <= 1 for r in rs_lengths):
+        # No replication - each thread accesses its own unique data
+        thread_to_data_id = {}
+        for warp_id, threads in thread_blocks.items():
+            for thread_id, thread_info in threads.items():
+                thread_to_data_id[thread_info['global_id']] = thread_info['global_id']
+        print(f"DEBUG: RsLengths={rs_lengths} indicates NO replication - assigning unique data ID to each thread")
+        return thread_to_data_id
+    
+    thread_to_data_id = {}
+    
+    # For each warp
+    for warp_id, threads in thread_blocks.items():
+        warp_row = int(warp_id.replace('Warp', '')) // warp_per_block[1]
+        warp_col = int(warp_id.replace('Warp', '')) % warp_per_block[1]
+        
+        # For each thread in the warp
+        for thread_id, thread_info in threads.items():
+            thread_pos = thread_info.get('position', [0, 0])
+            thread_col = thread_pos[1]  # Use column position for R[1]
+            
+            # Calculate data ID components
+            data_id_components = []
+            
+            # Handle R[0] component (warp-level replication)
+            if len(rs_lengths) > 0 and rs_lengths[0] > 1:
+                data_id_components.append(warp_row % rs_lengths[0])
+            
+            # Handle R[1] component (thread-level replication)
+            if len(rs_lengths) > 1 and rs_lengths[1] > 1:
+                # CORRECTED: Use thread column position for thread-level replication
+                # This creates row-wise replication where threads in same row access same data
+                # based on their column position
+                data_id_components.append(thread_col % rs_lengths[1])
+            
+            # Combine components into a single data ID
+            if data_id_components:
+                # Create a unique ID by combining components with different magnitude
+                # e.g., [2, 3] becomes 203 (2*100 + 3)
+                data_id = 0
+                for i, component in enumerate(data_id_components):
+                    data_id += component * (10 ** (2 * (len(data_id_components) - 1 - i)))
+                thread_to_data_id[thread_info['global_id']] = data_id
+            else:
+                # No replication (RsLengths=[1] or empty), each thread has its own unique ID
+                thread_to_data_id[thread_info['global_id']] = thread_info['global_id']
+    
+    return thread_to_data_id
+
+def calculate_thread_data_id(global_id, ps_to_rs_mapping, rs_lengths, thread_per_warp, warp_per_block):
+    """
+    Calculate which data set a thread accesses based on its position
+    and the replication pattern.
+    
+    This is a helper for calculate_data_ids but is less accurate than the full implementation.
+    """
+    # Calculate p0, p1 indices from thread position
+    threads_in_warp = thread_per_warp[0] * thread_per_warp[1]
+    warp_id = global_id // threads_in_warp
+    local_id = global_id % threads_in_warp
+    
+    # Handle potential division by zero
+    if warp_per_block[0] == 0:
+        warp_m, warp_n = 0, 0
+    else:
+        warp_m = warp_id % warp_per_block[0]
+        warp_n = warp_id // warp_per_block[0]
+    
+    # Handle potential division by zero
+    if thread_per_warp[0] == 0:
+        thread_m, thread_n = 0, 0
+    else:
+        thread_m = local_id % thread_per_warp[0]
+        thread_n = local_id // thread_per_warp[0]
+    
+    # Map to P dimensions
+    p_coords = [warp_m * thread_per_warp[0] + thread_m, 
+                warp_n * thread_per_warp[1] + thread_n]
+    
+    # Ensure rs_lengths values are integers
+    try:
+        rs_lengths = [int(r) if isinstance(r, (int, float)) else 1 for r in rs_lengths]
+    except (ValueError, TypeError):
+        rs_lengths = [1]
+        
+    # Only consider R dimensions that cause replication (length > 1)
+    effective_rs_mapping = {}
+    for p_idx, r_idx in ps_to_rs_mapping.items():
+        if r_idx < len(rs_lengths) and rs_lengths[r_idx] > 1:
+            effective_rs_mapping[p_idx] = r_idx
+    
+    # If no effective replication dimensions, return the thread's global ID
+    if not effective_rs_mapping:
+        return global_id
+    
+    # Calculate data ID based on which P dimensions map to R dimensions
+    data_id_components = []
+    
+    for p_idx, r_idx in effective_rs_mapping.items():
+        if p_idx < len(p_coords) and r_idx < len(rs_lengths):
+            r_length = rs_lengths[r_idx]
+            if r_length > 1:
+                # If a P maps to an R dimension, use modulo by R length
+                # This shows which threads access the same data due to replication
+                data_component = p_coords[p_idx] % r_length
+                data_id_components.append(data_component)
+    
+    # Calculate final data ID from components
+    if not data_id_components:
+        return global_id  # No replication
+    
+    # Convert components to a single ID - first component is most significant
+    data_id = 0
+    for comp in data_id_components:
+        data_id = data_id * 100 + comp
+    
+    # Additional positional component if we have only one replication dimension
+    if len(data_id_components) == 1:
+        # Add a secondary component based on the other P coordinate
+        other_p_idx = 1 if list(effective_rs_mapping.keys())[0] == 0 else 0
+        if other_p_idx < len(p_coords):
+            data_id = data_id * 100 + p_coords[other_p_idx]
+    
+    return data_id

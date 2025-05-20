@@ -1279,7 +1279,17 @@ class TileDistributionPedantic:
 
         # --- Process ThreadPerWarp ---
         tpw_p_indices_hint = hints.get('thread_per_warp_p_indices')
-        if tpw_p_indices_hint is not None:
+        
+        # Check for explicit override first
+        tpw_override = hints.get('thread_per_warp_override')
+        if tpw_override and isinstance(tpw_override, list):
+            # Use explicit override values
+            if len(tpw_override) >= 2:
+                hierarchical_info['ThreadPerWarp'] = [tpw_override[0], tpw_override[1]]
+            elif len(tpw_override) == 1:
+                hierarchical_info['ThreadPerWarp'] = [tpw_override[0], 1]
+            print(f"DEBUG: Using ThreadPerWarp override: {hierarchical_info['ThreadPerWarp']}")
+        elif tpw_p_indices_hint is not None:
             current_hint_val = tpw_p_indices_hint
             if not isinstance(current_hint_val, list):
                 current_hint_val = [current_hint_val] # Ensure it's a list
@@ -1375,8 +1385,17 @@ class TileDistributionPedantic:
         wpb_p_indices_hint = hints.get('warp_per_block_p_indices')
         wpb_m_len = 1
         wpb_n_len = 1 # Often WPB is [M_warps, 1]
-
-        if wpb_p_indices_hint is not None:
+        
+        # Check for explicit override first
+        wpb_override = hints.get('warp_per_block_override')
+        if wpb_override and isinstance(wpb_override, list):
+            # Use explicit override values
+            if len(wpb_override) >= 2:
+                hierarchical_info['WarpPerBlock'] = [wpb_override[0], wpb_override[1]]
+            elif len(wpb_override) == 1:
+                hierarchical_info['WarpPerBlock'] = [wpb_override[0], 1]
+            print(f"DEBUG: Using WarpPerBlock override: {hierarchical_info['WarpPerBlock']}")
+        elif wpb_p_indices_hint is not None:
             current_hint_val = wpb_p_indices_hint
             if not isinstance(current_hint_val, list):
                 current_hint_val = [current_hint_val]
