@@ -424,7 +424,7 @@ class TileDistributionPedantic:
     This class will use TileDistributionEncodingPedantic.
     """
     def __init__(self, encoding_dict: typing.Dict[str, typing.Any], variables: typing.Dict[str, int] = None):
-        self.encoding_input_dict = encoding_dict # Keep original for hints
+        self.encoding_input_dict = encoding_dict # Keep original input dict
         self.variables_input = variables or {}
         
         self.DstrEncode = TileDistributionEncodingPedantic(encoding_dict, variables)
@@ -1164,19 +1164,20 @@ class TileDistributionPedantic:
 
     def calculate_hierarchical_tile_structure(self) -> typing.Dict[str, typing.Any]:
         """
-        Calculates the hierarchical structure of tiles for visualization.
-        Configurable via 'visualization_hints' in the input encoding_dict.
-        Hints:
-            'thread_per_warp_p_indices': List of P-dim index(es) (e.g., [idx_m] or [idx_m, idx_n])
-            'warp_per_block_p_indices': List of P-dim index(es) (e.g., [idx_0, idx_1, ...])
-            'vector_dim_ys_index': YS-dim index for vector length.
-            'repeat_factor_ys_index': YS-dim index for repeat factor.
+        Calculates the hierarchical structure of tiles for visualization based on inference.
+        
+        Returns a dictionary with information about:
+          - ThreadPerWarp: Size of thread blocks per warp [M, N]
+          - WarpPerBlock: Number of warps per block [M, N]
+          - VectorDimensions: Vector dimension sizes
+          - Repeat: Repetition factors [M, N]
+          - BlockSize: Total block size derived from other values
+          - ThreadBlocks: Detailed thread organization 
         """
         # DEBUG PRINT - Check if function is entered and see basic params
         print(f"DEBUG: ENTERING calculate_hierarchical_tile_structure")
         print(f"DEBUG:   NDimPs = {self.NDimPs}")
         print(f"DEBUG:   NDimYs = {self.NDimYs}")
-        print(f"DEBUG:   visualization_hints = {self.encoding_input_dict.get('visualization_hints', {})}")
         print(f"DEBUG:   DstrEncode.variables = {self.DstrEncode.variables}")
         print(f"DEBUG:   DstrEncode.HsLengthss = {self.DstrEncode.HsLengthss}")
 
@@ -1184,15 +1185,13 @@ class TileDistributionPedantic:
         if not self.DstrEncode.detail:
             self.DstrEncode.detail = self.DstrEncode._compute_detail()
 
-        hints = self.encoding_input_dict.get("visualization_hints", {})
-
-        # Initialize with defaults that can be overridden by hints
+        # Initialize with defaults
         hierarchical_info = {
             'BlockSize': [], 'ThreadPerWarp': [1, 1], 'WarpPerBlock': [1, 1], 
             'VectorDimensions': [1], 'Repeat': [1, 1], 'ThreadBlocks': {},
             'TileName': self.encoding_input_dict.get('_tile_name', "Pedantic Tile Distribution"),
             'DimensionValues': [],
-            'VectorDimensionYSIndex': -1 # NEW: To store which YS dim is the vector
+            'VectorDimensionYSIndex': -1
         }
 
         # Determine if our single P tuple should be treated as P1 instead of P0
@@ -1236,11 +1235,6 @@ class TileDistributionPedantic:
                     hierarchical_info['DimensionValues'].append(1)
             resolved_hs_lengthss.append(resolved_seq)
 
-        # --- Helper function to get lengths for given P-dimension indices ---
-        # (get_lengths_for_p_indices is defined here or accessible)
-        # Note: This was an inner function, moved out for clarity or ensure it's method of class
-        # For this edit, assuming it's an accessible method: self._get_lengths_for_p_dim_component
-
         # Helper for product
         def product(iterable):
             res = 1
@@ -1251,14 +1245,7 @@ class TileDistributionPedantic:
 
 
         # --- Process VectorDimensions --- 
-        vec_ys_idx_hint = hints.get('vector_dim_ys_index')
-        if vec_ys_idx_hint is not None and 0 <= vec_ys_idx_hint < self.NDimYs:
-            # Use explicit hint if provided
-            if vec_ys_idx_hint < len(self.DstrEncode.detail.get('ys_lengths_', [])):
-                 val = self.DstrEncode.detail['ys_lengths_'][vec_ys_idx_hint]
-                 hierarchical_info['VectorDimensions'] = [val if val > 0 else 1]
-                 hierarchical_info['VectorDimensionYSIndex'] = vec_ys_idx_hint if (val if val > 0 else 1) > 1 else -1 # Store hint index if vector is non-scalar
-        elif self.NDimYs > 0:
+        if self.NDimYs > 0:
             # IMPROVED INFERENCE: Find Ys that map to the highest/last position in H sequences
             # Group vector dimensions by which H sequence they belong to (for M/N dimensions)
             vector_dimensions_by_h = {}  # Maps H-idx to list of (value, y_idx)
@@ -1316,163 +1303,75 @@ class TileDistributionPedantic:
                 if 1 < last_ys_len <= 16:
                     hierarchical_info['VectorDimensions'] = [last_ys_len]
                     hierarchical_info['VectorDimensionYSIndex'] = self.NDimYs - 1 # Index of the last YS dim
-            # else, default to [1] is already set, VectorDimensionYSIndex remains -1
 
         # --- Process ThreadPerWarp ---
-        tpw_p_indices_hint = hints.get('thread_per_warp_p_indices')
+        # Default to [1,1] initially
+        tpw_m_len = 1
+        tpw_n_len = 1
+
+        # If we detected a P1 pattern in a single P tuple, use that as P1
+        # BUT we need to use index 0 since there's only one P dimension in the array
+        p_dim_for_threads = 0 if is_p1_pattern else 1
         
-        # Check for explicit override first
-        tpw_override = hints.get('thread_per_warp_override')
-        if tpw_override and isinstance(tpw_override, list):
-            # Use explicit override values
-            if len(tpw_override) >= 2:
-                hierarchical_info['ThreadPerWarp'] = [tpw_override[0], tpw_override[1]]
-            elif len(tpw_override) == 1:
-                hierarchical_info['ThreadPerWarp'] = [tpw_override[0], 1]
-            print(f"DEBUG: Using ThreadPerWarp override: {hierarchical_info['ThreadPerWarp']}")
-        elif tpw_p_indices_hint is not None:
-            current_hint_val = tpw_p_indices_hint
-            if not isinstance(current_hint_val, list):
-                current_hint_val = [current_hint_val] # Ensure it's a list
-
-            if len(current_hint_val) == 1:
-                m_lengths = self._get_lengths_for_p_dim_component(current_hint_val[0])
-                # FIXED: When we have just one P dimension's lengths, 
-                # Index 0 should be for rows (M dimension)
-                # Index 1 should be for cols (N dimension)
-                if len(m_lengths) >= 2:
-                    hierarchical_info['ThreadPerWarp'] = [m_lengths[0], m_lengths[1]]
-                elif len(m_lengths) == 1:
-                    hierarchical_info['ThreadPerWarp'] = [m_lengths[0], 1]
+        if self.NDimPs >= 2 or is_p1_pattern: # Use P1 for ThreadPerWarp
+            p1_contrib_lens = self._get_lengths_for_p_dim_component(p_dim_for_threads) # Get all lengths P1 maps to
+            if p1_contrib_lens:
+                tpw_m_len = p1_contrib_lens[0] # First component for M-dim
+                if len(p1_contrib_lens) > 1:
+                    tpw_n_len = p1_contrib_lens[1] # Second component for N-dim
                 else:
-                    hierarchical_info['ThreadPerWarp'] = [1, 1]
-            elif len(current_hint_val) >= 2:
-                m_lengths = self._get_lengths_for_p_dim_component(current_hint_val[0])
-                n_lengths = self._get_lengths_for_p_dim_component(current_hint_val[1])
-                # When explicit dimensions are provided, use them directly
-                hierarchical_info['ThreadPerWarp'] = [
-                    product(m_lengths) if m_lengths else 1, 
-                    product(n_lengths) if n_lengths else 1
-                ]
-            # else: uses default [1,1] initialized above
-        elif self.NDimPs >= 1: # INFERENCE for ThreadPerWarp
-            # Default to [1,1] initially
-            tpw_m_len = 1
-            tpw_n_len = 1
-
-            # If we detected a P1 pattern in a single P tuple, use that as P1
-            # BUT we need to use index 0 since there's only one P dimension in the array
-            p_dim_for_threads = 0 if is_p1_pattern else 1
-            
-            if self.NDimPs >= 2 or is_p1_pattern: # Use P1 for ThreadPerWarp
-                p1_contrib_lens = self._get_lengths_for_p_dim_component(p_dim_for_threads) # Get all lengths P1 maps to
-                if p1_contrib_lens:
-                    tpw_m_len = p1_contrib_lens[0] # First component for M-dim
-                    if len(p1_contrib_lens) > 1:
-                        tpw_n_len = p1_contrib_lens[1] # Second component for N-dim
-                    else:
-                        tpw_n_len = 1 # If P1 maps to only one, N-dim is 1
-                else:
-                    # P1 exists but has no valid mappings - keep ThreadPerWarp at [1,1]
-                    print(f"DEBUG: P{p_dim_for_threads} exists but no component lengths are mapped to it. Setting ThreadPerWarp=[1,1].")
-                    tpw_m_len = 1
-                    tpw_n_len = 1
-                # If p1_contrib_lens is empty, tpw_m_len/tpw_n_len remain 1
-            elif self.NDimPs == 1 and not is_p1_pattern: # Only P0 exists, special care needed
-                # By default, in Composable Kernels when there's only one P dimension (P0),
-                # it's more often used for WarpPerBlock, not ThreadPerWarp, especially when
-                # mapping to R dimensions or the first components in H-sequences.
-                # For examples like:
-                # - sequence<MWarp>, tuple<sequence<NIterPerWarp, NWarp>, sequence<KIterPerWarp>>
-                # - sequence<WarpPerBlock_N>, tuple<sequence<Repeat_M, WarpPerBlock_M>, sequence<Repeat_K>>
-                # ThreadPerWarp should default to [1,1]
-                
-                # Check Encoding for Key Indications:
-                # 1. When only P0 exists and maps to R (major=0) or first H component (minor=0/1)
-                # 2. When the mapped dimensions have names like "Warp", "WarpPerBlock", etc.
-                # 3. When the IndexMapping shows P0 mapping to elements with "Warp" in the name
-                
-                # Explicit check - look at the pattern of P0 mappings
-                p0_maps_to_warp = False
-                
-                # Check if this looks like a WarpPerBlock mapping pattern
-                if self.DstrEncode.Ps2RHssMajor and self.DstrEncode.Ps2RHssMinor:
-                    p0_major_mappings = self.DstrEncode.Ps2RHssMajor[0] if 0 < len(self.DstrEncode.Ps2RHssMajor) else []
-                    p0_minor_mappings = self.DstrEncode.Ps2RHssMinor[0] if 0 < len(self.DstrEncode.Ps2RHssMinor) else []
-                    
-                    # Check if P0 maps primarily to R-dimensions or early H components
-                    r_mappings_count = sum(1 for major in p0_major_mappings if major == 0)
-                    first_h_component_mappings = sum(1 for major, minor in zip(p0_major_mappings, p0_minor_mappings) 
-                                                 if major > 0 and (minor == 0 or minor == 1))
-                    
-                    if r_mappings_count > 0 or first_h_component_mappings > 0:
-                        # This looks like a WarpPerBlock mapping
-                        p0_maps_to_warp = True
-                
-                # For the specific case where P0 maps to components related to WarpPerBlock
-                # or we only have a "warp level" example without thread-level distribution
-                # (detected from P0's mapping pattern), set ThreadPerWarp to [1,1]
-                if p0_maps_to_warp:
-                    print(f"DEBUG: NDimPs=1 (only P0) and mapping pattern suggests WarpPerBlock. Setting ThreadPerWarp=[1,1]")
-                    tpw_m_len = 1
-                    tpw_n_len = 1
-                else:
-                    # Traditional inference from P0 (rare case, typically P1 does ThreadPerWarp)
-                    p0_contrib_lens = self._get_lengths_for_p_dim_component(0)
-                    if p0_contrib_lens:
-                        tpw_m_len = p0_contrib_lens[0]
-                        if len(p0_contrib_lens) > 1:
-                            tpw_n_len = p0_contrib_lens[1]
-                        else:
-                            tpw_n_len = 1
-            
-            # If we have a thread_per_warp_p_indices hint with an empty list, explicitly set [1,1]
-            if hints.get('thread_per_warp_p_indices') == []:
-                print(f"DEBUG: Explicit empty thread_per_warp_p_indices hint. Setting ThreadPerWarp=[1,1]")
+                    tpw_n_len = 1 # If P1 maps to only one, N-dim is 1
+            else:
+                # P1 exists but has no valid mappings - keep ThreadPerWarp at [1,1]
+                print(f"DEBUG: P{p_dim_for_threads} exists but no component lengths are mapped to it. Setting ThreadPerWarp=[1,1].")
                 tpw_m_len = 1
                 tpw_n_len = 1
+        elif self.NDimPs == 1 and not is_p1_pattern: # Only P0 exists, special care needed
+            # By default, in Composable Kernels when there's only one P dimension (P0),
+            # it's more often used for WarpPerBlock, not ThreadPerWarp, especially when
+            # mapping to R dimensions or the first components in H-sequences.
+            
+            # Check if this looks like a WarpPerBlock mapping pattern
+            p0_maps_to_warp = False
+            
+            if self.DstrEncode.Ps2RHssMajor and self.DstrEncode.Ps2RHssMinor:
+                p0_major_mappings = self.DstrEncode.Ps2RHssMajor[0] if 0 < len(self.DstrEncode.Ps2RHssMajor) else []
+                p0_minor_mappings = self.DstrEncode.Ps2RHssMinor[0] if 0 < len(self.DstrEncode.Ps2RHssMinor) else []
                 
-            hierarchical_info['ThreadPerWarp'] = [max(1,tpw_m_len), max(1,tpw_n_len)]
-            # Default [1,1] is already set if NDimPs = 0 or components are not found
-            # For NDimPs < 2 (i.e. only P0 or no P's), if the user expects TPW from P0, 
-            # they might need a hint if this P1-centric logic isn't desired.
-            # This matches tiler.py's P1-driven TPW.
+                # Check if P0 maps primarily to R-dimensions or early H components
+                r_mappings_count = sum(1 for major in p0_major_mappings if major == 0)
+                first_h_component_mappings = sum(1 for major, minor in zip(p0_major_mappings, p0_minor_mappings) 
+                                                if major > 0 and (minor == 0 or minor == 1))
+                
+                if r_mappings_count > 0 or first_h_component_mappings > 0:
+                    # This looks like a WarpPerBlock mapping
+                    p0_maps_to_warp = True
+            
+            # For the specific case where P0 maps to components related to WarpPerBlock
+            # or we only have a "warp level" example without thread-level distribution
+            # (detected from P0's mapping pattern), set ThreadPerWarp to [1,1]
+            if p0_maps_to_warp:
+                print(f"DEBUG: NDimPs=1 (only P0) and mapping pattern suggests WarpPerBlock. Setting ThreadPerWarp=[1,1]")
+                tpw_m_len = 1
+                tpw_n_len = 1
+            else:
+                # Traditional inference from P0 (rare case, typically P1 does ThreadPerWarp)
+                p0_contrib_lens = self._get_lengths_for_p_dim_component(0)
+                if p0_contrib_lens:
+                    tpw_m_len = p0_contrib_lens[0]
+                    if len(p0_contrib_lens) > 1:
+                        tpw_n_len = p0_contrib_lens[1]
+                    else:
+                        tpw_n_len = 1
+                
+        hierarchical_info['ThreadPerWarp'] = [max(1,tpw_m_len), max(1,tpw_n_len)]
 
         # --- Process WarpPerBlock ---
-        wpb_p_indices_hint = hints.get('warp_per_block_p_indices')
         wpb_m_len = 1
         wpb_n_len = 1 # Often WPB is [M_warps, 1]
         
-        # Check for explicit override first
-        wpb_override = hints.get('warp_per_block_override')
-        if wpb_override and isinstance(wpb_override, list):
-            # Use explicit override values
-            if len(wpb_override) >= 2:
-                hierarchical_info['WarpPerBlock'] = [wpb_override[0], wpb_override[1]]
-            elif len(wpb_override) == 1:
-                hierarchical_info['WarpPerBlock'] = [wpb_override[0], 1]
-            print(f"DEBUG: Using WarpPerBlock override: {hierarchical_info['WarpPerBlock']}")
-        elif wpb_p_indices_hint is not None:
-            current_hint_val = wpb_p_indices_hint
-            if not isinstance(current_hint_val, list):
-                current_hint_val = [current_hint_val]
-            
-            wpb_combined_lengths_m = []
-            wpb_combined_lengths_n = [] 
-
-            if len(current_hint_val) == 1: 
-                 wpb_combined_lengths_m.extend(self._get_lengths_for_p_dim_component(current_hint_val[0]))
-            elif len(current_hint_val) >= 2: 
-                 wpb_combined_lengths_m.extend(self._get_lengths_for_p_dim_component(current_hint_val[0]))
-                 wpb_combined_lengths_n.extend(self._get_lengths_for_p_dim_component(current_hint_val[1]))
-
-            if wpb_combined_lengths_m: wpb_m_len = product(wpb_combined_lengths_m)
-            if wpb_combined_lengths_n: wpb_n_len = product(wpb_combined_lengths_n)
-            hierarchical_info['WarpPerBlock'] = [max(1,wpb_m_len), max(1,wpb_n_len)]
-            if not wpb_combined_lengths_m and not wpb_combined_lengths_n:
-                hierarchical_info['WarpPerBlock'] = [1, 1]
         # We no longer need special handling for P1 patterns since we're treating single P sequences as P0
-        elif self.NDimPs >= 1: # INFERENCE for WarpPerBlock using P0 (aligns with tiler.py)
+        if self.NDimPs >= 1: # INFERENCE for WarpPerBlock using P0 (aligns with tiler.py)
             # Use P0 by default
             p_dim_for_warps = 0
             
@@ -1487,7 +1386,7 @@ class TileDistributionPedantic:
             hierarchical_info['WarpPerBlock'] = [max(1,wpb_m_len), max(1,wpb_n_len)]
         # else: default [1,1] already set for WarpPerBlock (from initialization if NDimPs = 0)
 
-        # If WPB is still [1,1] after hints/inference, and we have some P-dims,
+        # If WPB is still [1,1] after inference, and we have some P-dims,
         # apply a more common default for visualization (e.g., 4 warps in M-dim).
         # This is a heuristic for better visual representation when true inference is hard.
         if hierarchical_info['WarpPerBlock'] == [1,1] and self.NDimPs >= 1:
@@ -1498,63 +1397,51 @@ class TileDistributionPedantic:
                  print(f"INFO: WPB resulted in [1,1]. Applying common default [4,1] for visualization as NDimPs={self.NDimPs} >= 1 and TPW is non-trivial ({tpw_m}x{tpw_n}).")
                  hierarchical_info['WarpPerBlock'] = [4, 1]
 
-
         # --- Process Repeat --- 
-        rep_ys_idx_hint = hints.get('repeat_factor_ys_index')
         # Default repeat is [1,1] (set at initialization)
-        if rep_ys_idx_hint is not None and 0 <= rep_ys_idx_hint < self.NDimYs:
-            # Use explicit hint if provided
-            if rep_ys_idx_hint < len(self.DstrEncode.detail.get('ys_lengths_', [])):
-                val = self.DstrEncode.detail['ys_lengths_'][rep_ys_idx_hint]
-                # Current hint logic applies hint value to M-dimension of Repeat, N-dim remains 1.
-                hierarchical_info['Repeat'] = [max(1, val), 1]
-        else:
-            # IMPROVED INFERENCE: Find Ys that map to the first position in H sequences
-            repeat_y_indices = []
-            repeat_values = []
-            
-            for y_idx in range(self.NDimYs):
-                if y_idx < len(self.DstrEncode.Ys2RHsMajor) and y_idx < len(self.DstrEncode.Ys2RHsMinor):
-                    y_major = self.DstrEncode.Ys2RHsMajor[y_idx]
-                    y_minor = self.DstrEncode.Ys2RHsMinor[y_idx]
+        # IMPROVED INFERENCE: Find Ys that map to the first position in H sequences
+        repeat_y_indices = []
+        repeat_values = []
+        
+        for y_idx in range(self.NDimYs):
+            if y_idx < len(self.DstrEncode.Ys2RHsMajor) and y_idx < len(self.DstrEncode.Ys2RHsMinor):
+                y_major = self.DstrEncode.Ys2RHsMajor[y_idx]
+                y_minor = self.DstrEncode.Ys2RHsMinor[y_idx]
+                
+                # If Y maps to H sequence (major > 0)
+                if y_major > 0 and y_major <= len(self.DstrEncode.HsLengthss):
+                    h_idx = y_major - 1  # Convert to 0-based index
                     
-                    # If Y maps to H sequence (major > 0)
-                    if y_major > 0 and y_major <= len(self.DstrEncode.HsLengthss):
-                        h_idx = y_major - 1  # Convert to 0-based index
-                        
-                        # Check if it maps to the first element of the H sequence
-                        if y_minor == 0:
-                            h_seq = self.DstrEncode.HsLengthss[h_idx]
-                            val = h_seq[y_minor]
-                            if val > 0:
-                                repeat_y_indices.append(y_idx)
-                                repeat_values.append(val)
+                    # Check if it maps to the first element of the H sequence
+                    if y_minor == 0:
+                        h_seq = self.DstrEncode.HsLengthss[h_idx]
+                        val = h_seq[y_minor]
+                        if val > 0:
+                            repeat_y_indices.append(y_idx)
+                            repeat_values.append(val)
+        
+        # Use found repeat factors if available
+        if repeat_y_indices:
+            # For now, use up to 2 repeat factors for M and N dimensions
+            repeat_m = 1
+            repeat_n = 1
             
-            # Use found repeat factors if available
-            if repeat_y_indices:
-                # For now, use up to 2 repeat factors for M and N dimensions
-                repeat_m = 1
-                repeat_n = 1
-                
-                # Sort by index to ensure consistent assignment
-                sorted_repeats = sorted(zip(repeat_y_indices, repeat_values))
-                
-                if len(sorted_repeats) >= 1:
-                    repeat_m = sorted_repeats[0][1]
-                if len(sorted_repeats) >= 2:
-                    repeat_n = sorted_repeats[1][1]
-                
-                hierarchical_info['Repeat'] = [max(1, repeat_m), max(1, repeat_n)]
-                print(f"DEBUG: Found repeat factors from Ys mapping to first H positions: {sorted_repeats}")
-            # Otherwise, it stays at default [1,1]
+            # Sort by index to ensure consistent assignment
+            sorted_repeats = sorted(zip(repeat_y_indices, repeat_values))
+            
+            if len(sorted_repeats) >= 1:
+                repeat_m = sorted_repeats[0][1]
+            if len(sorted_repeats) >= 2:
+                repeat_n = sorted_repeats[1][1]
+            
+            hierarchical_info['Repeat'] = [max(1, repeat_m), max(1, repeat_n)]
+            print(f"DEBUG: Found repeat factors from Ys mapping to first H positions: {sorted_repeats}")
+        # Otherwise, it stays at default [1,1]
         
         # Calculate BlockSize from derived/default TPW and WPB
         tpw_m, tpw_n = hierarchical_info['ThreadPerWarp']
         wpb_m, wpb_n = hierarchical_info['WarpPerBlock']
         
-        # Assuming hierarchical_info['Repeat'] is like [val], applying to M-dimension of repeat by default
-        # repeat_val_m = hierarchical_info['Repeat'][0] if hierarchical_info['Repeat'] and len(hierarchical_info['Repeat']) > 0 else 1
-        # repeat_val_n = 1 # Default N-dimension repeat to 1, unless Repeat becomes a 2-element list in future
         repeat_val_m, repeat_val_n = hierarchical_info['Repeat'] # Now Repeat is [m,n]
         
         hierarchical_info['BlockSize'] = [
