@@ -44,8 +44,6 @@ if 'current_frame' not in st.session_state:
     st.session_state.current_frame = 0
 if 'debug_mode' not in st.session_state:
     st.session_state.debug_mode = False
-if 'show_dimension_arrows' not in st.session_state:
-    st.session_state.show_dimension_arrows = False
 
 def main():
     """Main function for the Streamlit app."""
@@ -71,20 +69,26 @@ def main():
                 st.session_state.selected_example = ""
         
         example_keys = list(examples.keys())
-        try:
-            # Find the index of the selected example or default to 0
-            selected_index = 0
-            if st.session_state.selected_example in example_keys:
-                selected_index = example_keys.index(st.session_state.selected_example)
+        # Define a callback to handle example selection changes
+        def on_example_change():
+            # Get the selected example from the session state
+            selected = st.session_state.example_selectbox
+            # Update our tracking of selected example
+            st.session_state.selected_example = selected
+            # Update the current code with the new example
+            st.session_state.current_code = examples[selected]
+            # Reset edit mode to True for a new example
+            st.session_state.edit_mode = True
             
+        try:
+            # Simple selection dropdown with callback
             selected_example = st.selectbox(
                 "Example Template:", 
-                example_keys, 
-                index=selected_index,
-                key="example_selectbox"
+                example_keys,
+                index=0 if not st.session_state.get('selected_example') in example_keys else example_keys.index(st.session_state.selected_example),
+                key="example_selectbox",
+                on_change=on_example_change
             )
-            # Update the session state
-            st.session_state.selected_example = selected_example
         except Exception as e:
             # Safer fallback if there's an issue with the selectbox
             if example_keys:
@@ -95,28 +99,61 @@ def main():
                 selected_example = ""
                 st.session_state.selected_example = ""
         
-        # Get the selected example code
-        cpp_code = examples[selected_example]
+        # Function to toggle edit mode when button is clicked
+        def toggle_mode():
+            st.session_state.edit_mode = not st.session_state.edit_mode
         
-        # Allow editing the code in a text area
-        edited_code = st.text_area(
-            "Edit Code:",
-            value=cpp_code,
-            height=300,
-            key="code_editor"
-        )
+        # Initialize session state variables if they don't exist
+        if 'current_code' not in st.session_state:
+            # Get the selected example code
+            if hasattr(st.session_state, 'selected_example') and st.session_state.selected_example in examples:
+                st.session_state.current_code = examples[st.session_state.selected_example]
+            else:
+                # Fallback to first example if something went wrong
+                st.session_state.current_code = examples[example_keys[0]]
+        
+        if 'edit_mode' not in st.session_state:
+            st.session_state.edit_mode = True
+            
+        # Create header row with title and toggle button
+        col1, col2 = st.columns([5, 2])
+        
+        with col1:
+            st.markdown("### Code Editor")
+            
+        with col2:
+            # Single button that changes label based on current mode
+            button_label = "🎨 Format" if st.session_state.edit_mode else "✏️ Edit"
+            st.button(button_label, on_click=toggle_mode, key="mode_toggle")
+            
+        # Display the appropriate code view based on current mode
+        if st.session_state.edit_mode:
+            # Edit mode: Show editable text area
+            edited_code = st.text_area(
+                label="",
+                value=st.session_state.current_code,
+                height=300,
+                key="code_editor"
+            )
+            # Save the edited code
+            st.session_state.current_code = edited_code
+        else:
+            # Format mode: Show syntax-highlighted code with built-in copy button
+            st.code(st.session_state.current_code, language="cpp")
         
         # Parse button
         if st.button("Parse Code"):
             parser = TileDistributionParser()
-            encoding = parser.parse_tile_distribution_encoding(edited_code)
+            # Use the current code from session state
+            current_code = st.session_state.current_code
+            encoding = parser.parse_tile_distribution_encoding(current_code)
             
             # Get default variables for this example
             variables = get_default_variables(selected_example)
             
             if encoding:
                 # Also extract any template variables that might be in the code
-                detected_variables = parser.extract_template_variables(edited_code)
+                detected_variables = parser.extract_template_variables(current_code)
                 
                 # Merge the extracted variables with the default ones, giving priority to extracted values
                 for var_name, var_value in detected_variables.items():
@@ -125,7 +162,10 @@ def main():
                 
                 st.session_state.encoding = encoding
                 st.session_state.variables = variables
-                st.session_state.cpp_code = edited_code  # Save the code for visualization
+                st.session_state.cpp_code = current_code  # Save the code for visualization
+                
+                # Switch to syntax-highlighted view after successful parsing
+                st.session_state.edit_mode = False
                 
                 # Extract variables from encoding for sliders
                 if encoding and "variable_names" in encoding:
@@ -147,9 +187,6 @@ def main():
         
         # Add debug mode toggle
         st.session_state.debug_mode = st.checkbox("Debug Mode", value=st.session_state.debug_mode)
-        
-        # Add dimension arrows toggle
-        st.session_state.show_dimension_arrows = st.checkbox("Show Dimension Arrows", value=st.session_state.show_dimension_arrows)
     
     # Main content
     if st.session_state.encoding is not None:
@@ -499,7 +536,6 @@ def main():
                                 hierarchical_fig = visualize_hierarchical_tiles(
                                     viz_data, 
                                     code_snippet=source_code, 
-                                    show_arrows=st.session_state.show_dimension_arrows,
                                     view_mode=view_mode,
                                     encoding=encoding_param,
                                     rs_lengths=resolved_rs_lengths
@@ -509,7 +545,6 @@ def main():
                                 hierarchical_fig = visualize_hierarchical_tiles(
                                     viz_data, 
                                     code_snippet=source_code, 
-                                    show_arrows=st.session_state.show_dimension_arrows,
                                     view_mode=view_mode
                                 )
                             st.pyplot(hierarchical_fig)
