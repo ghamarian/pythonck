@@ -1823,6 +1823,97 @@ def calculate_data_ids(hierarchical_structure, encoding=None, rs_lengths=None):
     if rs_lengths is None:
         rs_lengths = [warp_per_block[0], thread_per_warp[0]]  # Default: R[0]=WarpPerBlock_M, R[1]=ThreadPerWarp_M
     
+    # Initialize P-to-R mapping
+    ps_to_rs_mapping = {}
+    
+    # If encoding is provided, use the P-to-R mapping from it
+    if encoding and 'Ps2RHssMajor' in encoding and 'Ps2RHssMinor' in encoding:
+        print(f"DEBUG: Using P-to-R mapping from encoding")
+        for p_idx, major_map in enumerate(encoding['Ps2RHssMajor']):
+            for i, rh_major in enumerate(major_map):
+                if rh_major == 0:  # Maps to R-space
+                    minor_map = encoding['Ps2RHssMinor'][p_idx]
+                    r_idx = minor_map[i]
+                    ps_to_rs_mapping[p_idx] = r_idx
+                    print(f"DEBUG: P{p_idx} maps to R{r_idx}")
+        
+        # IMPROVED: Calculate data IDs for P-to-R mapping
+        if ps_to_rs_mapping:
+            print(f"DEBUG: Using P-to-R mapping: {ps_to_rs_mapping}")
+            
+            # Create a mapping that groups threads by their data ID
+            # based on P-to-R mapping
+            thread_to_data_id = {}
+            data_id_groups = {}  # key: tuple of data components, value: data_id
+            next_data_id = 0
+            
+            for warp_id, threads in thread_blocks.items():
+                warp_idx = int(warp_id.replace('Warp', ''))
+                
+                # FIXED: Corrected warp layout calculation
+                # For a 2×2 grid with row-major layout:
+                # Warp0 at [0,0], Warp1 at [0,1], Warp2 at [1,0], Warp3 at [1,1]
+                # Match the standard CUDA/GPU layout where consecutive warp IDs are in the same row
+                warp_width = warp_per_block[1]  # Number of warps per row (columns)
+                warp_row = warp_idx // warp_width  # Row index
+                warp_col = warp_idx % warp_width   # Column index
+                
+                print(f"DEBUG: Warp {warp_idx} position: [{warp_row}, {warp_col}]")
+                
+                for thread_id, thread_info in threads.items():
+                    thread_pos = thread_info.get('position', [0, 0])
+                    thread_row = thread_pos[0]  # M-dimension (row)
+                    thread_col = thread_pos[1]  # N-dimension (column)
+                    
+                    # Separate warp-level and thread-level positions for data ID calculation
+                    warp_positions = [warp_row, warp_col]  # [M, N] for warp
+                    thread_positions = [thread_row, thread_col]  # [M, N] for thread within warp
+                    
+                    # Calculate data components based on P mapping to R
+                    data_components = []
+                    for p_idx, r_idx in sorted(ps_to_rs_mapping.items()):
+                        if r_idx < len(rs_lengths):
+                            r_length = rs_lengths[r_idx]
+                            if r_length > 1:
+                                # Determine if this is a warp-level or thread-level replication
+                                # R[0] typically maps to WarpPerBlock_M, R[1] to ThreadPerWarp_M
+                                is_thread_level = (r_idx == 1)
+                                
+                                # For thread-level (R[1]), use thread position
+                                # For warp-level (R[0]), use warp position
+                                if is_thread_level:
+                                    # Thread-level replication based on thread position within warp
+                                    # For ThreadPerWarp_M (R[1]), replication happens in thread rows (M dimension)
+                                    dim_idx = 0  # Use thread row (M dimension)
+                                        
+                                    if dim_idx < len(thread_positions):
+                                        data_component = thread_positions[dim_idx] % r_length
+                                        data_components.append(data_component)
+                                        print(f"DEBUG: P{p_idx}->R{r_idx} (thread-level): position={thread_positions[dim_idx]}, component={data_component}")
+                                else:
+                                    # Warp-level replication based on warp position
+                                    # For WarpPerBlock_M (R[0]), replication happens in warp columns (N dimension)
+                                    dim_idx = 1  # Use warp column (N dimension)
+                                        
+                                    if dim_idx < len(warp_positions):
+                                        data_component = warp_positions[dim_idx] % r_length
+                                        data_components.append(data_component)
+                                        print(f"DEBUG: P{p_idx}->R{r_idx} (warp-level): position={warp_positions[dim_idx]}, component={data_component}")
+                    
+                    # Create a tuple key for the data components
+                    key = tuple(data_components) if data_components else (thread_info['global_id'],)
+                    
+                    # Assign or create a data ID for this key
+                    if key not in data_id_groups:
+                        data_id_groups[key] = next_data_id
+                        next_data_id += 1
+                    
+                    thread_to_data_id[thread_info['global_id']] = data_id_groups[key]
+                    print(f"DEBUG: Thread {thread_info['global_id']} with warp={warp_positions}, thread={thread_positions} gets data_id={data_id_groups[key]} (key={key})")
+            
+            return thread_to_data_id
+    
+    # Legacy code path for backward compatibility
     # Special case: if rs_lengths is [1] or empty or all values are 1, there's no replication
     if not rs_lengths or (len(rs_lengths) == 1 and rs_lengths[0] == 1) or all(r <= 1 for r in rs_lengths):
         # No replication - each thread accesses its own unique data
@@ -1837,27 +1928,37 @@ def calculate_data_ids(hierarchical_structure, encoding=None, rs_lengths=None):
     
     # For each warp
     for warp_id, threads in thread_blocks.items():
-        warp_row = int(warp_id.replace('Warp', '')) // warp_per_block[1]
-        warp_col = int(warp_id.replace('Warp', '')) % warp_per_block[1]
+        warp_idx = int(warp_id.replace('Warp', ''))
+        
+        # FIXED: Use correct warp layout calculation for legacy code path
+        warp_width = warp_per_block[1]  # Number of warps per row (columns)
+        warp_row = warp_idx // warp_width  # Row index
+        warp_col = warp_idx % warp_width   # Column index
         
         # For each thread in the warp
         for thread_id, thread_info in threads.items():
             thread_pos = thread_info.get('position', [0, 0])
-            thread_col = thread_pos[1]  # Use column position for R[1]
+            thread_row = thread_pos[0]  # M-dimension (row)
+            thread_col = thread_pos[1]  # N-dimension (column)
+            
+            # Calculate global position (P-coordinates)
+            p_coords = [
+                warp_row * thread_per_warp[0] + thread_row,  # P0 = M-dimension (global row)
+                warp_col * thread_per_warp[1] + thread_col   # P1 = N-dimension (global column)
+            ]
             
             # Calculate data ID components
             data_id_components = []
             
-            # Handle R[0] component (warp-level replication)
+            # Legacy code path (using assumptions about R dimensions)
+            # FIXED: Make both R dimensions match the expected replication pattern
             if len(rs_lengths) > 0 and rs_lengths[0] > 1:
-                data_id_components.append(warp_row % rs_lengths[0])
+                # R[0] (WarpPerBlock_M) causes replication in warp columns
+                data_id_components.append(warp_col % rs_lengths[0])  # Use warp column
             
-            # Handle R[1] component (thread-level replication)
             if len(rs_lengths) > 1 and rs_lengths[1] > 1:
-                # CORRECTED: Use thread column position for thread-level replication
-                # This creates row-wise replication where threads in same row access same data
-                # based on their column position
-                data_id_components.append(thread_col % rs_lengths[1])
+                # R[1] (ThreadPerWarp_M) causes replication in thread rows
+                data_id_components.append(thread_row % rs_lengths[1])  # Use thread row
             
             # Combine components into a single data ID
             if data_id_components:
