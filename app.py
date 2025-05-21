@@ -596,6 +596,12 @@ The system uses P0 (the first P-dimension) to determine warps per block:
   - ThreadPerWarp is meaningful (not just [1, 1])
 - Otherwise, defaults to [1, 1]
 
+### Visualization Limitations
+- The visualization has a practical limit on the number of warps it can display
+- For large warp counts, only a subset of the total warps will be shown in the visual grid
+- Any message about "showing X warps out of Y total" might not accurately reflect the actual total when dealing with very large numbers
+- This limitation is for display purposes only and doesn't affect the correctness of the calculated values
+
 ### Repeat Factor [repeat_m, repeat_n]
 Initialized to [1, 1] and typically remains at those values unless explicitly specified.
 

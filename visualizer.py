@@ -1218,6 +1218,9 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
     # Track if rows are truncated for warning message
     rows_truncated = visible_warp_rows < warps_per_block_m
     
+    # Track if columns are truncated for warning message
+    cols_truncated = visible_warp_cols < warps_per_block_n
+    
     # Calculate the height and width for each warp
     warp_height = warps_region_height / max(visible_warp_rows, 1)
     
@@ -1495,8 +1498,25 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
     
     # Add specific message if rows are truncated
     if rows_truncated:
+        # Calculate actual number of warp rows that would be shown if not limited
+        # Make sure we display the configured number, not the default
+        actual_total_rows = warps_per_block_m
+        
+        # Display warning with accurate count
         ax.text(thread_grid_start_x + thread_area_width/2, title_y - 0.03,
-               f"⚠️ Showing only {visible_warp_rows} of {warps_per_block_m} warp rows",
+               f"⚠️ Showing only {visible_warp_rows} of {actual_total_rows} warp rows",
+               fontsize=10, ha='center', va='bottom', color='yellow',
+               bbox=dict(facecolor='#444444', alpha=0.7, boxstyle='round,pad=0.3'))
+    
+    # Add specific message if columns are truncated
+    if cols_truncated:
+        # Make sure we display the configured number, not the default
+        actual_total_cols = warps_per_block_n
+        
+        # Display warning with accurate count (positioned below row warning if both exist)
+        vertical_position = title_y - 0.03 - (0.035 if rows_truncated else 0)
+        ax.text(thread_grid_start_x + thread_area_width/2, vertical_position,
+               f"⚠️ Showing only {visible_warp_cols} of {actual_total_cols} warp columns",
                fontsize=10, ha='center', va='bottom', color='yellow',
                bbox=dict(facecolor='#444444', alpha=0.7, boxstyle='round,pad=0.3'))
     
