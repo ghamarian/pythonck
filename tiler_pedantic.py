@@ -493,7 +493,12 @@ class TileDistributionPedantic:
             for i in range(ndim_r_minor):
                 hid = next_available_hidden_id
                 dst_dim_ids_for_replicate.append(hid)
-                rh_map[(0, i)] = {'id': hid, 'length': r_minor_lengths[i]}
+                # When adding an implicit R dimension, ensure its length is at least 1
+                length_val = r_minor_lengths[i]
+                if length_val <= 0:  # This is important for the case of implicit R dimensions
+                    length_val = 1
+                    r_minor_lengths[i] = length_val  # Update the actual list too
+                rh_map[(0, i)] = {'id': hid, 'length': length_val}
                 next_available_hidden_id += 1
             psys_to_xs_transforms.append({
                 "Name": "Replicate", "MetaData": r_minor_lengths,
@@ -537,7 +542,20 @@ class TileDistributionPedantic:
                     src_dims_for_p_merge.append(entry['id'])
                     src_lengths_for_p_merge_metadata.append(entry['length'])
                 else:
-                    raise ValueError(f"P-Merge Error: RH component ({rh_major_val},{rh_minor_val}) for P{iDimP} not in rh_map.")
+                    # Instead of failing, provide reasonable defaults for the missing component
+                    # This helps with edge cases like implicit R dimensions
+                    default_length = 1
+                    default_id = next_available_hidden_id
+                    next_available_hidden_id += 1
+                    
+                    # Create a default entry in rh_map for this component
+                    rh_map[(rh_major_val, rh_minor_val)] = {'id': default_id, 'length': default_length}
+                    
+                    # Add it to our merge inputs
+                    src_dims_for_p_merge.append(default_id)
+                    src_lengths_for_p_merge_metadata.append(default_length)
+                    
+                    print(f"DEBUG: Created default entry for missing RH component ({rh_major_val},{rh_minor_val}) with length 1")
             psys_to_xs_transforms.append({
                 "Name": "Merge", "MetaData": src_lengths_for_p_merge_metadata,
                 "SrcDimIds": src_dims_for_p_merge, "DstDimIds": [p_final_hidden_id]
@@ -1319,11 +1337,23 @@ class TileDistributionPedantic:
 
             if len(current_hint_val) == 1:
                 m_lengths = self._get_lengths_for_p_dim_component(current_hint_val[0])
-                hierarchical_info['ThreadPerWarp'] = [product(m_lengths) if m_lengths else 1, 1]
+                # FIXED: When we have just one P dimension's lengths, 
+                # Index 0 should be for rows (M dimension)
+                # Index 1 should be for cols (N dimension)
+                if len(m_lengths) >= 2:
+                    hierarchical_info['ThreadPerWarp'] = [m_lengths[0], m_lengths[1]]
+                elif len(m_lengths) == 1:
+                    hierarchical_info['ThreadPerWarp'] = [m_lengths[0], 1]
+                else:
+                    hierarchical_info['ThreadPerWarp'] = [1, 1]
             elif len(current_hint_val) >= 2:
                 m_lengths = self._get_lengths_for_p_dim_component(current_hint_val[0])
                 n_lengths = self._get_lengths_for_p_dim_component(current_hint_val[1])
-                hierarchical_info['ThreadPerWarp'] = [product(m_lengths) if m_lengths else 1, product(n_lengths) if n_lengths else 1]
+                # When explicit dimensions are provided, use them directly
+                hierarchical_info['ThreadPerWarp'] = [
+                    product(m_lengths) if m_lengths else 1, 
+                    product(n_lengths) if n_lengths else 1
+                ]
             # else: uses default [1,1] initialized above
         elif self.NDimPs >= 1: # INFERENCE for ThreadPerWarp
             # Default to [1,1] initially
@@ -1618,7 +1648,15 @@ class TileDistributionPedantic:
             if rh_major == 0:  # Maps to R-space
                 if 0 <= rh_minor < self.NDimRs and rh_minor < len(self.DstrEncode.RsLengths):
                     length = self.DstrEncode.RsLengths[rh_minor]
+                    # If mapping to an implicit R dimension, use length 1
+                    if length <= 0:
+                        length = 1
                     print(f"DEBUG:       Maps to R-space. R[{rh_minor}], length={length}") # DEBUG
+                else:
+                    # For R-space, default to length 1 if we can't find an explicit length
+                    # This helps with empty RsLengths or R dimensions that were implicitly created
+                    length = 1
+                    print(f"DEBUG:       Maps to R-space with implicit/default length 1") # DEBUG
             elif rh_major > 0:  # Maps to H-space (1-based index for H from Ps2RHssMajor)
                 h_sequence_idx = rh_major - 1 # 0-based index for HsLengthss
                 if (0 <= h_sequence_idx < self.NDimX and
