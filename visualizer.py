@@ -1893,32 +1893,40 @@ def calculate_data_ids(hierarchical_structure, encoding=None, rs_lengths=None):
                     # Check mapping for P0 (warp level)
                     if 0 in p_to_r_mapping:
                         r_idx = p_to_r_mapping[0]
-                        # Check if this maps to row or column replication
-                        if r_idx == 0:  # WarpPerBlock_M
-                            # Figure out if this is row or column replication from the encoding
-                            if encoding['Ps2RHssMajor'][0][0] == 0:
-                                # Row-wise replication (warps in same row share data)
-                                print(f"DEBUG: P0->R0 (warp-level ROW): warp_row={warp_row}, component={warp_row % rs_lengths[0]}")
-                                data_id_components.append(warp_row % rs_lengths[0])  # Row replication
-                            else:
-                                # Column-wise replication (warps in same column share data)
-                                print(f"DEBUG: P0->R0 (warp-level COLUMN): warp_col={warp_col}, component={warp_col % rs_lengths[0]}")
-                                data_id_components.append(warp_col % rs_lengths[0])  # Column replication
+                        
+                        # Check if this maps to M dimension or N dimension based on minor index
+                        minor_idx = encoding['Ps2RHssMinor'][0][0]  # Get minor index for P0[0]
+                        
+                        # Check if P0 maps to WarpPerBlock_M (minor=0) or WarpPerBlock_N (minor=1)
+                        if minor_idx == 0:  # Maps to WarpPerBlock_M - COLUMN-wise replication
+                            # WarpPerBlock_M now determines column-wise replication
+                            # Warps with the same column share data
+                            print(f"DEBUG: P0->R{r_idx} (WarpPerBlock_M): warp_col={warp_col}, component={warp_col % rs_lengths[0]}")
+                            data_id_components.append(warp_col % rs_lengths[0])  # Use warp_col for WarpPerBlock_M
+                        elif minor_idx == 1:  # Maps to WarpPerBlock_N - ROW-wise replication
+                            # WarpPerBlock_N now determines row-wise replication
+                            # Warps with the same row share data
+                            print(f"DEBUG: P0->R{r_idx} (WarpPerBlock_N): warp_row={warp_row}, component={warp_row % rs_lengths[0]}")
+                            data_id_components.append(warp_row % rs_lengths[0])  # Use warp_row for WarpPerBlock_N
                     
                     # Check mapping for P1 (thread level)
                     if 1 in p_to_r_mapping:
                         r_idx = p_to_r_mapping[1]
-                        # Check if this maps to row or column replication
-                        if r_idx == 1:  # ThreadPerWarp_M
-                            # Figure out if this is row or column replication from the encoding
-                            if encoding['Ps2RHssMajor'][1][0] == 0:
-                                # Row-wise replication (threads in same row share data)
-                                print(f"DEBUG: P1->R1 (thread-level ROW): thread_row={thread_row}, component={thread_row % rs_lengths[1]}")
-                                data_id_components.append(thread_row % rs_lengths[1])  # Row replication
-                            else:
-                                # Column-wise replication (threads in same column share data)
-                                print(f"DEBUG: P1->R1 (thread-level COLUMN): thread_col={thread_col}, component={thread_col % rs_lengths[1]}")
-                                data_id_components.append(thread_col % rs_lengths[1])  # Column replication
+                        
+                        # Check if this maps to M dimension or N dimension based on minor index
+                        minor_idx = encoding['Ps2RHssMinor'][1][0]  # Get minor index for P1[0]
+                        
+                        # Check if P1 maps to ThreadPerWarp_M (minor=1) or ThreadPerWarp_N (minor=2)
+                        if minor_idx == 1:  # Maps to ThreadPerWarp_M - COLUMN-wise replication
+                            # ThreadPerWarp_M now determines column-wise replication
+                            # Threads with the same column share data
+                            print(f"DEBUG: P1->R{r_idx} (ThreadPerWarp_M): thread_col={thread_col}, component={thread_col % rs_lengths[1]}")
+                            data_id_components.append(thread_col % rs_lengths[1])  # Use thread_col for ThreadPerWarp_M
+                        elif minor_idx == 2:  # Maps to ThreadPerWarp_N - ROW-wise replication
+                            # ThreadPerWarp_N now determines row-wise replication
+                            # Threads with the same row share data
+                            print(f"DEBUG: P1->R{r_idx} (ThreadPerWarp_N): thread_row={thread_row}, component={thread_row % rs_lengths[1]}")
+                            data_id_components.append(thread_row % rs_lengths[1])  # Use thread_row for ThreadPerWarp_N
                 
                 # Create a unique key for this data ID
                 data_id_key = tuple(data_id_components)
@@ -1937,14 +1945,58 @@ def calculate_data_ids(hierarchical_structure, encoding=None, rs_lengths=None):
                 data_id_components = []
                 
                 if len(rs_lengths) > 0 and rs_lengths[0] > 1:
-                    # R[0] corresponds to WarpPerBlock dimensions
-                    # Default to column-wise replication for warp-level (most common case)
-                    data_id_components.append(warp_col % rs_lengths[0])
+                    # Determine if this is WarpPerBlock_M (column-wise) or WarpPerBlock_N (row-wise)
+                    if encoding and 'Ps2RHssMajor' in encoding and 'Ps2RHssMinor' in encoding:
+                        # Get minor index for P0[0] to determine whether to use warp_row or warp_col
+                        if len(encoding['Ps2RHssMinor']) > 0 and len(encoding['Ps2RHssMinor'][0]) > 0:
+                            minor_idx = encoding['Ps2RHssMinor'][0][0]
+                            if minor_idx == 0:  # Maps to WarpPerBlock_M - COLUMN-wise replication
+                                # Column-wise replication (warps in same column share data)
+                                data_id_components.append(warp_col % rs_lengths[0])
+                                print(f"DEBUG: Legacy path: WarpPerBlock_M (column-wise): warp_col={warp_col}, component={warp_col % rs_lengths[0]}")
+                            elif minor_idx == 1:  # Maps to WarpPerBlock_N - ROW-wise replication
+                                # Row-wise replication (warps in same row share data)
+                                data_id_components.append(warp_row % rs_lengths[0])
+                                print(f"DEBUG: Legacy path: WarpPerBlock_N (row-wise): warp_row={warp_row}, component={warp_row % rs_lengths[0]}")
+                            else:
+                                # Default to column-wise if minor index is unexpected
+                                data_id_components.append(warp_col % rs_lengths[0])
+                                print(f"DEBUG: Legacy path: Default to column-wise: warp_col={warp_col}, component={warp_col % rs_lengths[0]}")
+                        else:
+                            # Default to column-wise if minor indices are missing
+                            data_id_components.append(warp_col % rs_lengths[0])
+                            print(f"DEBUG: Legacy path: Default to column-wise: warp_col={warp_col}, component={warp_col % rs_lengths[0]}")
+                    else:
+                        # Default to column-wise if encoding is missing
+                        data_id_components.append(warp_col % rs_lengths[0])
+                        print(f"DEBUG: Legacy path: Default to column-wise: warp_col={warp_col}, component={warp_col % rs_lengths[0]}")
                 
                 if len(rs_lengths) > 1 and rs_lengths[1] > 1:
-                    # R[1] corresponds to ThreadPerWarp dimensions
-                    # Default to row-wise replication for thread-level (most common case)
-                    data_id_components.append(thread_row % rs_lengths[1])
+                    # Determine if this is ThreadPerWarp_M (column-wise) or ThreadPerWarp_N (row-wise)
+                    if encoding and 'Ps2RHssMajor' in encoding and 'Ps2RHssMinor' in encoding:
+                        # Get minor index for P1[0] to determine whether to use thread_row or thread_col
+                        if len(encoding['Ps2RHssMinor']) > 1 and len(encoding['Ps2RHssMinor'][1]) > 0:
+                            minor_idx = encoding['Ps2RHssMinor'][1][0]
+                            if minor_idx == 1:  # Maps to ThreadPerWarp_M - COLUMN-wise replication
+                                # Column-wise replication (threads in same column share data)
+                                data_id_components.append(thread_col % rs_lengths[1])
+                                print(f"DEBUG: Legacy path: ThreadPerWarp_M (column-wise): thread_col={thread_col}, component={thread_col % rs_lengths[1]}")
+                            elif minor_idx == 2:  # Maps to ThreadPerWarp_N - ROW-wise replication
+                                # Row-wise replication (threads in same row share data)
+                                data_id_components.append(thread_row % rs_lengths[1])
+                                print(f"DEBUG: Legacy path: ThreadPerWarp_N (row-wise): thread_row={thread_row}, component={thread_row % rs_lengths[1]}")
+                            else:
+                                # Default to column-wise if minor index is unexpected
+                                data_id_components.append(thread_col % rs_lengths[1])
+                                print(f"DEBUG: Legacy path: Default to column-wise: thread_col={thread_col}, component={thread_col % rs_lengths[1]}")
+                        else:
+                            # Default to column-wise if minor indices are missing
+                            data_id_components.append(thread_col % rs_lengths[1])
+                            print(f"DEBUG: Legacy path: Default to column-wise: thread_col={thread_col}, component={thread_col % rs_lengths[1]}")
+                    else:
+                        # Default to column-wise if encoding is missing
+                        data_id_components.append(thread_col % rs_lengths[1])
+                        print(f"DEBUG: Legacy path: Default to column-wise: thread_col={thread_col}, component={thread_col % rs_lengths[1]}")
                 
                 # Generate data ID as hash of components
                 if data_id_components:
