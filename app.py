@@ -31,20 +31,6 @@ st.set_page_config(
     layout="wide",
 )
 
-# Initialize session state
-if 'encoding' not in st.session_state:
-    st.session_state.encoding = None
-if 'variables' not in st.session_state:
-    st.session_state.variables = {}
-if 'parsed_variables' not in st.session_state:
-    st.session_state.parsed_variables = []
-if 'tile_distribution' not in st.session_state:
-    st.session_state.tile_distribution = None
-if 'current_frame' not in st.session_state:
-    st.session_state.current_frame = 0
-if 'debug_mode' not in st.session_state:
-    st.session_state.debug_mode = False
-
 def main():
     """Main function for the Streamlit app."""
     # Clean slate when restarting app
@@ -55,6 +41,20 @@ def main():
                 del st.session_state[key]
         # Mark that we've done the first load
         st.session_state.first_load = True
+    
+    # Initialize all required session state variables
+    if 'encoding' not in st.session_state:
+        st.session_state.encoding = None
+    if 'variables' not in st.session_state:
+        st.session_state.variables = {}
+    if 'parsed_variables' not in st.session_state:
+        st.session_state.parsed_variables = []
+    if 'tile_distribution' not in st.session_state:
+        st.session_state.tile_distribution = None
+    if 'current_frame' not in st.session_state:
+        st.session_state.current_frame = 0
+    if 'debug_mode' not in st.session_state:
+        st.session_state.debug_mode = False
 
     st.title("Tile Distribution Visualizer")
     
@@ -219,6 +219,22 @@ def main():
     
     # Main content
     if st.session_state.encoding is not None:
+        # Forcibly recalculate the tile distribution when:
+        # 1. It doesn't exist yet 
+        # 2. It was set to None by the slider code
+        # 3. Debug mode is on and force_recalculate is checked
+        
+        force_recalculate = False
+        if st.session_state.debug_mode:
+            force_recalculate = st.checkbox("Force recalculation", value=False, key="force_recalc_checkbox")
+        
+        if (
+            'tile_distribution' not in st.session_state or
+            st.session_state.tile_distribution is None or
+            force_recalculate
+        ):
+            calculate_distribution()
+        
         # Display parsed structure
         st.header("Parsed Tile Distribution Encoding")
         
@@ -793,21 +809,12 @@ def display_variable_controls():
     """Display sliders for adjusting template variables."""
     st.header("Template Variables")
     
-    variables = {}
+    # Initialize a new dictionary to store the updated variable values
+    updated_variables = {}
     
     if not hasattr(st.session_state, 'parsed_variables') or not st.session_state.parsed_variables:
         st.info("No template variables detected in code. Parse your code to find variables.")
         return
-    
-    # Clear old sliders before redrawing
-    if hasattr(st.session_state, 'active_sliders'):
-        active_slider_keys = [f"slider_{var}" for var in st.session_state.active_sliders]
-        for key in active_slider_keys:
-            if key in st.session_state:
-                del st.session_state[key]
-    
-    # Track current set of sliders
-    st.session_state.active_sliders = st.session_state.parsed_variables.copy()
     
     for var in st.session_state.parsed_variables:
         # Get current value if exists, otherwise default to 4
@@ -820,7 +827,7 @@ def display_variable_controls():
         else:
             display_name = var
         
-        # Create a slider for this variable with a unique key based on the variable name
+        # Create a slider for this variable with a simpler approach
         value = st.slider(
             display_name,
             min_value=1,
@@ -830,33 +837,62 @@ def display_variable_controls():
             key=f"slider_{var}"  # Use unique key to prevent conflicts
         )
         
-        variables[var] = value
+        updated_variables[var] = value
     
-    # Update session state variables - only include the current parsed variables
-    st.session_state.variables = {k: v for k, v in variables.items() if k in st.session_state.parsed_variables}
+    # Check if any variable has changed
+    variables_changed = False
+    if hasattr(st.session_state, 'variables'):
+        for var, value in updated_variables.items():
+            if var in st.session_state.variables and st.session_state.variables[var] != value:
+                variables_changed = True
+                break
+    
+    # Store the updated variables in the session state
+    st.session_state.variables = updated_variables
+    
+    # Force recalculation if variables changed
+    if variables_changed and 'tile_distribution' in st.session_state:
+        st.session_state.tile_distribution = None
 
 def calculate_distribution():
     """Calculate tile distribution based on current encoding and variables."""
     try:
         if st.session_state.encoding is not None:
-            # Create tile distribution object
-            tile_distribution = TileDistribution(
-                st.session_state.encoding,
-                st.session_state.variables
-            )
+            # Use the variables directly from session state (updated by the sliders)
+            variables = st.session_state.variables
             
-            # Set a descriptive title based on the selected example or custom code
+            # Make a copy of the encoding
+            encoding = st.session_state.encoding.copy()
+            
+            # Add PsLengths if missing (for the single P tuple case)
+            if "PsLengths" not in encoding and "Ps2RHssMajor" in encoding:
+                ndim_p = len(encoding["Ps2RHssMajor"])
+                if ndim_p > 0:
+                    encoding["PsLengths"] = [1] * ndim_p
+                    if st.session_state.debug_mode:
+                        st.info(f"Added missing PsLengths=[{', '.join(['1'] * ndim_p)}] based on Ps2RHssMajor length {ndim_p}")
+            
+            # Create the tile distribution with current variables
+            tile_distribution = TileDistribution(encoding, variables)
+            
+            # Set name and source code
             if hasattr(st.session_state, 'selected_example'):
                 tile_distribution.set_tile_name(st.session_state.selected_example)
             
-            # Set the source code for visualization
             if hasattr(st.session_state, 'cpp_code') and st.session_state.cpp_code:
                 tile_distribution.set_source_code(st.session_state.cpp_code)
             
+            # Store in session state
             st.session_state.tile_distribution = tile_distribution
+            
+            return True
+        return False
     except Exception as e:
         st.error(f"Error creating tile distribution: {str(e)}")
+        if st.session_state.debug_mode:
+            st.exception(e)
         st.session_state.tile_distribution = None
+        return False
 
 if __name__ == "__main__":
     main() 

@@ -76,19 +76,26 @@ class TileDistributionParser:
             if not val:
                 continue
                 
+            # Parse the value
+            parsed_val = None
+            
             # Try to convert to integer
             try:
-                result.append(int(val))
+                parsed_val = int(val)
             except ValueError:
                 # Check if it's a nested structure
                 if "sequence<" in val:
-                    result.append(TileDistributionParser.parse_sequence(val))
+                    parsed_val = TileDistributionParser.parse_sequence(val)
                 elif "tuple<" in val:
-                    result.append(TileDistributionParser.parse_tuple(val))
+                    parsed_val = TileDistributionParser.parse_tuple(val)
                 else:
                     # Must be a variable name (possibly with namespace)
                     # Keep the full name including namespace if present
-                    result.append(val)
+                    parsed_val = val
+            
+            # Ensure the value is added to the result list
+            if parsed_val is not None:
+                result.append(parsed_val)
                     
         return result
 
@@ -155,12 +162,22 @@ class TileDistributionParser:
             if not item:
                 continue
                 
+            # Parse nested sequences and tuples
+            parsed_item = None
             if "sequence<" in item:
-                result.append(TileDistributionParser.parse_sequence(item))
+                parsed_item = TileDistributionParser.parse_sequence(item)
             elif "tuple<" in item:
-                result.append(TileDistributionParser.parse_tuple(item))
+                parsed_item = TileDistributionParser.parse_tuple(item)
             else:
-                result.append(item)
+                parsed_item = item
+                
+            # Ensure the item is added as an element to the result list
+            if parsed_item is not None:
+                # For single-element sequences or tuples, make sure we're still adding a list
+                if isinstance(parsed_item, list):
+                    result.append(parsed_item)
+                else:
+                    result.append(parsed_item)
                 
         return result
 
@@ -446,9 +463,24 @@ def debug_indexing_relationships(parsed_encoding: Dict[str, Any], variables: Dic
     for i, h_vals in enumerate(h_orig_values):
         result["MinorIndices"][f"H{i}"] = h_vals
     
+    # Determine which P index to use for each entry based on the mapping pattern
+    # Special case detection: single tuple sequence - check if it's P1 pattern
+    is_p1_pattern = False
+    if len(ps_rhss_major) == 1 and len(ps_rhss_minor) == 1:
+        p_major = ps_rhss_major[0]
+        p_minor = ps_rhss_minor[0]
+        
+        # Check for patterns that indicate this is P1, not P0
+        # Typical ThreadPerWarp patterns: maps to H1[1] (major=2, minor=1) or H0 (major=1, minor=0)
+        if len(p_major) >= 1 and len(p_minor) >= 1:
+            if (2 in p_major and 1 in p_minor) or (1 in p_major and 0 in p_minor):
+                is_p1_pattern = True
+    
     # Add P0, P1, etc. information
     for i, (p_major, p_minor) in enumerate(zip(ps_rhss_major, ps_rhss_minor)):
-        p_key = f"P{i}"
+        # Choose P0 or P1 based on detection
+        p_idx = 1 if (i == 0 and is_p1_pattern) else i
+        p_key = f"P{p_idx}"
         
         # Record P to R/H mappings
         mappings = []

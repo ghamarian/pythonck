@@ -1177,6 +1177,27 @@ class TileDistributionPedantic:
             'VectorDimensionYSIndex': -1 # NEW: To store which YS dim is the vector
         }
 
+        # Determine if our single P tuple should be treated as P1 instead of P0
+        is_p1_pattern = False
+        if (self.NDimPs == 1 and len(self.DstrEncode.Ps2RHssMajor) == 1 and 
+                len(self.DstrEncode.Ps2RHssMinor) == 1):
+            p_major = self.DstrEncode.Ps2RHssMajor[0]
+            p_minor = self.DstrEncode.Ps2RHssMinor[0]
+            
+            # Check for patterns that indicate this is P1, not P0
+            # Typical ThreadPerWarp patterns: maps to H1[1] (major=2, minor=1) or H0 (major=1, minor=0)
+            if isinstance(p_major, list) and isinstance(p_minor, list) and len(p_major) >= 1 and len(p_minor) >= 1:
+                if ((2 in p_major and 1 in p_minor) or 
+                    (1 in p_major and 0 in p_minor)):
+                    is_p1_pattern = True
+                    print(f"DEBUG: Detected P1 pattern in single P tuple")
+            elif not isinstance(p_major, list) and not isinstance(p_minor, list):
+                # Handle scalar case
+                if ((p_major == 2 and p_minor == 1) or 
+                    (p_major == 1 and p_minor == 0)):
+                    is_p1_pattern = True
+                    print(f"DEBUG: Detected P1 pattern in single P tuple (scalar case)")
+
         # Populate DimensionValues from HsLengthss (raw, for annotation)
         # Also resolve variable names to values for HsLengthss for internal use
         resolved_hs_lengthss = []
@@ -1307,8 +1328,12 @@ class TileDistributionPedantic:
             tpw_m_len = 1
             tpw_n_len = 1
 
-            if self.NDimPs >= 2: # Use P1 for ThreadPerWarp
-                p1_contrib_lens = self._get_lengths_for_p_dim_component(1) # Get all lengths P1 maps to
+            # If we detected a P1 pattern in a single P tuple, use that as P1
+            # BUT we need to use index 0 since there's only one P dimension in the array
+            p_dim_for_threads = 0 if is_p1_pattern else 1
+            
+            if self.NDimPs >= 2 or is_p1_pattern: # Use P1 for ThreadPerWarp
+                p1_contrib_lens = self._get_lengths_for_p_dim_component(p_dim_for_threads) # Get all lengths P1 maps to
                 if p1_contrib_lens:
                     tpw_m_len = p1_contrib_lens[0] # First component for M-dim
                     if len(p1_contrib_lens) > 1:
@@ -1317,11 +1342,11 @@ class TileDistributionPedantic:
                         tpw_n_len = 1 # If P1 maps to only one, N-dim is 1
                 else:
                     # P1 exists but has no valid mappings - keep ThreadPerWarp at [1,1]
-                    print(f"DEBUG: P1 exists but no component lengths are mapped to it. Setting ThreadPerWarp=[1,1].")
+                    print(f"DEBUG: P{p_dim_for_threads} exists but no component lengths are mapped to it. Setting ThreadPerWarp=[1,1].")
                     tpw_m_len = 1
                     tpw_n_len = 1
                 # If p1_contrib_lens is empty, tpw_m_len/tpw_n_len remain 1
-            elif self.NDimPs == 1: # Only P0 exists, special care needed
+            elif self.NDimPs == 1 and not is_p1_pattern: # Only P0 exists, special care needed
                 # By default, in Composable Kernels when there's only one P dimension (P0),
                 # it's more often used for WarpPerBlock, not ThreadPerWarp, especially when
                 # mapping to R dimensions or the first components in H-sequences.
@@ -1416,7 +1441,10 @@ class TileDistributionPedantic:
                 hierarchical_info['WarpPerBlock'] = [1, 1]
 
         elif self.NDimPs >= 1: # INFERENCE for WarpPerBlock using P0 (aligns with tiler.py)
-            p0_contrib_lens = self._get_lengths_for_p_dim_component(0)
+            # Use P0 by default, unless we only have a single P that's pattern-detected as P1
+            p_dim_for_warps = 0
+            
+            p0_contrib_lens = self._get_lengths_for_p_dim_component(p_dim_for_warps)
             if p0_contrib_lens:
                 wpb_m_len = p0_contrib_lens[0] # First component for M-dim
                 if len(p0_contrib_lens) > 1:
@@ -1569,6 +1597,13 @@ class TileDistributionPedantic:
         
         current_p_major_map = self.DstrEncode.Ps2RHssMajor[p_dim_index]
         current_p_minor_map = self.DstrEncode.Ps2RHssMinor[p_dim_index]
+        
+        # Handle single-element lists - ensure they're treated as lists even if they were parsed as individual values
+        if not isinstance(current_p_major_map, list):
+            current_p_major_map = [current_p_major_map]
+        if not isinstance(current_p_minor_map, list):
+            current_p_minor_map = [current_p_minor_map]
+            
         print(f"DEBUG:   For P{p_dim_index}: major_map={current_p_major_map}, minor_map={current_p_minor_map}") # DEBUG
         
         for idim_low_idx in range(len(current_p_major_map)):
