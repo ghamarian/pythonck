@@ -47,6 +47,15 @@ if 'debug_mode' not in st.session_state:
 
 def main():
     """Main function for the Streamlit app."""
+    # Clean slate when restarting app
+    if 'first_load' not in st.session_state:
+        # This is a first load, clear all session state
+        for key in list(st.session_state.keys()):
+            if key != 'first_load':
+                del st.session_state[key]
+        # Mark that we've done the first load
+        st.session_state.first_load = True
+
     st.title("Tile Distribution Visualizer")
     
     # Sidebar for inputs
@@ -146,22 +155,43 @@ def main():
             parser = TileDistributionParser()
             # Use the current code from session state
             current_code = st.session_state.current_code
+            
+            # COMPLETELY RESET ALL VARIABLE STATES
+            # This ensures old variables are fully removed
+            if 'parsed_variables' in st.session_state:
+                del st.session_state.parsed_variables
+            if 'variables' in st.session_state:
+                del st.session_state.variables
+            
+            # Now parse the code freshly
             encoding = parser.parse_tile_distribution_encoding(current_code)
             
-            # Get default variables for this example
-            variables = get_default_variables(selected_example)
-            
             if encoding:
-                # Also extract any template variables that might be in the code
+                # Extract template variables directly from the current code
                 detected_variables = parser.extract_template_variables(current_code)
                 
-                # Merge the extracted variables with the default ones, giving priority to extracted values
-                for var_name, var_value in detected_variables.items():
-                    if var_name not in variables:
-                        variables[var_name] = var_value
+                # Get default values for template variables only if they exist in the code
+                default_variables = get_default_variables(selected_example)
+                filtered_defaults = {
+                    k: v for k, v in default_variables.items() 
+                    if k in detected_variables
+                }
                 
+                # Create a new clean variables dict - start with detected variables
+                new_variables = {}
+                
+                # Add default values first (lower priority)
+                new_variables.update(filtered_defaults)
+                
+                # Then add detected values (higher priority)
+                new_variables.update(detected_variables)
+                
+                # Initialize parsed_variables with only what's in the current code
+                st.session_state.parsed_variables = sorted(list(detected_variables.keys()))
+                
+                # Save everything to session state
                 st.session_state.encoding = encoding
-                st.session_state.variables = variables
+                st.session_state.variables = new_variables
                 st.session_state.cpp_code = current_code  # Save the code for visualization
                 
                 # Switch to syntax-highlighted view after successful parsing
@@ -173,9 +203,8 @@ def main():
                 else:
                     var_list = []
                     
-                st.session_state.parsed_variables = list(set(
-                    var_list + list(variables.keys())
-                ))
+                # We no longer need this since we're directly setting 
+                # parsed_variables in the parsing function by using only detected variables
                 
                 st.success("Code parsed successfully!")
             else:
@@ -766,6 +795,20 @@ def display_variable_controls():
     
     variables = {}
     
+    if not hasattr(st.session_state, 'parsed_variables') or not st.session_state.parsed_variables:
+        st.info("No template variables detected in code. Parse your code to find variables.")
+        return
+    
+    # Clear old sliders before redrawing
+    if hasattr(st.session_state, 'active_sliders'):
+        active_slider_keys = [f"slider_{var}" for var in st.session_state.active_sliders]
+        for key in active_slider_keys:
+            if key in st.session_state:
+                del st.session_state[key]
+    
+    # Track current set of sliders
+    st.session_state.active_sliders = st.session_state.parsed_variables.copy()
+    
     for var in st.session_state.parsed_variables:
         # Get current value if exists, otherwise default to 4
         current_value = st.session_state.variables.get(var, 4)
@@ -777,7 +820,7 @@ def display_variable_controls():
         else:
             display_name = var
         
-        # Create a slider for this variable
+        # Create a slider for this variable with a unique key based on the variable name
         value = st.slider(
             display_name,
             min_value=1,
@@ -789,8 +832,8 @@ def display_variable_controls():
         
         variables[var] = value
     
-    # Update session state variables
-    st.session_state.variables = variables
+    # Update session state variables - only include the current parsed variables
+    st.session_state.variables = {k: v for k, v in variables.items() if k in st.session_state.parsed_variables}
 
 def calculate_distribution():
     """Calculate tile distribution based on current encoding and variables."""
