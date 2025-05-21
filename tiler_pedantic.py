@@ -1184,19 +1184,21 @@ class TileDistributionPedantic:
             p_major = self.DstrEncode.Ps2RHssMajor[0]
             p_minor = self.DstrEncode.Ps2RHssMinor[0]
             
-            # Check for patterns that indicate this is P1, not P0
-            # Typical ThreadPerWarp patterns: maps to H1[1] (major=2, minor=1) or H0 (major=1, minor=0)
-            if isinstance(p_major, list) and isinstance(p_minor, list) and len(p_major) >= 1 and len(p_minor) >= 1:
-                if ((2 in p_major and 1 in p_minor) or 
-                    (1 in p_major and 0 in p_minor)):
+            # CORRECTED LOGIC: A single P sequence is always P0 by default
+            # Only detect as P1 in the VERY specific case of ThreadPerWarp pattern
+            # Which is just one specific case: major=2, minor=1 (H1[1] which is traditionally ThreadPerWarp_M)
+            if isinstance(p_major, list) and isinstance(p_minor, list):
+                # Only the exact ThreadPerWarp pattern of H1[1] is detected as P1
+                if 2 in p_major and 1 in p_minor and not (1 in p_major and 0 in p_minor):
                     is_p1_pattern = True
-                    print(f"DEBUG: Detected P1 pattern in single P tuple")
+                    print(f"DEBUG: Detected P1 pattern in single P tuple - specific H1[1] pattern")
             elif not isinstance(p_major, list) and not isinstance(p_minor, list):
-                # Handle scalar case
-                if ((p_major == 2 and p_minor == 1) or 
-                    (p_major == 1 and p_minor == 0)):
+                # Handle scalar case with same limited detection
+                if p_major == 2 and p_minor == 1:
                     is_p1_pattern = True
-                    print(f"DEBUG: Detected P1 pattern in single P tuple (scalar case)")
+                    print(f"DEBUG: Detected P1 pattern in single P tuple (scalar case) - H1[1]")
+
+            print(f"DEBUG: P1 pattern detection result: {is_p1_pattern} for P mapping: major={p_major}, minor={p_minor}")
 
         # Populate DimensionValues from HsLengthss (raw, for annotation)
         # Also resolve variable names to values for HsLengthss for internal use
@@ -1439,9 +1441,9 @@ class TileDistributionPedantic:
             hierarchical_info['WarpPerBlock'] = [max(1,wpb_m_len), max(1,wpb_n_len)]
             if not wpb_combined_lengths_m and not wpb_combined_lengths_n:
                 hierarchical_info['WarpPerBlock'] = [1, 1]
-
+        # We no longer need special handling for P1 patterns since we're treating single P sequences as P0
         elif self.NDimPs >= 1: # INFERENCE for WarpPerBlock using P0 (aligns with tiler.py)
-            # Use P0 by default, unless we only have a single P that's pattern-detected as P1
+            # Use P0 by default
             p_dim_for_warps = 0
             
             p0_contrib_lens = self._get_lengths_for_p_dim_component(p_dim_for_warps)
@@ -1461,6 +1463,7 @@ class TileDistributionPedantic:
         if hierarchical_info['WarpPerBlock'] == [1,1] and self.NDimPs >= 1:
             # Check if ThreadPerWarp looks reasonable (e.g., not just [1,1])
             tpw_m, tpw_n = hierarchical_info['ThreadPerWarp']
+            # We no longer need to check for is_p1_pattern since we're treating single P as P0
             if tpw_m * tpw_n > 1: # If TPW is not trivial
                  print(f"INFO: WPB resulted in [1,1]. Applying common default [4,1] for visualization as NDimPs={self.NDimPs} >= 1 and TPW is non-trivial ({tpw_m}x{tpw_n}).")
                  hierarchical_info['WarpPerBlock'] = [4, 1]

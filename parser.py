@@ -470,10 +470,15 @@ def debug_indexing_relationships(parsed_encoding: Dict[str, Any], variables: Dic
         p_major = ps_rhss_major[0]
         p_minor = ps_rhss_minor[0]
         
-        # Check for patterns that indicate this is P1, not P0
-        # Typical ThreadPerWarp patterns: maps to H1[1] (major=2, minor=1) or H0 (major=1, minor=0)
+        # CORRECTED: Only detect as P1 in very specific case of mapping to H1[1]
+        # Typical ThreadPerWarp pattern: maps to H1[1] (major=2, minor=1)
+        # This means the P dimension is specifically for thread-level distribution
         if len(p_major) >= 1 and len(p_minor) >= 1:
-            if (2 in p_major and 1 in p_minor) or (1 in p_major and 0 in p_minor):
+            if 2 in p_major and 1 in p_minor and not (1 in p_major and 0 in p_minor):
+                is_p1_pattern = True
+        elif not isinstance(p_major, list) and not isinstance(p_minor, list):
+            # Scalar case
+            if p_major == 2 and p_minor == 1:
                 is_p1_pattern = True
     
     # Add P0, P1, etc. information
