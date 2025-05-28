@@ -10,6 +10,7 @@ import numpy as np
 from dataclasses import dataclass, field
 
 from .tile_distribution import TileDistribution
+from .tensor_coordinate import MultiIndex
 
 
 @dataclass
@@ -135,6 +136,39 @@ class StaticDistributedTensor:
         
         np.copyto(self.thread_buffer, other.thread_buffer)
     
+    def get_num_of_elements(self) -> int:
+        """Get the total number of elements in the thread's local buffer."""
+        return len(self.thread_buffer)
+
+    def __getitem__(self, key: Union[int, MultiIndex]) -> Any:
+        """Get element or slice from thread buffer using integer or MultiIndex."""
+        if isinstance(key, int):
+            return self.thread_buffer[key]
+        elif isinstance(key, MultiIndex):
+            # Assuming key is for D-dimensions, calculate flat offset
+            offset = self.tile_distribution.ys_to_d_descriptor.calculate_offset(key)
+            return self.thread_buffer[offset]
+        elif isinstance(key, slice):
+            # Allow basic slicing directly on the buffer for simplicity
+            return self.thread_buffer[key]
+        else:
+            raise TypeError(f"Unsupported key type for __getitem__: {type(key)}")
+
+    def __setitem__(self, key: Union[int, MultiIndex], value: Any):
+        """Set element in thread buffer using integer or MultiIndex."""
+        if isinstance(key, int):
+            if key < 0 or key >= len(self.thread_buffer):
+                raise IndexError(f"Index {key} out of bounds for thread buffer size {len(self.thread_buffer)}")
+            self.thread_buffer[key] = value
+        elif isinstance(key, MultiIndex):
+            # Assuming key is for D-dimensions, calculate flat offset
+            offset = self.tile_distribution.ys_to_d_descriptor.calculate_offset(key)
+            if offset < 0 or offset >= len(self.thread_buffer):
+                raise IndexError(f"Calculated offset {offset} from MultiIndex {key} is out of bounds for thread buffer size {len(self.thread_buffer)}")
+            self.thread_buffer[offset] = value
+        else:
+            raise TypeError(f"Unsupported key type for __setitem__: {type(key)}")
+
     def __repr__(self) -> str:
         """String representation."""
         return (f"StaticDistributedTensor(dtype={self.data_type.__name__}, "

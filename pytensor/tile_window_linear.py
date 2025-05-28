@@ -191,24 +191,25 @@ class TileWindowLinear:
     
     def _create_space_filling_curve(self):
         """Create space-filling curve for access pattern."""
-        encoding = self.tile_distribution.encoding
-        y_tile_lengths = []
-        for y_idx in range(self.ndim_y):
-            map_to_major = encoding.ys_to_rhs_major[y_idx]
-            map_to_minor = encoding.ys_to_rhs_minor[y_idx]
-            if map_to_major > 0:  # Maps to H-dimension map_to_major-1
-                # Assuming hs_lengthss[map_to_major-1] is like [length]
-                y_tile_lengths.append(encoding.hs_lengthss[map_to_major - 1][0])
-            else:  # Maps to R-dimension (map_to_major == 0), R-dim index is map_to_minor
-                y_tile_lengths.append(encoding.rs_lengths[map_to_minor])
-        
+        # y_tile_lengths should be the lengths of the dimensions that ys_to_d_descriptor manages.
+        y_tile_lengths = self.tile_distribution.ys_to_d_descriptor.get_lengths()
+
+        # Ensure ndim_y from tile_distribution (derived from ys_to_d_descriptor) matches these lengths.
+        if len(y_tile_lengths) != self.ndim_y:
+            # This case should ideally not happen if ndim_y is correctly derived.
+            # If it does, it indicates an inconsistency in how ndim_y is set in TileDistribution
+            # versus the actual dimensions of ys_to_d_descriptor.
+            # For robustness, we could use len(y_tile_lengths) as the effective ndim_y for sfc.
+            # However, the current structure of TileWindowLinear relies on self.ndim_y being consistent.
+            pass # Assuming self.ndim_y is already correct based on ys_to_d_descriptor
+
         # Simple dimension order
-        dim_access_order = list(range(self.ndim_y))
+        dim_access_order = list(range(len(y_tile_lengths))) # Use length of y_tile_lengths
         
         # Scalars per access (simplified for Python)
-        scalars_per_access = [1] * self.ndim_y
-        if self.ndim_y > 0: # Protect against empty y_tile_lengths if ndim_y is 0
-            scalars_per_access[self.vector_dim_y % self.ndim_y] = self.scalar_per_vector
+        scalars_per_access = [1] * len(y_tile_lengths) # Use length of y_tile_lengths
+        if len(y_tile_lengths) > 0:
+            scalars_per_access[self.vector_dim_y % len(y_tile_lengths)] = self.scalar_per_vector
         else:
             # Handle cases where ndim_y might be 0, though sfc_ys might not be used then
             pass # scalars_per_access remains empty or default handling by SFC

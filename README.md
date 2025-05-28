@@ -198,3 +198,128 @@ To improve compatibility with `app.py` when explicit `visualization_hints` are n
 
 **Important Note on Inference:**
 The inference logic is based on common conventions where P0/P1 often define thread work within a warp, and P2/P3 might define warp arrangements. These are heuristics and may not hold for all `tile_distribution_encoding` schemes. The C++ `tile_distribution.hpp` and `tile_distribution_encoding.hpp` themselves do not perform such inference; they are parameterized by these strategic choices at a higher level. 
+
+# PyTensor - Python Implementation of Composable Kernels Tensor Operations
+
+This package provides educational Python implementations of tensor operations from the Composable Kernels library. The implementations focus on clarity and understanding rather than performance.
+
+## Modules
+
+### buffer_view.py
+Memory buffer abstraction with different address spaces and access patterns.
+
+**Key Classes:**
+- `BufferView`: Generic buffer view with configurable memory operations
+- `AddressSpace`: Enum for memory spaces (GENERIC, GLOBAL, LDS, VGPR)
+- `MemoryOperation`: Enum for operations (SET, ADD, ATOMIC_ADD, ATOMIC_MAX)
+
+**Key Functions:**
+- `make_buffer_view()`: Create a buffer view
+
+### tensor_coordinate.py
+Multi-dimensional tensor coordinate handling and transformations.
+
+**Key Classes:**
+- `MultiIndex`: Multi-dimensional index representation
+- `TensorAdaptorCoordinate`: Coordinate with transformation tracking
+- `TensorCoordinate`: Extended adaptor coordinate
+
+**Key Functions:**
+- `make_tensor_adaptor_coordinate()`: Create adaptor coordinate
+- `make_tensor_coordinate()`: Create tensor coordinate
+- `move_tensor_adaptor_coordinate()`: Move coordinate by offset
+- `is_valid_tensor_adaptor_coordinate()`: Validate coordinate
+
+### tensor_descriptor.py
+Tensor layout descriptions with transformation support.
+
+**Key Classes:**
+- `Transform`: Abstract base for coordinate transformations
+- `EmbedTransform`: Strided tensor layout transform
+- `UnmergeTransform`: Packed tensor layout transform
+- `OffsetTransform`: Constant offset transform
+- `TensorAdaptor`: Manages transformation chains
+- `TensorDescriptor`: Complete tensor layout with element space
+
+**Key Functions:**
+- `make_naive_tensor_descriptor()`: Create strided tensor descriptor
+- `make_naive_tensor_descriptor_packed()`: Create packed tensor descriptor
+- `make_naive_tensor_descriptor_aligned()`: Create aligned tensor descriptor
+
+### tensor_view.py
+Unified tensor access interface combining buffers and descriptors.
+
+**Key Classes:**
+- `TensorView`: Provides array-style access to tensor data
+
+**Key Functions:**
+- `make_tensor_view()`: Create tensor view from buffer and descriptor
+- `make_naive_tensor_view()`: Create view with strided layout
+- `make_naive_tensor_view_packed()`: Create view with packed layout
+- `transform_tensor_view()`: Apply transformation to view
+
+### tile_distribution.py
+Tile distribution for parallel processing across threads/warps/blocks.
+
+**Key Classes:**
+- `TileDistributedSpan`: Partial lengths in each dimension
+- `TileDistributedIndex`: Partial indices in each dimension
+- `TileDistributionEncoding`: Encodes distribution mapping
+- `TileDistribution`: Manages data distribution across processing elements
+
+**Key Functions:**
+- `make_tile_distributed_span()`: Create distributed span
+- `make_tile_distributed_index()`: Create distributed index
+- `make_tile_distribution_encoding()`: Create distribution encoding
+- `make_tile_distribution()`: Create tile distribution
+
+## Usage Example
+
+```python
+import numpy as np
+from pytensor import *
+
+# Create a buffer
+data = np.arange(24, dtype=np.float32).reshape(6, 4)
+buffer = make_buffer_view(data)
+
+# Create a tensor descriptor for 2D layout
+descriptor = make_naive_tensor_descriptor([6, 4], [4, 1])
+
+# Create a tensor view
+tensor = make_tensor_view(buffer, descriptor)
+
+# Access elements
+print(tensor[2, 3])  # Access element at row 2, column 3
+
+# Create a tile distribution for parallel processing
+encoding = make_tile_distribution_encoding(
+    rs_lengths=[],  # No replication
+    hs_lengthss=[[2, 3], [4]],  # Hierarchical dimensions
+    ps_to_rhss_major=[[1]],  # Partition mapping
+    ps_to_rhss_minor=[[0]],
+    ys_to_rhs_major=[1, 2],  # Tile mapping
+    ys_to_rhs_minor=[0, 0]
+)
+
+# More examples in example_usage.py
+```
+
+## Testing
+
+Run tests with pytest:
+
+```bash
+cd tests
+python -m pytest -v
+```
+
+## Design Philosophy
+
+These implementations prioritize:
+1. **Clarity**: Easy to understand code structure
+2. **Correctness**: Accurate implementation of concepts
+3. **Education**: Suitable for learning complex tensor operations
+4. **Pythonic**: Following Python idioms and conventions
+
+The code adapts C++ template metaprogramming concepts to Python's dynamic nature while maintaining the mathematical rigor of the original implementations. 

@@ -181,9 +181,7 @@ The code adapts C++ template metaprogramming concepts to Python's dynamic nature
 - ✅ static_distributed_tensor.py
 - ✅ tile_window.py (with enhanced functionality)
 - ✅ tensor_adaptor.py
-
-### Remaining Modules (3/12)
-- ⏳ store_tile.py
-- ⏳ sweep_tile.py
+- ✅ store_tile.py
+- ✅ sweep_tile.py
 
 All implemented modules have comprehensive test coverage. The tile_window module has been enhanced with additional methods (load_raw, store_raw, update, async operations) to match the C++ implementation more closely. 

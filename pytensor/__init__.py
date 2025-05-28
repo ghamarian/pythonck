@@ -133,6 +133,12 @@ from .tile_scatter_gather import (
     make_tile_scatter_gather
 )
 
+# Tile window linear
+from .tile_window_linear import (
+    TileWindowLinear,
+    make_tile_window_linear
+)
+
 __all__ = [
     # Buffer operations
     'BufferView',
@@ -233,6 +239,10 @@ __all__ = [
     # Tile scatter/gather operations
     'TileScatterGather',
     'make_tile_scatter_gather',
+
+    # Tile window linear
+    'TileWindowLinear',
+    'make_tile_window_linear',
 ]
 
 __version__ = '0.1.0' 

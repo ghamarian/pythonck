@@ -928,6 +928,20 @@ Example Transformation:
                         p_coords = [0] * st.session_state.tile_dist.NDimPs
                         y_coords = [0] * st.session_state.tile_dist.NDimYs
                         
+                        # Debug: Show the adaptor structure first
+                        st.write("**Debug: Adaptor Structure**")
+                        st.write(f"P dimensions: {st.session_state.tile_dist.NDimPs}")
+                        st.write(f"Y dimensions: {st.session_state.tile_dist.NDimYs}")
+                        st.write(f"X dimensions: {st.session_state.tile_dist.NDimX}")
+                        
+                        # Show the rh_map for debugging
+                        rh_map = st.session_state.tile_dist.DstrDetail.get('rh_map', {})
+                        st.write(f"**RH Map:** {rh_map}")
+                        
+                        # Show effective order
+                        effective_order = adaptor['TopView']['_effective_display_order_ids_']
+                        st.write(f"**Effective Order:** {effective_order}")
+                        
                         # Use the actual transformation method
                         x_coords = st.session_state.tile_dist._calculate_xs_from_ps_ys(p_coords, y_coords, adaptor)
                         
@@ -944,6 +958,25 @@ Example Transformation:
                         
                 except Exception as e:
                     st.error(f"❌ Transformation failed: {str(e)}")
+                    
+                    # Show detailed debug information
+                    st.write("**Debug Information:**")
+                    
+                    # Show the adaptor structure
+                    st.write("**Adaptor TopView:**")
+                    st.json(adaptor.get('TopView', {}))
+                    
+                    st.write("**Adaptor BottomView:**")
+                    st.json(adaptor.get('BottomView', {}))
+                    
+                    st.write("**Adaptor Transformations:**")
+                    for i, trans in enumerate(adaptor.get('Transformations', [])):
+                        st.write(f"Transform {i}: {trans}")
+                    
+                    # Show the rh_map
+                    rh_map = st.session_state.tile_dist.DstrDetail.get('rh_map', {})
+                    st.write(f"**RH Map:** {rh_map}")
+                    
                     st.code(traceback.format_exc())
             
             # Hardware Thread ID Mapping
