@@ -88,6 +88,7 @@ class TileDistributionEncoding:
     @property
     def ndim_p(self) -> int:
         """Number of P dimensions."""
+        # This is just a hint - actual P dimensions come from adaptor
         return len(self.ps_to_rhss_major)
     
     @property

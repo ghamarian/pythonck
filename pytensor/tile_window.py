@@ -67,16 +67,18 @@ class TileWindowWithStaticDistribution:
         """Pre-compute coordinate bundles for efficient load/store operations."""
         self.pre_computed_coords = []
         
-        # Get partition index
+        # Get partition index and Y dimensions
         partition_idx = self.tile_distribution.get_partition_index()
         ndim_y = self.tile_distribution.ndim_y
         
         # Create initial adaptor coordinate
         # The adaptor expects P+Y dimensions, where P is partition dimensions
-        ps_ys_idx = partition_idx + [0] * ndim_y
+        adaptor = self.tile_distribution.ps_ys_to_xs_adaptor
+        ndim_top = adaptor.get_num_of_top_dimension()
+        idx_top = [0] * ndim_top
         window_adaptor_coord = make_tensor_adaptor_coordinate(
-            self.tile_distribution.ps_ys_to_xs_adaptor,
-            ps_ys_idx
+            adaptor,
+            idx_top
         )
         
         # Create initial bottom tensor coordinate

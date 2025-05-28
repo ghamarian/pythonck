@@ -17,7 +17,8 @@ from .static_distributed_tensor import StaticDistributedTensor, make_static_dist
 from .tensor_coordinate import (
     make_tensor_coordinate, move_tensor_coordinate,
     make_tensor_adaptor_coordinate, move_tensor_adaptor_coordinate,
-    coordinate_has_valid_offset_assuming_top_index_is_valid
+    coordinate_has_valid_offset_assuming_top_index_is_valid,
+    MultiIndex, TensorCoordinate
 )
 from .buffer_view import AddressSpaceEnum
 from .tile_window_utils import get_warp_id, get_lane_id, m0_set_with_memory, m0_inc_with_memory
@@ -190,20 +191,31 @@ class TileWindowLinear:
     
     def _create_space_filling_curve(self):
         """Create space-filling curve for access pattern."""
-        # Get Y-dimension lengths
-        y_desc = self.tile_distribution.ys_to_d_descriptor
-        y_lengths = y_desc.get_lengths()
+        encoding = self.tile_distribution.encoding
+        y_tile_lengths = []
+        for y_idx in range(self.ndim_y):
+            map_to_major = encoding.ys_to_rhs_major[y_idx]
+            map_to_minor = encoding.ys_to_rhs_minor[y_idx]
+            if map_to_major > 0:  # Maps to H-dimension map_to_major-1
+                # Assuming hs_lengthss[map_to_major-1] is like [length]
+                y_tile_lengths.append(encoding.hs_lengthss[map_to_major - 1][0])
+            else:  # Maps to R-dimension (map_to_major == 0), R-dim index is map_to_minor
+                y_tile_lengths.append(encoding.rs_lengths[map_to_minor])
         
         # Simple dimension order
         dim_access_order = list(range(self.ndim_y))
         
-        # Scalars per access (simplified)
+        # Scalars per access (simplified for Python)
         scalars_per_access = [1] * self.ndim_y
-        scalars_per_access[self.vector_dim_y] = self.scalar_per_vector
+        if self.ndim_y > 0: # Protect against empty y_tile_lengths if ndim_y is 0
+            scalars_per_access[self.vector_dim_y % self.ndim_y] = self.scalar_per_vector
+        else:
+            # Handle cases where ndim_y might be 0, though sfc_ys might not be used then
+            pass # scalars_per_access remains empty or default handling by SFC
         
         # Create space-filling curve
         self.sfc_ys = SpaceFillingCurve(
-            y_lengths, dim_access_order, scalars_per_access, snaked=False
+            y_tile_lengths, dim_access_order, scalars_per_access, snaked=False
         )
         
         self.num_access = self.sfc_ys.get_num_of_access()
@@ -252,55 +264,89 @@ class TileWindowLinear:
         self.access_prefix_sum_non_linear = prefix_sum
     
     def _precompute_coordinates(self):
-        """Pre-compute coordinates for all access positions."""
-        # Initialize coordinate storage
+        """Pre-compute coordinates and flags for efficient access."""
+        # Get partition index values (P-dimensions)
+        idx_p_values = self.tile_distribution.get_partition_index()
+
+        # Sanity check for TileDistribution consistency (optional, but good practice)
+        if len(idx_p_values) != self.ndim_p:
+            raise RuntimeError(
+                f"TileDistribution inconsistency: get_partition_index() returned {len(idx_p_values)} "
+                f"elements, but self.ndim_p is {self.ndim_p}."
+            )
+
+        # Initial Y-dimension values (all zeros)
+        initial_y_values = [0] * self.ndim_y
+        
+        # Combined (P,Y) initial index values
+        combined_py_values = idx_p_values + initial_y_values
+        
+        # Create the MultiIndex for the adaptor's top dimensions.
+        # Its length is self.ndim_p + self.ndim_y.
+        idx_top_for_adaptor = MultiIndex(self.ndim_p + self.ndim_y, combined_py_values)
+
+        # Create initial adaptor coordinate.
+        # This will raise an error if self.window_adaptor.get_num_of_top_dimension()
+        # does not match (self.ndim_p + self.ndim_y), highlighting the
+        # inconsistency in TileDistribution setup from the tests.
+        window_adaptor_thread_coord = make_tensor_adaptor_coordinate(
+            self.window_adaptor, # This is ps_ys_to_xs_adaptor
+            idx_top_for_adaptor
+        )
+        
+        # Calculate bottom tensor thread origin
+        bottom_tensor_thread_origin_idx_values = [
+            self.window_origin[i] + window_adaptor_thread_coord.get_bottom_index()[i]
+            for i in range(self.ndim_bottom)
+        ]
+        idx_top_for_bottom_tensor = MultiIndex(self.ndim_bottom, bottom_tensor_thread_origin_idx_values)
+
+        # Create bottom tensor coordinate using the standard factory function
+        # This ensures ndim_hidden and idx_hidden are correctly initialized based on its descriptor
+        bottom_tensor_thread_coord = make_tensor_coordinate(
+            self.bottom_tensor_view.get_tensor_descriptor(),
+            idx_top_for_bottom_tensor
+        )
+        
+        # Initialize cached coordinates and flags
         self.cached_coords = [None] * self.num_access_non_linear
         self.cached_flags = [False] * self.num_access
         
-        # Get initial thread coordinate
-        partition_idx = [get_warp_id(), get_lane_id()] + [0] * self.ndim_y
-        window_adaptor_coord = make_tensor_adaptor_coordinate(
-            self.window_adaptor, partition_idx
-        )
-        
-        # Get bottom tensor coordinate
-        bottom_idx = window_adaptor_coord.get_bottom_index()
-        bottom_origin = self.window_origin.copy()
-        for i in range(len(bottom_origin)):
-            bottom_origin[i] += bottom_idx[i]
-        
-        bottom_tensor_coord = make_tensor_coordinate(
-            self.bottom_tensor_view.get_tensor_descriptor(), bottom_origin
-        )
-        
-        # Pre-compute for each access
+        # Process each access
         for i_access in range(self.num_access):
+            # Get non-linear ID
             non_linear_id = self.access_map_non_linear[i_access]
             
-            # Save coordinate if first occurrence of this non-linear ID
-            if i_access == self.access_prefix_sum_non_linear[non_linear_id]:
-                self.cached_coords[non_linear_id] = bottom_tensor_coord.copy()
+            # Save coordinate if needed
+            if self.access_prefix_sum_non_linear[non_linear_id] == i_access:
+                self.cached_coords[non_linear_id] = bottom_tensor_thread_coord.copy()
             
-            # Save validity flag
+            # Calculate flag
             self.cached_flags[i_access] = coordinate_has_valid_offset_assuming_top_index_is_valid(
-                self.bottom_tensor_view.get_tensor_descriptor(), bottom_tensor_coord
+                self.bottom_tensor_view.get_tensor_descriptor(),
+                bottom_tensor_thread_coord
             )
             
-            # Move to next position
+            # Move to next position if not last access
             if i_access < self.num_access - 1:
+                # Get step in Y dimensions
                 idx_diff_ys = self.sfc_ys.get_forward_step(i_access)
+                
+                # Create step in P+Y dimensions
                 idx_diff_ps_ys = [0] * self.ndim_p + idx_diff_ys
                 
                 # Move coordinates
                 move_tensor_adaptor_coordinate(
-                    self.window_adaptor, window_adaptor_coord, idx_diff_ps_ys
+                    self.window_adaptor,
+                    window_adaptor_thread_coord,
+                    MultiIndex(len(idx_diff_ps_ys), idx_diff_ps_ys)
                 )
                 
                 # Update bottom tensor coordinate
-                bottom_idx_diff = window_adaptor_coord.get_bottom_index()
                 move_tensor_coordinate(
                     self.bottom_tensor_view.get_tensor_descriptor(),
-                    bottom_tensor_coord, bottom_idx_diff
+                    bottom_tensor_thread_coord,
+                    MultiIndex(len(idx_diff_ys), idx_diff_ys)
                 )
     
     def get_num_of_dimension(self) -> int:
@@ -436,7 +482,8 @@ class TileWindowLinear:
             if self.cached_coords[i] is not None:
                 move_tensor_coordinate(
                     self.bottom_tensor_view.get_tensor_descriptor(),
-                    self.cached_coords[i], step
+                    self.cached_coords[i],
+                    MultiIndex(len(step), step)
                 )
         
         # Update flags
@@ -444,12 +491,10 @@ class TileWindowLinear:
             non_linear_id = self.access_map_non_linear[i_access]
             coord = self.cached_coords[non_linear_id]
             
-            # Add linear offset to get actual coordinate
-            linear_offset = self.get_bottom_linear_offset(i_access)
-            # In real implementation, would adjust coordinate by linear offset
-            
+            # Calculate flag
             self.cached_flags[i_access] = coordinate_has_valid_offset_assuming_top_index_is_valid(
-                self.bottom_tensor_view.get_tensor_descriptor(), coord
+                self.bottom_tensor_view.get_tensor_descriptor(),
+                coord
             )
     
     def set_window_origin(self, new_origin: List[int]):

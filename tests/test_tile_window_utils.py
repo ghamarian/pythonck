@@ -104,7 +104,7 @@ class TestTileWindowUtils:
             ps_ys_to_xs_adaptor=adaptor,
             ys_to_d_descriptor=descriptor,
             encoding=encoding,
-            partition_index_func=lambda: [0]
+            partition_index_func=lambda: [0, 0, 0]
         )
         
         # Create LDS window

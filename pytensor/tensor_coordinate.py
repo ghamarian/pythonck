@@ -152,6 +152,14 @@ class TensorCoordinate(TensorAdaptorCoordinate):
             idx_hidden=adaptor_coord.idx_hidden.copy()
         )
 
+    def copy(self):
+        """Create a copy of this TensorCoordinate."""
+        return TensorCoordinate(
+            ndim_hidden=self.ndim_hidden,
+            top_dimension_hidden_ids=self.top_dimension_hidden_ids.copy(),
+            idx_hidden=self.idx_hidden.copy()
+        )
+
 
 def make_tensor_coordinate(tensor_desc: 'TensorDescriptor', idx_top: Union[List[int], MultiIndex]) -> TensorCoordinate:
     """

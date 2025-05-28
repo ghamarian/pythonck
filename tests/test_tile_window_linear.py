@@ -77,8 +77,8 @@ class TestTileWindowLinear:
             hs_lengthss=[[2], [2]],
             ps_to_rhss_major=[[1]],
             ps_to_rhss_minor=[[0]],
-            ys_to_rhs_major=[1, 0],
-            ys_to_rhs_minor=[0, 1]
+            ys_to_rhs_major=[1, 2],
+            ys_to_rhs_minor=[0, 0]
         )
         
         transform1 = EmbedTransform([2], [1])
@@ -98,7 +98,7 @@ class TestTileWindowLinear:
             ps_ys_to_xs_adaptor=adaptor,
             ys_to_d_descriptor=descriptor,
             encoding=encoding,
-            partition_index_func=lambda: [0]
+            partition_index_func=lambda: [0]  # Use 1D partition index for 2D case
         )
         
         # Create linear window
@@ -126,8 +126,8 @@ class TestTileWindowLinear:
             hs_lengthss=[[2], [2]],
             ps_to_rhss_major=[[1]],
             ps_to_rhss_minor=[[0]],
-            ys_to_rhs_major=[1, 0],
-            ys_to_rhs_minor=[0, 1]
+            ys_to_rhs_major=[1, 2],
+            ys_to_rhs_minor=[0, 0]
         )
         
         transform1 = EmbedTransform([2], [1])
@@ -168,8 +168,8 @@ class TestTileWindowLinear:
             hs_lengthss=[[2], [2]],
             ps_to_rhss_major=[[1]],
             ps_to_rhss_minor=[[0]],
-            ys_to_rhs_major=[1, 0],
-            ys_to_rhs_minor=[0, 1]
+            ys_to_rhs_major=[1, 2],
+            ys_to_rhs_minor=[0, 0]
         )
         
         transform1 = EmbedTransform([2], [1])
@@ -219,8 +219,8 @@ class TestTileWindowLinear:
             hs_lengthss=[[2], [2]],
             ps_to_rhss_major=[[1]],
             ps_to_rhss_minor=[[0]],
-            ys_to_rhs_major=[1, 0],
-            ys_to_rhs_minor=[0, 1]
+            ys_to_rhs_major=[1, 2],
+            ys_to_rhs_minor=[0, 0]
         )
         
         transform1 = EmbedTransform([2], [1])
@@ -276,8 +276,8 @@ class TestTileWindowLinear:
             hs_lengthss=[[2], [2]],
             ps_to_rhss_major=[[1]],
             ps_to_rhss_minor=[[0]],
-            ys_to_rhs_major=[1, 0],
-            ys_to_rhs_minor=[0, 1]
+            ys_to_rhs_major=[1, 2],
+            ys_to_rhs_minor=[0, 0]
         )
         
         transform1 = EmbedTransform([2], [1])
@@ -326,8 +326,8 @@ class TestTileWindowLinear:
             hs_lengthss=[[2], [2]],
             ps_to_rhss_major=[[1]],
             ps_to_rhss_minor=[[0]],
-            ys_to_rhs_major=[1, 0],
-            ys_to_rhs_minor=[0, 1]
+            ys_to_rhs_major=[1, 2],
+            ys_to_rhs_minor=[0, 0]
         )
         
         transform1 = EmbedTransform([2], [1])

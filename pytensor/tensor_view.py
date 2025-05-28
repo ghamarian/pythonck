@@ -12,7 +12,7 @@ from enum import Enum, auto
 
 from .buffer_view import BufferView, AddressSpaceEnum, MemoryOperationEnum, make_buffer_view
 from .tensor_descriptor import TensorDescriptor, make_naive_tensor_descriptor, make_naive_tensor_descriptor_packed
-from .tensor_coordinate import TensorCoordinate, make_tensor_coordinate, coordinate_has_valid_offset_assuming_top_index_is_valid
+from .tensor_coordinate import TensorCoordinate, make_tensor_coordinate, coordinate_has_valid_offset_assuming_top_index_is_valid, MultiIndex
 
 
 @dataclass
@@ -155,37 +155,52 @@ class TensorView(Generic[TypeVar('T')]):
             oob_conditional_check=oob_conditional_check
         )
     
-    def get_element(self, indices: Union[List[int], TensorCoordinate]) -> Any:
-        """
-        Get a single element from the tensor.
-        
-        Args:
-            indices: Multi-dimensional indices or tensor coordinate
-            
-        Returns:
-            Element value
-        """
-        if isinstance(indices, list):
-            coord = make_tensor_coordinate(self.tensor_desc, indices)
+    def get_element(self, idx_top: Union[List[int], MultiIndex, TensorCoordinate]) -> Any:
+        """Get a single element from the tensor at the given top-level index."""
+        _idx_top_multi_index: MultiIndex
+        if isinstance(idx_top, list):
+            _idx_top_multi_index = MultiIndex(len(idx_top), idx_top)
+        elif isinstance(idx_top, MultiIndex):
+            _idx_top_multi_index = idx_top
+        elif isinstance(idx_top, TensorCoordinate):
+            _idx_top_multi_index = idx_top.get_index()
         else:
-            coord = indices
-            
-        return self.get_vectorized_elements(coord, 0, 1)
-    
-    def set_element(self, indices: Union[List[int], TensorCoordinate], value: Any) -> None:
-        """
-        Set a single element in the tensor.
+            raise TypeError("idx_top must be a List[int], MultiIndex, or TensorCoordinate")
+
+        # Create a new TensorCoordinate for internal use, from the resolved MultiIndex
+        internal_coord = make_tensor_coordinate(self.tensor_desc, _idx_top_multi_index)
         
-        Args:
-            indices: Multi-dimensional indices or tensor coordinate
-            value: Value to set
-        """
-        if isinstance(indices, list):
-            coord = make_tensor_coordinate(self.tensor_desc, indices)
+        # For a single element, vector_size is 1 and linear_offset is 0.
+        vector_result = self.get_vectorized_elements(internal_coord, linear_offset=0, vector_size=1, oob_conditional_check=True)
+        
+        if isinstance(vector_result, (list, np.ndarray)):
+            if hasattr(vector_result, '__len__') and len(vector_result) == 1:
+                return vector_result[0]
+            elif hasattr(vector_result, '__len__') and len(vector_result) == 0:
+                 raise RuntimeError("get_vectorized_elements returned empty for single element access")
+            # If it's a multi-element array but should be scalar (e.g. from vector_size=1 call)
+            # and it's a numpy array with a single value, extract it.
+            if isinstance(vector_result, np.ndarray) and vector_result.size == 1:
+                return vector_result.item() # Safely extract scalar from numpy array
+            raise RuntimeError(f"get_vectorized_elements returned unexpected result for single element: {vector_result}")
+        return vector_result # Assumed to be scalar already
+
+    def set_element(self, idx_top: Union[List[int], MultiIndex, TensorCoordinate], value: Any):
+        """Set a single element in the tensor at the given top-level index."""
+        _idx_top_multi_index: MultiIndex
+        if isinstance(idx_top, list):
+            _idx_top_multi_index = MultiIndex(len(idx_top), idx_top)
+        elif isinstance(idx_top, MultiIndex):
+            _idx_top_multi_index = idx_top
+        elif isinstance(idx_top, TensorCoordinate):
+            _idx_top_multi_index = idx_top.get_index()
         else:
-            coord = indices
-            
-        self.set_vectorized_elements(coord, value, 0, 1)
+            raise TypeError("idx_top must be a List[int], MultiIndex, or TensorCoordinate")
+
+        # Create a new TensorCoordinate for internal use, from the resolved MultiIndex
+        internal_coord = make_tensor_coordinate(self.tensor_desc, _idx_top_multi_index)
+
+        self.set_vectorized_elements(internal_coord, value, linear_offset=0, vector_size=1, oob_conditional_check=True)
     
     def __getitem__(self, indices: Union[int, Tuple[int, ...], List[int]]) -> Any:
         """
@@ -197,12 +212,17 @@ class TensorView(Generic[TypeVar('T')]):
         Returns:
             Element value
         """
+        _indices_list: List[int]
         if isinstance(indices, int):
-            indices = [indices]
+            _indices_list = [indices]
         elif isinstance(indices, tuple):
-            indices = list(indices)
+            _indices_list = list(indices)
+        elif isinstance(indices, list):
+            _indices_list = indices
+        else:
+            raise TypeError("Indices for __getitem__ must be int, Tuple[int, ...], or List[int]")
             
-        return self.get_element(indices)
+        return self.get_element(_indices_list)
     
     def __setitem__(self, indices: Union[int, Tuple[int, ...], List[int]], value: Any) -> None:
         """
@@ -212,12 +232,17 @@ class TensorView(Generic[TypeVar('T')]):
             indices: Single index, tuple of indices, or list of indices
             value: Value to set
         """
+        _indices_list: List[int]
         if isinstance(indices, int):
-            indices = [indices]
+            _indices_list = [indices]
         elif isinstance(indices, tuple):
-            indices = list(indices)
+            _indices_list = list(indices)
+        elif isinstance(indices, list):
+            _indices_list = indices
+        else:
+            raise TypeError("Indices for __setitem__ must be int, Tuple[int, ...], or List[int]")
             
-        self.set_element(indices, value)
+        self.set_element(_indices_list, value)
     
     def get_element_by_offset(self, offset: int) -> Any:
         """
