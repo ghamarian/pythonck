@@ -734,3 +734,201 @@ def slice_distribution_from_x(distribution: TileDistribution, x_slice_begins: Li
     y_slice_lengths = [length for length in x_slice_lengths]
 
     return new_distribution, y_slice_origins, y_slice_lengths 
+
+def make_embedding_tile_distribution(
+    base_distribution: TileDistribution,
+    embedding_dims: List[int],
+    embedding_lengths: List[int]
+) -> TileDistribution:
+    """
+    Create a tile distribution by embedding additional dimensions into an existing distribution.
+    
+    Args:
+        base_distribution: The base tile distribution to embed into.
+        embedding_dims: List of X dimension indices where to embed new dimensions.
+        embedding_lengths: List of lengths for each embedded dimension.
+        
+    Returns:
+        A new TileDistribution with embedded dimensions.
+    """
+    # Validate embedding parameters
+    if len(embedding_dims) != len(embedding_lengths):
+        raise ValueError("Number of embedding dimensions must match number of embedding lengths")
+    if not all(0 <= d <= base_distribution.ndim_x for d in embedding_dims):
+        raise ValueError("Invalid embedding dimension index")
+    
+    # Get base encoding
+    base_encoding = base_distribution.encoding
+    
+    # Create new encoding with embedded dimensions
+    new_hs_lengthss = []
+    for x_idx in range(base_distribution.ndim_x):
+        if x_idx in embedding_dims:
+            # Add embedded dimension
+            new_hs_lengthss.append([embedding_lengths[embedding_dims.index(x_idx)]])
+        new_hs_lengthss.append(base_encoding.hs_lengthss[x_idx])
+    
+    # Create new encoding
+    new_encoding = make_tile_distribution_encoding(
+        rs_lengths=base_encoding.rs_lengths,
+        hs_lengthss=new_hs_lengthss,
+        ps_to_rhss_major=base_encoding.ps_to_rhss_major,
+        ps_to_rhss_minor=base_encoding.ps_to_rhss_minor,
+        ys_to_rhs_major=base_encoding.ys_to_rhs_major,
+        ys_to_rhs_minor=base_encoding.ys_to_rhs_minor
+    )
+    
+    return make_static_tile_distribution(new_encoding)
+
+def make_reduction_tile_distribution(
+    base_distribution: TileDistribution,
+    reduction_dims: List[int]
+) -> TileDistribution:
+    """
+    Create a tile distribution by reducing dimensions from an existing distribution.
+    
+    Args:
+        base_distribution: The base tile distribution to reduce.
+        reduction_dims: List of X dimension indices to reduce.
+        
+    Returns:
+        A new TileDistribution with reduced dimensions.
+    """
+    # Validate reduction dimensions
+    if not all(0 <= d < base_distribution.ndim_x for d in reduction_dims):
+        raise ValueError("Invalid reduction dimension index")
+    
+    # Get base encoding
+    base_encoding = base_distribution.encoding
+    
+    # Create new encoding without reduced dimensions
+    new_hs_lengthss = [
+        lengths for i, lengths in enumerate(base_encoding.hs_lengthss)
+        if i not in reduction_dims
+    ]
+    
+    # Adjust P dimension mappings
+    new_ps_to_rhss_major = []
+    new_ps_to_rhss_minor = []
+    for p_major, p_minor in zip(base_encoding.ps_to_rhss_major, base_encoding.ps_to_rhss_minor):
+        new_major = []
+        new_minor = []
+        for m, n in zip(p_major, p_minor):
+            if m == 0:  # R dimension
+                new_major.append(m)
+                new_minor.append(n)
+            elif m not in reduction_dims:
+                # Adjust major index for removed dimensions
+                new_major.append(m - sum(1 for d in reduction_dims if d < m))
+                new_minor.append(n)
+        if new_major:  # Only add if there are remaining dimensions
+            new_ps_to_rhss_major.append(new_major)
+            new_ps_to_rhss_minor.append(new_minor)
+    
+    # Adjust Y dimension mappings
+    new_ys_to_rhs_major = []
+    new_ys_to_rhs_minor = []
+    for m, n in zip(base_encoding.ys_to_rhs_major, base_encoding.ys_to_rhs_minor):
+        if m not in reduction_dims:
+            # Adjust major index for removed dimensions
+            new_ys_to_rhs_major.append(m - sum(1 for d in reduction_dims if d < m))
+            new_ys_to_rhs_minor.append(n)
+    
+    # Create new encoding
+    new_encoding = make_tile_distribution_encoding(
+        rs_lengths=base_encoding.rs_lengths,
+        hs_lengthss=new_hs_lengthss,
+        ps_to_rhss_major=new_ps_to_rhss_major,
+        ps_to_rhss_minor=new_ps_to_rhss_minor,
+        ys_to_rhs_major=new_ys_to_rhs_major,
+        ys_to_rhs_minor=new_ys_to_rhs_minor
+    )
+    
+    return make_static_tile_distribution(new_encoding)
+
+def compose_tile_distributions(
+    outer_distribution: TileDistribution,
+    inner_distribution: TileDistribution,
+    composition_dims: List[int]
+) -> TileDistribution:
+    """
+    Create a tile distribution by composing two distributions.
+    
+    Args:
+        outer_distribution: The outer tile distribution.
+        inner_distribution: The inner tile distribution to compose with.
+        composition_dims: List of X dimension indices in outer distribution to compose with inner dimensions.
+        
+    Returns:
+        A new TileDistribution representing the composition.
+    """
+    # Validate composition dimensions
+    if not all(0 <= d < outer_distribution.ndim_x for d in composition_dims):
+        raise ValueError("Invalid composition dimension index")
+    
+    # Get encodings
+    outer_encoding = outer_distribution.encoding
+    inner_encoding = inner_distribution.encoding
+    
+    # Create new encoding by composing dimensions
+    new_hs_lengthss = []
+    for x_idx in range(outer_distribution.ndim_x):
+        if x_idx in composition_dims:
+            # Add inner dimensions
+            new_hs_lengthss.extend(inner_encoding.hs_lengthss)
+        else:
+            new_hs_lengthss.append(outer_encoding.hs_lengthss[x_idx])
+    
+    # Calculate mapping from old to new dimension indices
+    new_dim_idx = 0
+    old_to_new_major = {}  # Maps old major IDs to new major IDs
+    
+    for x_idx in range(outer_distribution.ndim_x):
+        if x_idx in composition_dims:
+            # This X dimension is replaced by inner dimensions
+            for inner_x_idx in range(inner_distribution.ndim_x):
+                old_to_new_major[x_idx + 1] = new_dim_idx + 1  # +1 for R dimension
+                new_dim_idx += 1
+        else:
+            # This X dimension is preserved
+            old_to_new_major[x_idx + 1] = new_dim_idx + 1  # +1 for R dimension
+            new_dim_idx += 1
+    
+    # Adjust P dimension mappings
+    new_ps_to_rhss_major = []
+    new_ps_to_rhss_minor = []
+    for p_major, p_minor in zip(outer_encoding.ps_to_rhss_major, outer_encoding.ps_to_rhss_minor):
+        new_major = []
+        new_minor = []
+        for m, n in zip(p_major, p_minor):
+            if m == 0:  # R dimension
+                new_major.append(m)
+                new_minor.append(n)
+            else:
+                # Use the mapping to get the new major dimension ID
+                if m in old_to_new_major:
+                    new_major.append(old_to_new_major[m])
+                    new_minor.append(n)
+        if new_major:  # Only add if there are remaining dimensions
+            new_ps_to_rhss_major.append(new_major)
+            new_ps_to_rhss_minor.append(new_minor)
+    
+    # Adjust Y dimension mappings
+    new_ys_to_rhs_major = []
+    new_ys_to_rhs_minor = []
+    for m, n in zip(outer_encoding.ys_to_rhs_major, outer_encoding.ys_to_rhs_minor):
+        if m in old_to_new_major:
+            new_ys_to_rhs_major.append(old_to_new_major[m])
+            new_ys_to_rhs_minor.append(n)
+    
+    # Create new encoding
+    new_encoding = make_tile_distribution_encoding(
+        rs_lengths=outer_encoding.rs_lengths,
+        hs_lengthss=new_hs_lengthss,
+        ps_to_rhss_major=new_ps_to_rhss_major,
+        ps_to_rhss_minor=new_ps_to_rhss_minor,
+        ys_to_rhs_major=new_ys_to_rhs_major,
+        ys_to_rhs_minor=new_ys_to_rhs_minor
+    )
+    
+    return make_static_tile_distribution(new_encoding) 

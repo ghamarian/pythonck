@@ -75,7 +75,13 @@ from .tile_distribution import (
     make_tile_distributed_span,
     make_tile_distributed_index,
     make_tile_distribution_encoding,
-    make_tile_distribution
+    make_tile_distribution,
+    make_static_tile_distribution,
+    slice_distribution_from_x,
+    StaticDistributedTensor,
+    make_embedding_tile_distribution,
+    make_reduction_tile_distribution,
+    compose_tile_distributions
 )
 
 # Tile distribution encoding
@@ -84,12 +90,6 @@ from .tile_distribution_encoding import (
     TileDistributionEncoding as TileDistributionEncodingEnhanced,
     make_embed_tile_distribution_encoding,
     make_reduce_tile_distribution_encoding
-)
-
-# Static distributed tensor
-from .static_distributed_tensor import (
-    StaticDistributedTensor,
-    make_static_distributed_tensor
 )
 
 # Tile window
@@ -200,16 +200,18 @@ __all__ = [
     'make_tile_distributed_index',
     'make_tile_distribution_encoding',
     'make_tile_distribution',
+    'make_static_tile_distribution',
+    'slice_distribution_from_x',
+    'StaticDistributedTensor',
+    'make_embedding_tile_distribution',
+    'make_reduction_tile_distribution',
+    'compose_tile_distributions',
     
     # Tile distribution encoding
     'TileDistributionEncodingDetail',
     'TileDistributionEncodingEnhanced',
     'make_embed_tile_distribution_encoding',
     'make_reduce_tile_distribution_encoding',
-    
-    # Static distributed tensor
-    'StaticDistributedTensor',
-    'make_static_distributed_tensor',
     
     # Tile window
     'TileWindowWithStaticDistribution',

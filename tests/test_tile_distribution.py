@@ -5,14 +5,18 @@ Tests for tile_distribution module.
 import pytest
 import numpy as np
 import sys
-sys.path.append('..')
+import os
+
+# Add the parent directory to the Python path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from pytensor.tile_distribution import (
     TileDistributedSpan, TileDistributedIndex, TileDistributionEncoding,
     TileDistribution, make_tile_distributed_span, make_tile_distributed_index,
     make_tile_distribution_encoding, make_tile_distribution,
     make_static_tile_distribution, slice_distribution_from_x,
-    StaticDistributedTensor
+    StaticDistributedTensor, make_embedding_tile_distribution,
+    make_reduction_tile_distribution, compose_tile_distributions
 )
 from pytensor.tensor_descriptor import (
     TensorAdaptor, TensorDescriptor, UnmergeTransform, make_naive_tensor_descriptor
@@ -663,6 +667,167 @@ class TestSliceDistributionFromX:
 
         with pytest.raises(ValueError):
             slice_distribution_from_x(distribution, [1, 1, 1], [3, 3, 3])  # Too many dimensions
+
+
+class TestAdvancedConstructionAPIs:
+    """Test cases for advanced tile distribution construction APIs."""
+
+    def test_embedding_tile_distribution(self):
+        """Test creating a tile distribution by embedding dimensions."""
+        # Create base distribution
+        base_encoding = make_tile_distribution_encoding(
+            rs_lengths=[2],
+            hs_lengthss=[[4, 4]],
+            ps_to_rhss_major=[[0, 1]],
+            ps_to_rhss_minor=[[0, 0]],
+            ys_to_rhs_major=[1],
+            ys_to_rhs_minor=[1]
+        )
+        base_distribution = make_static_tile_distribution(base_encoding)
+
+        # Embed a new dimension at index 0
+        embedding_dims = [0]
+        embedding_lengths = [3]
+        new_distribution = make_embedding_tile_distribution(
+            base_distribution, embedding_dims, embedding_lengths
+        )
+
+        # Verify new distribution
+        assert new_distribution.ndim_x == base_distribution.ndim_x + 1
+        assert len(new_distribution.encoding.hs_lengthss) == len(base_encoding.hs_lengthss) + 1
+        assert new_distribution.encoding.hs_lengthss[0] == [3]  # Embedded dimension
+        assert new_distribution.encoding.hs_lengthss[1:] == base_encoding.hs_lengthss  # Original dimensions
+
+    def test_reduction_tile_distribution(self):
+        """Test creating a tile distribution by reducing dimensions."""
+        # Create base distribution with 2 X dimensions
+        base_encoding = make_tile_distribution_encoding(
+            rs_lengths=[2, 3],  # 2 R dimensions with lengths 2 and 3
+            hs_lengthss=[[4, 4], [4, 4]],
+            ps_to_rhss_major=[[0, 1], [0, 1]],
+            ps_to_rhss_minor=[[0, 0], [1, 1]],  # First P uses R[0] and X[0][0], second P uses R[1] and X[0][1]
+            ys_to_rhs_major=[1, 2],
+            ys_to_rhs_minor=[1, 1]
+        )
+        base_distribution = make_static_tile_distribution(base_encoding)
+
+        # Reduce dimension 0
+        reduction_dims = [0]
+        new_distribution = make_reduction_tile_distribution(
+            base_distribution, reduction_dims
+        )
+
+        # Verify new distribution
+        assert new_distribution.ndim_x == base_distribution.ndim_x - 1
+        assert len(new_distribution.encoding.hs_lengthss) == len(base_encoding.hs_lengthss) - 1
+        assert new_distribution.encoding.hs_lengthss == [base_encoding.hs_lengthss[1]]  # Only second dimension remains
+
+    def test_compose_tile_distributions(self):
+        """Test creating a tile distribution by composing two distributions."""
+        # Create outer distribution
+        outer_encoding = make_tile_distribution_encoding(
+            rs_lengths=[2],
+            hs_lengthss=[[4, 4]],
+            ps_to_rhss_major=[[0, 1]],
+            ps_to_rhss_minor=[[0, 0]],
+            ys_to_rhs_major=[1],
+            ys_to_rhs_minor=[1]
+        )
+        outer_distribution = make_static_tile_distribution(outer_encoding)
+
+        # Create inner distribution
+        inner_encoding = make_tile_distribution_encoding(
+            rs_lengths=[2],
+            hs_lengthss=[[2, 2]],
+            ps_to_rhss_major=[[0, 1]],
+            ps_to_rhss_minor=[[0, 0]],
+            ys_to_rhs_major=[1],
+            ys_to_rhs_minor=[1]
+        )
+        inner_distribution = make_static_tile_distribution(inner_encoding)
+
+        # Compose distributions at dimension 0
+        composition_dims = [0]
+        new_distribution = compose_tile_distributions(
+            outer_distribution, inner_distribution, composition_dims
+        )
+
+        # Verify new distribution
+        assert new_distribution.ndim_x == outer_distribution.ndim_x + inner_distribution.ndim_x - 1
+        assert len(new_distribution.encoding.hs_lengthss) == len(outer_encoding.hs_lengthss) + len(inner_encoding.hs_lengthss) - 1
+        assert new_distribution.encoding.hs_lengthss[0] == inner_encoding.hs_lengthss[0]  # Inner dimension
+        assert new_distribution.encoding.hs_lengthss[1:] == outer_encoding.hs_lengthss[1:]  # Remaining outer dimensions
+
+    def test_embedding_tile_distribution_invalid(self):
+        """Test invalid embedding parameters."""
+        base_encoding = make_tile_distribution_encoding(
+            rs_lengths=[2],
+            hs_lengthss=[[4, 4]],
+            ps_to_rhss_major=[[0, 1]],
+            ps_to_rhss_minor=[[0, 0]],
+            ys_to_rhs_major=[1],
+            ys_to_rhs_minor=[1]
+        )
+        base_distribution = make_static_tile_distribution(base_encoding)
+
+        # Test mismatched lengths
+        with pytest.raises(ValueError):
+            make_embedding_tile_distribution(
+                base_distribution, [0, 1], [3]  # Only one length for two dimensions
+            )
+
+        # Test invalid dimension index
+        with pytest.raises(ValueError):
+            make_embedding_tile_distribution(
+                base_distribution, [2], [3]  # Index 2 is out of bounds
+            )
+
+    def test_reduction_tile_distribution_invalid(self):
+        """Test invalid reduction parameters."""
+        base_encoding = make_tile_distribution_encoding(
+            rs_lengths=[2],
+            hs_lengthss=[[4, 4]],
+            ps_to_rhss_major=[[0, 1]],
+            ps_to_rhss_minor=[[0, 0]],
+            ys_to_rhs_major=[1],
+            ys_to_rhs_minor=[1]
+        )
+        base_distribution = make_static_tile_distribution(base_encoding)
+
+        # Test invalid dimension index
+        with pytest.raises(ValueError):
+            make_reduction_tile_distribution(
+                base_distribution, [1]  # Index 1 is out of bounds
+            )
+
+    def test_compose_tile_distributions_invalid(self):
+        """Test invalid composition parameters."""
+        # Create distributions
+        outer_encoding = make_tile_distribution_encoding(
+            rs_lengths=[2],
+            hs_lengthss=[[4, 4]],
+            ps_to_rhss_major=[[0, 1]],
+            ps_to_rhss_minor=[[0, 0]],
+            ys_to_rhs_major=[1],
+            ys_to_rhs_minor=[1]
+        )
+        outer_distribution = make_static_tile_distribution(outer_encoding)
+
+        inner_encoding = make_tile_distribution_encoding(
+            rs_lengths=[2],
+            hs_lengthss=[[2, 2]],
+            ps_to_rhss_major=[[0, 1]],
+            ps_to_rhss_minor=[[0, 0]],
+            ys_to_rhs_major=[1],
+            ys_to_rhs_minor=[1]
+        )
+        inner_distribution = make_static_tile_distribution(inner_encoding)
+
+        # Test invalid dimension index
+        with pytest.raises(ValueError):
+            compose_tile_distributions(
+                outer_distribution, inner_distribution, [1]  # Index 1 is out of bounds
+            )
 
 
 if __name__ == "__main__":
