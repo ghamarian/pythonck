@@ -633,4 +633,104 @@ def make_tensor_descriptor_from_adaptor(adaptor, element_space_size):
         element_space_size=element_space_size
     )
     desc._is_static = True
-    return desc 
+    return desc
+
+@dataclass
+class StaticDistributedTensor:
+    """
+    A static distributed tensor that integrates with TileDistribution.
+    
+    Attributes:
+        thread_buffer: A list representing the thread buffer.
+        distribution: The tile distribution for this tensor.
+    """
+    thread_buffer: List[Any]  # Replace 'Any' with the actual data type if known
+    distribution: TileDistribution
+
+    def get_y_sliced_thread_data(self, y_slice_origins: List[int], y_slice_lengths: List[int]) -> List[Any]:
+        """
+        Get a slice of the thread buffer based on Y slice origins and lengths.
+        
+        Args:
+            y_slice_origins: List of origins for each Y dimension.
+            y_slice_lengths: List of lengths for each Y dimension.
+            
+        Returns:
+            A new list representing the sliced thread buffer.
+        """
+        # This is a simplified implementation. In practice, you would use a tensor descriptor
+        # to calculate offsets and handle multi-dimensional slicing.
+        # For now, we assume a flat buffer and simple slicing.
+        start = sum(y_slice_origins)
+        end = start + sum(y_slice_lengths)
+        return self.thread_buffer[start:end]
+
+    def set_y_sliced_thread_data(self, y_slice_origins: List[int], y_slice_lengths: List[int], sliced_data: List[Any]) -> None:
+        """
+        Set a slice of the thread buffer based on Y slice origins and lengths.
+        
+        Args:
+            y_slice_origins: List of origins for each Y dimension.
+            y_slice_lengths: List of lengths for each Y dimension.
+            sliced_data: The data to set in the slice.
+        """
+        # Simplified implementation. In practice, use a tensor descriptor for offset calculation.
+        start = sum(y_slice_origins)
+        end = start + sum(y_slice_lengths)
+        self.thread_buffer[start:end] = sliced_data
+
+def slice_distribution_from_x(distribution: TileDistribution, x_slice_begins: List[int], x_slice_ends: List[int]) -> Tuple[TileDistribution, List[int], List[int]]:
+    """
+    Slice a tile distribution along X dimensions.
+    
+    Args:
+        distribution: The tile distribution to slice.
+        x_slice_begins: List of begin indices for each X dimension.
+        x_slice_ends: List of end indices for each X dimension.
+        
+    Returns:
+        A tuple containing:
+        - A new TileDistribution representing the sliced distribution.
+        - A list of Y slice origins.
+        - A list of Y slice lengths.
+    """
+    # Validate slice parameters
+    if len(x_slice_begins) != len(x_slice_ends):
+        raise ValueError("x_slice_begins and x_slice_ends must have the same length")
+    if len(x_slice_begins) != distribution.ndim_x:
+        raise ValueError("Slice parameters must match the number of X dimensions")
+
+    # Calculate slice lengths
+    x_slice_lengths = [end - begin for begin, end in zip(x_slice_begins, x_slice_ends)]
+
+    # Get the encoding from the distribution
+    encoding = distribution.encoding
+
+    # Create a new encoding for the sliced distribution
+    # For simplicity, we assume slicing only affects H dimensions
+    # In practice, you would need to adjust R, P, and Y mappings as well
+    new_hs_lengthss = []
+    for x_idx, h_lengths in enumerate(encoding.hs_lengthss):
+        new_h_lengths = h_lengths.copy()
+        # Adjust H lengths based on slice
+        new_h_lengths[0] = x_slice_lengths[x_idx]  # Simplified: assume first H dimension is sliced
+        new_hs_lengthss.append(new_h_lengths)
+
+    new_encoding = make_tile_distribution_encoding(
+        rs_lengths=encoding.rs_lengths,
+        hs_lengthss=new_hs_lengthss,
+        ps_to_rhss_major=encoding.ps_to_rhss_major,
+        ps_to_rhss_minor=encoding.ps_to_rhss_minor,
+        ys_to_rhs_major=encoding.ys_to_rhs_major,
+        ys_to_rhs_minor=encoding.ys_to_rhs_minor
+    )
+
+    # Create a new distribution from the sliced encoding
+    new_distribution = make_static_tile_distribution(new_encoding)
+
+    # Calculate Y slice origins and lengths
+    # For simplicity, we assume Y origins are derived from X slice begins
+    y_slice_origins = [begin for begin in x_slice_begins]
+    y_slice_lengths = [length for length in x_slice_lengths]
+
+    return new_distribution, y_slice_origins, y_slice_lengths 

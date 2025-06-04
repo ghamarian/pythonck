@@ -11,7 +11,8 @@ from pytensor.tile_distribution import (
     TileDistributedSpan, TileDistributedIndex, TileDistributionEncoding,
     TileDistribution, make_tile_distributed_span, make_tile_distributed_index,
     make_tile_distribution_encoding, make_tile_distribution,
-    make_static_tile_distribution
+    make_static_tile_distribution, slice_distribution_from_x,
+    StaticDistributedTensor
 )
 from pytensor.tensor_descriptor import (
     TensorAdaptor, TensorDescriptor, UnmergeTransform, make_naive_tensor_descriptor
@@ -551,6 +552,117 @@ def test_make_static_tile_distribution_invalid():
             ys_to_rhs_minor=[1]
         )
         make_static_tile_distribution(encoding)
+
+
+class TestStaticDistributedTensor:
+    """Test cases for StaticDistributedTensor class."""
+
+    def test_creation(self):
+        """Test basic creation of StaticDistributedTensor."""
+        # Create a simple tile distribution
+        encoding = make_tile_distribution_encoding(
+            rs_lengths=[2],
+            hs_lengthss=[[4, 4]],
+            ps_to_rhss_major=[[0, 1]],
+            ps_to_rhss_minor=[[0, 0]],
+            ys_to_rhs_major=[1],
+            ys_to_rhs_minor=[1]
+        )
+        distribution = make_static_tile_distribution(encoding)
+        # Create a thread buffer (simplified for testing)
+        thread_buffer = [0] * 16  # 4 * 4 = 16
+        tensor = StaticDistributedTensor(thread_buffer, distribution)
+        assert tensor.distribution == distribution
+        assert tensor.thread_buffer == thread_buffer
+
+    def test_get_y_sliced_thread_data(self):
+        """Test getting a slice of the thread buffer."""
+        encoding = make_tile_distribution_encoding(
+            rs_lengths=[2],
+            hs_lengthss=[[4, 4]],
+            ps_to_rhss_major=[[0, 1]],
+            ps_to_rhss_minor=[[0, 0]],
+            ys_to_rhs_major=[1],
+            ys_to_rhs_minor=[1]
+        )
+        distribution = make_static_tile_distribution(encoding)
+        thread_buffer = list(range(16))  # [0, 1, 2, ..., 15]
+        tensor = StaticDistributedTensor(thread_buffer, distribution)
+        # Slice from index 4 to 8
+        y_slice_origins = [4]
+        y_slice_lengths = [4]
+        sliced_data = tensor.get_y_sliced_thread_data(y_slice_origins, y_slice_lengths)
+        assert sliced_data == [4, 5, 6, 7]
+
+    def test_set_y_sliced_thread_data(self):
+        """Test setting a slice of the thread buffer."""
+        encoding = make_tile_distribution_encoding(
+            rs_lengths=[2],
+            hs_lengthss=[[4, 4]],
+            ps_to_rhss_major=[[0, 1]],
+            ps_to_rhss_minor=[[0, 0]],
+            ys_to_rhs_major=[1],
+            ys_to_rhs_minor=[1]
+        )
+        distribution = make_static_tile_distribution(encoding)
+        thread_buffer = [0] * 16
+        tensor = StaticDistributedTensor(thread_buffer, distribution)
+        # Set slice from index 4 to 8
+        y_slice_origins = [4]
+        y_slice_lengths = [4]
+        new_data = [10, 11, 12, 13]
+        tensor.set_y_sliced_thread_data(y_slice_origins, y_slice_lengths, new_data)
+        assert tensor.thread_buffer[4:8] == new_data
+
+
+class TestSliceDistributionFromX:
+    """Test cases for slice_distribution_from_x function."""
+
+    def test_slice_distribution_from_x(self):
+        # Create a simple tile distribution encoding
+        encoding = make_tile_distribution_encoding(
+            rs_lengths=[2, 2],
+            hs_lengthss=[[4, 4], [4, 4]],
+            ps_to_rhss_major=[[0, 1], [0, 1]],
+            ps_to_rhss_minor=[[0, 0], [1, 1]],
+            ys_to_rhs_major=[0, 1],
+            ys_to_rhs_minor=[0, 1]
+        )
+        distribution = make_static_tile_distribution(encoding)
+
+        # Slice the distribution along X dimensions
+        x_slice_begins = [1, 1]
+        x_slice_ends = [3, 3]
+        new_distribution, y_slice_origins, y_slice_lengths = slice_distribution_from_x(distribution, x_slice_begins, x_slice_ends)
+
+        # Verify the new distribution
+        assert new_distribution.ndim_x == distribution.ndim_x
+        assert len(new_distribution.encoding.hs_lengthss) == len(distribution.encoding.hs_lengthss)
+        assert new_distribution.ndim_p == distribution.ndim_p
+        assert new_distribution.ndim_y == distribution.ndim_y
+
+        # Verify Y slice origins and lengths
+        assert y_slice_origins == x_slice_begins
+        assert y_slice_lengths == [2, 2]  # 3 - 1 = 2 for each dimension
+
+    def test_slice_distribution_from_x_invalid(self):
+        # Create a simple tile distribution encoding
+        encoding = make_tile_distribution_encoding(
+            rs_lengths=[2, 2],
+            hs_lengthss=[[4, 4], [4, 4]],
+            ps_to_rhss_major=[[0, 1], [0, 1]],
+            ps_to_rhss_minor=[[0, 0], [1, 1]],
+            ys_to_rhs_major=[0, 1],
+            ys_to_rhs_minor=[0, 1]
+        )
+        distribution = make_static_tile_distribution(encoding)
+
+        # Test invalid slice parameters
+        with pytest.raises(ValueError):
+            slice_distribution_from_x(distribution, [1], [3, 3])  # Mismatched lengths
+
+        with pytest.raises(ValueError):
+            slice_distribution_from_x(distribution, [1, 1, 1], [3, 3, 3])  # Too many dimensions
 
 
 if __name__ == "__main__":
