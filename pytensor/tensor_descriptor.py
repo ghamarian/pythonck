@@ -132,6 +132,7 @@ class UnmergeTransform(Transform):
         offset = 0
         for i in range(self.ndim):
             offset += idx_upper[i] * self.strides[i]
+        # offset = np.array(idx_upper) @ np.array(self.strides)  
         
         return MultiIndex(1, [offset])
     
@@ -329,14 +330,14 @@ class MergeTransform(Transform):
     This is the inverse of UnmergeTransform.
     
     Attributes:
-        lower_lengths: Lengths of dimensions to merge
+        lengths: Lengths of dimensions to merge
     """
     
-    lower_lengths: List[int]
+    lengths: List[int]
     
     def get_num_of_lower_dimension(self) -> int:
         """Get number of lower dimensions."""
-        return len(self.lower_lengths)
+        return len(self.lengths)
     
     def get_num_of_upper_dimension(self) -> int:
         """Get number of upper dimensions (1)."""
@@ -344,10 +345,7 @@ class MergeTransform(Transform):
     
     def get_upper_lengths(self) -> List[int]:
         """Get upper dimension lengths (product of lower)."""
-        total = 1
-        for length in self.lower_lengths:
-            total *= length
-        return [total]
+        return [math.prod(self.lengths)]
     
     def calculate_lower_index(self, idx_upper: MultiIndex) -> MultiIndex:
         """Calculate lower indices from merged index."""
@@ -355,19 +353,27 @@ class MergeTransform(Transform):
         lower_indices = []
         
         # Convert linear index to multi-dimensional indices
-        for i in range(len(self.lower_lengths) - 1, -1, -1):
-            lower_indices.append(idx % self.lower_lengths[i])
-            idx //= self.lower_lengths[i]
+        for i in range(len(self.lengths) - 1, -1, -1):
+            lower_indices.append(idx % self.lengths[i])
+            idx //= self.lengths[i]
         
-        return MultiIndex(len(self.lower_lengths), list(reversed(lower_indices)))
+        return MultiIndex(len(self.lengths), list(reversed(lower_indices)))
     
     def calculate_upper_index(self, idx_lower: MultiIndex) -> MultiIndex:
         """Calculate merged index from lower indices."""
+        if len(idx_lower) != len(self.lengths):
+            raise ValueError(f"Index dimension {len(idx_lower)} doesn't match transform dimension {len(self.lengths)}")
+        
+        # Check bounds for each dimension
+        for i, idx in enumerate(idx_lower):
+            if idx < 0 or idx >= self.lengths[i]:
+                raise ValueError("Index out of bounds")
+        
         idx = 0
         stride = 1
-        for i in range(len(self.lower_lengths) - 1, -1, -1):
+        for i in range(len(self.lengths) - 1, -1, -1):
             idx += idx_lower[i] * stride
-            stride *= self.lower_lengths[i]
+            stride *= self.lengths[i]
         return MultiIndex(1, [idx])
     
     def is_valid_upper_index_always_mapped_to_valid_lower_index(self) -> bool:
@@ -391,7 +397,7 @@ class MergeTransform(Transform):
     
     def __repr__(self) -> str:
         """String representation."""
-        return f"MergeTransform(lengths={self.lower_lengths})"
+        return f"MergeTransform(lengths={self.lengths})"
 
 
 @dataclass
@@ -566,8 +572,7 @@ class TensorAdaptor:
     
     def is_static(self) -> bool:
         """Check if adaptor is static (compile-time known)."""
-        # In Python, we consider all adaptors as dynamic
-        return False
+        return getattr(self, '_is_static', False)
 
 
 @dataclass
@@ -672,8 +677,7 @@ class TensorDescriptor(TensorAdaptor):
     
     def is_static(self) -> bool:
         """Check if descriptor is static (compile-time known)."""
-        # In Python, we consider all descriptors as dynamic
-        return False
+        return getattr(self, '_is_static', False)
     
     def __repr__(self) -> str:
         """String representation."""
@@ -714,9 +718,10 @@ def make_naive_tensor_descriptor(lengths: List[int],
     top_dimension_hidden_ids = list(range(1, ndim + 1))
     
     # Calculate element space size
-    element_space_size = 1
-    for i in range(ndim):
-        element_space_size += (lengths[i] - 1) * strides[i]
+    # element_space_size = 1
+    # for i in range(ndim):
+    #     element_space_size += (lengths[i] - 1) * strides[i]
+    element_space_size = (np.array(lengths) - 1) @ np.array(strides) + 1 
     
     # Set up guaranteed vector info
     guaranteed_vector_lengths = [-1] * (ndim + 1)  # +1 for bottom dimension
@@ -762,9 +767,7 @@ def make_naive_tensor_descriptor_packed(lengths: List[int],
     top_dimension_hidden_ids = list(range(1, ndim + 1))
     
     # Calculate element space size (product of lengths)
-    element_space_size = 1
-    for length in lengths:
-        element_space_size *= length
+    element_space_size = math.prod(lengths) 
     
     # Set up guaranteed vector info
     guaranteed_vector_lengths = [-1] * (ndim + 1)

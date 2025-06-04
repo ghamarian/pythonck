@@ -10,12 +10,14 @@ sys.path.append('..')
 from pytensor.tile_distribution import (
     TileDistributedSpan, TileDistributedIndex, TileDistributionEncoding,
     TileDistribution, make_tile_distributed_span, make_tile_distributed_index,
-    make_tile_distribution_encoding, make_tile_distribution
+    make_tile_distribution_encoding, make_tile_distribution,
+    make_static_tile_distribution
 )
 from pytensor.tensor_descriptor import (
     TensorAdaptor, TensorDescriptor, UnmergeTransform, make_naive_tensor_descriptor
 )
 from pytensor.tensor_coordinate import MultiIndex
+from pytensor.tensor_adaptor import make_single_stage_tensor_adaptor
 
 
 class TestTileDistributedSpan:
@@ -167,13 +169,11 @@ class TestTileDistribution:
         # Simple 1D to 1D mapping using UnmergeTransform
         transform = UnmergeTransform([4])
         
-        # Create adaptor with proper arguments
-        adaptor = TensorAdaptor(
+        # Create adaptor using factory function
+        adaptor = make_single_stage_tensor_adaptor(
             transforms=[transform],
-            lower_dimension_hidden_idss=[[0]],  # Transform outputs to hidden dim 0
-            upper_dimension_hidden_idss=[[1]],  # Transform takes hidden dim 1
-            bottom_dimension_hidden_ids=[0],    # Bottom is hidden dim 0
-            top_dimension_hidden_ids=[1]        # Top is hidden dim 1 (P=1, Y=0)
+            lower_dimension_old_top_idss=[[0]],  # Transform outputs to hidden dim 0
+            upper_dimension_new_top_idss=[[1]]   # Transform takes hidden dim 1
         )
         
         descriptor = make_naive_tensor_descriptor([4], [1])
@@ -203,12 +203,10 @@ class TestTileDistribution:
         # Create mock adaptor and descriptor
         transform = UnmergeTransform([8])
         
-        adaptor = TensorAdaptor(
+        adaptor = make_single_stage_tensor_adaptor(
             transforms=[transform],
-            lower_dimension_hidden_idss=[[0]],
-            upper_dimension_hidden_idss=[[1, 2]],  # Takes 2 upper dims
-            bottom_dimension_hidden_ids=[0],
-            top_dimension_hidden_ids=[1, 2]  # P=2, Y=0
+            lower_dimension_old_top_idss=[[0]],
+            upper_dimension_new_top_idss=[[1, 2]]  # Takes 2 upper dims
         )
         
         descriptor = make_naive_tensor_descriptor([4], [1])
@@ -239,12 +237,10 @@ class TestTileDistribution:
         """Test default partition index."""
         transform = UnmergeTransform([8])
         
-        adaptor = TensorAdaptor(
+        adaptor = make_single_stage_tensor_adaptor(
             transforms=[transform],
-            lower_dimension_hidden_idss=[[0]],
-            upper_dimension_hidden_idss=[[1, 2]],
-            bottom_dimension_hidden_ids=[0],
-            top_dimension_hidden_ids=[1, 2]  # P=2
+            lower_dimension_old_top_idss=[[0]],
+            upper_dimension_new_top_idss=[[1, 2]]
         )
         
         descriptor = make_naive_tensor_descriptor([4], [1])
@@ -468,6 +464,93 @@ class TestTileDistribution:
         )
         
         assert isinstance(dist, TileDistribution)
+
+
+def test_make_static_tile_distribution():
+    # Create a simple encoding
+    encoding = make_tile_distribution_encoding(
+        rs_lengths=[2],  # One replication dimension
+        hs_lengthss=[[4, 4]],  # One X dimension with two H dimensions
+        ps_to_rhss_major=[[0, 1]],  # One P dimension mapping to R and first H
+        ps_to_rhss_minor=[[0, 0]],  # First R and first H
+        ys_to_rhs_major=[1],  # One Y dimension mapping to first H
+        ys_to_rhs_minor=[1]  # Second H
+    )
+    
+    # Create static distribution
+    distribution = make_static_tile_distribution(encoding)
+    
+    # Test basic properties
+    assert distribution.ndim_x == 1
+    assert distribution.ndim_y == 1
+    assert distribution.ndim_p == 1
+    assert distribution.ndim_r == 1
+    
+    # Test adaptor properties
+    assert distribution.ps_ys_to_xs_adaptor.is_static()
+    assert distribution.ys_to_d_descriptor.is_static()
+    
+    # Test lengths
+    lengths = distribution.get_lengths()
+    assert len(lengths) == 1
+    assert lengths[0] == 16  # 4 * 4
+    
+    # Test distributed spans
+    spans = distribution.get_distributed_spans()
+    assert len(spans) == 1
+    assert len(spans[0].partial_lengths) == 1
+    assert spans[0].partial_lengths[0] == 4
+
+def test_make_static_tile_distribution_complex():
+    # Create a more complex encoding
+    encoding = make_tile_distribution_encoding(
+        rs_lengths=[2, 2],  # Two replication dimensions
+        hs_lengthss=[[4, 4], [2, 2]],  # Two X dimensions with two H dimensions each
+        ps_to_rhss_major=[[0, 1], [0, 2]],  # Two P dimensions
+        ps_to_rhss_minor=[[0, 0], [1, 0]],  # Mapping to different R and H dimensions
+        ys_to_rhs_major=[1, 2],  # Two Y dimensions
+        ys_to_rhs_minor=[1, 1]  # Mapping to second H of each X
+    )
+    
+    # Create static distribution
+    distribution = make_static_tile_distribution(encoding)
+    
+    # Test basic properties
+    assert distribution.ndim_x == 2
+    assert distribution.ndim_y == 2
+    assert distribution.ndim_p == 2
+    assert distribution.ndim_r == 2
+    
+    # Test adaptor properties
+    assert distribution.ps_ys_to_xs_adaptor.is_static()
+    assert distribution.ys_to_d_descriptor.is_static()
+    
+    # Test lengths
+    lengths = distribution.get_lengths()
+    assert len(lengths) == 2
+    assert lengths[0] == 16  # 4 * 4
+    assert lengths[1] == 4   # 2 * 2
+    
+    # Test distributed spans
+    spans = distribution.get_distributed_spans()
+    assert len(spans) == 2
+    assert len(spans[0].partial_lengths) == 1
+    assert len(spans[1].partial_lengths) == 1
+    assert spans[0].partial_lengths[0] == 4
+    assert spans[1].partial_lengths[0] == 2
+
+def test_make_static_tile_distribution_invalid():
+    # Test with invalid encoding (invalid major_id: 2 for only 1 X dimension)
+    with pytest.raises(ValueError):
+        encoding = make_tile_distribution_encoding(
+            rs_lengths=[2],
+            hs_lengthss=[[4, 4]],
+            ps_to_rhss_major=[[2, 0]],  # 2 is invalid: only 0 (R) and 1 (X0) are valid
+            ps_to_rhss_minor=[[0, 0]],
+            ys_to_rhs_major=[1],
+            ys_to_rhs_minor=[1]
+        )
+        make_static_tile_distribution(encoding)
 
 
 if __name__ == "__main__":

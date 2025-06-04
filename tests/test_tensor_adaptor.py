@@ -225,7 +225,7 @@ class TestTransformClasses:
         
         assert transform.get_upper_lengths() == [7]  # 4 + 1 + 2
         
-        # Test index mapping with MultiIndex
+        # Test index mapping with MultiIndee
         assert list(transform.calculate_lower_index(MultiIndex(1, [0]))) == [0]  # In left pad
         assert list(transform.calculate_lower_index(MultiIndex(1, [1]))) == [0]  # First real element
         assert list(transform.calculate_lower_index(MultiIndex(1, [4]))) == [3]  # Last real element
@@ -252,6 +252,29 @@ class TestTransformClasses:
         assert list(transform.calculate_lower_index(MultiIndex(1, [4]))) == [0, 1, 0]
         assert list(transform.calculate_lower_index(MultiIndex(1, [12]))) == [1, 0, 0]
         assert list(transform.calculate_lower_index(MultiIndex(1, [23]))) == [1, 2, 3]
+    
+    def test_merge_transform_upper_index(self):
+        """Test MergeTransform's calculate_upper_index."""
+        transform = MergeTransform([2, 3, 4])
+        
+        # Test upper index calculation
+        assert list(transform.calculate_upper_index(MultiIndex(3, [0, 0, 0]))) == [0]
+        assert list(transform.calculate_upper_index(MultiIndex(3, [0, 0, 1]))) == [1]
+        assert list(transform.calculate_upper_index(MultiIndex(3, [0, 1, 0]))) == [4]
+        assert list(transform.calculate_upper_index(MultiIndex(3, [1, 0, 0]))) == [12]
+        assert list(transform.calculate_upper_index(MultiIndex(3, [1, 2, 3]))) == [23]
+        
+        # Test invalid input - wrong dimensionality
+        with pytest.raises(ValueError, match="Index dimension 2 doesn't match transform dimension 3"):
+            transform.calculate_upper_index(MultiIndex(2, [0, 0]))  # 2D instead of 3D
+        
+        # Test invalid input - out of bounds indices
+        with pytest.raises(ValueError, match="Index out of bounds"):
+            transform.calculate_upper_index(MultiIndex(3, [2, 0, 0]))  # First index too large
+        with pytest.raises(ValueError, match="Index out of bounds"):
+            transform.calculate_upper_index(MultiIndex(3, [0, 3, 0]))  # Second index too large
+        with pytest.raises(ValueError, match="Index out of bounds"):
+            transform.calculate_upper_index(MultiIndex(3, [0, 0, 4]))  # Third index too large
     
     def test_replicate_transform(self):
         """Test ReplicateTransform."""

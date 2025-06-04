@@ -94,13 +94,13 @@ class TestUnmergeTransform:
     
     def test_unmerge_transform_creation(self):
         """Test basic unmerge transform creation."""
-        lengths = [4, 5, 6]
+        lengths = [4, 5, 6, 7]
         transform = UnmergeTransform(lengths)
         
         assert transform.lengths == lengths
-        assert transform.ndim == 3
+        assert transform.ndim == 4
         # Check calculated strides for packed layout
-        assert transform.strides == [30, 6, 1]  # 5*6, 6, 1
+        assert transform.strides == [210, 42, 7, 1]  # 7*6*5, 6*5, 5, 1
     
     def test_calculate_indices(self):
         """Test index calculations for unmerge transform."""

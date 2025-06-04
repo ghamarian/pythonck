@@ -79,6 +79,26 @@ class TileDistributionEncoding:
             raise ValueError("P dimension mappings must have same length")
         if len(self.ys_to_rhs_major) != len(self.ys_to_rhs_minor):
             raise ValueError("Y dimension mappings must have same length")
+            
+        # Validate P dimension mappings
+        for i, (major_ids, minor_ids) in enumerate(zip(self.ps_to_rhss_major, self.ps_to_rhss_minor)):
+            if len(major_ids) != len(minor_ids):
+                raise ValueError(f"P dimension {i} major and minor mappings must have same length")
+            
+            # Check that major IDs are valid (0 for R, 1+ for X dimensions)
+            for major_id in major_ids:
+                if major_id < 0 or major_id > self.ndim_x:
+                    raise ValueError(f"Invalid major dimension ID {major_id} in P dimension {i}")
+            
+            # Check that minor IDs are valid for each major dimension
+            for major_id, minor_id in zip(major_ids, minor_ids):
+                if major_id == 0:  # R dimension
+                    if minor_id < 0 or minor_id >= len(self.rs_lengths):
+                        raise ValueError(f"Invalid minor dimension ID {minor_id} for R dimension in P dimension {i}")
+                else:  # X dimension
+                    x_idx = major_id - 1
+                    if minor_id < 0 or minor_id >= len(self.hs_lengthss[x_idx]):
+                        raise ValueError(f"Invalid minor dimension ID {minor_id} for X dimension {x_idx} in P dimension {i}")
     
     @property
     def ndim_x(self) -> int:
@@ -353,4 +373,264 @@ def make_tile_distribution(ps_ys_to_xs_adaptor: TensorAdaptor,
         ys_to_d_descriptor=ys_to_d_descriptor,
         encoding=encoding,
         partition_index_func=partition_index_func
-    ) 
+    )
+
+
+def make_static_tile_distribution(encoding: TileDistributionEncoding) -> TileDistribution:
+    """
+    Create a static tile distribution from encoding.
+    
+    Args:
+        encoding: Static tile distribution encoding
+        
+    Returns:
+        TileDistribution instance with static properties
+    """
+    # Create adaptor encoding for tile distribution
+    adaptor_impl = _make_adaptor_encoding_for_tile_distribution(encoding)
+    
+    ps_ys_to_xs_adaptor_impl = adaptor_impl[0]
+    ys_to_d_adaptor_impl = adaptor_impl[1]
+    d_length = adaptor_impl[2]
+    rh_major_minor_to_hidden_ids_impl = adaptor_impl[3]
+    
+    # Construct static tensor adaptors
+    ps_ys_to_xs_adaptor = _construct_static_tensor_adaptor_from_encoding(ps_ys_to_xs_adaptor_impl)
+    ys_to_d_adaptor = _construct_static_tensor_adaptor_from_encoding(ys_to_d_adaptor_impl)
+    
+    # Create descriptor from adaptor
+    ys_to_d_descriptor = make_tensor_descriptor_from_adaptor(ys_to_d_adaptor, d_length)
+    
+    # Get dimensions
+    ndim_rh_major = len(encoding.hs_lengthss) + 1  # +1 for R
+    ndims_rhs_minor = [len(encoding.rs_lengths)] + [len(hs) for hs in encoding.hs_lengthss]
+    
+    # Convert hidden IDs to tuple of sequences
+    rh_major_minor_to_hidden_ids = _to_tuple_of_sequence(
+        rh_major_minor_to_hidden_ids_impl, 
+        ndim_rh_major, 
+        ndims_rhs_minor
+    )
+    
+    # Create distribution detail
+    distribution_detail = TileDistributionDetail(rh_major_minor_to_hidden_ids)
+    
+    return TileDistribution(
+        ps_ys_to_xs_adaptor=ps_ys_to_xs_adaptor,
+        ys_to_d_descriptor=ys_to_d_descriptor,
+        encoding=encoding
+    )
+
+def _make_adaptor_encoding_for_tile_distribution(encoding: TileDistributionEncoding) -> Tuple:
+    """Create adaptor encoding for tile distribution."""
+    # Get encoding components
+    rs_lengths = encoding.rs_lengths
+    hs_lengthss = encoding.hs_lengthss
+    ps_to_rhss_major = encoding.ps_to_rhss_major
+    ps_to_rhss_minor = encoding.ps_to_rhss_minor
+    ys_to_rhs_major = encoding.ys_to_rhs_major
+    ys_to_rhs_minor = encoding.ys_to_rhs_minor
+    
+    # Constants
+    MAX_NUM_TRANSFORMS = 20
+    MAX_META_DATA_SIZE = 128
+    MAX_NUM_DIM = 10
+    
+    # Get dimensions
+    ndim_x = len(hs_lengthss)
+    
+    # Initialize arrays for hidden dimensions
+    rh_major_minor_to_hidden_ids = [[0] * MAX_NUM_DIM for _ in range(ndim_x + 1)]
+    rh_major_minor_to_hidden_lengths = [[0] * MAX_NUM_DIM for _ in range(ndim_x + 1)]
+    
+    # Initialize transforms array
+    transforms = []
+    num_trans = 0
+    hidden_dim_cnt = ndim_x
+    
+    # Add replicate transform
+    ndim_r_minor = len(rs_lengths)
+    transforms.append({
+        'name': 'replicate',
+        'meta_data': rs_lengths,
+        'num_dim': 0,
+        'dims': [],
+        'num_dim_out': ndim_r_minor,
+        'dims_out': list(range(hidden_dim_cnt, hidden_dim_cnt + ndim_r_minor))
+    })
+    
+    # Update hidden dimension mappings
+    for i in range(ndim_r_minor):
+        rh_major_minor_to_hidden_ids[0][i] = hidden_dim_cnt
+        rh_major_minor_to_hidden_lengths[0][i] = rs_lengths[i]
+        hidden_dim_cnt += 1
+    
+    # Add unmerge transforms for X dimensions
+    for idim_x in range(ndim_x):
+        h_minor_lengths = hs_lengthss[idim_x]
+        ndim_h_minor = len(h_minor_lengths)
+        
+        transforms.append({
+            'name': 'unmerge',
+            'meta_data': h_minor_lengths,
+            'num_dim': 1,
+            'dims': [idim_x],
+            'num_dim_out': ndim_h_minor,
+            'dims_out': list(range(hidden_dim_cnt, hidden_dim_cnt + ndim_h_minor))
+        })
+        
+        # Update hidden dimension mappings
+        for i in range(ndim_h_minor):
+            rh_major_minor_to_hidden_ids[idim_x + 1][i] = hidden_dim_cnt
+            rh_major_minor_to_hidden_lengths[idim_x + 1][i] = h_minor_lengths[i]
+            hidden_dim_cnt += 1
+    
+    # Add P dimension transforms
+    ndim_p = len(ps_to_rhss_major)
+    hidden_dim_id_ps = [0] * ndim_p
+    
+    for i_dim_p in range(ndim_p):
+        hidden_dim_id_p = hidden_dim_cnt
+        hidden_dim_cnt += 1
+        hidden_dim_id_ps[i_dim_p] = hidden_dim_id_p
+        
+        p2RHsMajor = ps_to_rhss_major[i_dim_p]
+        p2RHsMinor = ps_to_rhss_minor[i_dim_p]
+        
+        assert len(p2RHsMajor) == len(p2RHsMinor), "wrong!"
+        
+        ndim_low = len(p2RHsMajor)
+        low_dims = [0] * ndim_low
+        low_lengths = [0] * ndim_low
+        
+        for i in range(ndim_low):
+            rh_major = p2RHsMajor[i]
+            rh_minor = p2RHsMinor[i]
+            low_dims[i] = rh_major_minor_to_hidden_ids[rh_major][rh_minor]
+            low_lengths[i] = rh_major_minor_to_hidden_lengths[rh_major][rh_minor]
+        
+        transforms.append({
+            'name': 'merge',
+            'meta_data': low_lengths,
+            'num_dim': ndim_low,
+            'dims': low_dims,
+            'num_dim_out': 1,
+            'dims_out': [hidden_dim_id_p]
+        })
+    
+    # Create bottom and top dimension IDs
+    bottom_dim_ids = list(range(ndim_x))
+    top_dim_ids = hidden_dim_id_ps.copy()
+    
+    # Add Y dimensions to top_dim_ids
+    for i in range(len(ys_to_rhs_major)):
+        rh_major = ys_to_rhs_major[i]
+        rh_minor = ys_to_rhs_minor[i]
+        top_dim_ids.append(rh_major_minor_to_hidden_ids[rh_major][rh_minor])
+    
+    # Create adaptor encodings
+    ps_ys_to_xs_adaptor_encoding = (
+        transforms,
+        len(transforms),
+        bottom_dim_ids,
+        len(bottom_dim_ids),
+        top_dim_ids,
+        len(top_dim_ids)
+    )
+    
+    # Create Y to D descriptor encoding
+    y_lengths = [0] * len(ys_to_rhs_major)
+    d_length = 1
+    
+    for i in range(len(ys_to_rhs_major)):
+        rh_major = ys_to_rhs_major[i]
+        rh_minor = ys_to_rhs_minor[i]
+        y_length = rh_major_minor_to_hidden_lengths[rh_major][rh_minor]
+        y_lengths[i] = y_length
+        d_length *= y_length
+    
+    ys_to_d_adaptor_encoding = (
+        [{
+            'name': 'unmerge',
+            'meta_data': y_lengths,
+            'num_dim': 1,
+            'dims': [0],
+            'num_dim_out': len(y_lengths),
+            'dims_out': list(range(1, len(y_lengths) + 1))
+        }],
+        1,
+        [0],
+        1,
+        list(range(1, len(y_lengths) + 1)),
+        len(y_lengths)
+    )
+    
+    return (
+        ps_ys_to_xs_adaptor_encoding,
+        ys_to_d_adaptor_encoding,
+        d_length,
+        rh_major_minor_to_hidden_ids
+    )
+
+def _construct_static_tensor_adaptor_from_encoding(encoding: Tuple) -> TensorAdaptor:
+    """Construct static tensor adaptor from encoding."""
+    transforms, num_trans, bottom_dim_ids, ndim_bottom, top_dim_ids, ndim_top = encoding
+    
+    # Create lower and upper dimension hidden IDs for each transform
+    lower_dimension_hidden_idss = []
+    upper_dimension_hidden_idss = []
+    
+    for transform in transforms:
+        # Get dimensions from transform
+        dims = transform['dims']
+        dims_out = transform['dims_out']
+        
+        # For lower dimensions, use the input dimensions directly
+        lower_ids = dims
+        # For upper dimensions, use the output dimensions directly
+        upper_ids = dims_out
+        lower_dimension_hidden_idss.append(lower_ids)
+        upper_dimension_hidden_idss.append(upper_ids)
+    
+    # Validation: number of transforms must match number of lower/upper dimension ID lists
+    if not (len(transforms) == len(lower_dimension_hidden_idss) == len(upper_dimension_hidden_idss)):
+        raise ValueError("Number of transforms must match lower/upper dimension IDs")
+    
+    # Create adaptor with static properties
+    adaptor = TensorAdaptor(
+        transforms=transforms,
+        lower_dimension_hidden_idss=lower_dimension_hidden_idss,
+        upper_dimension_hidden_idss=upper_dimension_hidden_idss,
+        bottom_dimension_hidden_ids=bottom_dim_ids,
+        top_dimension_hidden_ids=top_dim_ids
+    )
+    
+    # Mark as static
+    adaptor._is_static = True
+    
+    return adaptor
+
+def _to_tuple_of_sequence(arr: List[List[int]], ndim_rh_major: int, ndims_rhs_minor: List[int]) -> Tuple:
+    """Convert array to tuple of sequences."""
+    result = []
+    for i in range(ndim_rh_major):
+        result.append(tuple(arr[i][:ndims_rhs_minor[i]]))
+    return tuple(result)
+
+@dataclass
+class TileDistributionDetail:
+    """Detail information for tile distribution."""
+    rh_major_minor_to_adaptor_hidden_idss: Tuple[Tuple[int, ...], ...]
+
+def make_tensor_descriptor_from_adaptor(adaptor, element_space_size):
+    """Create a TensorDescriptor from a TensorAdaptor and element space size."""
+    from .tensor_descriptor import TensorDescriptor
+    desc = TensorDescriptor(
+        transforms=adaptor.transforms,
+        lower_dimension_hidden_idss=adaptor.lower_dimension_hidden_idss,
+        upper_dimension_hidden_idss=adaptor.upper_dimension_hidden_idss,
+        top_dimension_hidden_ids=adaptor.top_dimension_hidden_ids,
+        element_space_size=element_space_size
+    )
+    desc._is_static = True
+    return desc 
