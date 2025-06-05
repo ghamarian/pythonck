@@ -284,6 +284,28 @@ class TileDistributionEncoding:
         
         return uniformed_indices
     
+    def get_distributed_spans(self) -> List['TileDistributedSpan']:
+        """
+        Get distributed spans for each X dimension.
+        
+        Returns:
+            List of TileDistributedSpan objects, one for each X dimension
+        """
+        from .tile_distribution import TileDistributedSpan
+        
+        spans = []
+        for x_idx in range(self.ndim_x):
+            # Get the distributed span lengths for this X dimension
+            span_lengths = []
+            for span_minor in range(self.detail.ndims_distributed_spans_minor[x_idx]):
+                length = self.detail.distributed_spans_lengthss[x_idx][span_minor]
+                if length != -1:
+                    span_lengths.append(length)
+            
+            spans.append(TileDistributedSpan(span_lengths))
+        
+        return spans
+    
     def __repr__(self) -> str:
         """String representation."""
         return (f"TileDistributionEncoding(ndim_x={self.ndim_x}, "
