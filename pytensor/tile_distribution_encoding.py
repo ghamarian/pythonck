@@ -93,14 +93,21 @@ class TileDistributionEncodingDetail:
         for i in range(ndim_y):
             rh_major = ys_to_rhs_major[i]
             rh_minor = ys_to_rhs_minor[i]
-            ys_lengths.append(rhs_lengthss[rh_major][rh_minor])
+            # Bounds check before accessing
+            if 0 <= rh_major < len(rhs_lengthss) and 0 <= rh_minor < len(rhs_lengthss[rh_major]):
+                ys_lengths.append(rhs_lengthss[rh_major][rh_minor])
+            else:
+                ys_lengths.append(0)  # Default value for invalid indices
         
         # rhs_major_minor_to_ys
         rhs_major_minor_to_ys = [[-1] * max_ndim_rh_minor for _ in range(ndim_rh_major)]
         for i in range(ndim_y):
             rh_major = ys_to_rhs_major[i]
             rh_minor = ys_to_rhs_minor[i]
-            rhs_major_minor_to_ys[rh_major][rh_minor] = i
+            # Bounds check before assignment
+            if (0 <= rh_major < len(rhs_major_minor_to_ys) and 
+                0 <= rh_minor < len(rhs_major_minor_to_ys[rh_major])):
+                rhs_major_minor_to_ys[rh_major][rh_minor] = i
         
         # ndims_span_minor
         ndims_span_minor = [0] * ndim_x
@@ -132,7 +139,12 @@ class TileDistributionEncodingDetail:
             
             rh_major = ys_to_rhs_major[i]
             rh_minor = ys_to_rhs_minor[i]
-            span_minor = rhs_major_minor_to_span_minor[rh_major][rh_minor]
+            # Bounds check before accessing span_minor
+            if (0 <= rh_major < len(rhs_major_minor_to_span_minor) and 
+                0 <= rh_minor < len(rhs_major_minor_to_span_minor[rh_major])):
+                span_minor = rhs_major_minor_to_span_minor[rh_major][rh_minor]
+            else:
+                span_minor = -1  # Default for invalid indices
             ys_to_span_minor.append(span_minor)
         
         # distributed_spans_lengthss
@@ -142,10 +154,16 @@ class TileDistributionEncodingDetail:
             rh_minor = ys_to_rhs_minor[i]
             
             if rh_major > 0:  # Skip R dimension
-                h_length = hs_lengthss[rh_major - 1][rh_minor]
-                span_major = rh_major - 1
-                span_minor = rhs_major_minor_to_span_minor[rh_major][rh_minor]
-                distributed_spans_lengthss[span_major][span_minor] = h_length
+                h_major_idx = rh_major - 1
+                # Bounds check before accessing H lengths
+                if (0 <= h_major_idx < len(hs_lengthss) and 
+                    0 <= rh_minor < len(hs_lengthss[h_major_idx])):
+                    h_length = hs_lengthss[h_major_idx][rh_minor]
+                    span_major = rh_major - 1
+                    span_minor = rhs_major_minor_to_span_minor[rh_major][rh_minor]
+                    if (0 <= span_major < len(distributed_spans_lengthss) and 
+                        0 <= span_minor < len(distributed_spans_lengthss[span_major])):
+                        distributed_spans_lengthss[span_major][span_minor] = h_length
         
         # ndims_distributed_spans_minor
         ndims_distributed_spans_minor = [0] * ndim_span_major
@@ -175,13 +193,16 @@ class TileDistributionEncodingDetail:
                 # Skip invalid indices
                 if rh_minor < 0:
                     continue
+                
+                # Bounds check before accessing
+                if (0 <= rh_major < len(rhs_lengthss) and 
+                    0 <= rh_minor < len(rhs_lengthss[rh_major])):
+                    rh_length = rhs_lengthss[rh_major][rh_minor]
                     
-                rh_length = rhs_lengthss[rh_major][rh_minor]
-                
-                if rh_major == 0 and 0 <= rh_minor < ndim_r:  # R dimension
-                    ps_over_rs_derivative[idim_p][rh_minor] = p_over_rh_derivative
-                
-                p_over_rh_derivative *= rh_length
+                    if rh_major == 0 and 0 <= rh_minor < ndim_r:  # R dimension
+                        ps_over_rs_derivative[idim_p][rh_minor] = p_over_rh_derivative
+                    
+                    p_over_rh_derivative *= rh_length
         
         return cls(
             ndim_rh_major=ndim_rh_major,
@@ -222,6 +243,35 @@ class TileDistributionEncoding:
     
     def __post_init__(self):
         """Compute detail information after initialization."""
+        # Validate encoding before computing detail
+        # Validate dimensions match
+        if len(self.ps_to_rhss_major) != len(self.ps_to_rhss_minor):
+            raise ValueError("P dimension mappings must have same length")
+        if len(self.ys_to_rhs_major) != len(self.ys_to_rhs_minor):
+            raise ValueError("Y dimension mappings must have same length")
+            
+        # Validate P dimension mappings
+        for i, (major_ids, minor_ids) in enumerate(zip(self.ps_to_rhss_major, self.ps_to_rhss_minor)):
+            if len(major_ids) != len(minor_ids):
+                raise ValueError(f"P dimension {i} major and minor mappings must have same length")
+            
+            # Check that major IDs are valid (0 for R, 1+ for X dimensions)
+            for major_id in major_ids:
+                if major_id < 0 or major_id > self.ndim_x:
+                    raise ValueError(f"Invalid major dimension ID {major_id} in P dimension {i}")
+            
+            # Check that minor IDs are valid for each major dimension
+            # Note: -1 is allowed as a sentinel value
+            for major_id, minor_id in zip(major_ids, minor_ids):
+                if minor_id >= 0:  # Only validate non-sentinel values
+                    if major_id == 0:  # R dimension
+                        if minor_id >= len(self.rs_lengths):
+                            raise ValueError(f"Invalid minor dimension ID {minor_id} for R dimension in P dimension {i}")
+                    else:  # X dimension
+                        x_idx = major_id - 1
+                        if x_idx < len(self.hs_lengthss) and minor_id >= len(self.hs_lengthss[x_idx]):
+                            raise ValueError(f"Invalid minor dimension ID {minor_id} for X dimension {x_idx} in P dimension {i}")
+
         self.detail = TileDistributionEncodingDetail.from_encoding(
             self.rs_lengths,
             self.hs_lengthss,

@@ -12,6 +12,7 @@ from abc import ABC, abstractmethod
 
 from .tensor_descriptor import TensorAdaptor, TensorDescriptor
 from .tensor_coordinate import MultiIndex, TensorAdaptorCoordinate, make_tensor_adaptor_coordinate
+from .tile_distribution_encoding import TileDistributionEncoding
 
 
 @dataclass
@@ -50,98 +51,6 @@ class TileDistributedIndex:
     def __repr__(self) -> str:
         """String representation."""
         return f"TileDistributedIndex({self.partial_indices})"
-
-
-@dataclass
-class TileDistributionEncoding:
-    """
-    Encoding for tile distribution that describes how data is distributed.
-    
-    This encodes the mapping between:
-    - R dimensions: Replication dimensions
-    - H dimensions: Hierarchical dimensions (for each X dimension)
-    - P dimensions: Partition dimensions (thread, warp, block)
-    - Y dimensions: Tile dimensions
-    - X dimensions: Tensor dimensions
-    """
-    
-    rs_lengths: List[int]  # Replication dimension lengths
-    hs_lengthss: List[List[int]]  # Hierarchical dimension lengths for each X
-    ps_to_rhss_major: List[List[int]]  # P to RH major dimension mapping
-    ps_to_rhss_minor: List[List[int]]  # P to RH minor dimension mapping
-    ys_to_rhs_major: List[int]  # Y to RH major dimension mapping
-    ys_to_rhs_minor: List[int]  # Y to RH minor dimension mapping
-    
-    def __post_init__(self):
-        """Validate encoding after initialization."""
-        # Validate dimensions match
-        if len(self.ps_to_rhss_major) != len(self.ps_to_rhss_minor):
-            raise ValueError("P dimension mappings must have same length")
-        if len(self.ys_to_rhs_major) != len(self.ys_to_rhs_minor):
-            raise ValueError("Y dimension mappings must have same length")
-            
-        # Validate P dimension mappings
-        for i, (major_ids, minor_ids) in enumerate(zip(self.ps_to_rhss_major, self.ps_to_rhss_minor)):
-            if len(major_ids) != len(minor_ids):
-                raise ValueError(f"P dimension {i} major and minor mappings must have same length")
-            
-            # Check that major IDs are valid (0 for R, 1+ for X dimensions)
-            for major_id in major_ids:
-                if major_id < 0 or major_id > self.ndim_x:
-                    raise ValueError(f"Invalid major dimension ID {major_id} in P dimension {i}")
-            
-            # Check that minor IDs are valid for each major dimension
-            for major_id, minor_id in zip(major_ids, minor_ids):
-                if major_id == 0:  # R dimension
-                    if minor_id < 0 or minor_id >= len(self.rs_lengths):
-                        raise ValueError(f"Invalid minor dimension ID {minor_id} for R dimension in P dimension {i}")
-                else:  # X dimension
-                    x_idx = major_id - 1
-                    if minor_id < 0 or minor_id >= len(self.hs_lengthss[x_idx]):
-                        raise ValueError(f"Invalid minor dimension ID {minor_id} for X dimension {x_idx} in P dimension {i}")
-    
-    @property
-    def ndim_x(self) -> int:
-        """Number of X dimensions."""
-        return len(self.hs_lengthss)
-    
-    @property
-    def ndim_p(self) -> int:
-        """Number of P dimensions."""
-        # This is just a hint - actual P dimensions come from adaptor
-        return len(self.ps_to_rhss_major)
-    
-    @property
-    def ndim_y(self) -> int:
-        """Number of Y dimensions."""
-        return len(self.ys_to_rhs_major)
-    
-    @property
-    def ndim_r(self) -> int:
-        """Number of R dimensions."""
-        return len(self.rs_lengths)
-    
-    def get_distributed_spans(self) -> List[TileDistributedSpan]:
-        """Get distributed spans for each X dimension."""
-        spans = []
-        
-        for x_idx in range(self.ndim_x):
-            # Get H lengths for this X dimension
-            h_lengths = self.hs_lengthss[x_idx]
-            
-            # Find which H dimensions are distributed (referenced by Y)
-            distributed_h_indices = []
-            for y_idx in range(self.ndim_y):
-                if self.ys_to_rhs_major[y_idx] == x_idx + 1:  # +1 for R dimension
-                    h_idx = self.ys_to_rhs_minor[y_idx]
-                    if h_idx not in distributed_h_indices:
-                        distributed_h_indices.append(h_idx)
-            
-            # Create span with distributed H lengths
-            distributed_lengths = [h_lengths[i] for i in sorted(distributed_h_indices)]
-            spans.append(TileDistributedSpan(distributed_lengths))
-        
-        return spans
 
 
 @dataclass
@@ -762,20 +671,63 @@ def make_embedding_tile_distribution(
     
     # Create new encoding with embedded dimensions
     new_hs_lengthss = []
+    # Build mapping from old to new X dimension indices
+    old_to_new_x_idx = {}
+    new_x_idx = 0
+    
     for x_idx in range(base_distribution.ndim_x):
         if x_idx in embedding_dims:
-            # Add embedded dimension
+            # Add embedded dimension first
             new_hs_lengthss.append([embedding_lengths[embedding_dims.index(x_idx)]])
+            new_x_idx += 1
+        
+        # Map old index to new index
+        old_to_new_x_idx[x_idx] = new_x_idx
+        # Add original dimension
         new_hs_lengthss.append(base_encoding.hs_lengthss[x_idx])
+        new_x_idx += 1
+    
+    # Adjust Y dimension mappings for new X indices
+    new_ys_to_rhs_major = []
+    new_ys_to_rhs_minor = []
+    
+    for old_major, old_minor in zip(base_encoding.ys_to_rhs_major, base_encoding.ys_to_rhs_minor):
+        if old_major == 0:  # R dimension - no change
+            new_ys_to_rhs_major.append(old_major)
+            new_ys_to_rhs_minor.append(old_minor)
+        else:  # X dimension - adjust for embedded dimensions
+            old_x_idx = old_major - 1  # Convert from RH space to X space
+            new_x_idx = old_to_new_x_idx[old_x_idx]
+            new_ys_to_rhs_major.append(new_x_idx + 1)  # Convert back to RH space
+            new_ys_to_rhs_minor.append(old_minor)
+    
+    # Adjust P dimension mappings for new X indices
+    new_ps_to_rhss_major = []
+    new_ps_to_rhss_minor = []
+    
+    for p_major, p_minor in zip(base_encoding.ps_to_rhss_major, base_encoding.ps_to_rhss_minor):
+        new_major = []
+        new_minor = []
+        for old_major, old_minor in zip(p_major, p_minor):
+            if old_major == 0:  # R dimension - no change
+                new_major.append(old_major)
+                new_minor.append(old_minor)
+            else:  # X dimension - adjust for embedded dimensions
+                old_x_idx = old_major - 1  # Convert from RH space to X space
+                new_x_idx = old_to_new_x_idx[old_x_idx]
+                new_major.append(new_x_idx + 1)  # Convert back to RH space
+                new_minor.append(old_minor)
+        new_ps_to_rhss_major.append(new_major)
+        new_ps_to_rhss_minor.append(new_minor)
     
     # Create new encoding
     new_encoding = make_tile_distribution_encoding(
         rs_lengths=base_encoding.rs_lengths,
         hs_lengthss=new_hs_lengthss,
-        ps_to_rhss_major=base_encoding.ps_to_rhss_major,
-        ps_to_rhss_minor=base_encoding.ps_to_rhss_minor,
-        ys_to_rhs_major=base_encoding.ys_to_rhs_major,
-        ys_to_rhs_minor=base_encoding.ys_to_rhs_minor
+        ps_to_rhss_major=new_ps_to_rhss_major,
+        ps_to_rhss_minor=new_ps_to_rhss_minor,
+        ys_to_rhs_major=new_ys_to_rhs_major,
+        ys_to_rhs_minor=new_ys_to_rhs_minor
     )
     
     return make_static_tile_distribution(new_encoding)
