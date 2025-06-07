@@ -11,7 +11,7 @@ from tensor_transform_parser import (
     unmerge_transform_to_sympy
 )
 from tensor_transform_examples import get_transform_examples, get_default_variables
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Tuple
 
 def initialize_session_state():
     """Initialize all required session state variables."""
@@ -65,6 +65,23 @@ def build_sympy_backward_exprs(y: sp.Symbol, transform: Dict[str, Any]) -> List[
         return backward_exprs
     return []
 
+def build_combined_formula(transforms: List[Dict[str, Any]], lower_dims: List[List[int]]) -> Tuple[sp.Expr, List[sp.Symbol]]:
+    """Build the final combined formula for all transforms."""
+    # Create input symbols for all dimensions
+    all_input_dims = set()
+    for dims in lower_dims:
+        all_input_dims.update(dims)
+    input_symbols = [sp.Symbol(f"d_{k}") for k in sorted(all_input_dims)]
+    symbols_iter = iter(input_symbols)
+    
+    # Build forward expressions for each transform
+    forward_exprs = []
+    for transform in transforms:
+        forward_exprs.append(build_sympy_forward_expr(transform, symbols_iter))
+    
+    # Combine all forward expressions into a tuple
+    return sp.Tuple(*forward_exprs), input_symbols
+
 def main():
     """Main function for the Streamlit app."""
     st.set_page_config(layout="wide")
@@ -99,20 +116,28 @@ def main():
         )
 
         parser = TensorTransformParser()
-        # Find all potential variables (e.g., number<X>{}, number<Y/Z>{})
-        variable_names = set(re.findall(r'number<([a-zA-Z0-9_ / * + -]+)>{}', st.session_state.current_code))
-        # Extract individual variable names from expressions
-        cleaned_vars = set()
-        for var in variable_names:
-            cleaned_vars.update(re.findall(r'[a-zA-Z_][a-zA-Z0-9_]*', var))
+        # Find all potential variables (both in number<> templates and raw variables)
+        variable_names = set()
+        
+        # Find variables in number<> templates
+        template_vars = re.findall(r'number<([a-zA-Z0-9_ / * + -]+)>{}', st.session_state.current_code)
+        for var in template_vars:
+            variable_names.update(re.findall(r'[a-zA-Z_][a-zA-Z0-9_]*', var))
+        
+        # Find raw variables (standalone identifiers that look like variables)
+        raw_vars = re.findall(r'\b([a-zA-Z_][a-zA-Z0-9_]*)\b', st.session_state.current_code)
+        # Filter out C++ keywords and common non-variable words
+        cpp_keywords = {'make_tuple', 'sequence', 'transform_tensor_descriptor', 'make_pass_through_transform', 
+                       'make_merge_transform', 'number', 'true', 'false', 'nullptr'}
+        variable_names.update(var for var in raw_vars if var not in cpp_keywords)
 
-        if cleaned_vars:
+        if variable_names:
             st.subheader("Template Variables")
             
             # Use default variables for the selected example
             default_vars = get_default_variables().get(st.session_state.selected_example, {})
             
-            for var in sorted(list(cleaned_vars)):
+            for var in sorted(list(variable_names)):
                 # If we have a value in session state, use it, otherwise use default.
                 current_val = st.session_state.variables.get(var, default_vars.get(var, 1))
                 st.session_state.variables[var] = st.number_input(
@@ -141,6 +166,20 @@ def main():
         if not transforms:
             st.info("No transformations found in the descriptor.")
             return
+
+        # Show combined formula first
+        st.subheader("Combined Transformation Formula")
+        try:
+            combined_expr, input_symbols = build_combined_formula(transforms, lower_dims)
+            st.markdown("**Input Dimensions:**")
+            st.latex(f"\\text{{Input}} = {sp.latex(sp.Tuple(*input_symbols))}")
+            st.markdown("**Output Dimensions:**")
+            st.latex(f"\\text{{Output}} = {sp.latex(combined_expr)}")
+        except Exception as e:
+            st.error(f"Failed to generate combined formula: {e}")
+
+        st.markdown("---")
+        st.subheader("Individual Transform Analysis")
 
         for i, transform in enumerate(transforms):
             st.subheader(f"Analysis of Transform #{i+1}")
