@@ -1,7 +1,14 @@
 import sympy as sp
 from typing import List, Tuple, Dict, Any
 import pytest
-from tensor_transform_parser import merge_transform_to_sympy, unmerge_transform_to_sympy
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from tensor_transform_parser import (
+    merge_transform_to_sympy, 
+    unmerge_transform_to_sympy,
+    TensorTransformParser
+)
 
 def pass_through_transform_to_sympy(input_expr: sp.Expr) -> sp.Expr:
     """Convert pass-through transform to SymPy expression."""
@@ -139,6 +146,132 @@ def test_unmerge_transform_validation():
     with pytest.raises(ZeroDivisionError, match="Lengths must not contain zero"):
         unmerge_transform_to_sympy(z, [0])  # Zero length
 
+def test_nested_merge_transforms():
+    """Test deeply nested merge transforms."""
+    x, y, z, w = sp.symbols('x y z w')
+    lengths = [2, 3, 4, 5]
+    
+    # Test 4-level nested merge
+    result = merge_transform_to_sympy([x, y, z, w], lengths)
+    expected = x * 60 + y * 20 + z * 5 + w  # For lengths [2, 3, 4, 5]
+    assert result == expected
+    
+    # Test with specific values
+    values = {x: 1, y: 2, z: 1, w: 3}
+    numeric_result = result.subs(values)
+    assert numeric_result == 1 * 60 + 2 * 20 + 1 * 5 + 3
+
+def test_to_sympy_edge_cases():
+    """Test edge cases in to_sympy conversion."""
+    parser = TensorTransformParser()
+    
+    # Test empty transforms
+    descriptor = {
+        'input_descriptor': 'test_desc',
+        'transforms': [],
+        'lower_dimensions': [],
+        'upper_dimensions': []
+    }
+    result = parser.to_sympy(descriptor)
+    assert len(result['transforms']) == 0
+    assert len(result['symbols']) == 0
+    
+    # Test single pass-through transform
+    descriptor = {
+        'input_descriptor': 'test_desc',
+        'transforms': [{'type': 'pass_through', 'value': 0}],
+        'lower_dimensions': [[0]],
+        'upper_dimensions': [[0]]
+    }
+    result = parser.to_sympy(descriptor)
+    assert len(result['transforms']) == 1
+    assert result['transforms'][0]['type'] == 'pass_through'
+    assert result['transforms'][0]['expr'] == sp.Symbol('dim_0')
+    
+    # Test large dimension count
+    descriptor = {
+        'input_descriptor': 'test_desc',
+        'transforms': [{'type': 'pass_through', 'value': 100}],
+        'lower_dimensions': [[100]],
+        'upper_dimensions': [[100]]
+    }
+    result = parser.to_sympy(descriptor)
+    assert 'dim_100' in result['symbols']
+
+def test_symbolic_arithmetic():
+    """Test transforms with symbolic arithmetic expressions."""
+    x, y = sp.symbols('x y')
+    lengths = [x + y, x * y]
+    
+    # Test merge with symbolic lengths
+    result = merge_transform_to_sympy([x, y], lengths)
+    expected = x * (x * y) + y
+    assert result == expected
+    
+    # Test with specific values
+    values = {x: 2, y: 3}
+    numeric_result = result.subs(values)
+    assert numeric_result == 2 * (2 * 3) + 3
+
+def test_transform_chain_complex():
+    """Test complex chains of transforms."""
+    x, y, z = sp.symbols('x y z')
+    
+    # Chain: pass-through -> merge -> pass-through
+    result1 = pass_through_transform_to_sympy(x)
+    result2 = merge_transform_to_sympy([result1, y], [4, 3])
+    result3 = pass_through_transform_to_sympy(result2)
+    
+    # Test with specific values
+    values = {x: 2, y: 1}
+    numeric_result = result3.subs(values)
+    assert numeric_result == 7  # 2 * 3 + 1
+    
+    # Chain: merge -> merge -> pass-through
+    # First merge: [x, y] with lengths [4, 3] -> x * 3 + y
+    result1 = merge_transform_to_sympy([x, y], [4, 3])
+    # Second merge: [result1, z] with lengths [2, 2] -> result1 * 2 + z
+    result2 = merge_transform_to_sympy([result1, z], [2, 2])
+    result3 = pass_through_transform_to_sympy(result2)
+    
+    # Test with specific values
+    values = {x: 1, y: 2, z: 1}
+    numeric_result = result3.subs(values)
+    # For x=1, y=2, z=1:
+    # result1 = 1 * 3 + 2 = 5
+    # result2 = 5 * 2 + 1 = 11
+    assert numeric_result == 11  # (1 * 3 + 2) * 2 + 1
+
+def test_memory_alignment():
+    """Test transforms with memory alignment considerations."""
+    x, y = sp.symbols('x y')
+    alignment = 64
+    
+    # Test merge with alignment
+    result = merge_transform_to_sympy([x, y], [4, 3])
+    aligned_result = result + alignment
+    
+    # Test with specific values
+    values = {x: 2, y: 1}
+    numeric_result = aligned_result.subs(values)
+    assert numeric_result == 7 + alignment  # (2 * 3 + 1) + 64
+
+def test_optimization_patterns():
+    """Test common optimization patterns."""
+    x, y, z = sp.symbols('x y z')
+    
+    # Test tiling pattern
+    tile_size = 32
+    result = merge_transform_to_sympy([x, y], [tile_size, tile_size])
+    expected = x * tile_size + y
+    assert result == expected
+    
+    # Test vectorization pattern
+    vector_size = 4
+    result = merge_transform_to_sympy([x, y, z], [vector_size, vector_size, vector_size])
+    expected = x * (vector_size * vector_size) + y * vector_size + z
+    assert result == expected
+
 def merge_transform_to_sympy(input_exprs: List[sp.Expr], lengths: List[int]) -> sp.Expr:
     """Convert merge transform to SymPy expression."""
     if not input_exprs or not lengths:
@@ -189,6 +322,12 @@ def main():
     test_transform_inverse()
     test_merge_transform_validation()
     test_unmerge_transform_validation()
+    test_nested_merge_transforms()
+    test_to_sympy_edge_cases()
+    test_symbolic_arithmetic()
+    test_transform_chain_complex()
+    test_memory_alignment()
+    test_optimization_patterns()
     print("All tests passed!")
 
 if __name__ == "__main__":
