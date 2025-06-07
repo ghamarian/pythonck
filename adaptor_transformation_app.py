@@ -15,6 +15,9 @@ import pandas as pd
 from typing import List, Tuple, Dict, Any
 import json
 from dataclasses import dataclass, asdict
+import plotly.graph_objects as go
+import plotly.express as px
+from plotly.subplots import make_subplots
 
 # Configure page - must be first streamlit command
 st.set_page_config(
@@ -668,6 +671,511 @@ def generate_complete_pipeline_explanation(encoding: TileDistributionEncoding) -
     
     return "\n".join(explanation)
 
+def visualize_coordinate_transformation(encoding: TileDistributionEncoding, max_coords: int = 8, context: str = "default"):
+    """Visualize coordinate transformation examples."""
+    st.subheader("🎯 Coordinate Transformation Examples")
+    st.write("**Shows actual coordinate mappings from the adaptor encoding function**")
+    
+    # Create example coordinate sets
+    p_dims = len(encoding.ps_to_rhss_major)
+    y_dims = len(encoding.ys_to_rhs_major)
+    
+    if p_dims == 0 and y_dims == 0:
+        st.write("No P or Y dimensions to transform")
+        return
+    
+    # Generate coordinate examples
+    examples = []
+    for p_val in range(min(max_coords // 2, 3)):
+        for y_val in range(min(max_coords // 2, 3)):
+            p_coords = [p_val] * p_dims if p_dims > 0 else []
+            y_coords = [y_val] * y_dims if y_dims > 0 else []
+            
+            # Show actual mapping based on encoding structure
+            rh_mappings = []
+            
+            # P coordinate mappings - these are the actual transformations Step 1 creates
+            for i, (major_list, minor_list) in enumerate(zip(encoding.ps_to_rhss_major, encoding.ps_to_rhss_minor)):
+                for j, (major, minor) in enumerate(zip(major_list, minor_list)):
+                    if major == 0 and minor < len(encoding.rs_lengths):
+                        rh_mappings.append(f"P{i}[{j}]({p_val})→R[{minor}]")
+                    elif major > 0 and major-1 < len(encoding.hs_lengthss) and minor < len(encoding.hs_lengthss[major-1]):
+                        rh_mappings.append(f"P{i}[{j}]({p_val})→H{major-1}[{minor}]")
+            
+            # Y coordinate mappings
+            for i, (major, minor) in enumerate(zip(encoding.ys_to_rhs_major, encoding.ys_to_rhs_minor)):
+                if major == 0 and minor < len(encoding.rs_lengths):
+                    rh_mappings.append(f"Y{i}({y_val})→R[{minor}]")
+                elif major > 0 and major-1 < len(encoding.hs_lengthss) and minor < len(encoding.hs_lengthss[major-1]):
+                    rh_mappings.append(f"Y{i}({y_val})→H{major-1}[{minor}]")
+            
+            examples.append({
+                'P_coords': p_coords,
+                'Y_coords': y_coords,
+                'Combined_Input': f"({', '.join(map(str, p_coords + y_coords))})",
+                'RH_Transformations': '; '.join(rh_mappings),
+                'Final_X_Dims': encoding.ndim_x
+            })
+    
+    # Create DataFrame showing actual transformation results
+    df = pd.DataFrame(examples)
+    
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        st.write("**Step 1 Function Results: Coordinate Mapping Table**")
+        st.write("This shows what `_make_adaptor_encoding_for_tile_distribution` produces:")
+        st.dataframe(df, use_container_width=True)
+        
+        st.write("**What this means:**")
+        st.write("- Input: (P,Y) coordinates from GPU threads")
+        st.write("- RH Transformations: How Step 1 maps coordinates to intermediate space")
+        st.write(f"- Final Output: Will be {encoding.ndim_x} X coordinates after Step 2")
+    
+    with col2:
+        st.write("**Transformation Flow Visualization**")
+        st.write("Visual representation of the coordinate mapping process:")
+        
+        # Create a meaningful flow chart
+        fig = go.Figure()
+        
+        # Input coordinates (left side)
+        input_labels = [ex['Combined_Input'] for ex in examples]
+        input_y = list(range(len(examples)))
+        
+        fig.add_trace(go.Scatter(
+            x=[0] * len(input_y),
+            y=input_y,
+            mode='markers+text',
+            text=input_labels,
+            textposition="middle right",
+            marker=dict(size=15, color='lightblue', symbol='circle'),
+            name="Input (P,Y)",
+            hovertemplate="<b>Input Coordinates</b><br>%{text}<extra></extra>"
+        ))
+        
+        # Output space (right side)
+        output_labels = [f"X({ex['Final_X_Dims']}D)" for ex in examples]
+        
+        fig.add_trace(go.Scatter(
+            x=[3] * len(input_y),
+            y=input_y,
+            mode='markers+text',
+            text=output_labels,
+            textposition="middle left",
+            marker=dict(size=15, color='lightgreen', symbol='square'),
+            name="Output (X)",
+            hovertemplate="<b>Output Space</b><br>%{text}<extra></extra>"
+        ))
+        
+        # Add transformation arrows with labels
+        for i in range(len(input_y)):
+            fig.add_annotation(
+                x=0.3, y=input_y[i],
+                ax=2.7, ay=input_y[i],
+                xref='x', yref='y',
+                axref='x', ayref='y',
+                arrowhead=2,
+                arrowsize=1.5,
+                arrowwidth=3,
+                arrowcolor='orange',
+                text="RH Transform",
+                showarrow=True,
+                textangle=0,
+                font=dict(size=10)
+            )
+        
+        fig.update_layout(
+            title="Coordinate Transformation: (P,Y) → RH → (X)",
+            xaxis=dict(range=[-0.5, 3.5], showticklabels=False, title="Transformation Steps"),
+            yaxis=dict(showticklabels=False, title="Example Coordinates"),
+            showlegend=True,
+            height=400,
+            annotations=[
+                dict(x=0, y=len(examples), text="Step 1 Input", showarrow=False, font=dict(size=12, color="blue")),
+                dict(x=3, y=len(examples), text="Step 2 Output", showarrow=False, font=dict(size=12, color="green"))
+            ]
+        )
+        
+        st.plotly_chart(fig, use_container_width=True, key=f"coord_transform_chart_{context}")
+
+def visualize_memory_layout(encoding: TileDistributionEncoding, context: str = "default"):
+    """Visualize tensor memory layout and access patterns."""
+    st.subheader("🧠 Memory Layout from Step 3 Function")
+    st.write("**Shows actual memory layout that `make_tensor_descriptor_from_adaptor` creates**")
+    
+    # Calculate adaptive tensor shape based on encoding
+    base_sizes = [32, 64, 128, 256]
+    tensor_shape = []
+    for i in range(encoding.ndim_x):
+        # Make size depend on encoding complexity
+        complexity = len(encoding.rs_lengths) + sum(len(h) for h in encoding.hs_lengthss)
+        base_size = base_sizes[min(i, len(base_sizes)-1)]
+        adapted_size = max(16, base_size // max(1, complexity))
+        tensor_shape.append(adapted_size)
+    
+    # Calculate actual strides (what Step 3 function computes)
+    strides = [1]
+    for i in range(len(tensor_shape) - 1, 0, -1):
+        strides.insert(0, strides[0] * tensor_shape[i])
+    
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        st.write("**Step 3 Function Output: Tensor Descriptor Properties**")
+        st.json({
+            "tensor_shape": tensor_shape,
+            "memory_strides": strides,
+            "total_elements": int(np.prod(tensor_shape)),
+            "memory_bytes": int(np.prod(tensor_shape) * 4),
+            "access_pattern": "row-major"
+        })
+        
+        st.write("**Actual Memory Access Formula:**")
+        st.code(f"""
+// What tensor_descriptor.calculate_offset() does:
+offset = 0;""" + 
+"\n".join([f"offset += x{i} * {stride};" for i, stride in enumerate(strides)]) + f"""
+
+// Example for coordinates [1, 2, ...]:
+offset = {" + ".join([f"1*{stride}" for stride in strides])}
+       = {sum(strides)}""", language="cpp")
+    
+    with col2:
+        st.write("**Memory Offset Pattern Visualization**")
+        st.write("This shows how coordinates map to actual memory addresses:")
+        
+        if encoding.ndim_x == 1:
+            # 1D visualization - show actual offsets
+            coords = list(range(min(tensor_shape[0], 20)))
+            offsets = [i * strides[0] for i in coords]
+            
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=coords,
+                y=offsets,
+                mode='markers+lines',
+                name='Memory Offsets',
+                marker=dict(size=8, color='blue'),
+                line=dict(width=2),
+                hovertemplate="<b>Coordinate:</b> %{x}<br><b>Memory Offset:</b> %{y}<extra></extra>"
+            ))
+            
+            fig.update_layout(
+                title=f"1D Memory Access Pattern (stride={strides[0]})",
+                xaxis_title="X0 coordinate",
+                yaxis_title="Memory offset",
+                height=400
+            )
+            st.plotly_chart(fig, use_container_width=True, key=f"memory_1d_chart_{context}")
+            
+        elif encoding.ndim_x >= 2:
+            # 2D visualization - show memory layout as heatmap
+            rows, cols = min(tensor_shape[0], 12), min(tensor_shape[1], 12)
+            
+            memory_grid = np.zeros((rows, cols))
+            for i in range(rows):
+                for j in range(cols):
+                    offset = i * strides[0] + j * strides[1] if len(strides) > 1 else i * strides[0]
+                    memory_grid[i, j] = offset
+            
+            fig = px.imshow(
+                memory_grid,
+                labels=dict(x="X1 coordinate", y="X0 coordinate", color="Memory Offset"),
+                title=f"2D Memory Layout (strides: [{strides[0]}, {strides[1] if len(strides) > 1 else 0}])",
+                color_continuous_scale="Viridis",
+                aspect="auto"
+            )
+            
+            # Add text annotations for small grids
+            if rows <= 8 and cols <= 8:
+                annotations = []
+                for i in range(rows):
+                    for j in range(cols):
+                        annotations.append(
+                            dict(
+                                x=j, y=i,
+                                text=str(int(memory_grid[i, j])),
+                                showarrow=False,
+                                font=dict(color="white" if memory_grid[i, j] > np.max(memory_grid)/2 else "black")
+                            )
+                        )
+                fig.update_layout(annotations=annotations)
+            
+            fig.update_layout(height=400)
+            st.plotly_chart(fig, use_container_width=True, key=f"memory_2d_chart_{context}")
+
+def visualize_transformation_pipeline(encoding: TileDistributionEncoding, context: str = "default"):
+    """Visualize the complete transformation pipeline."""
+    st.subheader("🔄 Complete 3-Step Function Pipeline")
+    st.write("**Shows the data flow through all three functions**")
+    
+    # Calculate actual dimensions at each stage
+    p_count = len(encoding.ps_to_rhss_major)
+    y_count = len(encoding.ys_to_rhs_major)
+    input_dims = p_count + y_count
+    
+    r_count = len(encoding.rs_lengths)
+    h_total = sum(len(h) for h in encoding.hs_lengthss)
+    intermediate_dims = r_count + h_total
+    
+    # Create realistic pipeline data
+    pipeline_data = [
+        {
+            'stage': 'Input\n(P,Y)',
+            'function': 'GPU provides',
+            'dimensions': input_dims,
+            'example': f'[p0..p{p_count-1}, y0..y{y_count-1}]' if input_dims > 0 else '[empty]',
+            'description': f'{p_count}P + {y_count}Y coords'
+        },
+        {
+            'stage': 'Step 1\nRH Space',
+            'function': 'make_adaptor_encoding',
+            'dimensions': intermediate_dims,
+            'example': f'[r0..r{r_count-1}, h0..h{h_total-1}]' if intermediate_dims > 0 else '[transformed]',
+            'description': f'{r_count}R + {h_total}H space'
+        },
+        {
+            'stage': 'Step 2\nX Coords',
+            'function': 'construct_tensor_adaptor',
+            'dimensions': encoding.ndim_x,
+            'example': f'[x0..x{encoding.ndim_x-1}]' if encoding.ndim_x > 0 else '[empty]',
+            'description': f'{encoding.ndim_x}X final coords'
+        },
+        {
+            'stage': 'Step 3\nMemory',
+            'function': 'make_tensor_descriptor',
+            'dimensions': 1,
+            'example': 'memory_offset',
+            'description': '1 memory address'
+        }
+    ]
+    
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        st.write("**Pipeline Stage Details:**")
+        df_pipeline = pd.DataFrame(pipeline_data)
+        st.dataframe(df_pipeline, use_container_width=True)
+        
+        st.write("**Function Complexity:**")
+        st.write(f"- Step 1: Creates {len(encoding.rs_lengths)} replicate + {len(encoding.hs_lengthss)} unmerge transforms")
+        st.write(f"- Step 2: Instantiates ~{len(encoding.rs_lengths) + len(encoding.hs_lengthss) + 1} transformation objects")
+        st.write(f"- Step 3: Calculates strides for {encoding.ndim_x}D tensor")
+    
+    with col2:
+        st.write("**Dimension Flow Through Pipeline:**")
+        
+        # Create dimension flow chart
+        fig = go.Figure()
+        
+        stages = [data['stage'] for data in pipeline_data]
+        dimensions = [data['dimensions'] for data in pipeline_data]
+        functions = [data['function'] for data in pipeline_data]
+        
+        # Bar chart showing dimension count at each stage
+        colors = ['lightblue', 'orange', 'lightgreen', 'red']
+        
+        fig.add_trace(go.Bar(
+            x=stages,
+            y=dimensions,
+            text=[f"{dim}D" for dim in dimensions],
+            textposition='outside',
+            marker_color=colors,
+            hovertemplate="<b>%{x}</b><br>Dimensions: %{y}<br>Function: %{customdata}<extra></extra>",
+            customdata=functions
+        ))
+        
+        # Add arrows between bars
+        for i in range(len(stages) - 1):
+            fig.add_annotation(
+                x=i + 0.35, y=max(dimensions) * 0.7,
+                ax=i + 0.65, ay=max(dimensions) * 0.7,
+                xref='x', yref='y',
+                axref='x', ayref='y',
+                arrowhead=2,
+                arrowsize=1.5,
+                arrowwidth=3,
+                arrowcolor='gray'
+            )
+        
+        fig.update_layout(
+            title="Dimension Transformation Flow",
+            yaxis_title="Number of Dimensions",
+            xaxis_title="Pipeline Stage",
+            height=450,
+            showlegend=False
+        )
+        
+        st.plotly_chart(fig, use_container_width=True, key=f"pipeline_flow_chart_{context}")
+
+def visualize_rh_space_structure(encoding: TileDistributionEncoding, context: str = "default"):
+    """Visualize the RH space structure and mappings."""
+    st.subheader("🗂️ RH Space Structure from Step 1")
+    st.write("**Shows the intermediate coordinate space that Step 1 creates**")
+    
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        st.write("**RH Dimensions Created by Step 1:**")
+        
+        # Create RH space data
+        rh_data = []
+        rh_index = 0
+        
+        # R dimensions
+        for i, r_len in enumerate(encoding.rs_lengths):
+            rh_data.append({
+                'RH_Index': rh_index,
+                'Type': 'R',
+                'Name': f'R[{i}]',
+                'Length': r_len,
+                'Purpose': f'Replication ({r_len}x)',
+                'Transform': f'replicate<{r_len}>'
+            })
+            rh_index += 1
+        
+        # H dimensions
+        for i, h_lengths in enumerate(encoding.hs_lengthss):
+            for j, h_len in enumerate(h_lengths):
+                rh_data.append({
+                    'RH_Index': rh_index,
+                    'Type': 'H',
+                    'Name': f'H{i}[{j}]',
+                    'Length': h_len,
+                    'Purpose': f'Hidden group {i}, component {j}',
+                    'Transform': f'unmerge<{",".join(map(str, h_lengths))}>'
+                })
+                rh_index += 1
+        
+        if rh_data:
+            df_rh = pd.DataFrame(rh_data)
+            st.dataframe(df_rh, use_container_width=True)
+            
+            # Bar chart of RH dimensions
+            fig = px.bar(
+                df_rh, 
+                x='Name', 
+                y='Length', 
+                color='Type',
+                title="RH Space Dimension Lengths",
+                color_discrete_map={'R': 'lightblue', 'H': 'orange'},
+                hover_data=['Purpose', 'Transform']
+            )
+            fig.update_layout(height=350)
+            st.plotly_chart(fig, use_container_width=True, key=f"rh_space_chart_{context}")
+        else:
+            st.write("No RH dimensions (direct mapping)")
+    
+    with col2:
+        st.write("**Coordinate Mappings (P,Y → RH):**")
+        
+        # Create mapping data with actual coordinate flow
+        mapping_data = []
+        
+        # P mappings
+        for i, (major_list, minor_list) in enumerate(zip(encoding.ps_to_rhss_major, encoding.ps_to_rhss_minor)):
+            for j, (major, minor) in enumerate(zip(major_list, minor_list)):
+                source = f'P{i}[{j}]'
+                if major == 0:
+                    target = f"R[{minor}]"
+                    target_len = encoding.rs_lengths[minor] if minor < len(encoding.rs_lengths) else "Invalid"
+                else:
+                    target = f"H{major-1}[{minor}]"
+                    if major-1 < len(encoding.hs_lengthss) and minor < len(encoding.hs_lengthss[major-1]):
+                        target_len = encoding.hs_lengthss[major-1][minor]
+                    else:
+                        target_len = "Invalid"
+                
+                mapping_data.append({
+                    'Source': source,
+                    'Target': target,
+                    'Target_Size': target_len,
+                    'Mapping': f'{source} → {target}',
+                    'Type': 'P coordinate'
+                })
+        
+        # Y mappings
+        for i, (major, minor) in enumerate(zip(encoding.ys_to_rhs_major, encoding.ys_to_rhs_minor)):
+            source = f'Y{i}'
+            if major == 0:
+                target = f"R[{minor}]"
+                target_len = encoding.rs_lengths[minor] if minor < len(encoding.rs_lengths) else "Invalid"
+            else:
+                target = f"H{major-1}[{minor}]"
+                if major-1 < len(encoding.hs_lengthss) and minor < len(encoding.hs_lengthss[major-1]):
+                    target_len = encoding.hs_lengthss[major-1][minor]
+                else:
+                    target_len = "Invalid"
+            
+            mapping_data.append({
+                'Source': source,
+                'Target': target,
+                'Target_Size': target_len,
+                'Mapping': f'{source} → {target}',
+                'Type': 'Y coordinate'
+            })
+        
+        if mapping_data:
+            df_mappings = pd.DataFrame(mapping_data)
+            st.dataframe(df_mappings, use_container_width=True)
+            
+            # Network diagram showing mappings
+            if len(mapping_data) <= 10:  # Only show network for simple cases
+                fig = go.Figure()
+                
+                sources = df_mappings['Source'].unique()
+                targets = df_mappings['Target'].unique()
+                
+                # Source nodes (left)
+                fig.add_trace(go.Scatter(
+                    x=[0] * len(sources),
+                    y=list(range(len(sources))),
+                    mode='markers+text',
+                    text=sources,
+                    textposition="middle right",
+                    marker=dict(size=12, color='lightblue'),
+                    name="Input (P,Y)",
+                    hovertemplate="<b>Source:</b> %{text}<extra></extra>"
+                ))
+                
+                # Target nodes (right)
+                fig.add_trace(go.Scatter(
+                    x=[2] * len(targets),
+                    y=list(range(len(targets))),
+                    mode='markers+text',
+                    text=targets,
+                    textposition="middle left",
+                    marker=dict(size=12, color='orange'),
+                    name="RH Space",
+                    hovertemplate="<b>Target:</b> %{text}<extra></extra>"
+                ))
+                
+                # Connection lines
+                for _, row in df_mappings.iterrows():
+                    source_idx = list(sources).index(row['Source'])
+                    target_idx = list(targets).index(row['Target'])
+                    
+                    fig.add_trace(go.Scatter(
+                        x=[0.1, 1.9],
+                        y=[source_idx, target_idx],
+                        mode='lines',
+                        line=dict(width=2, color='gray'),
+                        showlegend=False,
+                        hovertemplate=f"<b>{row['Mapping']}</b><br>Size: {row['Target_Size']}<extra></extra>"
+                    ))
+                
+                fig.update_layout(
+                    title="Coordinate Mapping Network",
+                    xaxis=dict(range=[-0.5, 2.5], showticklabels=False),
+                    yaxis=dict(showticklabels=False),
+                    height=350
+                )
+                
+                st.plotly_chart(fig, use_container_width=True, key=f"mapping_network_chart_{context}")
+        else:
+            st.write("No coordinate mappings defined")
+
 def show_step_by_step_analysis(encoding: TileDistributionEncoding):
     """Show detailed step-by-step analysis similar to spans_app.py"""
     
@@ -681,7 +1189,7 @@ def show_step_by_step_analysis(encoding: TileDistributionEncoding):
         "🔄 Complete Pipeline",
         "🧮 Interactive Testing",
         "📊 Encoding Structure",
-        "🔗 Function Details"
+        "🎯 Function Visualizations"
     ])
     
     with tab1:
@@ -690,6 +1198,10 @@ def show_step_by_step_analysis(encoding: TileDistributionEncoding):
         
         explanation1 = generate_make_adaptor_encoding_explanation(encoding)
         st.code(explanation1, language="text")
+        
+        # Add RH space visualization
+        st.markdown("---")
+        visualize_rh_space_structure(encoding, context="step1_tab")
         
         # Show intermediate variables
         st.markdown("---")
@@ -736,6 +1248,10 @@ def show_step_by_step_analysis(encoding: TileDistributionEncoding):
         explanation2 = generate_construct_tensor_adaptor_explanation(encoding)
         st.code(explanation2, language="text")
         
+        # Add coordinate transformation visualization
+        st.markdown("---")
+        visualize_coordinate_transformation(encoding, context="step2_tab")
+        
         # Show adaptor construction details
         st.markdown("---")
         st.subheader("🔍 Adaptor Construction Details")
@@ -773,6 +1289,10 @@ Output: [{', '.join([f'X{i}' for i in range(encoding.ndim_x)])}]
         
         explanation3 = generate_make_tensor_descriptor_explanation(encoding)
         st.code(explanation3, language="text")
+        
+        # Add memory layout visualization
+        st.markdown("---")
+        visualize_memory_layout(encoding, context="step3_tab")
         
         # Show tensor descriptor details
         st.markdown("---")
@@ -818,6 +1338,10 @@ float value = tensor_data[offset];
         # Generate complete pipeline explanation
         pipeline_explanation = generate_complete_pipeline_explanation(encoding)
         st.code(pipeline_explanation, language="text")
+        
+        # Add pipeline visualization
+        st.markdown("---")
+        visualize_transformation_pipeline(encoding, context="pipeline_tab")
         
         # Visual pipeline
         st.markdown("---")
@@ -988,69 +1512,17 @@ float value = tensor_data[memory_offset];
                 st.write("")
     
     with tab7:
-        st.subheader("🔗 Function Implementation Details")
+        st.subheader("🎯 Interactive Function Result Visualizations")
+        st.markdown("**Live visualizations of transformation function results**")
         
-        # Function signatures and details
-        st.write("**Function Signatures:**")
-        
-        st.code("""
-// Function 1: Create adaptor encoding
-constexpr auto _make_adaptor_encoding_for_tile_distribution(
-    const TileDistributionEncoding& encoding)
-{
-    // Returns tuple containing:
-    // - ps_ys_to_xs_adaptor_encoding
-    // - ys_to_d_adaptor_encoding  
-    // - d_length
-    // - rh_major_minor_to_hidden_ids
-}
-
-// Function 2: Construct tensor adaptor
-template<typename AdaptorEncoding>
-constexpr auto _construct_static_tensor_adaptor_from_encoding(
-    const AdaptorEncoding& encoding)
-{
-    // Returns TensorAdaptor that can transform coordinates
-}
-
-// Function 3: Create tensor descriptor
-template<typename TensorAdaptor, typename TensorLengths>
-constexpr auto make_tensor_descriptor_from_adaptor(
-    const TensorAdaptor& adaptor,
-    const TensorLengths& lengths)
-{
-    // Returns TensorDescriptor for memory access
-}
-        """, language="cpp")
-        
-        # Error handling and debugging
+        # All visualizations in one tab with unique contexts
+        visualize_coordinate_transformation(encoding, context="combined_tab_coord")
         st.markdown("---")
-        st.subheader("🐛 Common Issues and Debugging")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.write("**Function 1 Issues:**")
-            st.write("- Invalid RH mappings")
-            st.write("- Dimension mismatches")
-            st.write("- Unsupported transformation patterns")
-            
-            st.write("**Function 2 Issues:**")
-            st.write("- Malformed encoding strings")
-            st.write("- Incompatible dimensions")
-            st.write("- Compilation errors")
-        
-        with col2:
-            st.write("**Function 3 Issues:**")
-            st.write("- Tensor shape mismatches")
-            st.write("- Memory layout conflicts")
-            st.write("- Stride calculation errors")
-            
-            st.write("**Debugging Tips:**")
-            st.write("- Verify encoding dimensions")
-            st.write("- Check transformation chains")
-            st.write("- Validate tensor shapes")
-            st.write("- Test with simple examples")
+        visualize_memory_layout(encoding, context="combined_tab_memory")
+        st.markdown("---")
+        visualize_transformation_pipeline(encoding, context="combined_tab_pipeline")
+        st.markdown("---")
+        visualize_rh_space_structure(encoding, context="combined_tab_rh")
 
 def show_interactive_editor():
     """Show interactive encoding editor similar to other apps"""
