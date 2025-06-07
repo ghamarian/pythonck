@@ -72,7 +72,8 @@ class TensorTransformParser:
         for item in items:
             if not item: continue
             # Try parsing as a transform first
-            if 'make_pass_through_transform' in item or 'make_merge_transform' in item:
+            if any(t in item for t in ['make_pass_through_transform', 'make_merge_transform', 
+                                     'make_xor_transform', 'make_unmerge_transform']):
                 result.append(self.parse_transform(item))
             elif item.startswith('sequence<'):
                 result.append(self.parse_sequence(item))
@@ -142,6 +143,28 @@ class TensorTransformParser:
                     'values': values
                 }
         
+        # Handle xor transform
+        elif transform_str.startswith('make_xor_transform'):
+            match = re.match(r'make_xor_transform\((.*)\)', transform_str, re.DOTALL)
+            if match:
+                tuple_content = match.group(1).strip()
+                values = self.parse_make_tuple(tuple_content)
+                return {
+                    'type': 'xor',
+                    'values': values
+                }
+        
+        # Handle unmerge transform
+        elif transform_str.startswith('make_unmerge_transform'):
+            match = re.match(r'make_unmerge_transform\((.*)\)', transform_str, re.DOTALL)
+            if match:
+                tuple_content = match.group(1).strip()
+                values = self.parse_make_tuple(tuple_content)
+                return {
+                    'type': 'unmerge',
+                    'values': values
+                }
+        
         try:
             # Fallback for raw values/expressions, treat as pass_through
             value = self._parse_value_expr(transform_str)
@@ -154,7 +177,21 @@ class TensorTransformParser:
     
     def parse_tensor_descriptor(self, descriptor_str: str) -> Dict[str, Any]:
         """Parse a tensor descriptor transformation."""
-        # Extract the main components with a more precise pattern
+        # First check if it's a naive tensor descriptor
+        naive_match = re.search(r'make_naive_tensor_descriptor_packed\s*\(\s*make_tuple\s*\((.*?)\)\s*\)', descriptor_str, re.DOTALL)
+        if naive_match:
+            # Parse the tuple of dimensions
+            dimensions_str = naive_match.group(1).strip()
+            dimensions = self.parse_make_tuple(dimensions_str)
+            return {
+                'type': 'naive',
+                'dimensions': dimensions,
+                'transforms': [],
+                'lower_dimensions': [],
+                'upper_dimensions': []
+            }
+        
+        # Otherwise, try to parse as a transform_tensor_descriptor
         pattern = r'transform_tensor_descriptor\s*\(\s*(.*?)\s*,\s*make_tuple\s*\((.*?)\)\s*,\s*make_tuple\s*\((.*?)\)\s*,\s*make_tuple\s*\((.*?)\)\s*\)'
         match = re.search(pattern, descriptor_str, re.DOTALL)
         
@@ -190,6 +227,7 @@ class TensorTransformParser:
                 }
         
         return {
+            'type': 'transform',
             'input_descriptor': input_desc,
             'transforms': transforms,
             'lower_dimensions': lower_dims,
