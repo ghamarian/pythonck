@@ -341,6 +341,7 @@ def build_transformation_graph(parsed_descriptors, variables):
         return dot
 
     # 3. Loop through all transformations
+    prev_stage_output_formulas = None
     for i in range(transform_start_index, len(parsed_descriptors)):
         transform_desc = parsed_descriptors[i]
         
@@ -356,7 +357,11 @@ def build_transformation_graph(parsed_descriptors, variables):
 
         # --- Formula Generation for this Stage (Now handles nesting and xor) ---
         num_inputs = len(prev_stage_output_nodes)
-        input_symbols = [sp.Symbol(f"d_{k}") for k in range(num_inputs)]
+        # Use previous stage's output formulas as input symbols if available
+        if prev_stage_output_formulas is not None:
+            input_symbols = [prev_stage_output_formulas.get(k, sp.Symbol(f"d_{k}")) for k in range(num_inputs)]
+        else:
+            input_symbols = [sp.Symbol(f"d_{k}") for k in range(num_inputs)]
         output_formulas = {}
 
         for j, transform in enumerate(transforms):
@@ -374,29 +379,23 @@ def build_transformation_graph(parsed_descriptors, variables):
                 return dot
 
             # Create an iterator that provides the symbols for this specific transform.
-            # This is crucial for the recursive builder to consume symbols correctly.
             current_input_symbols_iter = iter([input_symbols[k] for k in input_indices])
 
             if transform_type == 'pass_through':
-                # Pass-through is 1-to-1 and consumes one symbol.
                 if input_indices and output_indices:
                     output_formulas[output_indices[0]] = next(current_input_symbols_iter)
             elif transform_type == 'merge':
-                # Use the recursive builder for potentially nested merges.
                 formula = build_formula_for_transform(transform, current_input_symbols_iter, variables)
                 if output_indices:
                     output_formulas[output_indices[0]] = formula
             elif transform_type == 'unmerge':
-                # Unmerge is 1-to-many and consumes one symbol.
                 if input_indices:
                     input_symbol = next(current_input_symbols_iter)
-                    # Pass variables to get_transform_length.
                     lengths = [get_transform_length(val, variables) for val in transform.get('values', [])]
                     formulas = unmerge_transform_to_sympy(input_symbol, lengths)
                     for k_out_idx, form in zip(output_indices, formulas):
                         output_formulas[k_out_idx] = form
             elif transform_type == 'xor':
-                # XOR produces one result. That one result is mapped to all output dimensions.
                 symbols = [input_symbols[k] for k in input_indices]
                 formula = sp.Function('XOR')(*symbols)
                 for k_out_idx in output_indices:
@@ -404,22 +403,13 @@ def build_transformation_graph(parsed_descriptors, variables):
 
         # --- Node and Edge Creation for this Stage ---
         stage_num = i - transform_start_index + 1
-        
-        # Robustly calculate the number of output dimensions from upper_dimensions.
         if not upper_dims_indices or not any(upper_dims_indices):
             num_output_dims = 0
         else:
-            # Get all unique indices from all upper_dimensions
             all_output_indices = set()
             for indices in upper_dims_indices:
                 all_output_indices.update(indices)
             num_output_dims = max(all_output_indices) + 1 if all_output_indices else 0
-            
-        # Debug info
-        st.write(f"Debug: Stage {i}, Transform start: {transform_start_index}")
-        st.write(f"Debug: Upper dims indices: {upper_dims_indices}")
-        st.write(f"Debug: Calculated output dims: {num_output_dims}")
-        st.write(f"Debug: Previous stage had {len(prev_stage_output_nodes)} output nodes")
             
         current_stage_output_nodes = {}
 
@@ -427,16 +417,14 @@ def build_transformation_graph(parsed_descriptors, variables):
             node_id = f"s{stage_num}_d{k}"
             current_stage_output_nodes[k] = node_id
             
-            label = f"d{k}"
             formula = output_formulas.get(k)
             if formula is not None:
-                # Substitute variables before simplifying and rendering
                 substituted_formula = formula.subs(variables)
-                formula_str = str(sp.simplify(substituted_formula))
-                # Use HTML-like labels for formatting (no variable values)
-                label = f'<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" ALIGN="LEFT"><TR><TD>{label}</TD></TR><HR/><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9">{formula_str}</FONT></TD></TR></TABLE>>'
-            
-            dot.node(node_id, label, fillcolor="#c0ffc0")
+                formula_str = sp.pretty(sp.simplify(substituted_formula), use_unicode=True)
+                label = f'<<FONT POINT-SIZE="12">{formula_str}</FONT>>'
+                dot.node(node_id, label, fillcolor="#c0ffc0")
+            else:
+                dot.node(node_id, f"d{k}", fillcolor="#c0ffc0")
 
         # Create edges from previous stage's nodes to this stage's nodes
         for j, transform in enumerate(transforms):
@@ -455,6 +443,7 @@ def build_transformation_graph(parsed_descriptors, variables):
         # Only update if we actually created output nodes
         if current_stage_output_nodes:
             prev_stage_output_nodes = current_stage_output_nodes
+            prev_stage_output_formulas = output_formulas
         
     return dot
 
