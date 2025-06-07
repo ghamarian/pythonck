@@ -14,10 +14,10 @@ class TensorTransformParser:
     
     def __init__(self):
         """Initialize the parser."""
-        self.variables: Dict[str, int] = {}
+        pass
     
     def _parse_value_expr(self, expr_str: str) -> sp.Expr:
-        """Parse a string into a SymPy expression, handling variables."""
+        """Parse a string into a SymPy expression, keeping variables symbolic."""
         s = expr_str.strip()
 
         # Handle number<...>{} template
@@ -32,10 +32,9 @@ class TensorTransformParser:
         local_dict = {i: sp.Symbol(i) for i in identifiers}
 
         try:
-            # Use sympify to parse the string into a SymPy expression
-            # and substitute known numeric variables
-            expr = sp.sympify(s, locals=local_dict)
-            return expr.subs(self.variables)
+            # Use sympify to parse the string into a SymPy expression.
+            # Variables are kept as symbols.
+            return sp.sympify(s, locals=local_dict)
         except (sp.SympifyError, TypeError, SyntaxError):
             raise ValueError(f"Could not parse '{expr_str}' as a symbolic expression.")
     
@@ -197,10 +196,6 @@ class TensorTransformParser:
             'upper_dimensions': upper_dims
         }
     
-    def set_variables(self, variables: Dict[str, int]):
-        """Set variable values for parsing."""
-        self.variables = variables
-    
     def to_sympy(self, descriptor: Dict[str, Any]) -> Dict[str, Any]:
         """Convert parsed descriptor to SymPy expressions."""
         # Create symbols for each dimension
@@ -284,13 +279,6 @@ def main():
         make_tuple(sequence<1>{}, sequence<0, 2>{}),
         make_tuple(sequence<0>{}, sequence<1>{}))
     """
-    
-    # Set some example variables
-    parser.set_variables({
-        'kNPerBlock': 32,
-        'kKPerBlock': 64,
-        'kKPack': 8
-    })
     
     # Parse and convert to SymPy
     descriptor = parser.parse_tensor_descriptor(example)

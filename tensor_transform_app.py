@@ -40,64 +40,88 @@ def get_transform_length(transform: Dict[str, Any]) -> sp.Expr:
         return total_length
     return sp.Integer(1)
 
-def build_sympy_forward_expr(transform: Dict[str, Any], symbols_iterator) -> sp.Expr:
+def build_sympy_forward_expr(transform: Dict[str, Any], symbols_iterator, variables: Dict[str, int]) -> sp.Expr:
     """Recursively build the SymPy expression for a forward transformation."""
     if transform['type'] == 'pass_through':
         return next(symbols_iterator)
     elif transform['type'] == 'merge':
-        sub_exprs = [build_sympy_forward_expr(val, symbols_iterator) for val in transform.get('values', [])]
+        sub_exprs = [build_sympy_forward_expr(val, symbols_iterator, variables) for val in transform.get('values', [])]
         lengths = [get_transform_length(val) for val in transform.get('values', [])]
+        # Substitute variables in lengths
+        lengths = [length.subs(variables) if isinstance(length, sp.Expr) else length for length in lengths]
         return merge_transform_to_sympy(sub_exprs, lengths)
     return sp.Integer(0)
 
-def build_sympy_backward_exprs(y: sp.Symbol, transform: Dict[str, Any]) -> List[sp.Expr]:
+def build_sympy_backward_exprs(y: sp.Symbol, transform: Dict[str, Any], variables: Dict[str, int]) -> List[sp.Expr]:
     """Recursively build the SymPy expressions for a backward transformation."""
     if transform['type'] == 'pass_through':
         return [y]
     elif transform['type'] == 'merge':
         lengths = [get_transform_length(val) for val in transform.get('values', [])]
+        # Substitute variables in lengths
+        lengths = [length.subs(variables) if isinstance(length, sp.Expr) else length for length in lengths]
         unmerged_ys = unmerge_transform_to_sympy(y, lengths)
         
         backward_exprs = []
         for i, sub_transform in enumerate(transform.get('values', [])):
-            sub_backward = build_sympy_backward_exprs(unmerged_ys[i], sub_transform)
+            sub_backward = build_sympy_backward_exprs(unmerged_ys[i], sub_transform, variables)
             backward_exprs.extend(sub_backward)
         return backward_exprs
     return []
 
-def build_combined_formula(transforms: List[Dict[str, Any]], lower_dims: List[List[int]]) -> Tuple[sp.Expr, List[sp.Symbol]]:
+def build_combined_formula(transforms: List[Dict[str, Any]], lower_dims: List[List[int]], variables: Dict[str, int]) -> Tuple[sp.Expr, List[sp.Symbol]]:
     """Build the final combined formula for all transforms."""
     # Create input symbols for all dimensions
     all_input_dims = set()
     for dims in lower_dims:
         all_input_dims.update(dims)
     input_symbols = [sp.Symbol(f"d_{k}") for k in sorted(all_input_dims)]
-    symbols_iter = iter(input_symbols)
     
     # Build forward expressions for each transform
     forward_exprs = []
-    for transform in transforms:
-        forward_exprs.append(build_sympy_forward_expr(transform, symbols_iter))
+    for i, transform in enumerate(transforms):
+        # Get the specific input dimensions for this transform
+        transform_dims = lower_dims[i] if i < len(lower_dims) else []
+        # Create symbols for just this transform's input dimensions
+        transform_symbols = [sp.Symbol(f"d_{k}") for k in transform_dims]
+        symbols_iter = iter(transform_symbols)
+        forward_exprs.append(build_sympy_forward_expr(transform, symbols_iter, variables))
     
     # Combine all forward expressions into a tuple
     return sp.Tuple(*forward_exprs), input_symbols
 
-def build_combined_backward_formula(transforms: List[Dict[str, Any]], lower_dims: List[List[int]]) -> Tuple[List[sp.Expr], List[sp.Symbol]]:
+def build_combined_backward_formula(transforms: List[Dict[str, Any]], lower_dims: List[List[int]], variables: Dict[str, int]) -> Tuple[List[sp.Expr], List[sp.Symbol], List[sp.Symbol]]:
     """Build the final combined backward formula for all transforms."""
     # Create output symbols for all transforms
     output_symbols = [sp.Symbol(f"y_{i}") for i in range(len(transforms))]
     
-    # Build backward expressions for each transform
-    backward_exprs = []
-    for i, transform in enumerate(transforms):
-        sub_exprs = build_sympy_backward_exprs(output_symbols[i], transform)
-        backward_exprs.extend(sub_exprs)
-    
-    # Create input symbols for all dimensions
+    # Create input symbols for all dimensions in the correct order
     all_input_dims = set()
     for dims in lower_dims:
         all_input_dims.update(dims)
     input_symbols = [sp.Symbol(f"d_{k}") for k in sorted(all_input_dims)]
+    
+    # Build backward expressions for each transform and properly order them
+    # We need to collect all backward expressions and then order them by dimension index
+    all_backward_exprs = {}  # dimension_index -> expression
+    
+    for i, transform in enumerate(transforms):
+        transform_dims = lower_dims[i] if i < len(lower_dims) else []
+        sub_exprs = build_sympy_backward_exprs(output_symbols[i], transform, variables)
+        
+        # Map the sub_expressions back to their dimension indices
+        for j, dim_idx in enumerate(transform_dims):
+            if j < len(sub_exprs):
+                all_backward_exprs[dim_idx] = sub_exprs[j]
+    
+    # Order the backward expressions by dimension index
+    backward_exprs = []
+    for dim_idx in sorted(all_input_dims):
+        if dim_idx in all_backward_exprs:
+            backward_exprs.append(all_backward_exprs[dim_idx])
+        else:
+            # This shouldn't happen if everything is consistent
+            backward_exprs.append(sp.Symbol(f"d_{dim_idx}"))
     
     return backward_exprs, input_symbols, output_symbols
 
@@ -167,7 +191,6 @@ def main():
 
         if st.button("Parse and Generate Formulas"):
             try:
-                parser.set_variables(st.session_state.variables)
                 st.session_state.parsed_descriptor = parser.parse_tensor_descriptor(st.session_state.current_code)
                 st.success("Descriptor parsed successfully!")
             except Exception as e:
@@ -190,13 +213,13 @@ def main():
         st.subheader("Combined Transformation Formulas")
         try:
             # Forward formula
-            combined_expr, input_symbols = build_combined_formula(transforms, lower_dims)
+            combined_expr, input_symbols = build_combined_formula(transforms, lower_dims, st.session_state.variables)
             st.markdown("**Forward Transformation (Input → Output):**")
             st.latex(f"\\text{{Input}} = {sp.latex(sp.Tuple(*input_symbols))}")
             st.latex(f"\\text{{Output}} = {sp.latex(combined_expr)}")
             
             # Backward formula
-            backward_exprs, input_symbols, output_symbols = build_combined_backward_formula(transforms, lower_dims)
+            backward_exprs, input_symbols, output_symbols = build_combined_backward_formula(transforms, lower_dims, st.session_state.variables)
             st.markdown("**Backward Transformation (Output → Input):**")
             st.latex(f"\\text{{Output}} = {sp.latex(sp.Tuple(*output_symbols))}")
             st.latex(f"\\text{{Input}} = {sp.latex(sp.Tuple(*backward_exprs))}")
@@ -206,8 +229,18 @@ def main():
             **What these formulas mean:**
             - Forward: Shows how input dimensions are combined to create output dimensions
             - Backward: Shows how to recover input dimensions from output dimensions
+            
+            **Note about division and modulo:**
+            In merge transforms, the division and modulo values are always the same because they come from the same length parameter. 
+            For example, in `\floor{y/8} \bmod 8`, both 8's come from the same dimension length in the merge transform.
             """)
             
+            # Show how variables affect the formulas
+            if st.session_state.variables:
+                st.markdown("**Variable Values Used:**")
+                for var, val in sorted(st.session_state.variables.items()):
+                    st.latex(f"{var} = {val}")
+
         except Exception as e:
             st.error(f"Failed to generate combined formulas: {e}")
 
@@ -232,12 +265,12 @@ def main():
                     # --- Forward Transformation ---
                     st.markdown("**Forward Formula:**")
                     y = sp.Symbol(f"y_{i}")
-                    forward_expr = build_sympy_forward_expr(transform, symbols_iter)
+                    forward_expr = build_sympy_forward_expr(transform, symbols_iter, st.session_state.variables)
                     st.latex(f"{sp.latex(y)} = {sp.latex(forward_expr)}")
 
                     # --- Backward Transformation ---
                     st.markdown("**Backward Formulas:**")
-                    backward_exprs = build_sympy_backward_exprs(y, transform)
+                    backward_exprs = build_sympy_backward_exprs(y, transform, st.session_state.variables)
                     
                     if len(input_symbols) != len(backward_exprs):
                          st.warning("Could not fully determine backward formula for all inputs.")
