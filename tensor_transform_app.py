@@ -447,6 +447,83 @@ def build_transformation_graph(parsed_descriptors, variables):
         
     return dot
 
+def build_full_pipeline_formula(parsed_descriptors, variables):
+    """
+    Compose all transforms from all descriptors into a single symbolic mapping
+    from the initial input dimensions to the final output dimensions.
+    Returns (final_output_formulas, initial_input_symbols)
+    """
+    # Determine initial input symbols from the first descriptor
+    first_desc = parsed_descriptors[0]
+    if first_desc.get('type') == 'naive':
+        dimensions = first_desc.get('dimensions', [])
+        num_initial_dims = len(dimensions)
+        initial_input_symbols = [sp.Symbol(f"d_{k}") for k in range(num_initial_dims)]
+        transform_start_index = 1
+    elif first_desc.get('type') == 'transform':
+        lower_dims = first_desc.get('lower_dimensions', [])
+        if lower_dims:
+            num_initial_dims = max(idx for indices in lower_dims for idx in indices) + 1
+        else:
+            num_initial_dims = 0
+        initial_input_symbols = [sp.Symbol(f"d_{k}") for k in range(num_initial_dims)]
+        transform_start_index = 0
+    else:
+        return [], []
+
+    prev_stage_output_formulas = {k: sym for k, sym in enumerate(initial_input_symbols)}
+    prev_stage_output_count = num_initial_dims
+
+    for i in range(transform_start_index, len(parsed_descriptors)):
+        desc = parsed_descriptors[i]
+        if desc.get('type') != 'transform':
+            continue
+        transforms = desc.get('transforms', [])
+        lower_dims_indices = desc.get('lower_dimensions', [])
+        upper_dims_indices = desc.get('upper_dimensions', [])
+        if not all([transforms, lower_dims_indices, upper_dims_indices]):
+            continue
+        num_inputs = prev_stage_output_count
+        input_symbols = [prev_stage_output_formulas.get(k, sp.Symbol(f"d_{k}")) for k in range(num_inputs)]
+        output_formulas = {}
+        for j, transform in enumerate(transforms):
+            transform_type = transform.get('type', 'unknown')
+            input_indices = lower_dims_indices[j]
+            output_indices = upper_dims_indices[j]
+            current_input_symbols_iter = iter([input_symbols[k] for k in input_indices])
+            if transform_type == 'pass_through':
+                if input_indices and output_indices:
+                    output_formulas[output_indices[0]] = next(current_input_symbols_iter)
+            elif transform_type == 'merge':
+                formula = build_formula_for_transform(transform, current_input_symbols_iter, variables)
+                if output_indices:
+                    output_formulas[output_indices[0]] = formula
+            elif transform_type == 'unmerge':
+                if input_indices:
+                    input_symbol = next(current_input_symbols_iter)
+                    lengths = [get_transform_length(val, variables) for val in transform.get('values', [])]
+                    formulas = unmerge_transform_to_sympy(input_symbol, lengths)
+                    for k_out_idx, form in zip(output_indices, formulas):
+                        output_formulas[k_out_idx] = form
+            elif transform_type == 'xor':
+                symbols = [input_symbols[k] for k in input_indices]
+                formula = sp.Function('XOR')(*symbols)
+                for k_out_idx in output_indices:
+                    output_formulas[k_out_idx] = formula
+        # Calculate output dimension count
+        if not upper_dims_indices or not any(upper_dims_indices):
+            output_count = 0
+        else:
+            all_output_indices = set()
+            for indices in upper_dims_indices:
+                all_output_indices.update(indices)
+            output_count = max(all_output_indices) + 1 if all_output_indices else 0
+        prev_stage_output_formulas = output_formulas
+        prev_stage_output_count = output_count
+    # Return the final output formulas in order
+    final_output_formulas = [prev_stage_output_formulas.get(k, sp.Symbol(f"d_{k}")) for k in range(prev_stage_output_count)]
+    return final_output_formulas, initial_input_symbols
+
 def main():
     """Main function for the Streamlit app."""
     st.set_page_config(layout="wide")
@@ -521,22 +598,14 @@ def main():
         # stages = analyzer.analyze()
 
         st.markdown("---")
-        st.header("Final Combined Transformation Formulas (last descriptor)")
-        # Show formulas for the last descriptor in the chain
-        last_parsed = parsed_descriptors[-1]
-        transforms = last_parsed.get('transforms', [])
-        lower_dims = last_parsed.get('lower_dimensions', [])
+        st.header("Final Combined Transformation Formulas (full pipeline)")
         try:
-            combined_expr, input_symbols = build_combined_formula(transforms, lower_dims, st.session_state.variables)
+            final_output_formulas, initial_input_symbols = build_full_pipeline_formula(parsed_descriptors, st.session_state.variables)
             st.markdown("**Forward Transformation (Input → Output):**")
-            st.latex(f"\\text{{Input}} = {sp.latex(sp.Tuple(*input_symbols))}")
-            st.latex(f"\\text{{Output}} = {sp.latex(combined_expr.subs(st.session_state.variables))}")
-            backward_exprs, input_symbols, output_symbols = build_combined_backward_formula(transforms, lower_dims, st.session_state.variables)
-            st.markdown("**Backward Transformation (Output → Input):**")
-            st.latex(f"\\text{{Output}} = {sp.latex(sp.Tuple(*output_symbols))}")
-            st.latex(f"\\text{{Input}} = {sp.latex(sp.Tuple(*backward_exprs).subs(st.session_state.variables))}")
+            st.latex(f"\\text{{Input}} = {sp.latex(sp.Tuple(*initial_input_symbols))}")
+            st.latex(f"\\text{{Output}} = {sp.latex(sp.Tuple(*final_output_formulas))}")
         except Exception as e:
-            st.error(f"Failed to generate combined formulas: {e}")
+            st.error(f"Failed to generate full pipeline formulas: {e}")
 
         st.markdown("---")
         st.header("Transformation Pipeline Graph")
