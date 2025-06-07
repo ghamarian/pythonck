@@ -82,6 +82,25 @@ def build_combined_formula(transforms: List[Dict[str, Any]], lower_dims: List[Li
     # Combine all forward expressions into a tuple
     return sp.Tuple(*forward_exprs), input_symbols
 
+def build_combined_backward_formula(transforms: List[Dict[str, Any]], lower_dims: List[List[int]]) -> Tuple[List[sp.Expr], List[sp.Symbol]]:
+    """Build the final combined backward formula for all transforms."""
+    # Create output symbols for all transforms
+    output_symbols = [sp.Symbol(f"y_{i}") for i in range(len(transforms))]
+    
+    # Build backward expressions for each transform
+    backward_exprs = []
+    for i, transform in enumerate(transforms):
+        sub_exprs = build_sympy_backward_exprs(output_symbols[i], transform)
+        backward_exprs.extend(sub_exprs)
+    
+    # Create input symbols for all dimensions
+    all_input_dims = set()
+    for dims in lower_dims:
+        all_input_dims.update(dims)
+    input_symbols = [sp.Symbol(f"d_{k}") for k in sorted(all_input_dims)]
+    
+    return backward_exprs, input_symbols, output_symbols
+
 def main():
     """Main function for the Streamlit app."""
     st.set_page_config(layout="wide")
@@ -167,16 +186,30 @@ def main():
             st.info("No transformations found in the descriptor.")
             return
 
-        # Show combined formula first
-        st.subheader("Combined Transformation Formula")
+        # Show combined formulas
+        st.subheader("Combined Transformation Formulas")
         try:
+            # Forward formula
             combined_expr, input_symbols = build_combined_formula(transforms, lower_dims)
-            st.markdown("**Input Dimensions:**")
+            st.markdown("**Forward Transformation (Input → Output):**")
             st.latex(f"\\text{{Input}} = {sp.latex(sp.Tuple(*input_symbols))}")
-            st.markdown("**Output Dimensions:**")
             st.latex(f"\\text{{Output}} = {sp.latex(combined_expr)}")
+            
+            # Backward formula
+            backward_exprs, input_symbols, output_symbols = build_combined_backward_formula(transforms, lower_dims)
+            st.markdown("**Backward Transformation (Output → Input):**")
+            st.latex(f"\\text{{Output}} = {sp.latex(sp.Tuple(*output_symbols))}")
+            st.latex(f"\\text{{Input}} = {sp.latex(sp.Tuple(*backward_exprs))}")
+            
+            # Add explanation
+            st.markdown("""
+            **What these formulas mean:**
+            - Forward: Shows how input dimensions are combined to create output dimensions
+            - Backward: Shows how to recover input dimensions from output dimensions
+            """)
+            
         except Exception as e:
-            st.error(f"Failed to generate combined formula: {e}")
+            st.error(f"Failed to generate combined formulas: {e}")
 
         st.markdown("---")
         st.subheader("Individual Transform Analysis")
