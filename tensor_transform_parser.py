@@ -2,28 +2,57 @@
 Parser for tensor descriptor transformations.
 
 This module provides functionality to parse C++ tensor descriptor transformation
-expressions and convert them to SymPy expressions for analysis.
+expressions and convert them to pytensor objects.
 """
 
 import re
-from typing import List, Dict, Any, Tuple, Optional
+from typing import List, Dict, Any, Tuple, Optional, Union
 import sympy as sp
+from pytensor.tensor_descriptor import (
+    Transform, PassThroughTransform, MergeTransform, UnmergeTransform,
+    EmbedTransform, OffsetTransform, PadTransform, ReplicateTransform
+)
 
 class TensorTransformParser:
     """Parser for tensor descriptor transformations."""
     
     def __init__(self):
         """Initialize the parser."""
-        pass
+        self.descriptor_registry = {}  # Registry for resolving variable references
     
     def _parse_value_expr(self, expr_str: str) -> sp.Expr:
         """Parse a string into a SymPy expression, keeping variables symbolic."""
         s = expr_str.strip()
 
+        # Handle typename arithmetic_sequence_gen<start, N, step>::type{} template
+        typename_match = re.match(r'typename\s+arithmetic_sequence_gen<([^>]+)>::type\{\}', s)
+        if typename_match:
+            # For arithmetic sequence generation, we'll return a sequence symbol
+            # The content inside <> should be start, length, step
+            content = typename_match.group(1).strip()
+            parts = [p.strip() for p in content.split(',')]
+            if len(parts) >= 2:
+                # Return a symbol representing the sequence length (second parameter)
+                return sp.Symbol(parts[1]) if parts[1].isalpha() else sp.Integer(int(parts[1]))
+            else:
+                return sp.Symbol('seq_len')
+
         # Handle number<...>{} template
         match = re.match(r'number<([^>]+)>{}', s)
         if match:
             s = match.group(1).strip()
+
+        # Handle expressions like "BK0 * number<NLdsLayer>{}"
+        # Look for pattern: variable * number<expression>{}
+        mult_number_match = re.match(r'([a-zA-Z_][a-zA-Z0-9_]*)\s*\*\s*number<([^>]+)>\{\}', s)
+        if mult_number_match:
+            var_name = mult_number_match.group(1)
+            number_expr = mult_number_match.group(2).strip()
+            
+            # Parse both parts as symbols/expressions
+            var_symbol = sp.Symbol(var_name)
+            number_symbol = self._parse_value_expr(f'number<{number_expr}>{{}}')
+            return var_symbol * number_symbol
 
         # Find all identifiers (potential variables) in the string
         identifiers = re.findall(r'[a-zA-Z_][a-zA-Z0-9_]*', s)
@@ -36,7 +65,7 @@ class TensorTransformParser:
             # Variables are kept as symbols.
             return sp.sympify(s, locals=local_dict)
         except (sp.SympifyError, TypeError, SyntaxError):
-            raise ValueError(f"Could not parse '{expr_str}' as a symbolic expression.")
+            raise ValueError(f"Failed to parse expression: {expr_str}")
     
     def parse_make_tuple(self, tuple_str: str) -> List[Any]:
         """Parse a make_tuple expression."""
@@ -85,11 +114,20 @@ class TensorTransformParser:
                     'values': nested_result
                 })
             else:
-                # Otherwise, it's a value expression that we treat as a pass_through length
-                result.append({
-                    'type': 'pass_through',
-                    'value': self._parse_value_expr(item)
-                })
+                # Check if this is a bare variable name that might refer to a list
+                # We'll handle this in the transform creation phase
+                if re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', item):
+                    # This is a bare variable name - could be a list reference
+                    result.append({
+                        'type': 'variable_reference',
+                        'name': item
+                    })
+                else:
+                    # Otherwise, it's a value expression that we treat as a pass_through length
+                    result.append({
+                        'type': 'pass_through',
+                        'value': self._parse_value_expr(item)
+                    })
         return result
     
     def parse_sequence(self, sequence_str: str) -> List[int]:
@@ -177,15 +215,53 @@ class TensorTransformParser:
     
     def parse_tensor_descriptor(self, descriptor_str: str) -> Dict[str, Any]:
         """Parse a tensor descriptor transformation."""
-        # First check if it's a naive tensor descriptor
-        naive_match = re.search(r'make_naive_tensor_descriptor_packed\s*\(\s*make_tuple\s*\((.*?)\)\s*\)', descriptor_str, re.DOTALL)
-        if naive_match:
+        descriptor_str = descriptor_str.strip()
+        
+        # Check if it's just a variable reference (e.g., "input_desc", "k_lds_block_desc_0")
+        if re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', descriptor_str):
+            return {
+                'type': 'variable',
+                'name': descriptor_str,
+                'transforms': [],
+                'lower_dimensions': [],
+                'upper_dimensions': []
+            }
+        
+        # Check for make_naive_tensor_descriptor_packed first
+        naive_packed_match = re.search(r'make_naive_tensor_descriptor_packed\s*\(\s*make_tuple\s*\((.*?)\)\s*\)', descriptor_str, re.DOTALL)
+        if naive_packed_match:
             # Parse the tuple of dimensions
-            dimensions_str = naive_match.group(1).strip()
+            dimensions_str = naive_packed_match.group(1).strip()
             dimensions = self.parse_make_tuple(dimensions_str)
             return {
-                'type': 'naive',
+                'type': 'naive_packed',
                 'dimensions': dimensions,
+                'transforms': [],
+                'lower_dimensions': [],
+                'upper_dimensions': []
+            }
+        
+        # Check for regular make_naive_tensor_descriptor
+        # Pattern: make_naive_tensor_descriptor(lengths_tuple, strides_tuple, vector_length, offset)
+        naive_match = re.search(r'make_naive_tensor_descriptor\s*\(\s*make_tuple\s*\((.*?)\)\s*,\s*make_tuple\s*\((.*?)\)\s*,\s*(.*?)\s*,\s*(.*?)\s*\)', descriptor_str, re.DOTALL)
+        if naive_match:
+            # Parse all components
+            lengths_str = naive_match.group(1).strip()
+            strides_str = naive_match.group(2).strip()
+            vector_length_str = naive_match.group(3).strip()
+            offset_str = naive_match.group(4).strip()
+            
+            lengths = self.parse_make_tuple(lengths_str)
+            strides = self.parse_make_tuple(strides_str)
+            vector_length = self._parse_value_expr(vector_length_str)
+            offset = self._parse_value_expr(offset_str)
+            
+            return {
+                'type': 'naive',
+                'lengths': lengths,
+                'strides': strides,
+                'vector_length': vector_length,
+                'offset': offset,
                 'transforms': [],
                 'lower_dimensions': [],
                 'upper_dimensions': []
@@ -196,7 +272,7 @@ class TensorTransformParser:
         match = re.search(pattern, descriptor_str, re.DOTALL)
         
         if not match:
-            raise ValueError("Invalid tensor descriptor format")
+            raise ValueError(f"Invalid tensor descriptor format. Unable to parse: {descriptor_str[:200]}...")
         
         input_desc = match.group(1).strip()
         transforms_str = match.group(2).strip()
@@ -234,74 +310,456 @@ class TensorTransformParser:
             'upper_dimensions': upper_dims
         }
     
-    def to_sympy(self, descriptor: Dict[str, Any]) -> Dict[str, Any]:
-        """Convert parsed descriptor to SymPy expressions."""
-        # Create symbols for each dimension
-        dim_symbols = {}
-        max_dim = -1
-        
-        # Find max dimension from lower and upper dimensions
-        all_dims = descriptor.get('lower_dimensions', []) + descriptor.get('upper_dimensions', [])
-        for dims in all_dims:
-            if isinstance(dims, list):
-                max_dim = max(max_dim, max(dims, default=-1))
+    def _flatten_merge_lengths(self, val, variables):
+        """Recursively flatten merge structures to get individual input lengths."""
+        if isinstance(val, dict):
+            if val.get('type') == 'pass_through':
+                # PassThrough: contributes its length as one input
+                value = val.get('value', 1)
+                if isinstance(value, sp.Basic):
+                    # Handle case where variables might contain lists
+                    safe_variables = {k: v for k, v in variables.items() if not isinstance(v, list)}
+                    return [int(value.subs(safe_variables))]
+                else:
+                    return [int(value)]
+            elif val.get('type') == 'variable_reference':
+                # Handle variable references that might be lists
+                var_name = val.get('name')
+                if var_name in variables:
+                    var_value = variables[var_name]
+                    if isinstance(var_value, list):
+                        # If the variable is a list, use it as the lengths
+                        return [int(x) for x in var_value]
+                    else:
+                        # If it's a scalar, treat it as a single length
+                        return [int(var_value)]
+                else:
+                    # Variable not found, default to 1
+                    return [1]
+            elif val.get('type') == 'merge':
+                # Nested merge: flatten its components
+                nested_lengths = []
+                for nested_val in val.get('values', []):
+                    nested_lengths.extend(self._flatten_merge_lengths(nested_val, variables))
+                return nested_lengths
             else:
-                max_dim = max(max_dim, dims)
-
-        for i in range(max_dim + 1):
-            dim_symbols[f'dim_{i}'] = sp.Symbol(f'dim_{i}')
+                # Other transform types
+                nested_transform = self.create_pytensor_transform(val, variables)
+                if hasattr(nested_transform, 'length'):
+                    return [nested_transform.length]
+                else:
+                    return [1]
+        elif isinstance(val, sp.Basic):
+            # Handle case where variables might contain lists
+            safe_variables = {k: v for k, v in variables.items() if not isinstance(v, list)}
+            return [int(val.subs(safe_variables))]
+        else:
+            return [int(val)]
+    
+    def create_pytensor_transform(self, transform_dict: Dict[str, Any], variables: Dict[str, int] = None) -> 'Transform':
+        """Convert a parsed transform dictionary to a pytensor Transform object."""
+        from pytensor.tensor_descriptor import (
+            PassThroughTransform, MergeTransform, UnmergeTransform,
+            PadTransform, OffsetTransform, ReplicateTransform, XorTransform
+        )
         
-        # Convert transforms to SymPy expressions
-        sympy_transforms = []
-        for transform in descriptor['transforms']:
-            if transform['type'] == 'pass_through':
-                dim_idx = transform['value']
-                if f'dim_{dim_idx}' not in dim_symbols:
-                     # This can happen if a pass_through refers to a dim not in lower/upper
-                     dim_symbols[f'dim_{dim_idx}'] = sp.Symbol(f'dim_{dim_idx}')
-                sympy_transforms.append({
-                    'type': 'pass_through',
-                    'expr': dim_symbols[f'dim_{dim_idx}']
-                })
-            elif transform['type'] == 'merge':
-                # Create merge expression
-                # This part needs to be implemented to handle expressions
-                sympy_transforms.append(transform)  # Placeholder
-
-        return {
-            'input_descriptor': descriptor.get('input_descriptor'),
-            'transforms': sympy_transforms,
-            'symbols': dim_symbols
+        if variables is None:
+            variables = {}
+        
+        transform_type = transform_dict.get('type')
+        
+        if transform_type == 'pass_through':
+            value = transform_dict.get('value', 1)
+            # Substitute variables if it's a symbolic expression
+            if isinstance(value, sp.Basic):
+                # Handle case where variables might contain lists
+                safe_variables = {k: v for k, v in variables.items() if not isinstance(v, list)}
+                value = int(value.subs(safe_variables))
+            return PassThroughTransform(length=value)
+        
+        elif transform_type == 'variable_reference':
+            # Handle standalone variable references as pass-through transforms
+            var_name = transform_dict.get('name')
+            if var_name in variables:
+                var_value = variables[var_name]
+                if isinstance(var_value, list):
+                    # If the variable is a list, we can't use it directly as a pass-through
+                    # This might need special handling depending on context
+                    raise ValueError(f"Variable '{var_name}' is a list and cannot be used as a standalone transform")
+                else:
+                    return PassThroughTransform(length=int(var_value))
+            else:
+                # Variable not found, default to 1
+                return PassThroughTransform(length=1)
+        
+        elif transform_type == 'merge':
+            values = transform_dict.get('values', [])
+            lengths = []
+            
+            # Flatten all values to get individual input lengths
+            for val in values:
+                lengths.extend(self._flatten_merge_lengths(val, variables))
+                
+            return MergeTransform(lengths=lengths)
+        
+        elif transform_type == 'unmerge':
+            values = transform_dict.get('values', [])
+            lengths = []
+            for val in values:
+                if isinstance(val, dict):
+                    if val.get('type') == 'variable_reference':
+                        # Handle variable references that might be lists
+                        var_name = val.get('name')
+                        if var_name in variables:
+                            var_value = variables[var_name]
+                            if isinstance(var_value, list):
+                                # If the variable is a list, use it as the lengths
+                                lengths.extend([int(x) for x in var_value])
+                            else:
+                                # If it's a scalar, treat it as a single length
+                                lengths.append(int(var_value))
+                        else:
+                            # Variable not found, default to 1
+                            lengths.append(1)
+                    else:
+                        nested_transform = self.create_pytensor_transform(val, variables)
+                        if hasattr(nested_transform, 'length'):
+                            lengths.append(nested_transform.length)
+                        elif hasattr(nested_transform, 'get_upper_lengths'):
+                            lengths.extend(nested_transform.get_upper_lengths())
+                        else:
+                            lengths.append(1)
+                elif isinstance(val, sp.Basic):
+                    # Handle case where variables might contain lists
+                    safe_variables = {k: v for k, v in variables.items() if not isinstance(v, list)}
+                    lengths.append(int(val.subs(safe_variables)))
+                else:
+                    lengths.append(int(val))
+            from pytensor.tensor_descriptor import UnmergeTransform
+            return UnmergeTransform(lengths=lengths)
+        
+        elif transform_type == 'pad':
+            lower_length = transform_dict.get('lower_length', 1)
+            left_pad = transform_dict.get('left_pad', 0)
+            right_pad = transform_dict.get('right_pad', 0)
+            
+            # Substitute variables if they're symbolic
+            safe_variables = {k: v for k, v in variables.items() if not isinstance(v, list)}
+            if isinstance(lower_length, sp.Basic):
+                lower_length = int(lower_length.subs(safe_variables))
+            if isinstance(left_pad, sp.Basic):
+                left_pad = int(left_pad.subs(safe_variables))
+            if isinstance(right_pad, sp.Basic):
+                right_pad = int(right_pad.subs(safe_variables))
+                
+            return PadTransform(lower_length=lower_length, left_pad=left_pad, right_pad=right_pad)
+        
+        elif transform_type == 'offset':
+            element_space_size = transform_dict.get('element_space_size', 1)
+            offset = transform_dict.get('offset', 0)
+            
+            safe_variables = {k: v for k, v in variables.items() if not isinstance(v, list)}
+            if isinstance(element_space_size, sp.Basic):
+                element_space_size = int(element_space_size.subs(safe_variables))
+            if isinstance(offset, sp.Basic):
+                offset = int(offset.subs(safe_variables))
+                
+            return OffsetTransform(element_space_size=element_space_size, offset=offset)
+        
+        elif transform_type == 'replicate':
+            upper_lengths = transform_dict.get('upper_lengths', [1])
+            
+            # Substitute variables in lengths
+            safe_variables = {k: v for k, v in variables.items() if not isinstance(v, list)}
+            resolved_lengths = []
+            for length in upper_lengths:
+                if isinstance(length, sp.Basic):
+                    resolved_lengths.append(int(length.subs(safe_variables)))
+                else:
+                    resolved_lengths.append(int(length))
+                    
+            return ReplicateTransform(upper_lengths=resolved_lengths)
+        
+        elif transform_type == 'xor':
+            # XOR transform - proper implementation
+            values = transform_dict.get('values', [])
+            lengths = []
+            for val in values:
+                if isinstance(val, dict):
+                    # For XOR, we expect the values to be numbers or expressions, not transforms
+                    # So we extract the values directly
+                    if val.get('type') == 'pass_through':
+                        value = val.get('value', 1)
+                        safe_variables = {k: v for k, v in variables.items() if not isinstance(v, list)}
+                        if isinstance(value, sp.Basic):
+                            lengths.append(int(value.subs(safe_variables)))
+                        else:
+                            lengths.append(int(value))
+                    else:
+                        nested_transform = self.create_pytensor_transform(val, variables)
+                        if hasattr(nested_transform, 'length'):
+                            lengths.append(nested_transform.length)
+                        elif hasattr(nested_transform, 'get_upper_lengths'):
+                            lengths.extend(nested_transform.get_upper_lengths())
+                        else:
+                            lengths.append(1)
+                elif isinstance(val, sp.Basic):
+                    safe_variables = {k: v for k, v in variables.items() if not isinstance(v, list)}
+                    lengths.append(int(val.subs(safe_variables)))
+                else:
+                    lengths.append(int(val))
+            
+            # XOR requires exactly 2 dimensions
+            if len(lengths) != 2:
+                raise ValueError(f"XOR transform requires exactly 2 dimensions, got {len(lengths)}")
+            
+            return XorTransform(lengths=lengths)
+        
+        elif transform_type == 'merge_v3_division_mod':
+            # Merge transform v3 with division/mod - use same flattening logic as regular merge
+            values = transform_dict.get('values', [])
+            lengths = []
+            
+            # Flatten all values to get individual input lengths
+            for val in values:
+                lengths.extend(self._flatten_merge_lengths(val, variables))
+                
+            return MergeTransform(lengths=lengths)
+        
+        else:
+            raise ValueError(f"Unknown transform type: {transform_type}")
+    
+    def create_pytensor_descriptor(self, descriptor_str: str, variables: Dict[str, int] = None) -> 'TensorDescriptor':
+        """Parse a tensor descriptor string and create a pytensor TensorDescriptor object."""
+        from pytensor.tensor_descriptor import (
+            make_naive_tensor_descriptor_packed, make_naive_tensor_descriptor, transform_tensor_descriptor
+        )
+        
+        if variables is None:
+            variables = {}
+        
+        # Parse the descriptor string
+        parsed_dict = self.parse_tensor_descriptor(descriptor_str)
+        
+        if parsed_dict['type'] == 'naive_packed':
+            # Create a naive tensor descriptor (packed version)
+            dimensions = parsed_dict['dimensions']
+            lengths = []
+            for dim in dimensions:
+                if isinstance(dim, dict):
+                    # Handle nested transform structures in dimensions
+                    nested_transform = self.create_pytensor_transform(dim, variables)
+                    if hasattr(nested_transform, 'length'):
+                        lengths.append(nested_transform.length)
+                    else:
+                        lengths.append(1)
+                elif isinstance(dim, sp.Basic):
+                    # Handle case where variables might contain lists
+                    safe_variables = {k: v for k, v in variables.items() if not isinstance(v, list)}
+                    lengths.append(int(dim.subs(safe_variables)))
+                else:
+                    lengths.append(int(dim))
+            
+            return make_naive_tensor_descriptor_packed(lengths)
+        
+        elif parsed_dict['type'] == 'naive':
+            # Create a naive tensor descriptor (regular version with lengths, strides, vector_length, offset)
+            lengths_data = parsed_dict['lengths']
+            strides_data = parsed_dict['strides']
+            vector_length = parsed_dict['vector_length']
+            offset = parsed_dict['offset']
+            
+            # Process lengths
+            lengths = []
+            for length_item in lengths_data:
+                if isinstance(length_item, dict):
+                    nested_transform = self.create_pytensor_transform(length_item, variables)
+                    if hasattr(nested_transform, 'length'):
+                        lengths.append(nested_transform.length)
+                    else:
+                        lengths.append(1)
+                elif isinstance(length_item, sp.Basic):
+                    safe_variables = {k: v for k, v in variables.items() if not isinstance(v, list)}
+                    lengths.append(int(length_item.subs(safe_variables)))
+                else:
+                    lengths.append(int(length_item))
+            
+            # Process strides
+            strides = []
+            for stride_item in strides_data:
+                if isinstance(stride_item, dict):
+                    nested_transform = self.create_pytensor_transform(stride_item, variables)
+                    if hasattr(nested_transform, 'length'):
+                        strides.append(nested_transform.length)
+                    else:
+                        strides.append(1)
+                elif isinstance(stride_item, sp.Basic):
+                    safe_variables = {k: v for k, v in variables.items() if not isinstance(v, list)}
+                    strides.append(int(stride_item.subs(safe_variables)))
+                else:
+                    strides.append(int(stride_item))
+            
+            # Process vector_length and offset
+            safe_variables = {k: v for k, v in variables.items() if not isinstance(v, list)}
+            if isinstance(vector_length, sp.Basic):
+                vector_length_val = int(vector_length.subs(safe_variables))
+            else:
+                vector_length_val = int(vector_length)
+            
+            if isinstance(offset, sp.Basic):
+                offset_val = int(offset.subs(safe_variables))
+            else:
+                offset_val = int(offset)
+            
+            return make_naive_tensor_descriptor(lengths, strides, vector_length_val, offset_val)
+        
+        elif parsed_dict['type'] == 'variable':
+            # Handle variable references by looking them up in the registry
+            var_name = parsed_dict['name']
+            
+            # Check if we have this variable in our registry
+            if hasattr(self, 'descriptor_registry') and var_name in self.descriptor_registry:
+                return self.descriptor_registry[var_name]
+            
+            # If not found, we need to create a descriptor with the right number of dimensions
+            # To do this properly, we need context about how this variable is used
+            # For now, create a reasonable default that can be overridden
+            from pytensor.tensor_descriptor import TensorDescriptor
+            
+            # Try to infer dimensions from usage context if available
+            if hasattr(self, '_current_context'):
+                context = self._current_context
+                required_dims = context.get('required_input_dims', 0)
+                if required_dims > 0:
+                    return TensorDescriptor(
+                        transforms=[],
+                        lower_dimension_hidden_idss=[],
+                        upper_dimension_hidden_idss=[],
+                        top_dimension_hidden_ids=list(range(required_dims)),
+                        element_space_size=128,
+                    )
+            
+            # Default fallback
+            return TensorDescriptor(
+                transforms=[],
+                lower_dimension_hidden_idss=[],
+                upper_dimension_hidden_idss=[],
+                top_dimension_hidden_ids=[0, 1],  # Default 2D
+                element_space_size=128,
+            )
+        
+        elif parsed_dict['type'] == 'transform':
+            # Analyze dimension requirements first
+            all_lower_dims = parsed_dict['lower_dimensions'] 
+            all_upper_dims = parsed_dict['upper_dimensions']
+            
+            # Find the maximum dimension index referenced
+            max_input_dim = 0
+            for dims in all_lower_dims:
+                if dims:
+                    max_input_dim = max(max_input_dim, max(dims) + 1)
+            
+            # Set context for variable resolution
+            self._current_context = {
+                'lower_dimensions': all_lower_dims,
+                'upper_dimensions': all_upper_dims,
+                'required_input_dims': max_input_dim
+            }
+            
+            # Then, recursively parse the input descriptor
+            input_desc_str = parsed_dict['input_descriptor']
+            input_descriptor = self.create_pytensor_descriptor(input_desc_str, variables)
+            
+            # Clear context
+            if hasattr(self, '_current_context'):
+                delattr(self, '_current_context')
+            
+            # Create transform objects
+            transforms = []
+            for transform_dict in parsed_dict['transforms']:
+                transform_obj = self.create_pytensor_transform(transform_dict, variables)
+                transforms.append(transform_obj)
+            
+            # Convert dimension indices
+            lower_dims = parsed_dict['lower_dimensions']
+            upper_dims = parsed_dict['upper_dimensions']
+            
+            return transform_tensor_descriptor(
+                input_descriptor=input_descriptor,
+                transforms=transforms,
+                lower_dimension_hidden_idss=lower_dims,
+                upper_dimension_hidden_idss=upper_dims
+            )
+        
+        else:
+            raise ValueError(f"Unknown descriptor type: {parsed_dict['type']}")
+    
+    def to_sympy(self, descriptor: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Convert a descriptor dictionary to SymPy expressions.
+        
+        Args:
+            descriptor: Dictionary containing transform information
+            
+        Returns:
+            Dictionary with SymPy expressions for transforms and symbols
+        """
+        result = {
+            'transforms': [],
+            'symbols': set()
         }
-
-def merge_transform_to_sympy(input_exprs: List[sp.Expr], lengths: List[int]) -> sp.Expr:
-    """Convert merge transform to SymPy expression."""
-    if len(input_exprs) != len(lengths):
-        raise ValueError("Number of input expressions must match number of lengths")
-    
-    result = 0
-    stride = 1
-    for i in range(len(input_exprs) - 1, -1, -1):
-        result += input_exprs[i] * stride
-        stride *= lengths[i]
-    return result
-
-def unmerge_transform_to_sympy(input_expr: sp.Expr, lengths: List[int]) -> List[sp.Expr]:
-    """Convert unmerge transform to SymPy expression."""
-    result = []
-    remaining = input_expr
-    stride = 1
-    
-    # Calculate strides
-    strides = [1]
-    for i in range(len(lengths) - 1, 0, -1):
-        strides.insert(0, strides[0] * lengths[i])
-    
-    # Extract each dimension
-    for i in range(len(lengths)):
-        result.append((remaining // strides[i]) % lengths[i])
-    
-    return result
+        
+        # Create symbols for each dimension
+        symbols = {}  # Use a dictionary to store symbols by dimension number
+        
+        # Process each transform
+        for transform, lower_dims in zip(descriptor.get('transforms', []), descriptor.get('lower_dimensions', [])):
+            # Create symbols for any new dimensions we encounter
+            for dim in lower_dims:
+                if dim not in symbols:
+                    symbols[dim] = sp.Symbol(f'dim_{dim}')
+            
+            if transform['type'] == 'pass_through':
+                # Create PassThroughTransform
+                transform_obj = PassThroughTransform(length=1)  # Length will be updated later
+                # Get input symbol
+                input_symbol = symbols[lower_dims[0]]
+                # Use sympy_forward to get output
+                output = transform_obj.sympy_forward([input_symbol])
+                result['transforms'].append({
+                    'type': 'pass_through',
+                    'expr': output[0]
+                })
+            
+            elif transform['type'] == 'merge':
+                # Get input symbols for this transform
+                input_symbols = [symbols[i] for i in lower_dims]
+                
+                # Get lengths for this transform
+                lengths = []
+                for val in transform['values']:
+                    if isinstance(val['value'], sp.Basic):
+                        length = val['value']
+                    else:
+                        length = sp.Integer(val['value'])
+                    lengths.append(length)
+                
+                # Create MergeTransform
+                transform_obj = MergeTransform(lengths=lengths)
+                # Use sympy_forward to get output
+                output = transform_obj.sympy_forward(input_symbols)
+                result['transforms'].append({
+                    'type': 'merge',
+                    'expr': output[0]
+                })
+        
+        # Add all symbols to the result
+        result['symbols'] = set(symbols.values())
+        
+        # Add symbol names for testing
+        result['symbol_names'] = {str(symbol) for symbol in symbols.values()}
+        
+        return result
 
 def main():
     """Test the parser with example input."""

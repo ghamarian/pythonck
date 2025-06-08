@@ -10,8 +10,44 @@ import numpy as np
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 import math
+import sympy as sp
 
 from .tensor_coordinate import MultiIndex
+
+
+# Define a custom XOR function for symbolic representation
+class XorFunction(sp.Function):
+    """Custom SymPy function to represent XOR operation."""
+    
+    @classmethod
+    def eval(cls, x, y):
+        """Evaluate XOR if both arguments are integers."""
+        # Only evaluate if both arguments are concrete integers
+        if x.is_integer and y.is_integer and x.is_number and y.is_number:
+            try:
+                return int(x) ^ int(y)
+            except (TypeError, ValueError):
+                pass
+        # For complex expressions (like floor operations), return None to keep symbolic
+        return None
+    
+    def _latex(self, printer):
+        """LaTeX representation."""
+        args = [printer._print(arg) for arg in self.args]
+        return f"{args[0]} \\oplus {args[1]}"
+    
+    def _pretty(self, printer):
+        """Pretty printing representation."""
+        from sympy.printing.pretty.stringpict import prettyForm
+        args = [printer._print(arg) for arg in self.args]
+        return prettyForm(f"{args[0]} ⊕ {args[1]}")
+    
+    def __str__(self):
+        """String representation."""
+        return f"{self.args[0]} ⊕ {self.args[1]}"
+
+# Create the XOR function instance
+Xor = XorFunction
 
 
 class Transform(ABC):
@@ -35,6 +71,16 @@ class Transform(ABC):
     @abstractmethod
     def is_valid_upper_index_mapped_to_valid_lower_index(self, idx_upper: MultiIndex) -> bool:
         """Check if specific upper index maps to valid lower index."""
+        pass
+    
+    @abstractmethod
+    def sympy_forward(self, input_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Calculate forward transformation using SymPy expressions."""
+        pass
+    
+    @abstractmethod
+    def sympy_backward(self, output_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Calculate backward transformation using SymPy expressions."""
         pass
 
 
@@ -100,6 +146,36 @@ class EmbedTransform(Transform):
             if idx_upper[i] < 0 or idx_upper[i] >= self.lengths[i]:
                 return False
         return True
+    
+    def sympy_forward(self, input_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Calculate linear offset from multi-dimensional symbols."""
+        if len(input_symbols) != self.ndim:
+            raise ValueError(f"Input symbols {len(input_symbols)} doesn't match transform dimension {self.ndim}")
+        
+        offset = 0
+        for i in range(self.ndim):
+            offset += input_symbols[i] * self.strides[i]
+        
+        return [offset]
+    
+    def sympy_backward(self, output_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Calculate multi-dimensional symbols from linear offset symbol."""
+        if len(output_symbols) != 1:
+            raise ValueError("Output must be 1D for embed transform")
+        
+        offset = output_symbols[0]
+        upper_symbols = []
+        
+        # Decompose offset using strides
+        for i in range(self.ndim):
+            if self.strides[i] > 0:
+                idx = offset // self.strides[i]
+                offset = offset % self.strides[i]
+                upper_symbols.append(idx)
+            else:
+                upper_symbols.append(sp.Integer(0))
+        
+        return upper_symbols
 
 
 class UnmergeTransform(Transform):
@@ -161,6 +237,34 @@ class UnmergeTransform(Transform):
             if idx_upper[i] < 0 or idx_upper[i] >= self.lengths[i]:
                 return False
         return True
+    
+    def sympy_forward(self, input_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Calculate linear offset from multi-dimensional symbols."""
+        if len(input_symbols) != self.ndim:
+            raise ValueError(f"Input symbols {len(input_symbols)} doesn't match transform dimension {self.ndim}")
+        
+        offset = 0
+        for i in range(self.ndim):
+            offset += input_symbols[i] * self.strides[i]
+        
+        return [offset]
+    
+    def sympy_backward(self, output_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Calculate multi-dimensional symbols from linear offset symbol."""
+        if len(output_symbols) != 1:
+            raise ValueError("Output must be 1D for unmerge transform")
+        
+        offset = output_symbols[0]
+        upper_symbols = []
+        
+        # Decompose offset using strides
+        remaining_offset = offset
+        for i in range(self.ndim):
+            idx = remaining_offset // self.strides[i]
+            remaining_offset = remaining_offset % self.strides[i]
+            upper_symbols.append(idx)
+        
+        return upper_symbols
 
 
 class OffsetTransform(Transform):
@@ -201,6 +305,20 @@ class OffsetTransform(Transform):
         """Check if index is within element space."""
         return 0 <= idx_upper[0] < self.element_space_size
 
+    def sympy_forward(self, input_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Add offset to symbol."""
+        if len(input_symbols) != 1:
+            raise ValueError("Offset transform expects 1D input")
+        
+        return [input_symbols[0] + self.offset]
+    
+    def sympy_backward(self, output_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Subtract offset from symbol."""
+        if len(output_symbols) != 1:
+            raise ValueError("Offset transform expects 1D output")
+        
+        return [output_symbols[0] - self.offset]
+    
     def __repr__(self) -> str:
         """String representation."""
         return f"OffsetTransform(offset={self.offset})"
@@ -246,6 +364,18 @@ class PassThroughTransform(Transform):
     def is_valid_upper_index_mapped_to_valid_lower_index(self, idx_upper: MultiIndex) -> bool:
         """Check if index is within bounds."""
         return 0 <= idx_upper[0] < self.length
+    
+    def sympy_forward(self, input_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Pass through symbols unchanged."""
+        if len(input_symbols) != 1:
+            raise ValueError("PassThrough transform expects 1D input")
+        return input_symbols
+    
+    def sympy_backward(self, output_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Pass through symbols unchanged."""
+        if len(output_symbols) != 1:
+            raise ValueError("PassThrough transform expects 1D output")
+        return output_symbols
     
     def calculate_upper_dimension_safe_vector_length_strides(
         self,
@@ -305,6 +435,25 @@ class PadTransform(Transform):
     def is_valid_upper_index_mapped_to_valid_lower_index(self, idx_upper: MultiIndex) -> bool:
         """Check if index is within padded bounds."""
         return 0 <= idx_upper[0] < self.get_upper_lengths()[0]
+    
+    def sympy_forward(self, input_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Adjust symbol for padding (subtract left pad)."""
+        if len(input_symbols) != 1:
+            raise ValueError("Pad transform expects 1D input")
+        
+        # For forward: upper -> lower, subtract left padding
+        # But clamp to valid range [0, lower_length-1]
+        adjusted = input_symbols[0] - self.left_pad
+        clamped = sp.Max(0, sp.Min(adjusted, self.lower_length - 1))
+        return [clamped]
+    
+    def sympy_backward(self, output_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Add padding offset to symbol."""
+        if len(output_symbols) != 1:
+            raise ValueError("Pad transform expects 1D output")
+        
+        # For backward: lower -> upper, add left padding
+        return [output_symbols[0] + self.left_pad]
     
     def calculate_upper_dimension_safe_vector_length_strides(
         self,
@@ -384,6 +533,39 @@ class MergeTransform(Transform):
         """Check if index is within merged bounds."""
         return 0 <= idx_upper[0] < self.get_upper_lengths()[0]
     
+    def sympy_forward(self, input_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Merge multiple symbols into one (lower -> upper)."""
+        if len(input_symbols) != len(self.lengths):
+            raise ValueError(f"Input symbols {len(input_symbols)} doesn't match lengths {len(self.lengths)}")
+        
+        # Compute: result = sum(input_symbols[i] * stride[i])
+        result = 0
+        stride = 1
+        for i in range(len(self.lengths) - 1, -1, -1):
+            result += input_symbols[i] * stride
+            stride *= self.lengths[i]
+        
+        return [result]
+    
+    def sympy_backward(self, output_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Unmerge one symbol into multiple (upper -> lower)."""
+        if len(output_symbols) != 1:
+            raise ValueError("Merge transform expects 1D output")
+        
+        merged_symbol = output_symbols[0]
+        lower_symbols = []
+        
+        # Calculate strides
+        strides = [1]
+        for i in range(len(self.lengths) - 1, 0, -1):
+            strides.insert(0, strides[0] * self.lengths[i])
+        
+        # Extract each dimension using division and modulo
+        for i in range(len(self.lengths)):
+            lower_symbols.append((merged_symbol // strides[i]) % self.lengths[i])
+        
+        return lower_symbols
+    
     def calculate_upper_dimension_safe_vector_length_strides(
         self,
         vector_lengths_lower: List[int],
@@ -398,6 +580,98 @@ class MergeTransform(Transform):
     def __repr__(self) -> str:
         """String representation."""
         return f"MergeTransform(lengths={self.lengths})"
+
+
+@dataclass
+class XorTransform(Transform):
+    """
+    XOR transform that applies XOR operation for address scrambling.
+    
+    This transform takes two dimensions and applies XOR to create
+    a scrambled memory access pattern.
+    
+    Attributes:
+        lengths: Lengths of the two dimensions to XOR
+    """
+    
+    lengths: List[int]
+    
+    def __post_init__(self):
+        """Validate XOR transform has exactly 2 dimensions."""
+        if len(self.lengths) != 2:
+            raise ValueError("XOR transform requires exactly 2 dimensions")
+    
+    def get_num_of_lower_dimension(self) -> int:
+        """Get number of lower dimensions (2)."""
+        return 2
+    
+    def get_num_of_upper_dimension(self) -> int:
+        """Get number of upper dimensions (2)."""
+        return 2
+    
+    def get_upper_lengths(self) -> List[int]:
+        """Get upper dimension lengths (same as lower)."""
+        return self.lengths
+    
+    def calculate_lower_index(self, idx_upper: MultiIndex) -> MultiIndex:
+        """Calculate lower index by applying XOR."""
+        if len(idx_upper) != 2:
+            raise ValueError("XOR transform expects 2D upper index")
+        
+        # Apply XOR: lower[0] = upper[0] ^ upper[1], lower[1] = upper[1]
+        x, y = idx_upper[0], idx_upper[1]
+        return MultiIndex(2, [x ^ y, y])
+    
+    def calculate_upper_index(self, idx_lower: MultiIndex) -> MultiIndex:
+        """Calculate upper index by applying inverse XOR."""
+        if len(idx_lower) != 2:
+            raise ValueError("XOR transform expects 2D lower index")
+        
+        # Inverse XOR: upper[0] = lower[0] ^ lower[1], upper[1] = lower[1]
+        x, y = idx_lower[0], idx_lower[1]
+        return MultiIndex(2, [x ^ y, y])
+    
+    def is_valid_upper_index_always_mapped_to_valid_lower_index(self) -> bool:
+        """XOR transform preserves validity."""
+        return True
+    
+    def is_valid_upper_index_mapped_to_valid_lower_index(self, idx_upper: MultiIndex) -> bool:
+        """Check if indices are within bounds."""
+        for i, idx in enumerate(idx_upper):
+            if idx < 0 or idx >= self.lengths[i]:
+                return False
+        return True
+    
+    def sympy_forward(self, input_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Apply XOR to symbols."""
+        if len(input_symbols) != 2:
+            raise ValueError("XOR transform expects 2D input")
+        
+        x, y = input_symbols[0], input_symbols[1]
+        # XOR in symbolic form: x ⊕ y using proper XOR symbol
+        return [Xor(x, y), y]
+    
+    def sympy_backward(self, output_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Apply inverse XOR to symbols."""
+        if len(output_symbols) != 2:
+            raise ValueError("XOR transform expects 2D output")
+        
+        x, y = output_symbols[0], output_symbols[1]
+        # Inverse XOR: same operation in symbolic form (XOR is its own inverse)
+        return [Xor(x, y), y]
+    
+    def calculate_upper_dimension_safe_vector_length_strides(
+        self,
+        vector_lengths_lower: List[int],
+        vector_strides_lower: List[int]
+    ) -> Tuple[List[int], List[int]]:
+        """Calculate safe vector lengths and strides."""
+        # XOR can break vectorization patterns, so be conservative
+        return [1, 1], [1, 1]
+    
+    def __repr__(self) -> str:
+        """String representation."""
+        return f"XorTransform(lengths={self.lengths})"
 
 
 @dataclass
@@ -444,6 +718,18 @@ class ReplicateTransform(Transform):
             if idx < 0 or idx >= self.upper_lengths[i]:
                 return False
         return True
+    
+    def sympy_forward(self, input_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Replicate has no input symbols."""
+        if len(input_symbols) != 0:
+            raise ValueError("Replicate transform expects no input symbols")
+        return []
+    
+    def sympy_backward(self, output_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Replicate creates zeros for all output dimensions."""
+        if len(output_symbols) != len(self.upper_lengths):
+            raise ValueError(f"Output symbols {len(output_symbols)} doesn't match upper lengths {len(self.upper_lengths)}")
+        return []
     
     def calculate_upper_dimension_safe_vector_length_strides(
         self,
@@ -819,4 +1105,48 @@ def make_naive_tensor_descriptor_aligned(lengths: List[int], align: int) -> Tens
     for i in range(ndim - 3, -1, -1):
         strides[i] = strides[i + 1] * lengths[i + 1]
     
-    return make_naive_tensor_descriptor(lengths, strides) 
+    return make_naive_tensor_descriptor(lengths, strides)
+
+
+def transform_tensor_descriptor(
+    input_descriptor: TensorDescriptor,
+    transforms: List[Transform],
+    lower_dimension_hidden_idss: List[List[int]],
+    upper_dimension_hidden_idss: List[List[int]]
+) -> TensorDescriptor:
+    """
+    Create a new tensor descriptor by applying a sequence of transforms to an input descriptor.
+    
+    Args:
+        input_descriptor: The input tensor descriptor
+        transforms: List of transforms to apply
+        lower_dimension_hidden_idss: Lower dimension indices for each transform
+        upper_dimension_hidden_idss: Upper dimension indices for each transform
+        
+    Returns:
+        A new TensorDescriptor with the transforms applied
+    """
+    # Validate input
+    if len(transforms) != len(lower_dimension_hidden_idss) or len(transforms) != len(upper_dimension_hidden_idss):
+        raise ValueError("Number of transforms must match number of dimension index lists")
+    
+    # Combine transforms from input descriptor and new transforms
+    all_transforms = input_descriptor.get_transforms() + transforms
+    
+    # Combine dimension mappings
+    all_lower_idss = input_descriptor.get_lower_dimension_hidden_idss() + lower_dimension_hidden_idss
+    all_upper_idss = input_descriptor.get_upper_dimension_hidden_idss() + upper_dimension_hidden_idss
+    
+    # Use the top dimensions from the last transform as the new top dimensions
+    top_dimension_hidden_ids = upper_dimension_hidden_idss[-1] if upper_dimension_hidden_idss else input_descriptor.get_top_dimension_hidden_ids()
+    
+    # Create new tensor descriptor
+    return TensorDescriptor(
+        transforms=all_transforms,
+        lower_dimension_hidden_idss=all_lower_idss,
+        upper_dimension_hidden_idss=all_upper_idss,
+        top_dimension_hidden_ids=top_dimension_hidden_ids,
+        element_space_size=input_descriptor.get_element_space_size(),
+        guaranteed_vector_lengths=input_descriptor.guaranteed_vector_lengths,
+        guaranteed_vector_strides=input_descriptor.guaranteed_vector_strides
+    ) 

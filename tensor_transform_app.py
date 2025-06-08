@@ -6,205 +6,55 @@ import streamlit as st
 import sympy as sp
 import re
 import time
-from tensor_transform_parser import (
-    TensorTransformParser, 
-    merge_transform_to_sympy, 
-    unmerge_transform_to_sympy
+from tensor_transform_parser import TensorTransformParser
+from pytensor.tensor_descriptor import (
+    Transform, PassThroughTransform, MergeTransform, UnmergeTransform,
+    EmbedTransform, OffsetTransform, PadTransform, ReplicateTransform
 )
 from tensor_transform_examples import get_transform_examples, get_default_variables
 from extract_descriptors import extract_descriptors_from_text
-from tensor_transform_analyzer import TensorTransformAnalyzer
 from typing import Dict, Any, List, Tuple
 import graphviz
+import pytensor.tensor_descriptor
 
-# --- Add a multi-descriptor example ---
-MULTI_DESCRIPTOR_EXAMPLE = '''
-constexpr auto b_lds_block_desc = make_naive_tensor_descriptor_packed(
-    make_tuple(number<KThreadWrite / kfold / KThreadReadPerm>{},
-               number<K0PerThreadWrite>{},
-               number<KThreadReadPerm * N1>{},
-               number<kfold * N0 / npair>{},
-               number<npair>{},
-               BK1));
-
-constexpr auto b_lds_block_desc_permuted = transform_tensor_descriptor(
-    b_lds_block_desc,
-    make_tuple(
-        make_pass_through_transform(number<KThreadWrite / kfold / KThreadReadPerm>{}),
-        make_pass_through_transform(number<K0PerThreadWrite>{}),
-        make_xor_transform(
-            make_tuple(number<KThreadReadPerm * N1>{}, number<kfold * N0 / npair>{})),
-        make_pass_through_transform(number<npair>{}),
-        make_pass_through_transform(BK1)),
-    make_tuple(
-        sequence<0>{}, sequence<1>{}, sequence<2, 3>{}, sequence<4>{}, sequence<5>{}),
-    make_tuple(
-        sequence<0>{}, sequence<1>{}, sequence<2, 3>{}, sequence<4>{}, sequence<5>{}));
-
-constexpr auto b_lds_block_desc_unmerged = transform_tensor_descriptor(
-    b_lds_block_desc_permuted,
-    make_tuple(
-        make_pass_through_transform(number<KThreadWrite / kfold / KThreadReadPerm>{}),
-        make_pass_through_transform(number<K0PerThreadWrite>{}),
-        make_unmerge_transform(make_tuple(number<KThreadReadPerm>{}, number<N1>{})),
-        make_unmerge_transform(make_tuple(number<kfold>{}, number<N0 / npair>{})),
-        make_pass_through_transform(number<npair>{}),
-        make_pass_through_transform(BK1)),
-    make_tuple(sequence<0>{},
-               sequence<1>{},
-               sequence<2>{},
-               sequence<3>{},
-               sequence<4>{},
-               sequence<5>{}),
-    make_tuple(sequence<1>{},
-               sequence<2>{},
-               sequence<0, 3>{},
-               sequence<4, 5>{},
-               sequence<6>{},
-               sequence<7>{}));
-
-constexpr auto b_lds_block_desc_kn = transform_tensor_descriptor(
-    b_lds_block_desc_unmerged,
-    make_tuple(make_merge_transform_v3_division_mod(
-                   make_tuple(number<KThreadReadPerm>{},
-                              number<KThreadWrite / kfold / KThreadReadPerm>{},
-                              number<kfold>{},
-                              number<K0PerThreadWrite>{},
-                              BK1)),
-               make_merge_transform_v3_division_mod(
-                   make_tuple(number<N0 / npair>{}, number<npair>{}, number<N1>{}))),
-    make_tuple(sequence<0, 1, 4, 2, 7>{}, sequence<5, 6, 3>{}),
-    make_tuple(sequence<1>{}, sequence<0>{}));
-'''
-
-# Add to examples (with initial dims as a comment for now)
 def get_transform_examples_with_multi():
     examples = get_transform_examples()
-    examples["Realistic Multi-Descriptor Example"] = MULTI_DESCRIPTOR_EXAMPLE
     return examples
 
 def initialize_session_state():
     """Initialize all required session state variables."""
     if 'selected_example' not in st.session_state:
-        st.session_state.selected_example = list(get_transform_examples().keys())[0]
+        st.session_state.selected_example = list(get_transform_examples_with_multi().keys())[0]
     
     if 'variables' not in st.session_state:
         st.session_state.variables = {}
 
     if 'current_code' not in st.session_state:
-        st.session_state.current_code = get_transform_examples()[st.session_state.selected_example]
+        st.session_state.current_code = get_transform_examples_with_multi()[st.session_state.selected_example]
         
     if 'parsed_descriptor' not in st.session_state:
         st.session_state.parsed_descriptor = None
-
-# --- New Recursive Formula Generation ---
 
 def get_transform_length(transform: Dict[str, Any], variables: Dict[str, Any]) -> sp.Expr:
     """Recursively calculate the total length of a transform's output space, substituting variables."""
     transform_type = transform.get('type')
     
     if transform_type == 'pass_through':
-        # Substitute the value immediately.
         value = transform.get('value', sp.Integer(1))
         return value.subs(variables) if isinstance(value, sp.Basic) else value
         
     elif transform_type in ('merge', 'xor'):
         total_length = sp.Integer(1)
         for sub_transform in transform.get('values', []):
-            # Pass variables down in the recursive call.
             total_length *= get_transform_length(sub_transform, variables)
         return total_length
         
     return sp.Integer(1)
 
-def build_sympy_forward_expr(transform: Dict[str, Any], symbols_iterator, variables: Dict[str, int]) -> sp.Expr:
-    """Recursively build the SymPy expression for a forward transformation."""
-    if transform['type'] == 'pass_through':
-        return next(symbols_iterator)
-    elif transform['type'] == 'merge':
-        sub_exprs = [build_sympy_forward_expr(val, symbols_iterator, variables) for val in transform.get('values', [])]
-        # Pass variables to get_transform_length.
-        lengths = [get_transform_length(val, variables) for val in transform.get('values', [])]
-        return merge_transform_to_sympy(sub_exprs, lengths)
-    return sp.Integer(0)
-
-def build_sympy_backward_exprs(y: sp.Symbol, transform: Dict[str, Any], variables: Dict[str, int]) -> List[sp.Expr]:
-    """Recursively build the SymPy expressions for a backward transformation."""
-    if transform['type'] == 'pass_through':
-        return [y]
-    elif transform['type'] == 'merge':
-        # Pass variables to get_transform_length.
-        lengths = [get_transform_length(val, variables) for val in transform.get('values', [])]
-        unmerged_ys = unmerge_transform_to_sympy(y, lengths)
-        
-        backward_exprs = []
-        for i, sub_transform in enumerate(transform.get('values', [])):
-            sub_backward = build_sympy_backward_exprs(unmerged_ys[i], sub_transform, variables)
-            backward_exprs.extend(sub_backward)
-        return backward_exprs
-    return []
-
-def build_combined_formula(transforms: List[Dict[str, Any]], lower_dims: List[List[int]], variables: Dict[str, int]) -> Tuple[sp.Expr, List[sp.Symbol]]:
-    """Build the final combined formula for all transforms."""
-    # Create input symbols for all dimensions
-    all_input_dims = set()
-    for dims in lower_dims:
-        all_input_dims.update(dims)
-    input_symbols = [sp.Symbol(f"d_{k}") for k in sorted(all_input_dims)]
-    
-    # Build forward expressions for each transform
-    forward_exprs = []
-    for i, transform in enumerate(transforms):
-        # Get the specific input dimensions for this transform
-        transform_dims = lower_dims[i] if i < len(lower_dims) else []
-        # Create symbols for just this transform's input dimensions
-        transform_symbols = [sp.Symbol(f"d_{k}") for k in transform_dims]
-        symbols_iter = iter(transform_symbols)
-        forward_exprs.append(build_sympy_forward_expr(transform, symbols_iter, variables))
-    
-    # Combine all forward expressions into a tuple
-    return sp.Tuple(*forward_exprs), input_symbols
-
-def build_combined_backward_formula(transforms: List[Dict[str, Any]], lower_dims: List[List[int]], variables: Dict[str, int]) -> Tuple[List[sp.Expr], List[sp.Symbol], List[sp.Symbol]]:
-    """Build the final combined backward formula for all transforms."""
-    # Create output symbols for all transforms
-    output_symbols = [sp.Symbol(f"y_{i}") for i in range(len(transforms))]
-    
-    # Create input symbols for all dimensions in the correct order
-    all_input_dims = set()
-    for dims in lower_dims:
-        all_input_dims.update(dims)
-    input_symbols = [sp.Symbol(f"d_{k}") for k in sorted(all_input_dims)]
-    
-    # Build backward expressions for each transform and properly order them
-    # We need to collect all backward expressions and then order them by dimension index
-    all_backward_exprs = {}  # dimension_index -> expression
-    
-    for i, transform in enumerate(transforms):
-        transform_dims = lower_dims[i] if i < len(lower_dims) else []
-        sub_exprs = build_sympy_backward_exprs(output_symbols[i], transform, variables)
-        
-        # Map the sub_expressions back to their dimension indices
-        for j, dim_idx in enumerate(transform_dims):
-            if j < len(sub_exprs):
-                all_backward_exprs[dim_idx] = sub_exprs[j]
-    
-    # Order the backward expressions by dimension index
-    backward_exprs = []
-    for dim_idx in sorted(all_input_dims):
-        if dim_idx in all_backward_exprs:
-            backward_exprs.append(all_backward_exprs[dim_idx])
-        else:
-            # This shouldn't happen if everything is consistent
-            backward_exprs.append(sp.Symbol(f"d_{dim_idx}"))
-    
-    return backward_exprs, input_symbols, output_symbols
-
 def display_variable_controls():
     """Display number inputs for adjusting template variables."""
     st.subheader("Template Variables")
     
-    # Initialize a new dictionary to store the updated variable values
     updated_variables = {}
     
     if not hasattr(st.session_state, 'variable_names') or not st.session_state.variable_names:
@@ -212,27 +62,23 @@ def display_variable_controls():
         return
     
     for var in st.session_state.variable_names:
-        # Get current value if exists, otherwise default to 1
         current_value = st.session_state.variables.get(var, 1)
         
-        # Format display name for namespace-prefixed variables
         if '::' in var:
             namespace, var_name = var.split('::')
             display_name = f"{namespace}::{var_name}"
         else:
             display_name = var
         
-        # Create a number input for this variable with a unique key
         value = st.number_input(
             display_name,
             min_value=1,
             value=current_value,
-            key=f"var_{var}"  # Use unique key to prevent conflicts
+            key=f"var_{var}"
         )
         
         updated_variables[var] = value
     
-    # Check if any variable has changed
     variables_changed = False
     if hasattr(st.session_state, 'variables'):
         for var, value in updated_variables.items():
@@ -240,7 +86,6 @@ def display_variable_controls():
                 variables_changed = True
                 break
     
-    # Store the updated variables in the session state
     st.session_state.variables = updated_variables
 
 def substitute_descriptor(descriptor, user_vars):
@@ -254,275 +99,495 @@ def substitute_descriptor(descriptor, user_vars):
     else:
         return descriptor
 
-def build_formula_for_transform(transform, input_symbols_iter, variables):
+def build_transformation_graph_from_pytensor(descriptors, variables):
     """
-    Recursively builds a SymPy formula for a potentially nested transform object.
-    It consumes symbols from the provided iterator as it encounters leaf nodes.
-    """
-    transform_type = transform.get('type')
-
-    if transform_type == 'pass_through':
-        # A pass_through is a leaf node in the formula tree; consumes one symbol.
-        return next(input_symbols_iter)
-    
-    elif transform_type == 'merge':
-        # Recursively build formulas for all sub-transforms (the children).
-        sub_expressions = [
-            build_formula_for_transform(sub_transform, input_symbols_iter, variables)
-            for sub_transform in transform.get('values', [])
-        ]
-        
-        # Get the lengths of the direct children of this merge transform.
-        # Pass variables down and remove the now-redundant .subs() call.
-        lengths = [get_transform_length(val, variables) for val in transform.get('values', [])]
-        
-        # Merge the generated sub-expressions into a single formula.
-        return merge_transform_to_sympy(sub_expressions, lengths)
-
-    elif transform_type == 'xor':
-        # Handle XOR nested inside another transform.
-        sub_expressions = [
-            build_formula_for_transform(sub_transform, input_symbols_iter, variables)
-            for sub_transform in transform.get('values', [])
-        ]
-        # Create a symbolic representation of the XOR operation.
-        return sp.Function('XOR')(*sub_expressions)
-
-    # Fallback for unknown or unsupported transform types within this recursive context.
-    return sp.Integer(0)
-
-def build_transformation_graph(parsed_descriptors, variables):
-    """
-    Build a single, connected Graphviz DOT graph that correctly visualizes the
-    entire transformation pipeline, including symbolic formulas on the nodes.
-    This version correctly handles pipelines that start with a transform or a naive descriptor.
+    Build a Graphviz DOT graph using pytensor objects and their sympy methods.
     """
     dot = graphviz.Digraph(format="png")
     dot.attr(rankdir="LR", splines="ortho")
     dot.attr('node', shape='box', style='rounded,filled')
 
-    # Add variable values and timestamp to force graph refresh
-    timestamp = int(time.time() * 1000)  # millisecond precision
+    timestamp = int(time.time() * 1000)
     var_comment = f"Variables: {sorted(variables.items())} - Time: {timestamp}"
     dot.attr(comment=var_comment)
     
-    # Add a title node with current variable values to make changes visible
     vars_display = ", ".join(f"{k}={v}" for k, v in sorted(variables.items())[:5])
     dot.node("title", f"Variables: {vars_display}", shape="note", style="filled", fillcolor="lightyellow")
 
-    if not parsed_descriptors:
+    if not descriptors:
         return dot
 
-    # 1. Determine the initial state and where transforms begin
-    first_desc = parsed_descriptors[0]
-    num_initial_dims = 0
-    transform_start_index = 0
+    parser = TensorTransformParser()
+    
+    all_lines = [line.strip() for line in " ".join(descriptors).split('\n') if line.strip()]
+    
+    realistic_var_names = [
+        'b_lds_block_desc',
+        'b_lds_block_desc_permuted', 
+        'b_lds_block_desc_unmerged',
+        'b_lds_block_desc_kn'
+    ]
+    
+    pytensor_descriptors = []
+    descriptor_registry = {}
+    
+    for i, desc_str in enumerate(descriptors):
+        try:
+            parser.descriptor_registry = descriptor_registry
+            tensor_desc = parser.create_pytensor_descriptor(desc_str, variables)
+            pytensor_descriptors.append(tensor_desc)
+            
+            print(f"DEBUG: Created pytensor descriptor {i} with {len(tensor_desc.get_transforms())} transforms")
+            
+            if i < len(realistic_var_names):
+                var_name = realistic_var_names[i]
+                descriptor_registry[var_name] = tensor_desc
+                
+        except Exception as e:
+            st.error(f"Failed to create pytensor descriptor {i}: {e}")
+            dot.node(f"error_{i}", f"Error: {str(e)[:50]}...", fillcolor="#ffcccc")
+            continue
 
-    if first_desc.get('type') == 'naive':
-        dimensions = first_desc.get('dimensions', [])
-        num_initial_dims = len(dimensions)
-        transform_start_index = 1
-    elif first_desc.get('type') == 'transform':
-        lower_dims = first_desc.get('lower_dimensions', [])
-        if not lower_dims: return dot
-        num_initial_dims = max(idx for indices in lower_dims for idx in indices) + 1
-        transform_start_index = 0
-    else:
+    if not pytensor_descriptors:
+        st.error("No valid descriptors could be created")
         return dot
 
-    # 2. Create nodes for the initial state
+    # For multi-descriptor examples, process each descriptor as a sequential stage
+    # Each descriptor builds on the previous one, so we need to show the progression
+    
+    # Analyze all descriptors to find the maximum input dimension needed
+    max_input_dim = 0
+    for tensor_desc in pytensor_descriptors:
+        all_lower_idss = tensor_desc.get_lower_dimension_hidden_idss()
+        for lower_ids in all_lower_idss:
+            if lower_ids:
+                max_input_dim = max(max_input_dim, max(lower_ids) + 1)
+    
+    print(f"DEBUG: max_input_dim calculated as {max_input_dim}")
+    
+    # If no transforms found, use the first descriptor's dimension count
+    if max_input_dim == 0:
+        first_desc = pytensor_descriptors[0]
+        max_input_dim = first_desc.get_num_of_dimension()
+        print(f"DEBUG: max_input_dim fallback to first descriptor dimension count: {max_input_dim}")
+    
+    # For naive descriptors, we need to ensure we have enough input dimensions
+    # by checking the actual transforms in the pytensor object
+    if max_input_dim < 6:  # Assume at least 6 dimensions are often needed
+        first_desc = pytensor_descriptors[0]
+        all_upper_idss = first_desc.get_upper_dimension_hidden_idss()
+        all_lower_idss = first_desc.get_lower_dimension_hidden_idss()
+        
+        # Find the maximum dimension referenced in any transform
+        max_dim_needed = 0
+        for lower_ids in all_lower_idss:
+            if lower_ids:
+                max_dim_needed = max(max_dim_needed, max(lower_ids) + 1)
+        for upper_ids in all_upper_idss:
+            if upper_ids:
+                max_dim_needed = max(max_dim_needed, max(upper_ids) + 1)
+        
+        if max_dim_needed > max_input_dim:
+            max_input_dim = max_dim_needed
+            print(f"DEBUG: max_input_dim updated to {max_input_dim} based on pytensor transforms")
+    
+    # Special handling for the first descriptor if it's make_naive_tensor_descriptor_packed
+    first_desc_str = descriptors[0].strip()
+    is_first_naive_packed = "make_naive_tensor_descriptor_packed" in first_desc_str
+    
+    print(f"DEBUG: is_first_naive_packed = {is_first_naive_packed}")
+    
+    # Create initial input nodes
     prev_stage_output_nodes = {}
-    for k in range(num_initial_dims):
-        node_id = f"s0_d{k}"
-        prev_stage_output_nodes[k] = node_id
-        dot.node(node_id, f"d{k}", fillcolor="#e0e0e0")
-
-    if transform_start_index >= len(parsed_descriptors):
-        return dot
-
-    # 3. Loop through all transformations
-    prev_stage_output_formulas = None
-    for i in range(transform_start_index, len(parsed_descriptors)):
-        transform_desc = parsed_descriptors[i]
+    current_formulas = {}
+    
+    if is_first_naive_packed:
+        print("DEBUG: Using naive_packed path")
+        # For naive_tensor_descriptor_packed, create logical input dimensions
+        first_desc = pytensor_descriptors[0]
+        num_logical_dims = first_desc.get_num_of_dimension()
         
-        if transform_desc.get('type') != 'transform':
-            continue
-
-        transforms = transform_desc.get('transforms', [])
-        lower_dims_indices = transform_desc.get('lower_dimensions', [])
-        upper_dims_indices = transform_desc.get('upper_dimensions', [])
+        print(f"DEBUG: num_logical_dims = {num_logical_dims}")
         
-        if not all([transforms, lower_dims_indices, upper_dims_indices]):
-            continue
-
-        # --- Formula Generation for this Stage (Now handles nesting and xor) ---
-        num_inputs = len(prev_stage_output_nodes)
-        # Use previous stage's output formulas as input symbols if available
-        if prev_stage_output_formulas is not None:
-            input_symbols = [prev_stage_output_formulas.get(k, sp.Symbol(f"d_{k}")) for k in range(num_inputs)]
-        else:
-            input_symbols = [sp.Symbol(f"d_{k}") for k in range(num_inputs)]
-        output_formulas = {}
-
-        for j, transform in enumerate(transforms):
-            transform_type = transform.get('type', 'unknown')
-            input_indices = lower_dims_indices[j]
-            output_indices = upper_dims_indices[j]
+        for k in range(num_logical_dims):
+            node_id = f"input_d{k}"
+            # The logical dimensions should map directly to their indices
+            prev_stage_output_nodes[k] = node_id
             
-            # Defensive check to prevent IndexError
-            if any(k >= num_inputs for k in input_indices):
-                st.error(
-                    f"Internal Error: Invalid dimension index in descriptor {i}. "
-                    f"Attempted to access index >= {num_inputs}. "
-                    f"Available input dimensions: {num_inputs}."
-                )
-                return dot
-
-            # Create an iterator that provides the symbols for this specific transform.
-            current_input_symbols_iter = iter([input_symbols[k] for k in input_indices])
-
-            if transform_type == 'pass_through':
-                if input_indices and output_indices:
-                    output_formulas[output_indices[0]] = next(current_input_symbols_iter)
-            elif transform_type == 'merge':
-                formula = build_formula_for_transform(transform, current_input_symbols_iter, variables)
-                if output_indices:
-                    output_formulas[output_indices[0]] = formula
-            elif transform_type == 'unmerge':
-                if input_indices:
-                    input_symbol = next(current_input_symbols_iter)
-                    lengths = [get_transform_length(val, variables) for val in transform.get('values', [])]
-                    formulas = unmerge_transform_to_sympy(input_symbol, lengths)
-                    for k_out_idx, form in zip(output_indices, formulas):
-                        output_formulas[k_out_idx] = form
-            elif transform_type == 'xor':
-                symbols = [input_symbols[k] for k in input_indices]
-                formula = sp.Function('XOR')(*symbols)
-                for k_out_idx in output_indices:
-                    output_formulas[k_out_idx] = formula
-
-        # --- Node and Edge Creation for this Stage ---
-        stage_num = i - transform_start_index + 1
-        if not upper_dims_indices or not any(upper_dims_indices):
-            num_output_dims = 0
-        else:
-            all_output_indices = set()
-            for indices in upper_dims_indices:
-                all_output_indices.update(indices)
-            num_output_dims = max(all_output_indices) + 1 if all_output_indices else 0
+            print(f"DEBUG: Created input {node_id} mapped to index {k}")
             
-        current_stage_output_nodes = {}
-
-        for k in range(num_output_dims):
-            node_id = f"s{stage_num}_d{k}"
-            current_stage_output_nodes[k] = node_id
+            try:
+                dim_length = first_desc.get_length(k) if hasattr(first_desc, 'get_length') else '?'
+                dim_label = f"d{k} ({dim_length})"
+            except:
+                dim_label = f"d{k}"
+            dot.node(node_id, dim_label, fillcolor="#ffcccc")
+            current_formulas[node_id] = sp.Symbol(f"d{k}")
+    else:
+        print(f"DEBUG: Using non-packed path, creating {max_input_dim} input dimensions")
+        for k in range(max_input_dim):
+            node_id = f"input_d{k}"
+            prev_stage_output_nodes[k] = node_id
             
-            formula = output_formulas.get(k)
-            if formula is not None:
-                substituted_formula = formula.subs(variables)
-                formula_str = sp.pretty(sp.simplify(substituted_formula), use_unicode=True)
-                label = f'<<FONT POINT-SIZE="12">{formula_str}</FONT>>'
-                dot.node(node_id, label, fillcolor="#c0ffc0")
+            print(f"DEBUG: Created input {node_id} mapped to index {k}")
+            
+            # Get dimension length from first descriptor if possible
+            try:
+                first_desc = pytensor_descriptors[0]
+                if k < first_desc.get_num_of_dimension():
+                    dim_length = first_desc.get_length(k) if hasattr(first_desc, 'get_length') else '?'
+                    dim_label = f"d{k} ({dim_length})"
+                else:
+                    dim_label = f"d{k}"
+            except:
+                dim_label = f"d{k}"
+            dot.node(node_id, dim_label, fillcolor="#ffcccc")
+            current_formulas[node_id] = sp.Symbol(f"d{k}")
+    
+    # Process each descriptor as a separate stage
+    for stage_idx, tensor_desc in enumerate(pytensor_descriptors):
+        print(f"DEBUG: Processing stage_idx={stage_idx}")
+        stage_output_nodes = {}
+        next_formulas = {}
+        
+        all_transforms = tensor_desc.get_transforms()
+        all_lower_idss = tensor_desc.get_lower_dimension_hidden_idss()
+        all_upper_idss = tensor_desc.get_upper_dimension_hidden_idss()
+        
+        print(f"DEBUG: Stage {stage_idx} has {len(all_transforms)} total transforms")
+        
+        # Determine which transforms to process for this stage
+        if len(pytensor_descriptors) > 1 and stage_idx > 0:
+            # For multi-descriptor pipelines after the first, get only new transforms
+            prev_desc = pytensor_descriptors[stage_idx - 1]
+            prev_transform_count = len(prev_desc.get_transforms())
+            
+            print(f"DEBUG: Previous descriptor had {prev_transform_count} transforms")
+            
+            # Get only the new transforms for this stage
+            if prev_transform_count < len(all_transforms):
+                new_transforms = all_transforms[prev_transform_count:]
+                new_lower_idss = all_lower_idss[prev_transform_count:]
+                new_upper_idss = all_upper_idss[prev_transform_count:]
+                print(f"DEBUG: Stage {stage_idx} will process {len(new_transforms)} new transforms")
             else:
-                dot.node(node_id, f"d{k}", fillcolor="#c0ffc0")
-
-        # Create edges from previous stage's nodes to this stage's nodes
-        for j, transform in enumerate(transforms):
-            transform_type = transform.get('type', 'unknown')
+                # No new transforms in this stage, skip
+                print(f"DEBUG: Stage {stage_idx} has no new transforms, skipping")
+                continue
+        else:
+            # First descriptor - process all transforms
+            new_transforms = all_transforms
+            new_lower_idss = all_lower_idss
+            new_upper_idss = all_upper_idss
             
-            input_indices = lower_dims_indices[j]
-            input_node_ids = [prev_stage_output_nodes[k] for k in input_indices]
+            print(f"DEBUG: Stage {stage_idx} (first) will process {len(new_transforms)} transforms")
             
-            output_indices = upper_dims_indices[j]
-            output_node_ids = [current_stage_output_nodes[k] for k in output_indices]
-            
-            for in_node in input_node_ids:
-                for out_node in output_node_ids:
-                    dot.edge(in_node, out_node, label=transform_type)
-
-        # Only update if we actually created output nodes
-        if current_stage_output_nodes:
-            prev_stage_output_nodes = current_stage_output_nodes
-            prev_stage_output_formulas = output_formulas
+            # Special handling for naive_tensor_descriptor_packed first transform
+            if is_first_naive_packed and len(new_transforms) > 0:
+                if isinstance(new_transforms[0], pytensor.tensor_descriptor.UnmergeTransform):
+                    # Skip the first transform (UnmergeTransform) but set up connections
+                    first_upper_indices = new_upper_idss[0]
+                    for j, output_idx in enumerate(first_upper_indices):
+                        if j < num_logical_dims:
+                            input_node_id = f"input_d{j}"
+                            stage_output_nodes[j] = input_node_id
+                            next_formulas[input_node_id] = current_formulas[input_node_id]
+                    
+                    # Skip remaining processing for this stage if only UnmergeTransform
+                    if len(new_transforms) == 1:
+                        print(f"DEBUG: Stage {stage_idx} only has UnmergeTransform, setting up connections and continuing")
+                        prev_stage_output_nodes = stage_output_nodes
+                        current_formulas = next_formulas
+                        continue
+                    
+                    # Process remaining transforms  
+                    new_transforms = new_transforms[1:]
+                    new_lower_idss = new_lower_idss[1:]
+                    new_upper_idss = new_upper_idss[1:]
+                    print(f"DEBUG: Stage {stage_idx} after skipping UnmergeTransform will process {len(new_transforms)} transforms")
         
+        # Skip stages with no transforms to process
+        if not new_transforms:
+            print(f"DEBUG: Stage {stage_idx} has no transforms to process, skipping")
+            continue
+            
+        print(f"DEBUG: Stage {stage_idx} proceeding with {len(new_transforms)} transforms")
+        
+        # Process each transform in this stage
+        for i, transform in enumerate(new_transforms):
+            if i >= len(new_lower_idss) or i >= len(new_upper_idss):
+                continue
+                
+            lower_indices = new_lower_idss[i]
+            upper_indices = new_upper_idss[i]
+            
+            print(f"DEBUG: Transform {i} - lower_indices: {lower_indices}, upper_indices: {upper_indices}")
+            print(f"DEBUG: Transform {i} type: {transform.__class__.__name__}")
+            print(f"DEBUG: prev_stage_output_nodes keys: {list(prev_stage_output_nodes.keys())}")
+            
+            # Get input symbols for this transform
+            input_symbols = []
+            for idx in lower_indices:
+                if idx in prev_stage_output_nodes:
+                    prev_node_id = prev_stage_output_nodes[idx]
+                    if prev_node_id in current_formulas:
+                        input_symbols.append(current_formulas[prev_node_id])
+                    else:
+                        input_symbols.append(sp.Symbol(f"d_{idx}"))
+                else:
+                    input_symbols.append(sp.Symbol(f"d_{idx}"))
+            
+            try:
+                # Apply the transform
+                if isinstance(transform, pytensor.tensor_descriptor.UnmergeTransform):
+                    if len(input_symbols) != 1:
+                        merged_input = input_symbols[0] if len(input_symbols) == 1 else sum(input_symbols)
+                        output_formulas = transform.sympy_backward([merged_input])
+                    else:
+                        output_formulas = transform.sympy_backward(input_symbols)
+                elif isinstance(transform, pytensor.tensor_descriptor.EmbedTransform):
+                    # EmbedTransform takes inputs from lower_indices and produces outputs for upper_indices
+                    # In the XT example: lower_indices=[0], upper_indices=[1,2,3,4,5,6]
+                    # This means: 1 input -> 6 outputs
+                    
+                    if len(lower_indices) == 1 and len(upper_indices) > 1:
+                        # Case: 1 input -> multiple outputs 
+                        # Use calculate_upper_index direction: lower -> upper (1D -> 6D)
+                        # This corresponds to sympy_backward for EmbedTransform
+                        single_input = input_symbols[0] if input_symbols else sp.Symbol("d0")
+                        try:
+                            output_formulas = transform.sympy_backward([single_input])
+                            print(f"DEBUG: EmbedTransform.sympy_backward({single_input}) -> {len(output_formulas)} outputs")
+                        except Exception as embed_error:
+                            print(f"DEBUG: EmbedTransform.sympy_backward failed: {embed_error}")
+                            # Fallback: create individual coordinate symbols
+                            output_formulas = [sp.Symbol(f"coord{i}") for i in range(len(upper_indices))]
+                    else:
+                        # Case: multiple inputs -> 1 output 
+                        # Use calculate_lower_index direction: upper -> lower (6D -> 1D)
+                        # This corresponds to sympy_forward for EmbedTransform
+                        expected_input_dims = len(transform.lengths)
+                        
+                        # Create the required number of input symbols
+                        embed_input_symbols = []
+                        for dim_idx in range(expected_input_dims):
+                            if dim_idx < len(input_symbols):
+                                embed_input_symbols.append(input_symbols[dim_idx])
+                            else:
+                                embed_input_symbols.append(sp.Symbol(f"d{dim_idx}"))
+                        
+                        try:
+                            output_formulas = transform.sympy_forward(embed_input_symbols)
+                            print(f"DEBUG: EmbedTransform.sympy_forward({embed_input_symbols}) -> {len(output_formulas)} outputs")
+                        except Exception as embed_error:
+                            print(f"DEBUG: EmbedTransform.sympy_forward failed: {embed_error}")
+                            # Fallback: create simple formula
+                            formula = sum(input_symbols[:expected_input_dims]) if input_symbols else sp.Symbol("combined")
+                            output_formulas = [formula]
+                elif isinstance(transform, pytensor.tensor_descriptor.MergeTransform):
+                    # MergeTransform has INCONSISTENT sympy method naming!
+                    # For MergeTransform: sympy_forward does calculate_upper_index (lower->upper)
+                    # We need to handle this inconsistency
+                    if len(lower_indices) > 1 and len(upper_indices) == 1:
+                        # Case: multiple inputs -> 1 output (6D -> 1D)
+                        # This should use calculate_upper_index: lower -> upper
+                        # For MergeTransform, this is sympy_forward (inconsistent naming!)
+                        try:
+                            output_formulas = transform.sympy_forward(input_symbols)
+                            print(f"DEBUG: MergeTransform.sympy_forward({input_symbols}) -> {len(output_formulas)} outputs")
+                        except Exception as merge_error:
+                            print(f"DEBUG: MergeTransform.sympy_forward failed: {merge_error}")
+                            formula = sum(input_symbols) if input_symbols else sp.Symbol("merged")
+                            output_formulas = [formula]
+                    else:
+                        # Case: 1 input -> multiple outputs (1D -> 6D)
+                        # This should use calculate_lower_index: upper -> lower
+                        # For MergeTransform, this is sympy_backward (inconsistent naming!)
+                        single_input = input_symbols[0] if input_symbols else sp.Symbol("merged")
+                        try:
+                            output_formulas = transform.sympy_backward([single_input])
+                            print(f"DEBUG: MergeTransform.sympy_backward({single_input}) -> {len(output_formulas)} outputs")
+                        except Exception as merge_error:
+                            print(f"DEBUG: MergeTransform.sympy_backward failed: {merge_error}")
+                            output_formulas = [sp.Symbol(f"comp{i}") for i in range(len(upper_indices))]
+                elif isinstance(transform, pytensor.tensor_descriptor.UnmergeTransform):
+                    # UnmergeTransform should follow same pattern as MergeTransform
+                    # (they likely have the same inconsistent naming)
+                    if len(input_symbols) != 1:
+                        merged_input = input_symbols[0] if len(input_symbols) == 1 else sum(input_symbols)
+                        output_formulas = transform.sympy_backward([merged_input])
+                    else:
+                        output_formulas = transform.sympy_backward(input_symbols)
+                else:
+                    output_formulas = transform.sympy_forward(input_symbols)
+                
+                # Create output nodes for this transform
+                print(f"DEBUG: Transform {i} has {len(output_formulas)} output formulas for {len(upper_indices)} upper indices")
+                
+                # Create output nodes for each formula
+                for j, output_idx in enumerate(upper_indices):
+                    if j < len(output_formulas):
+                        # Use sequential stage numbering starting from 1
+                        actual_stage = stage_idx + 1
+                        node_id = f"s{actual_stage}_t{i}_d{output_idx}"
+                        stage_output_nodes[output_idx] = node_id
+                        
+                        print(f"DEBUG: Creating node {node_id} for stage {stage_idx} transform {i}")
+                        
+                        formula = output_formulas[j]
+                        next_formulas[node_id] = formula
+                        
+                        # Substitute variables and simplify
+                        substituted_formula = formula.subs(variables)
+                        simplified_formula = sp.simplify(substituted_formula)
+                        
+                        try:
+                            formula_str = str(simplified_formula)
+                            
+                            # Pretty print simple formulas
+                            if (not any(func in formula_str for func in ['floor', 'ceiling', 'sqrt', 'sin', 'cos', 'tan']) 
+                                and '/' not in formula_str and '**' not in formula_str):
+                                try:
+                                    pretty_str = sp.pretty(simplified_formula, use_unicode=False)
+                                    if '\n' not in pretty_str:
+                                        formula_str = pretty_str
+                                except:
+                                    pass
+                            
+                            # Clean up XOR notation
+                            import re
+                            formula_str = formula_str.replace('XorFunction', 'xor')
+                            formula_str = formula_str.replace('⊕', ' xor ')
+                            formula_str = re.sub(r'xor\(([^,]+),\s*([^)]+)\)', r'\1 xor \2', formula_str)
+                            
+                        except Exception:
+                            formula_str = f"d{output_idx}"
+                        
+                        label = f'<<FONT POINT-SIZE="12">{formula_str}</FONT>>'
+                        dot.node(node_id, label, fillcolor="#c0ffc0")
+                        print(f"DEBUG: Added DOT node {node_id} with label {formula_str}")
+                        
+                        # Create edges from input nodes to this output node
+                        for input_idx in lower_indices:
+                            if input_idx in prev_stage_output_nodes:
+                                transform_name = transform.__class__.__name__.replace('Transform', '')
+                                dot.edge(prev_stage_output_nodes[input_idx], node_id, 
+                                       label=transform_name)
+                
+            except Exception as e:
+                st.warning(f"Failed to generate formula for transform {transform}: {e}")
+                # Create error nodes
+                for j, output_idx in enumerate(upper_indices):
+                    actual_stage = stage_idx + 1
+                    node_id = f"s{actual_stage}_t{i}_d{output_idx}"
+                    stage_output_nodes[output_idx] = node_id
+                    next_formulas[node_id] = sp.Symbol(f"d{output_idx}")
+                    dot.node(node_id, f"d{output_idx}", fillcolor="#ffcccc")
+                    
+                    for input_idx in lower_indices:
+                        if input_idx in prev_stage_output_nodes:
+                            transform_name = transform.__class__.__name__.replace('Transform', '')
+                            dot.edge(prev_stage_output_nodes[input_idx], node_id, 
+                                   label=transform_name)
+        
+        # Update for next stage
+        if stage_output_nodes:
+            prev_stage_output_nodes = stage_output_nodes
+            current_formulas = next_formulas
+            print(f"DEBUG: Stage {stage_idx} completed, updated prev_stage_output_nodes")
+        else:
+            print(f"DEBUG: Stage {stage_idx} completed with no output nodes")
+
+    # Debug: Check if s4 nodes are in the DOT source
+    dot_source = dot.source
+    s4_count = dot_source.count('s4_')
+    print(f"DEBUG: DOT source contains {s4_count} s4 nodes")
+    if s4_count > 0:
+        print("DEBUG: s4 nodes found in DOT source")
+    else:
+        print("DEBUG: No s4 nodes found in DOT source!")
+
     return dot
 
-def build_full_pipeline_formula(parsed_descriptors, variables):
-    """
-    Compose all transforms from all descriptors into a single symbolic mapping
-    from the initial input dimensions to the final output dimensions.
-    Returns (final_output_formulas, initial_input_symbols)
-    """
-    # Determine initial input symbols from the first descriptor
-    first_desc = parsed_descriptors[0]
-    if first_desc.get('type') == 'naive':
-        dimensions = first_desc.get('dimensions', [])
-        num_initial_dims = len(dimensions)
-        initial_input_symbols = [sp.Symbol(f"d_{k}") for k in range(num_initial_dims)]
-        transform_start_index = 1
-    elif first_desc.get('type') == 'transform':
-        lower_dims = first_desc.get('lower_dimensions', [])
-        if lower_dims:
-            num_initial_dims = max(idx for indices in lower_dims for idx in indices) + 1
+def build_combined_formula(transforms: List[Dict[str, Any]], 
+                         lower_dims: List[List[int]], 
+                         variables: Dict[str, Any]) -> Tuple[sp.Expr, List[sp.Symbol]]:
+    """Build a combined formula for all transforms."""
+    input_symbols = []
+    for dims in lower_dims:
+        for dim in dims:
+            symbol = sp.Symbol(f'd_{dim}')
+            if symbol not in input_symbols:
+                input_symbols.append(symbol)
+    
+    output_exprs = []
+    for transform, dims in zip(transforms, lower_dims):
+        # Create appropriate transform object
+        if transform['type'] == 'merge':
+            lengths = [get_transform_length(val, variables) for val in transform['values']]
+            transform_obj = MergeTransform(lengths=lengths)
+        elif transform['type'] == 'unmerge':
+            lengths = [get_transform_length(val, variables) for val in transform['values']]
+            transform_obj = UnmergeTransform(lengths=lengths)
+        elif transform['type'] == 'pass_through':
+            transform_obj = PassThroughTransform(length=1)
         else:
-            num_initial_dims = 0
-        initial_input_symbols = [sp.Symbol(f"d_{k}") for k in range(num_initial_dims)]
-        transform_start_index = 0
-    else:
-        return [], []
-
-    prev_stage_output_formulas = {k: sym for k, sym in enumerate(initial_input_symbols)}
-    prev_stage_output_count = num_initial_dims
-
-    for i in range(transform_start_index, len(parsed_descriptors)):
-        desc = parsed_descriptors[i]
-        if desc.get('type') != 'transform':
-            continue
-        transforms = desc.get('transforms', [])
-        lower_dims_indices = desc.get('lower_dimensions', [])
-        upper_dims_indices = desc.get('upper_dimensions', [])
-        if not all([transforms, lower_dims_indices, upper_dims_indices]):
-            continue
-        num_inputs = prev_stage_output_count
-        input_symbols = [prev_stage_output_formulas.get(k, sp.Symbol(f"d_{k}")) for k in range(num_inputs)]
-        output_formulas = {}
-        for j, transform in enumerate(transforms):
-            transform_type = transform.get('type', 'unknown')
-            input_indices = lower_dims_indices[j]
-            output_indices = upper_dims_indices[j]
-            current_input_symbols_iter = iter([input_symbols[k] for k in input_indices])
-            if transform_type == 'pass_through':
-                if input_indices and output_indices:
-                    output_formulas[output_indices[0]] = next(current_input_symbols_iter)
-            elif transform_type == 'merge':
-                formula = build_formula_for_transform(transform, current_input_symbols_iter, variables)
-                if output_indices:
-                    output_formulas[output_indices[0]] = formula
-            elif transform_type == 'unmerge':
-                if input_indices:
-                    input_symbol = next(current_input_symbols_iter)
-                    lengths = [get_transform_length(val, variables) for val in transform.get('values', [])]
-                    formulas = unmerge_transform_to_sympy(input_symbol, lengths)
-                    for k_out_idx, form in zip(output_indices, formulas):
-                        output_formulas[k_out_idx] = form
-            elif transform_type == 'xor':
-                symbols = [input_symbols[k] for k in input_indices]
-                formula = sp.Function('XOR')(*symbols)
-                for k_out_idx in output_indices:
-                    output_formulas[k_out_idx] = formula
-        # Calculate output dimension count
-        if not upper_dims_indices or not any(upper_dims_indices):
-            output_count = 0
+            raise ValueError(f"Unsupported transform type: {transform['type']}")
+        
+        # Get input symbols for this transform
+        transform_inputs = [sp.Symbol(f'd_{dim}') for dim in dims]
+        
+        # Apply transform
+        if transform['type'] == 'unmerge':
+            result = transform_obj.sympy_backward(transform_inputs)
         else:
-            all_output_indices = set()
-            for indices in upper_dims_indices:
-                all_output_indices.update(indices)
-            output_count = max(all_output_indices) + 1 if all_output_indices else 0
-        prev_stage_output_formulas = output_formulas
-        prev_stage_output_count = output_count
-    # Return the final output formulas in order
-    final_output_formulas = [prev_stage_output_formulas.get(k, sp.Symbol(f"d_{k}")) for k in range(prev_stage_output_count)]
-    return final_output_formulas, initial_input_symbols
+            result = transform_obj.sympy_forward(transform_inputs)
+        
+        output_exprs.extend(result)
+    
+    return sp.Matrix(output_exprs), input_symbols
+
+def build_combined_backward_formula(transforms: List[Dict[str, Any]], 
+                                  lower_dims: List[List[int]], 
+                                  variables: Dict[str, Any]) -> Tuple[List[sp.Expr], List[sp.Symbol], List[sp.Symbol]]:
+    """Build a combined backward formula for all transforms."""
+    input_symbols = []
+    for dims in lower_dims:
+        for dim in dims:
+            symbol = sp.Symbol(f'd_{dim}')
+            if symbol not in input_symbols:
+                input_symbols.append(symbol)
+    
+    output_symbols = []
+    for i in range(len(transforms)):
+        output_symbols.append(sp.Symbol(f'y_{i}'))
+    
+    backward_exprs = []
+    for transform, dims, output_symbol in zip(transforms, lower_dims, output_symbols):
+        # Create appropriate transform object
+        if transform['type'] == 'merge':
+            lengths = [get_transform_length(val, variables) for val in transform['values']]
+            transform_obj = MergeTransform(lengths=lengths)
+        elif transform['type'] == 'unmerge':
+            lengths = [get_transform_length(val, variables) for val in transform['values']]
+            transform_obj = UnmergeTransform(lengths=lengths)
+        elif transform['type'] == 'pass_through':
+            transform_obj = PassThroughTransform(length=1)
+        else:
+            raise ValueError(f"Unsupported transform type: {transform['type']}")
+        
+        # Get input symbols for this transform
+        transform_inputs = [sp.Symbol(f'd_{dim}') for dim in dims]
+        
+        # Apply transform in reverse
+        if transform['type'] == 'merge':
+            result = transform_obj.sympy_backward([output_symbol])
+        else:
+            result = transform_obj.sympy_forward([output_symbol])
+        
+        backward_exprs.extend(result)
+    
+    return backward_exprs, input_symbols, output_symbols
 
 def main():
     """Main function for the Streamlit app."""
@@ -531,7 +596,6 @@ def main():
 
     initialize_session_state()
 
-    # --- Sidebar for Inputs ---
     with st.sidebar:
         st.header("Inputs")
         examples = get_transform_examples_with_multi()
@@ -539,8 +603,8 @@ def main():
         def on_example_change():
             st.session_state.selected_example = st.session_state.example_selectbox
             st.session_state.current_code = examples[st.session_state.selected_example]
-            st.session_state.parsed_descriptor = None # Reset parsing result
-            st.session_state.variables = {} # Reset variables
+            st.session_state.parsed_descriptor = None
+            st.session_state.variables = {}
 
         st.selectbox(
             "Select Example:",
@@ -560,11 +624,9 @@ def main():
         
         if st.button("Parse and Generate Formulas"):
             try:
-                # --- Multi-descriptor support ---
                 descriptor_texts = extract_descriptors_from_text(st.session_state.current_code)
                 parsed_descriptors = [parser.parse_tensor_descriptor(desc) for desc in descriptor_texts]
                 st.session_state.parsed_descriptor = parsed_descriptors
-                # Extract all variable names from all parsed descriptors
                 all_code = "\n".join(descriptor_texts)
                 variable_names = set()
                 template_vars = re.findall(r'number<([a-zA-Z0-9_ / * + -]+)>{}', all_code)
@@ -580,37 +642,16 @@ def main():
                 st.error(f"Failed to parse descriptor(s): {e}")
                 st.session_state.parsed_descriptor = None
 
-        # Show variables section using the separate function
         display_variable_controls()
 
-    # --- Main Content Area to Display Formulas and Pipeline ---
     if st.session_state.parsed_descriptor:
         parsed_descriptors = st.session_state.parsed_descriptor
         user_vars = st.session_state.variables
-        # Substitute user variable values before analysis
         parsed_descriptors = [substitute_descriptor(d, user_vars) for d in parsed_descriptors]
-        
-        # The analyzer is no longer needed for the graph, but might be for other things.
-        # We will bypass it for visualization.
-        # max_dims = max(len(desc.get('lower_dimensions', [])) for desc in parsed_descriptors if 'lower_dimensions' in desc)
-        # generic_dims = [f"d{i}" for i in range(max_dims)]
-        # analyzer = TensorTransformAnalyzer(parsed_descriptors, generic_dims)
-        # stages = analyzer.analyze()
-
-        st.markdown("---")
-        st.header("Final Combined Transformation Formulas (full pipeline)")
-        try:
-            final_output_formulas, initial_input_symbols = build_full_pipeline_formula(parsed_descriptors, st.session_state.variables)
-            st.markdown("**Forward Transformation (Input → Output):**")
-            st.latex(f"\\text{{Input}} = {sp.latex(sp.Tuple(*initial_input_symbols))}")
-            st.latex(f"\\text{{Output}} = {sp.latex(sp.Tuple(*final_output_formulas))}")
-        except Exception as e:
-            st.error(f"Failed to generate full pipeline formulas: {e}")
 
         st.markdown("---")
         st.header("Transformation Pipeline Graph")
         
-        # Force a rerun by checking if variables have changed
         if 'last_variables' not in st.session_state:
             st.session_state.last_variables = {}
         
@@ -619,27 +660,22 @@ def main():
             st.session_state.last_variables = st.session_state.variables.copy()
         
         try:
-            # Pass the original parsed descriptors and the current variables.
-            # The build function will handle all substitutions internally.
-            dot = build_transformation_graph(st.session_state.parsed_descriptor, st.session_state.variables)
+            descriptors = extract_descriptors_from_text(st.session_state.current_code)
             
-            # Show a status message when variables change
+            if not descriptors:
+                st.error("No descriptors found in the current code")
+                return
+            
+            dot = build_transformation_graph_from_pytensor(descriptors, st.session_state.variables)
+            
             if variables_changed:
                 st.success("Graph updated with new variable values!")
             
-            # The graph now includes variable values and timestamp in its content
             st.graphviz_chart(dot)
         except Exception as e:
             st.error(f"Failed to build graph: {e}")
-
-        # ... after the graph ...
-        st.markdown("---")
-        st.header("Debug: Raw Stage Data")
-        # Use the substituted descriptors for debug display
-        substituted_descriptors = [substitute_descriptor(d, st.session_state.variables) for d in st.session_state.parsed_descriptor]
-        for i, stage in enumerate(substituted_descriptors):
-            st.markdown(f"**Stage {i}:**")
-            st.json(stage)
+            import traceback
+            st.text(traceback.format_exc())
 
 if __name__ == "__main__":
     main() 
