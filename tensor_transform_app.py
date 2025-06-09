@@ -155,41 +155,49 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
     # For multi-descriptor examples, process each descriptor as a sequential stage
     # Each descriptor builds on the previous one, so we need to show the progression
     
-    # Analyze all descriptors to find the maximum input dimension needed
-    max_input_dim = 0
-    for tensor_desc in pytensor_descriptors:
-        all_lower_idss = tensor_desc.get_lower_dimension_hidden_idss()
-        for lower_ids in all_lower_idss:
-            if lower_ids:
-                max_input_dim = max(max_input_dim, max(lower_ids) + 1)
+    # For the first descriptor, if it's a naive descriptor, use its actual dimension count
+    # This fixes the issue where naive descriptors were getting too many input dimensions
+    first_desc = pytensor_descriptors[0]
+    first_desc_str = descriptors[0].strip()
     
-    print(f"DEBUG: max_input_dim calculated as {max_input_dim}")
-    
-    # If no transforms found, use the first descriptor's dimension count
-    if max_input_dim == 0:
-        first_desc = pytensor_descriptors[0]
+    if "make_naive_tensor_descriptor(" in first_desc_str and "make_naive_tensor_descriptor_packed(" not in first_desc_str:
+        # For non-packed naive descriptors, use the actual dimension count
         max_input_dim = first_desc.get_num_of_dimension()
-        print(f"DEBUG: max_input_dim fallback to first descriptor dimension count: {max_input_dim}")
-    
-    # For naive descriptors, we need to ensure we have enough input dimensions
-    # by checking the actual transforms in the pytensor object
-    if max_input_dim < 6:  # Assume at least 6 dimensions are often needed
-        first_desc = pytensor_descriptors[0]
-        all_upper_idss = first_desc.get_upper_dimension_hidden_idss()
-        all_lower_idss = first_desc.get_lower_dimension_hidden_idss()
+        print(f"DEBUG: Using naive descriptor dimension count: {max_input_dim}")
+    else:
+        # For other descriptors, analyze all descriptors to find the maximum input dimension needed
+        max_input_dim = 0
+        for tensor_desc in pytensor_descriptors:
+            all_lower_idss = tensor_desc.get_lower_dimension_hidden_idss()
+            for lower_ids in all_lower_idss:
+                if lower_ids:
+                    max_input_dim = max(max_input_dim, max(lower_ids) + 1)
         
-        # Find the maximum dimension referenced in any transform
-        max_dim_needed = 0
-        for lower_ids in all_lower_idss:
-            if lower_ids:
-                max_dim_needed = max(max_dim_needed, max(lower_ids) + 1)
-        for upper_ids in all_upper_idss:
-            if upper_ids:
-                max_dim_needed = max(max_dim_needed, max(upper_ids) + 1)
+        print(f"DEBUG: max_input_dim calculated as {max_input_dim}")
         
-        if max_dim_needed > max_input_dim:
-            max_input_dim = max_dim_needed
-            print(f"DEBUG: max_input_dim updated to {max_input_dim} based on pytensor transforms")
+        # If no transforms found, use the first descriptor's dimension count
+        if max_input_dim == 0:
+            max_input_dim = first_desc.get_num_of_dimension()
+            print(f"DEBUG: max_input_dim fallback to first descriptor dimension count: {max_input_dim}")
+        
+        # For naive descriptors, we need to ensure we have enough input dimensions
+        # by checking the actual transforms in the pytensor object
+        if max_input_dim < 6:  # Assume at least 6 dimensions are often needed
+            all_upper_idss = first_desc.get_upper_dimension_hidden_idss()
+            all_lower_idss = first_desc.get_lower_dimension_hidden_idss()
+            
+            # Find the maximum dimension referenced in any transform
+            max_dim_needed = 0
+            for lower_ids in all_lower_idss:
+                if lower_ids:
+                    max_dim_needed = max(max_dim_needed, max(lower_ids) + 1)
+            for upper_ids in all_upper_idss:
+                if upper_ids:
+                    max_dim_needed = max(max_dim_needed, max(upper_ids) + 1)
+            
+            if max_dim_needed > max_input_dim:
+                max_input_dim = max_dim_needed
+                print(f"DEBUG: max_input_dim updated to {max_input_dim} based on pytensor transforms")
     
     # Special handling for the first descriptor if it's make_naive_tensor_descriptor_packed
     first_desc_str = descriptors[0].strip()
@@ -257,23 +265,53 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
         
         print(f"DEBUG: Stage {stage_idx} has {len(all_transforms)} total transforms")
         
-        # For multi-descriptor examples, we need to determine which transforms are NEW in this stage
-        # by comparing with the previous descriptor's transforms
-        if stage_idx == 0:
-            # First descriptor: use all transforms
+        # Each descriptor defines its own complete transformation pipeline
+        # For transform_tensor_descriptor calls, we process the transforms defined in THAT descriptor
+        # not accumulated transforms from previous descriptors
+        
+        # Check if this is a naive descriptor or transform descriptor
+        desc_str = descriptors[stage_idx].strip() if stage_idx < len(descriptors) else ""
+        is_naive_descriptor = "make_naive_tensor_descriptor" in desc_str
+        is_transform_descriptor = "transform_tensor_descriptor" in desc_str
+        
+        if is_naive_descriptor:
+            # Naive descriptors: process all transforms (usually just EmbedTransform)
             new_transforms = all_transforms
             new_lower_idss = all_lower_idss
             new_upper_idss = all_upper_idss
-        else:
-            # Subsequent descriptors: find new transforms
-            prev_tensor_desc = pytensor_descriptors[stage_idx - 1]
-            prev_transforms = prev_tensor_desc.get_transforms()
-            prev_count = len(prev_transforms)
+        elif is_transform_descriptor:
+            # Transform descriptors: process the transforms specified in make_tuple(...)
+            # These are the transforms that get applied to the input descriptor
+            # For A LDS example: stage 1 should process [XorTransform, PassThroughTransform]
             
-            # The new transforms are those beyond the previous count
-            new_transforms = all_transforms[prev_count:]
-            new_lower_idss = all_lower_idss[prev_count:]
-            new_upper_idss = all_upper_idss[prev_count:]
+            # Extract the transform count from the original descriptor parsing
+            # The transforms in the tuple are what we want to visualize as this stage
+            parser = TensorTransformParser()
+            try:
+                parsed_desc = parser.parse_tensor_descriptor(desc_str)
+                if parsed_desc['type'] == 'transform':
+                    stage_transform_count = len(parsed_desc['transforms'])
+                    print(f"DEBUG: Stage {stage_idx} descriptor defines {stage_transform_count} transforms")
+                    
+                    # Process the last N transforms where N is the number defined in this descriptor
+                    new_transforms = all_transforms[-stage_transform_count:] if stage_transform_count > 0 else []
+                    new_lower_idss = all_lower_idss[-stage_transform_count:] if stage_transform_count > 0 else []
+                    new_upper_idss = all_upper_idss[-stage_transform_count:] if stage_transform_count > 0 else []
+                else:
+                    # Fallback: use all transforms
+                    new_transforms = all_transforms
+                    new_lower_idss = all_lower_idss
+                    new_upper_idss = all_upper_idss
+            except Exception as e:
+                print(f"DEBUG: Failed to parse descriptor for stage {stage_idx}, using all transforms: {e}")
+                new_transforms = all_transforms
+                new_lower_idss = all_lower_idss
+                new_upper_idss = all_upper_idss
+        else:
+            # Unknown descriptor type: use all transforms
+            new_transforms = all_transforms
+            new_lower_idss = all_lower_idss
+            new_upper_idss = all_upper_idss
         
         print(f"DEBUG: Stage {stage_idx} will process {len(new_transforms)} new transforms")
         
@@ -489,11 +527,23 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                         print(f"DEBUG: Added DOT node {node_id} with label {formula_str}")
                         
                         # Create edges from input nodes to this output node
-                        for input_idx in lower_indices:
-                            if input_idx in prev_stage_output_nodes:
-                                transform_name = transform.__class__.__name__.replace('Transform', '')
-                                dot.edge(prev_stage_output_nodes[input_idx], node_id, 
-                                       label=transform_name)
+                        # Special handling for EmbedTransform in naive descriptors
+                        if (isinstance(transform, pytensor.tensor_descriptor.EmbedTransform) and 
+                            stage_idx == 0 and "make_naive_tensor_descriptor" in descriptors[0]):
+                            # For naive descriptor EmbedTransform, connect all input dimensions
+                            expected_input_dims = len(transform.lengths)
+                            for dim_idx in range(expected_input_dims):
+                                if dim_idx in prev_stage_output_nodes:
+                                    transform_name = transform.__class__.__name__.replace('Transform', '')
+                                    dot.edge(prev_stage_output_nodes[dim_idx], node_id, 
+                                           label=transform_name)
+                        else:
+                            # Standard edge creation for other transforms
+                            for input_idx in lower_indices:
+                                if input_idx in prev_stage_output_nodes:
+                                    transform_name = transform.__class__.__name__.replace('Transform', '')
+                                    dot.edge(prev_stage_output_nodes[input_idx], node_id, 
+                                           label=transform_name)
                 
             except Exception as e:
                 st.warning(f"Failed to generate formula for transform {transform}: {e}")
@@ -504,17 +554,32 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                     next_formulas[node_id] = sp.Symbol(f"d{output_idx}")
                     dot.node(node_id, f"d{output_idx}", fillcolor="#ffcccc")
                     
-                    for input_idx in lower_indices:
-                        if input_idx in prev_stage_output_nodes:
-                            transform_name = transform.__class__.__name__.replace('Transform', '')
-                            dot.edge(prev_stage_output_nodes[input_idx], node_id, 
-                                   label=transform_name)
+                    # Create edges for error case - use same logic as successful case
+                    if (isinstance(transform, pytensor.tensor_descriptor.EmbedTransform) and 
+                        stage_idx == 0 and "make_naive_tensor_descriptor" in descriptors[0]):
+                        # For naive descriptor EmbedTransform, connect all input dimensions
+                        expected_input_dims = len(transform.lengths)
+                        for dim_idx in range(expected_input_dims):
+                            if dim_idx in prev_stage_output_nodes:
+                                transform_name = transform.__class__.__name__.replace('Transform', '')
+                                dot.edge(prev_stage_output_nodes[dim_idx], node_id, 
+                                       label=transform_name)
+                    else:
+                        # Standard edge creation for other transforms
+                        for input_idx in lower_indices:
+                            if input_idx in prev_stage_output_nodes:
+                                transform_name = transform.__class__.__name__.replace('Transform', '')
+                                dot.edge(prev_stage_output_nodes[input_idx], node_id, 
+                                       label=transform_name)
         
         # Update for next stage
         if stage_output_nodes:
-            prev_stage_output_nodes = stage_output_nodes
-            current_formulas = next_formulas
-            print(f"DEBUG: Stage {stage_idx} completed, updated prev_stage_output_nodes")
+            # Merge new stage outputs with existing nodes instead of replacing
+            # This preserves access to original inputs and previous stage outputs
+            prev_stage_output_nodes.update(stage_output_nodes)
+            current_formulas.update(next_formulas)
+            print(f"DEBUG: Stage {stage_idx} completed, merged stage outputs with existing nodes")
+            print(f"DEBUG: Available nodes for next stage: {list(prev_stage_output_nodes.keys())}")
             # Increment actual stage number only when we actually process a stage
             actual_stage_num += 1
         else:
@@ -698,6 +763,113 @@ def main():
             st.error(f"Failed to build graph: {e}")
             import traceback
             st.text(traceback.format_exc())
+
+        # Add JSON parsing view for debugging
+        st.markdown("---")
+        st.header("Parsing Debug Information")
+        
+        if st.checkbox("Show JSON Parsing Results", value=False):
+            try:
+                descriptors = extract_descriptors_from_text(st.session_state.current_code)
+                parser = TensorTransformParser()
+                
+                st.subheader("Descriptor Extraction Results")
+                st.write(f"**Number of descriptors found:** {len(descriptors)}")
+                
+                for i, desc_str in enumerate(descriptors):
+                    with st.expander(f"Descriptor {i} - Raw Text ({len(desc_str)} chars)"):
+                        st.code(desc_str, language="cpp")
+                
+                st.subheader("Parsing Results")
+                
+                parsing_results = {
+                    'total_descriptors': len(descriptors),
+                    'variables': st.session_state.variables,
+                    'descriptors': []
+                }
+                
+                descriptor_registry = {}
+                variable_names = ['desc_0', 'desc_1', 'desc_2', 'desc_3', 'desc_4']  # Generic names
+                
+                for i, desc_str in enumerate(descriptors):
+                    try:
+                        parser.descriptor_registry = descriptor_registry
+                        
+                        # Parse the descriptor
+                        parsed_dict = parser.parse_tensor_descriptor(desc_str)
+                        
+                        # Create pytensor descriptor
+                        tensor_desc = parser.create_pytensor_descriptor(desc_str, st.session_state.variables)
+                        
+                        if i < len(variable_names):
+                            descriptor_registry[variable_names[i]] = tensor_desc
+                        
+                        # Convert to JSON-serializable format
+                        json_desc = {
+                            'index': i,
+                            'type': parsed_dict['type'],
+                            'dimensions': tensor_desc.get_num_of_dimension(),
+                            'transform_count': len(tensor_desc.get_transforms()),
+                            'top_dimension_ids': tensor_desc.get_top_dimension_hidden_ids(),
+                        }
+                        
+                        # Add dimension lengths
+                        try:
+                            lengths = [tensor_desc.get_length(d) for d in range(tensor_desc.get_num_of_dimension())]
+                            json_desc['dimension_lengths'] = lengths
+                        except:
+                            json_desc['dimension_lengths'] = 'Could not compute'
+                        
+                        # Add parsing details
+                        if parsed_dict['type'] == 'naive':
+                            json_desc['lengths'] = [str(l) for l in parsed_dict['lengths']]
+                            json_desc['strides'] = [str(s) for s in parsed_dict['strides']]
+                            json_desc['vector_length'] = str(parsed_dict['vector_length'])
+                            json_desc['offset'] = str(parsed_dict['offset'])
+                        elif parsed_dict['type'] == 'transform':
+                            json_desc['input_descriptor'] = parsed_dict['input_descriptor']
+                            json_desc['transforms'] = []
+                            for j, transform in enumerate(parsed_dict['transforms']):
+                                json_transform = {
+                                    'index': j,
+                                    'type': transform['type']
+                                }
+                                if 'values' in transform:
+                                    json_transform['values'] = [str(v) for v in transform['values']]
+                                if 'value' in transform:
+                                    json_transform['value'] = str(transform['value'])
+                                json_desc['transforms'].append(json_transform)
+                            
+                            json_desc['lower_dimensions'] = parsed_dict['lower_dimensions']
+                            json_desc['upper_dimensions'] = parsed_dict['upper_dimensions']
+                        
+                        parsing_results['descriptors'].append(json_desc)
+                        
+                    except Exception as e:
+                        error_desc = {
+                            'index': i,
+                            'error': str(e),
+                            'descriptor_preview': desc_str[:200] + "..." if len(desc_str) > 200 else desc_str
+                        }
+                        parsing_results['descriptors'].append(error_desc)
+                
+                # Display as formatted JSON
+                st.json(parsing_results)
+                
+                # Add download button for JSON
+                import json
+                json_str = json.dumps(parsing_results, indent=2)
+                st.download_button(
+                    label="Download Parsing Results as JSON",
+                    data=json_str,
+                    file_name="tensor_parsing_results.json",
+                    mime="application/json"
+                )
+                
+            except Exception as e:
+                st.error(f"Failed to generate parsing debug info: {e}")
+                import traceback
+                st.text(traceback.format_exc())
 
 if __name__ == "__main__":
     main() 
