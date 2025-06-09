@@ -418,27 +418,28 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
     current_formulas = {}
     
     if is_first_naive_packed:
-        print("DEBUG: Using naive_packed path")
-        # For naive_tensor_descriptor_packed, create logical input dimensions
+        print("DEBUG: Using naive_packed path - consistent storage perspective")
+        # For naive_tensor_descriptor_packed, show the storage perspective consistently:
+        # Forward: 1 linear storage -> N logical dimensions (via UnmergeTransform)
+        # Backward: N logical dimensions -> 1 linear storage (via UnmergeTransform⁻¹)
         first_desc = pytensor_descriptors[0]
         num_logical_dims = first_desc.get_num_of_dimension()
         
         print(f"DEBUG: num_logical_dims = {num_logical_dims}")
         
-        for k in range(num_logical_dims):
-            node_id = f"input_d{k}"
-            # The logical dimensions should map directly to their indices
-            prev_stage_output_nodes[k] = node_id
-            
-            print(f"DEBUG: Created input {node_id} mapped to index {k}")
-            
-            try:
-                dim_length = first_desc.get_length(k) if hasattr(first_desc, 'get_length') else '?'
-                dim_label = f"d{k} ({dim_length})"
-            except:
-                dim_label = f"d{k}"
-            dot.node(node_id, dim_label, fillcolor="#ffcccc")
-            current_formulas[node_id] = sp.Symbol(f"d{k}")
+        # Create single input node for the linear storage (dimension 0 in hidden space)
+        storage_node_id = "input_storage"
+        prev_stage_output_nodes[0] = storage_node_id
+        
+        try:
+            element_space_size = first_desc.get_element_space_size()
+            storage_label = f"storage ({element_space_size})"
+        except:
+            storage_label = "storage"
+        dot.node(storage_node_id, storage_label, fillcolor="#ffcccc")
+        current_formulas[storage_node_id] = sp.Symbol("storage")
+        
+        print(f"DEBUG: Created single storage input {storage_node_id} for linear dimension 0")
     else:
         print(f"DEBUG: Using non-packed path, creating {max_input_dim} input dimensions")
         for k in range(max_input_dim):
@@ -524,29 +525,11 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
         print(f"DEBUG: Stage {stage_idx} will process {len(new_transforms)} new transforms")
         
         # Special handling for naive_tensor_descriptor_packed first transform
+        # For naive_packed descriptors, we want to show the logical interface (user perspective)
+        # while still displaying the internal UnmergeTransform that handles storage mapping
         if stage_idx == 0 and is_first_naive_packed and len(new_transforms) > 0:
             if isinstance(new_transforms[0], pytensor.tensor_descriptor.UnmergeTransform):
-                # Skip the first transform (UnmergeTransform) but set up connections
-                first_upper_indices = new_upper_idss[0]
-                for j, output_idx in enumerate(first_upper_indices):
-                    if j < num_logical_dims:
-                        input_node_id = f"input_d{j}"
-                        stage_output_nodes[j] = input_node_id
-                        next_formulas[input_node_id] = current_formulas[input_node_id]
-                
-                # Skip remaining processing for this stage if only UnmergeTransform
-                if len(new_transforms) == 1:
-                    print(f"DEBUG: Stage {stage_idx} only has UnmergeTransform, setting up connections and continuing")
-                    prev_stage_output_nodes = stage_output_nodes
-                    current_formulas = next_formulas
-                    # Don't increment actual_stage_num for skipped stages
-                    continue
-                
-                # Process remaining transforms  
-                new_transforms = new_transforms[1:]
-                new_lower_idss = new_lower_idss[1:]
-                new_upper_idss = new_upper_idss[1:]
-                print(f"DEBUG: Stage {stage_idx} after skipping UnmergeTransform will process {len(new_transforms)} transforms")
+                print(f"DEBUG: Stage {stage_idx} has UnmergeTransform, will show both logical and storage perspectives")
         
         # Skip stages with no new transforms to process
         if not new_transforms:
@@ -1247,29 +1230,54 @@ def build_backward_transformation_graph_from_pytensor(descriptors, variables):
     # Create final output nodes for backward graph (original input dimensions)
     if pytensor_descriptors:
         first_descriptor = pytensor_descriptors[0]
-        first_input_dims = first_descriptor.get_num_of_dimension()
+        first_desc_str = descriptors[0].strip() if descriptors else ""
+        is_first_naive_packed = "make_naive_tensor_descriptor_packed" in first_desc_str
         
-        print(f"DEBUG BACKWARD: Creating {first_input_dims} final output nodes")
-        
-        for k in range(first_input_dims):
-            # Check if we have a node that should connect to this final output
-            if k in prev_stage_output_nodes:
-                final_node_id = f"backward_output_d{k}"
+        if is_first_naive_packed:
+            # For naive_packed descriptors, create single storage output (consistent with forward input)
+            print(f"DEBUG BACKWARD: Creating single storage output for naive_packed descriptor")
+            
+            if 0 in prev_stage_output_nodes:
+                final_node_id = "backward_output_storage"
                 
                 try:
-                    dim_length = first_descriptor.get_length(k) if hasattr(first_descriptor, 'get_length') else '?'
-                    dim_label = f"in{k} ({dim_length})"
+                    element_space_size = first_descriptor.get_element_space_size()
+                    storage_label = f"storage ({element_space_size})"
                 except:
-                    dim_label = f"in{k}"
+                    storage_label = "storage"
                 
-                # Create final output node with distinct styling
-                dot.node(final_node_id, dim_label, fillcolor="#ff6666", style="filled,bold", shape="box")
+                # Create final storage output node
+                dot.node(final_node_id, storage_label, fillcolor="#ff6666", style="filled,bold", shape="box")
                 
-                # Connect from the last stage node to final output
-                source_node = prev_stage_output_nodes[k]
+                # Connect from the transform node to final storage output
+                source_node = prev_stage_output_nodes[0]
                 dot.edge(source_node, final_node_id, color="red", style="bold")
                 
-                print(f"DEBUG BACKWARD: Created final output node {final_node_id} connected from {source_node}")
+                print(f"DEBUG BACKWARD: Created final storage output {final_node_id} connected from {source_node}")
+        else:
+            # For regular descriptors, create logical dimension outputs
+            first_input_dims = first_descriptor.get_num_of_dimension()
+            print(f"DEBUG BACKWARD: Creating {first_input_dims} final output nodes")
+            
+            for k in range(first_input_dims):
+                # Check if we have a node that should connect to this final output
+                if k in prev_stage_output_nodes:
+                    final_node_id = f"backward_output_d{k}"
+                    
+                    try:
+                        dim_length = first_descriptor.get_length(k) if hasattr(first_descriptor, 'get_length') else '?'
+                        dim_label = f"in{k} ({dim_length})"
+                    except:
+                        dim_label = f"in{k}"
+                    
+                    # Create final output node with distinct styling
+                    dot.node(final_node_id, dim_label, fillcolor="#ff6666", style="filled,bold", shape="box")
+                    
+                    # Connect from the last stage node to final output
+                    source_node = prev_stage_output_nodes[k]
+                    dot.edge(source_node, final_node_id, color="red", style="bold")
+                    
+                    print(f"DEBUG BACKWARD: Created final output node {final_node_id} connected from {source_node}")
 
     return dot
 
