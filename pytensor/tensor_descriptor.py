@@ -1137,8 +1137,13 @@ def transform_tensor_descriptor(
     all_lower_idss = input_descriptor.get_lower_dimension_hidden_idss() + lower_dimension_hidden_idss
     all_upper_idss = input_descriptor.get_upper_dimension_hidden_idss() + upper_dimension_hidden_idss
     
-    # Use the top dimensions from the last transform as the new top dimensions
-    top_dimension_hidden_ids = upper_dimension_hidden_idss[-1] if upper_dimension_hidden_idss else input_descriptor.get_top_dimension_hidden_ids()
+    # Collect all unique output dimension indices from all transforms
+    all_output_indices = set()
+    for upper_ids in upper_dimension_hidden_idss:
+        all_output_indices.update(upper_ids)
+    
+    # Sort them to create the final top dimension IDs
+    top_dimension_hidden_ids = sorted(list(all_output_indices)) if all_output_indices else input_descriptor.get_top_dimension_hidden_ids()
     
     # Create new tensor descriptor
     return TensorDescriptor(

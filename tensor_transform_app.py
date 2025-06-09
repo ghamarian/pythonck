@@ -245,6 +245,7 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
             current_formulas[node_id] = sp.Symbol(f"d{k}")
     
     # Process each descriptor as a separate stage
+    actual_stage_num = 1  # Track actual stage numbers starting from 1
     for stage_idx, tensor_desc in enumerate(pytensor_descriptors):
         print(f"DEBUG: Processing stage_idx={stage_idx}")
         stage_output_nodes = {}
@@ -256,64 +257,69 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
         
         print(f"DEBUG: Stage {stage_idx} has {len(all_transforms)} total transforms")
         
-        # Determine which transforms to process for this stage
-        if len(pytensor_descriptors) > 1 and stage_idx > 0:
-            # For multi-descriptor pipelines after the first, get only new transforms
-            prev_desc = pytensor_descriptors[stage_idx - 1]
-            prev_transform_count = len(prev_desc.get_transforms())
-            
-            print(f"DEBUG: Previous descriptor had {prev_transform_count} transforms")
-            
-            # Get only the new transforms for this stage
-            if prev_transform_count < len(all_transforms):
-                new_transforms = all_transforms[prev_transform_count:]
-                new_lower_idss = all_lower_idss[prev_transform_count:]
-                new_upper_idss = all_upper_idss[prev_transform_count:]
-                print(f"DEBUG: Stage {stage_idx} will process {len(new_transforms)} new transforms")
-            else:
-                # No new transforms in this stage, skip
-                print(f"DEBUG: Stage {stage_idx} has no new transforms, skipping")
-                continue
-        else:
-            # First descriptor - process all transforms
+        # For multi-descriptor examples, we need to determine which transforms are NEW in this stage
+        # by comparing with the previous descriptor's transforms
+        if stage_idx == 0:
+            # First descriptor: use all transforms
             new_transforms = all_transforms
             new_lower_idss = all_lower_idss
             new_upper_idss = all_upper_idss
+        else:
+            # Subsequent descriptors: find new transforms
+            prev_tensor_desc = pytensor_descriptors[stage_idx - 1]
+            prev_transforms = prev_tensor_desc.get_transforms()
+            prev_count = len(prev_transforms)
             
-            print(f"DEBUG: Stage {stage_idx} (first) will process {len(new_transforms)} transforms")
-            
-            # Special handling for naive_tensor_descriptor_packed first transform
-            if is_first_naive_packed and len(new_transforms) > 0:
-                if isinstance(new_transforms[0], pytensor.tensor_descriptor.UnmergeTransform):
-                    # Skip the first transform (UnmergeTransform) but set up connections
-                    first_upper_indices = new_upper_idss[0]
-                    for j, output_idx in enumerate(first_upper_indices):
-                        if j < num_logical_dims:
-                            input_node_id = f"input_d{j}"
-                            stage_output_nodes[j] = input_node_id
-                            next_formulas[input_node_id] = current_formulas[input_node_id]
-                    
-                    # Skip remaining processing for this stage if only UnmergeTransform
-                    if len(new_transforms) == 1:
-                        print(f"DEBUG: Stage {stage_idx} only has UnmergeTransform, setting up connections and continuing")
-                        prev_stage_output_nodes = stage_output_nodes
-                        current_formulas = next_formulas
-                        continue
-                    
-                    # Process remaining transforms  
-                    new_transforms = new_transforms[1:]
-                    new_lower_idss = new_lower_idss[1:]
-                    new_upper_idss = new_upper_idss[1:]
-                    print(f"DEBUG: Stage {stage_idx} after skipping UnmergeTransform will process {len(new_transforms)} transforms")
+            # The new transforms are those beyond the previous count
+            new_transforms = all_transforms[prev_count:]
+            new_lower_idss = all_lower_idss[prev_count:]
+            new_upper_idss = all_upper_idss[prev_count:]
         
-        # Skip stages with no transforms to process
+        print(f"DEBUG: Stage {stage_idx} will process {len(new_transforms)} new transforms")
+        
+        # Special handling for naive_tensor_descriptor_packed first transform
+        if stage_idx == 0 and is_first_naive_packed and len(new_transforms) > 0:
+            if isinstance(new_transforms[0], pytensor.tensor_descriptor.UnmergeTransform):
+                # Skip the first transform (UnmergeTransform) but set up connections
+                first_upper_indices = new_upper_idss[0]
+                for j, output_idx in enumerate(first_upper_indices):
+                    if j < num_logical_dims:
+                        input_node_id = f"input_d{j}"
+                        stage_output_nodes[j] = input_node_id
+                        next_formulas[input_node_id] = current_formulas[input_node_id]
+                
+                # Skip remaining processing for this stage if only UnmergeTransform
+                if len(new_transforms) == 1:
+                    print(f"DEBUG: Stage {stage_idx} only has UnmergeTransform, setting up connections and continuing")
+                    prev_stage_output_nodes = stage_output_nodes
+                    current_formulas = next_formulas
+                    # Don't increment actual_stage_num for skipped stages
+                    continue
+                
+                # Process remaining transforms  
+                new_transforms = new_transforms[1:]
+                new_lower_idss = new_lower_idss[1:]
+                new_upper_idss = new_upper_idss[1:]
+                print(f"DEBUG: Stage {stage_idx} after skipping UnmergeTransform will process {len(new_transforms)} transforms")
+        
+        # Skip stages with no new transforms to process
         if not new_transforms:
-            print(f"DEBUG: Stage {stage_idx} has no transforms to process, skipping")
+            print(f"DEBUG: Stage {stage_idx} has no new transforms to process, skipping")
+            # Don't increment actual_stage_num for skipped stages
             continue
             
-        print(f"DEBUG: Stage {stage_idx} proceeding with {len(new_transforms)} transforms")
+        print(f"DEBUG: Stage {stage_idx} proceeding with {len(new_transforms)} new transforms, using actual stage number {actual_stage_num}")
         
-        # Process each transform in this stage
+        # Determine if this is the final stage
+        is_final_stage = (stage_idx == len(pytensor_descriptors) - 1)
+        
+        # For the final stage, we need to determine the actual final output dimensions
+        # by looking at the final descriptor's dimension count
+        if is_final_stage:
+            final_output_dims = tensor_desc.get_num_of_dimension()
+            print(f"DEBUG: Final stage should have {final_output_dims} output dimensions")
+        
+        # Process each new transform in this stage
         for i, transform in enumerate(new_transforms):
             if i >= len(new_lower_idss) or i >= len(new_upper_idss):
                 continue
@@ -336,7 +342,7 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                         input_symbols.append(sp.Symbol(f"d_{idx}"))
                 else:
                     input_symbols.append(sp.Symbol(f"d_{idx}"))
-            
+
             try:
                 # Apply the transform
                 if isinstance(transform, pytensor.tensor_descriptor.UnmergeTransform):
@@ -346,44 +352,52 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                     else:
                         output_formulas = transform.sympy_backward(input_symbols)
                 elif isinstance(transform, pytensor.tensor_descriptor.EmbedTransform):
-                    # EmbedTransform takes inputs from lower_indices and produces outputs for upper_indices
-                    # In the XT example: lower_indices=[0], upper_indices=[1,2,3,4,5,6]
-                    # This means: 1 input -> 6 outputs
+                    # EmbedTransform direction depends on the context:
+                    # - For the first (naive) descriptor: multi-dimensional coordinates -> linear address  
+                    # - For decomposition: linear address -> multi-dimensional coordinates
                     
-                    if len(lower_indices) == 1 and len(upper_indices) > 1:
-                        # Case: 1 input -> multiple outputs 
-                        # Use calculate_upper_index direction: lower -> upper (1D -> 6D)
-                        # This corresponds to sympy_backward for EmbedTransform
-                        single_input = input_symbols[0] if input_symbols else sp.Symbol("d0")
-                        try:
-                            output_formulas = transform.sympy_backward([single_input])
-                            print(f"DEBUG: EmbedTransform.sympy_backward({single_input}) -> {len(output_formulas)} outputs")
-                        except Exception as embed_error:
-                            print(f"DEBUG: EmbedTransform.sympy_backward failed: {embed_error}")
-                            # Fallback: create individual coordinate symbols
-                            output_formulas = [sp.Symbol(f"coord{i}") for i in range(len(upper_indices))]
-                    else:
-                        # Case: multiple inputs -> 1 output 
-                        # Use calculate_lower_index direction: upper -> lower (6D -> 1D)
-                        # This corresponds to sympy_forward for EmbedTransform
+                    # Check if this is the first naive descriptor
+                    is_first_descriptor = (stage_idx == 0)
+                    first_desc_str = descriptors[0].strip() if descriptors else ""
+                    is_naive_first = "make_naive_tensor_descriptor" in first_desc_str
+                    
+                    if is_first_descriptor and is_naive_first:
+                        # First descriptor: combines coordinates into linear address
+                        # Use sympy_forward: multiple inputs -> 1 output
                         expected_input_dims = len(transform.lengths)
                         
-                        # Create the required number of input symbols
-                        embed_input_symbols = []
+                        # Create input symbols for each coordinate
+                        coordinate_symbols = []
                         for dim_idx in range(expected_input_dims):
-                            if dim_idx < len(input_symbols):
-                                embed_input_symbols.append(input_symbols[dim_idx])
+                            if dim_idx in prev_stage_output_nodes:
+                                # Use the input node's formula
+                                input_node = prev_stage_output_nodes[dim_idx]
+                                coordinate_symbols.append(current_formulas[input_node])
                             else:
-                                embed_input_symbols.append(sp.Symbol(f"d{dim_idx}"))
+                                coordinate_symbols.append(sp.Symbol(f"d{dim_idx}"))
                         
                         try:
-                            output_formulas = transform.sympy_forward(embed_input_symbols)
-                            print(f"DEBUG: EmbedTransform.sympy_forward({embed_input_symbols}) -> {len(output_formulas)} outputs")
+                            output_formulas = transform.sympy_forward(coordinate_symbols)
+                            print(f"DEBUG: EmbedTransform.sympy_forward({coordinate_symbols}) -> {output_formulas}")
                         except Exception as embed_error:
                             print(f"DEBUG: EmbedTransform.sympy_forward failed: {embed_error}")
-                            # Fallback: create simple formula
-                            formula = sum(input_symbols[:expected_input_dims]) if input_symbols else sp.Symbol("combined")
-                            output_formulas = [formula]
+                            # Fallback: create simple sum
+                            output_formulas = [sum(coordinate_symbols)]
+                    else:
+                        # Decomposition case: linear address -> coordinates
+                        # Use sympy_backward: 1 input -> multiple outputs
+                        if input_symbols:
+                            single_input = input_symbols[0]
+                        else:
+                            single_input = sp.Symbol("d0")
+                        
+                        try:
+                            output_formulas = transform.sympy_backward([single_input])
+                            print(f"DEBUG: EmbedTransform.sympy_backward([{single_input}]) -> {len(output_formulas)} outputs")
+                        except Exception as embed_error:
+                            print(f"DEBUG: EmbedTransform.sympy_backward failed: {embed_error}")
+                            # Fallback: create coordinate symbols
+                            output_formulas = [sp.Symbol(f"coord{i}") for i in range(len(upper_indices))]
                 elif isinstance(transform, pytensor.tensor_descriptor.MergeTransform):
                     # MergeTransform has INCONSISTENT sympy method naming!
                     # For MergeTransform: sympy_forward does calculate_upper_index (lower->upper)
@@ -424,12 +438,19 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                 # Create output nodes for this transform
                 print(f"DEBUG: Transform {i} has {len(output_formulas)} output formulas for {len(upper_indices)} upper indices")
                 
+                # For final stage, only create nodes for dimensions that actually exist in the final output
+                if is_final_stage:
+                    # Filter upper_indices to only include those within the final output dimension count
+                    filtered_upper_indices = [idx for idx in upper_indices if idx < final_output_dims]
+                    print(f"DEBUG: Final stage filtering upper_indices {upper_indices} to {filtered_upper_indices}")
+                else:
+                    filtered_upper_indices = upper_indices
+                
                 # Create output nodes for each formula
-                for j, output_idx in enumerate(upper_indices):
+                for j, output_idx in enumerate(filtered_upper_indices):
                     if j < len(output_formulas):
-                        # Use sequential stage numbering starting from 1
-                        actual_stage = stage_idx + 1
-                        node_id = f"s{actual_stage}_t{i}_d{output_idx}"
+                        # Use the actual stage number for node naming
+                        node_id = f"s{actual_stage_num}_t{i}_d{output_idx}"
                         stage_output_nodes[output_idx] = node_id
                         
                         print(f"DEBUG: Creating node {node_id} for stage {stage_idx} transform {i}")
@@ -476,10 +497,9 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                 
             except Exception as e:
                 st.warning(f"Failed to generate formula for transform {transform}: {e}")
-                # Create error nodes
+                # Create error nodes with actual stage number
                 for j, output_idx in enumerate(upper_indices):
-                    actual_stage = stage_idx + 1
-                    node_id = f"s{actual_stage}_t{i}_d{output_idx}"
+                    node_id = f"s{actual_stage_num}_t{i}_d{output_idx}"
                     stage_output_nodes[output_idx] = node_id
                     next_formulas[node_id] = sp.Symbol(f"d{output_idx}")
                     dot.node(node_id, f"d{output_idx}", fillcolor="#ffcccc")
@@ -495,6 +515,8 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
             prev_stage_output_nodes = stage_output_nodes
             current_formulas = next_formulas
             print(f"DEBUG: Stage {stage_idx} completed, updated prev_stage_output_nodes")
+            # Increment actual stage number only when we actually process a stage
+            actual_stage_num += 1
         else:
             print(f"DEBUG: Stage {stage_idx} completed with no output nodes")
 
