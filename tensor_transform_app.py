@@ -27,7 +27,13 @@ def initialize_session_state():
         st.session_state.selected_example = list(get_transform_examples_with_multi().keys())[0]
     
     if 'variables' not in st.session_state:
-        st.session_state.variables = {}
+        # Get default variables for the selected example
+        examples = get_transform_examples_with_multi()
+        default_vars = get_default_variables()
+        if st.session_state.selected_example in default_vars:
+            st.session_state.variables = default_vars[st.session_state.selected_example].copy()
+        else:
+            st.session_state.variables = {}
 
     if 'current_code' not in st.session_state:
         st.session_state.current_code = get_transform_examples_with_multi()[st.session_state.selected_example]
@@ -61,8 +67,17 @@ def display_variable_controls():
         st.info("No template variables detected in code. Parse your code to find variables.")
         return
     
+    # Get default values for the current example
+    default_vars = get_default_variables()
+    example_defaults = default_vars.get(st.session_state.selected_example, {})
+    
     for var in st.session_state.variable_names:
-        current_value = st.session_state.variables.get(var, 1)
+        # First try to get current value from session state
+        current_value = st.session_state.variables.get(var)
+        
+        # If not in session state, try to get from defaults
+        if current_value is None:
+            current_value = example_defaults.get(var, 1)
         
         if '::' in var:
             namespace, var_name = var.split('::')
@@ -688,10 +703,17 @@ def main():
         examples = get_transform_examples_with_multi()
         
         def on_example_change():
+            """Handle example selection change."""
             st.session_state.selected_example = st.session_state.example_selectbox
             st.session_state.current_code = examples[st.session_state.selected_example]
             st.session_state.parsed_descriptor = None
-            st.session_state.variables = {}
+            
+            # Update variables with defaults for the new example
+            default_vars = get_default_variables()
+            if st.session_state.selected_example in default_vars:
+                st.session_state.variables = default_vars[st.session_state.selected_example].copy()
+            else:
+                st.session_state.variables = {}
 
         st.selectbox(
             "Select Example:",
@@ -714,6 +736,8 @@ def main():
                 descriptor_texts = extract_descriptors_from_text(st.session_state.current_code)
                 parsed_descriptors = [parser.parse_tensor_descriptor(desc) for desc in descriptor_texts]
                 st.session_state.parsed_descriptor = parsed_descriptors
+                
+                # Extract variable names from the code
                 all_code = "\n".join(descriptor_texts)
                 variable_names = set()
                 template_vars = re.findall(r'number<([a-zA-Z0-9_ / * + -]+)>{}', all_code)
@@ -724,6 +748,25 @@ def main():
                                'make_merge_transform', 'number', 'true', 'false', 'nullptr'}
                 variable_names.update(var for var in raw_vars if var not in cpp_keywords)
                 st.session_state.variable_names = sorted(variable_names)
+                
+                # Get default values for the current example
+                default_vars = get_default_variables()
+                example_defaults = default_vars.get(st.session_state.selected_example, {})
+                
+                # Create new variables dict preserving existing values where possible
+                new_variables = {}
+                for var in st.session_state.variable_names:
+                    # First try to get existing value from session state
+                    if var in st.session_state.variables:
+                        new_variables[var] = st.session_state.variables[var]
+                    # Then try defaults
+                    elif var in example_defaults:
+                        new_variables[var] = example_defaults[var]
+                    # Finally fall back to 1
+                    else:
+                        new_variables[var] = 1
+                
+                st.session_state.variables = new_variables
                 st.success(f"Parsed {len(parsed_descriptors)} descriptor(s) successfully!")
             except Exception as e:
                 st.error(f"Failed to parse descriptor(s): {e}")
