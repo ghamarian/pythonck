@@ -368,7 +368,15 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
     first_desc = pytensor_descriptors[0]
     first_desc_str = descriptors[0].strip()
     
-    if "make_naive_tensor_descriptor(" in first_desc_str and "make_naive_tensor_descriptor_packed(" not in first_desc_str:
+    # Special handling for the first descriptor if it's make_naive_tensor_descriptor_packed
+    is_first_naive_packed = "make_naive_tensor_descriptor_packed" in first_desc_str
+    
+    if is_first_naive_packed:
+        # For naive_packed descriptors, we use storage perspective (1 input)
+        # The max_input_dim calculation is not relevant since we create storage input
+        max_input_dim = 1  # Will be overridden by storage logic anyway
+        print(f"DEBUG: First descriptor is naive_packed, will use storage perspective")
+    elif "make_naive_tensor_descriptor(" in first_desc_str:
         # For non-packed naive descriptors, use the actual dimension count
         max_input_dim = first_desc.get_num_of_dimension()
         print(f"DEBUG: Using naive descriptor dimension count: {max_input_dim}")
@@ -406,10 +414,6 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
             if max_dim_needed > max_input_dim:
                 max_input_dim = max_dim_needed
                 print(f"DEBUG: max_input_dim updated to {max_input_dim} based on pytensor transforms")
-    
-    # Special handling for the first descriptor if it's make_naive_tensor_descriptor_packed
-    first_desc_str = descriptors[0].strip()
-    is_first_naive_packed = "make_naive_tensor_descriptor_packed" in first_desc_str
     
     print(f"DEBUG: is_first_naive_packed = {is_first_naive_packed}")
     
