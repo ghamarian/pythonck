@@ -114,6 +114,199 @@ def substitute_descriptor(descriptor, user_vars):
     else:
         return descriptor
 
+
+def create_hierarchical_merge_nodes(transform, input_symbols, lower_indices, upper_indices,
+                                   structure, variables, dot, stage_idx, transform_idx, 
+                                   actual_stage_num, prev_stage_output_nodes):
+    """
+    Create separate nodes for hierarchical merge structures.
+    
+    This function processes nested merge structures by creating intermediate nodes
+    for each level of the hierarchy.
+    
+    Returns:
+        tuple: (output_formulas, intermediate_node_ids) where intermediate_node_ids 
+               contains information about which intermediate nodes were created
+    """
+    import sympy as sp
+    from pytensor.tensor_descriptor import MergeTransform, PassThroughTransform
+    from tensor_transform_parser import TensorTransformParser
+    
+    print(f"DEBUG: Creating hierarchical merge nodes for structure: {structure}")
+    
+    parser = TensorTransformParser()
+    intermediate_nodes = {}
+    intermediate_formulas = {}
+    symbol_to_input_idx = {}
+    created_intermediate_nodes = []  # Track created intermediate nodes for edge connections
+    
+    # Map input symbols to their indices for tracking
+    for idx, symbol in zip(lower_indices, input_symbols):
+        symbol_to_input_idx[symbol] = idx
+    
+    def process_structure_recursive(struct, current_inputs, depth=0):
+        """Recursively process the hierarchical structure."""
+        indent = "  " * depth
+        print(f"DEBUG: {indent}Processing structure at depth {depth}: {struct}")
+        
+        result_symbols = []
+        
+        for i, item in enumerate(struct):
+            if isinstance(item, dict):
+                if item.get('type') == 'pass_through':
+                    # Simple pass-through - use corresponding input symbol
+                    if i < len(current_inputs):
+                        result_symbols.append(current_inputs[i])
+                        print(f"DEBUG: {indent}Pass-through: {current_inputs[i]}")
+                    else:
+                        # Fallback symbol
+                        fallback_symbol = sp.Symbol(f"pt_{depth}_{i}")
+                        result_symbols.append(fallback_symbol)
+                        print(f"DEBUG: {indent}Pass-through fallback: {fallback_symbol}")
+                
+                elif item.get('type') == 'merge':
+                    # Nested merge - create intermediate node
+                    nested_values = item.get('values', [])
+                    print(f"DEBUG: {indent}Processing nested merge with {len(nested_values)} values")
+                    
+                    # For the nested merge, we need to take the next available inputs
+                    # Based on the structure: [A, merge(B, C)] - the nested merge should get B and C
+                    nested_inputs = []
+                    needed_inputs = len(nested_values)  # Each value in the nested merge needs one input
+                    
+                    # Take the next 'needed_inputs' symbols from the remaining current_inputs
+                    start_idx = len(result_symbols)  # Skip inputs already consumed by previous items
+                    for j in range(needed_inputs):
+                        if start_idx + j < len(input_symbols):
+                            nested_inputs.append(input_symbols[start_idx + j])
+                    
+                    print(f"DEBUG: {indent}Nested merge using inputs: {nested_inputs}")
+                    
+                    # Create the intermediate merge transform
+                    nested_lengths = []
+                    for nested_item in nested_values:
+                        lengths = parser._flatten_merge_lengths(nested_item, variables)
+                        nested_lengths.extend(lengths)
+                    
+                    print(f"DEBUG: {indent}Creating intermediate merge with lengths: {nested_lengths}")
+                    intermediate_merge = MergeTransform(lengths=nested_lengths)
+                    
+                    # Create intermediate node
+                    intermediate_node_id = f"s{actual_stage_num}_t{transform_idx}_intermediate_{depth}_{i}"
+                    
+                    # Calculate the merge formula
+                    if nested_inputs:
+                        try:
+                            intermediate_formula = intermediate_merge.sympy_forward(nested_inputs)[0]
+                            print(f"DEBUG: {indent}Intermediate formula: {intermediate_formula}")
+                        except Exception as e:
+                            print(f"DEBUG: {indent}Failed to create intermediate formula: {e}")
+                            intermediate_formula = sum(nested_inputs) if nested_inputs else sp.Symbol("intermediate")
+                    else:
+                        intermediate_formula = sp.Symbol("intermediate")
+                    
+                    # Store intermediate result
+                    intermediate_nodes[intermediate_node_id] = intermediate_formula
+                    intermediate_formulas[intermediate_node_id] = intermediate_formula
+                    
+                    # Track this intermediate node for later edge connections
+                    intermediate_info = {
+                        'node_id': intermediate_node_id,
+                        'input_indices': [start_idx + j for j in range(needed_inputs)],
+                        'formula': intermediate_formula
+                    }
+                    created_intermediate_nodes.append(intermediate_info)
+                    
+                    # Substitute variables and create the DOT node
+                    substituted_formula = intermediate_formula.subs(variables)
+                    simplified_formula = sp.simplify(substituted_formula)
+                    
+                    try:
+                        formula_str = str(simplified_formula)
+                        if (not any(func in formula_str for func in ['floor', 'ceiling', 'sqrt']) 
+                            and '/' not in formula_str and '**' not in formula_str):
+                            try:
+                                pretty_str = sp.pretty(simplified_formula, use_unicode=False)
+                                if '\n' not in pretty_str:
+                                    formula_str = pretty_str
+                            except:
+                                pass
+                    except Exception:
+                        formula_str = f"intermediate_{depth}_{i}"
+                    
+                    label = f'<<FONT POINT-SIZE="12">{formula_str}</FONT>>'
+                    dot.node(intermediate_node_id, label, fillcolor="#ffcc99")  # Orange for intermediate
+                    print(f"DEBUG: {indent}Created intermediate node {intermediate_node_id}")
+                    
+                    # Create edges from inputs to intermediate node - use the actual input indices
+                    for j, nested_input in enumerate(nested_inputs):
+                        actual_input_idx = start_idx + j
+                        if actual_input_idx in prev_stage_output_nodes:
+                            dot.edge(prev_stage_output_nodes[actual_input_idx], intermediate_node_id, 
+                                    label="Merge")
+                    
+                    # Use the intermediate result as a symbol for further processing
+                    result_symbols.append(intermediate_formula)
+                    
+            else:
+                # Handle non-dict items (shouldn't happen in proper structure)
+                print(f"DEBUG: {indent}Unexpected item type: {type(item)}")
+                if current_inputs:
+                    result_symbols.append(current_inputs.pop(0))
+        
+        return result_symbols
+    
+    # Process the hierarchical structure
+    working_inputs = input_symbols.copy()
+    processed_symbols = process_structure_recursive(structure, working_inputs)
+    
+    # Create the final merge if needed
+    if len(processed_symbols) > 1:
+        # For hierarchical merge, we need to create the correct lengths for the final merge
+        # The final merge should combine the outputs of the hierarchical structure
+        # Calculate the effective lengths for the final merge
+        final_lengths = []
+        
+        # For each processed symbol, determine its contribution
+        for i, (symbol, struct_item) in enumerate(zip(processed_symbols, structure)):
+            if isinstance(struct_item, dict):
+                if struct_item.get('type') == 'pass_through':
+                    # Pass-through contributes its original length
+                    value = struct_item.get('value', 1)
+                    if hasattr(value, 'subs'):
+                        # It's a SymPy expression
+                        safe_variables = {k: v for k, v in variables.items() if not isinstance(v, list)}
+                        final_lengths.append(int(value.subs(safe_variables)))
+                    else:
+                        final_lengths.append(int(value))
+                elif struct_item.get('type') == 'merge':
+                    # Nested merge contributes the product of its input lengths
+                    nested_lengths = []
+                    for nested_item in struct_item.get('values', []):
+                        nested_lengths.extend(parser._flatten_merge_lengths(nested_item, variables))
+                    final_lengths.append(int(sp.prod(nested_lengths)))
+            else:
+                # Fallback
+                final_lengths.append(1)
+        
+        print(f"DEBUG: Final merge lengths calculated as: {final_lengths}")
+        
+        # Create final merge transform with correct lengths
+        final_merge = MergeTransform(lengths=final_lengths)
+        try:
+            final_formula = final_merge.sympy_forward(processed_symbols)[0]
+            print(f"DEBUG: Final hierarchical merge formula: {final_formula}")
+            return ([final_formula], created_intermediate_nodes)
+        except Exception as e:
+            print(f"DEBUG: Failed to create final merge formula: {e}")
+            return ([sum(processed_symbols)], created_intermediate_nodes)
+    elif len(processed_symbols) == 1:
+        return (processed_symbols, created_intermediate_nodes)
+    else:
+        # Fallback
+        return ([sum(input_symbols) if input_symbols else sp.Symbol("merged")], created_intermediate_nodes)
+
+
 def build_transformation_graph_from_pytensor(descriptors, variables):
     """
     Build a Graphviz DOT graph using pytensor objects and their sympy methods.
@@ -397,6 +590,9 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                     input_symbols.append(sp.Symbol(f"d_{idx}"))
 
             try:
+                # Initialize variable for hierarchical merge tracking
+                hierarchical_intermediate_nodes = []
+                
                 # Apply the transform
                 if isinstance(transform, pytensor.tensor_descriptor.UnmergeTransform):
                     if len(input_symbols) != 1:
@@ -452,31 +648,44 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                             # Fallback: create coordinate symbols
                             output_formulas = [sp.Symbol(f"coord{i}") for i in range(len(upper_indices))]
                 elif isinstance(transform, pytensor.tensor_descriptor.MergeTransform):
-                    # MergeTransform has INCONSISTENT sympy method naming!
-                    # For MergeTransform: sympy_forward does calculate_upper_index (lower->upper)
-                    # We need to handle this inconsistency
-                    if len(lower_indices) > 1 and len(upper_indices) == 1:
-                        # Case: multiple inputs -> 1 output (6D -> 1D)
-                        # This should use calculate_upper_index: lower -> upper
-                        # For MergeTransform, this is sympy_forward (inconsistent naming!)
-                        try:
-                            output_formulas = transform.sympy_forward(input_symbols)
-                            print(f"DEBUG: MergeTransform.sympy_forward({input_symbols}) -> {len(output_formulas)} outputs")
-                        except Exception as merge_error:
-                            print(f"DEBUG: MergeTransform.sympy_forward failed: {merge_error}")
-                            formula = sum(input_symbols) if input_symbols else sp.Symbol("merged")
-                            output_formulas = [formula]
+                    # Check if this is a hierarchical merge
+                    if hasattr(transform, '_hierarchy_info') and transform._hierarchy_info.get('is_hierarchical'):
+                        print(f"DEBUG: Processing hierarchical merge with structure: {transform._hierarchy_info['structure']}")
+                        # Create separate nodes for hierarchical merge
+                        output_formulas, intermediate_node_info = create_hierarchical_merge_nodes(
+                            transform, input_symbols, lower_indices, upper_indices,
+                            transform._hierarchy_info['structure'], variables, dot,
+                            stage_idx, i, actual_stage_num, prev_stage_output_nodes
+                        )
+                        # Store intermediate node info for custom edge creation
+                        hierarchical_intermediate_nodes = intermediate_node_info
                     else:
-                        # Case: 1 input -> multiple outputs (1D -> 6D)
-                        # This should use calculate_lower_index: upper -> lower
-                        # For MergeTransform, this is sympy_backward (inconsistent naming!)
-                        single_input = input_symbols[0] if input_symbols else sp.Symbol("merged")
-                        try:
-                            output_formulas = transform.sympy_backward([single_input])
-                            print(f"DEBUG: MergeTransform.sympy_backward({single_input}) -> {len(output_formulas)} outputs")
-                        except Exception as merge_error:
-                            print(f"DEBUG: MergeTransform.sympy_backward failed: {merge_error}")
-                            output_formulas = [sp.Symbol(f"comp{i}") for i in range(len(upper_indices))]
+                        # Regular flat merge - use existing logic
+                        # MergeTransform has INCONSISTENT sympy method naming!
+                        # For MergeTransform: sympy_forward does calculate_upper_index (lower->upper)
+                        # We need to handle this inconsistency
+                        if len(lower_indices) > 1 and len(upper_indices) == 1:
+                            # Case: multiple inputs -> 1 output (6D -> 1D)
+                            # This should use calculate_upper_index: lower -> upper
+                            # For MergeTransform, this is sympy_forward (inconsistent naming!)
+                            try:
+                                output_formulas = transform.sympy_forward(input_symbols)
+                                print(f"DEBUG: MergeTransform.sympy_forward({input_symbols}) -> {len(output_formulas)} outputs")
+                            except Exception as merge_error:
+                                print(f"DEBUG: MergeTransform.sympy_forward failed: {merge_error}")
+                                formula = sum(input_symbols) if input_symbols else sp.Symbol("merged")
+                                output_formulas = [formula]
+                        else:
+                            # Case: 1 input -> multiple outputs (1D -> 6D)
+                            # This should use calculate_lower_index: upper -> lower
+                            # For MergeTransform, this is sympy_backward (inconsistent naming!)
+                            single_input = input_symbols[0] if input_symbols else sp.Symbol("merged")
+                            try:
+                                output_formulas = transform.sympy_backward([single_input])
+                                print(f"DEBUG: MergeTransform.sympy_backward({single_input}) -> {len(output_formulas)} outputs")
+                            except Exception as merge_error:
+                                print(f"DEBUG: MergeTransform.sympy_backward failed: {merge_error}")
+                                output_formulas = [sp.Symbol(f"comp{i}") for i in range(len(upper_indices))]
                 elif isinstance(transform, pytensor.tensor_descriptor.UnmergeTransform):
                     # UnmergeTransform should follow same pattern as MergeTransform
                     # (they likely have the same inconsistent naming)
@@ -542,8 +751,48 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                         print(f"DEBUG: Added DOT node {node_id} with label {formula_str}")
                         
                         # Create edges from input nodes to this output node
+                        # Special handling for hierarchical merges
+                        if (isinstance(transform, pytensor.tensor_descriptor.MergeTransform) and 
+                            hasattr(transform, '_hierarchy_info') and transform._hierarchy_info.get('is_hierarchical')):
+                            # For hierarchical merges, create custom edges
+                            print(f"DEBUG: Creating custom edges for hierarchical merge")
+                            
+                            # Get the structure to understand the hierarchy
+                            structure = transform._hierarchy_info['structure']
+                            
+                            # Create edges based on the hierarchical structure
+                            consumed_inputs = set()  # Track which inputs have been consumed by intermediate nodes
+                            
+                            # First, mark inputs consumed by intermediate nodes
+                            if 'hierarchical_intermediate_nodes' in locals():
+                                for intermediate_info in hierarchical_intermediate_nodes:
+                                    consumed_inputs.update(intermediate_info['input_indices'])
+                                    print(f"DEBUG: Inputs {intermediate_info['input_indices']} consumed by intermediate {intermediate_info['node_id']}")
+                            
+                            # Create edges from remaining inputs and intermediate nodes to final node
+                            for struct_idx, struct_item in enumerate(structure):
+                                if isinstance(struct_item, dict):
+                                    if struct_item.get('type') == 'pass_through':
+                                        # Pass-through connects directly from input to final
+                                        input_idx = struct_idx  # For the first element (A)
+                                        if input_idx not in consumed_inputs and input_idx in prev_stage_output_nodes:
+                                            transform_name = "Merge"
+                                            dot.edge(prev_stage_output_nodes[input_idx], node_id, 
+                                                   label=transform_name)
+                                            print(f"DEBUG: Created edge from input {input_idx} to final node {node_id}")
+                                    
+                                    elif struct_item.get('type') == 'merge':
+                                        # Nested merge connects from intermediate node to final
+                                        if 'hierarchical_intermediate_nodes' in locals():
+                                            for intermediate_info in hierarchical_intermediate_nodes:
+                                                if struct_idx == 1:  # This is the second item in structure (the nested merge)
+                                                    transform_name = "Merge"
+                                                    dot.edge(intermediate_info['node_id'], node_id, 
+                                                           label=transform_name)
+                                                    print(f"DEBUG: Created edge from intermediate {intermediate_info['node_id']} to final node {node_id}")
+                        
                         # Special handling for EmbedTransform in naive descriptors
-                        if (isinstance(transform, pytensor.tensor_descriptor.EmbedTransform) and 
+                        elif (isinstance(transform, pytensor.tensor_descriptor.EmbedTransform) and 
                             stage_idx == 0 and "make_naive_tensor_descriptor" in descriptors[0]):
                             # For naive descriptor EmbedTransform, connect all input dimensions
                             expected_input_dims = len(transform.lengths)
@@ -599,6 +848,33 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
             actual_stage_num += 1
         else:
             print(f"DEBUG: Stage {stage_idx} completed with no output nodes")
+
+    # Create final output nodes for forward graph
+    if pytensor_descriptors:
+        final_descriptor = pytensor_descriptors[-1]
+        final_output_dims = final_descriptor.get_num_of_dimension()
+        
+        print(f"DEBUG: Creating {final_output_dims} final output nodes")
+        
+        for k in range(final_output_dims):
+            # Check if we have a node that should connect to this final output
+            if k in prev_stage_output_nodes:
+                final_node_id = f"forward_output_d{k}"
+                
+                try:
+                    dim_length = final_descriptor.get_length(k) if hasattr(final_descriptor, 'get_length') else '?'
+                    dim_label = f"out{k} ({dim_length})"
+                except:
+                    dim_label = f"out{k}"
+                
+                # Create final output node with distinct styling
+                dot.node(final_node_id, dim_label, fillcolor="#66ff66", style="filled,bold", shape="box")
+                
+                # Connect from the last stage node to final output
+                source_node = prev_stage_output_nodes[k]
+                dot.edge(source_node, final_node_id, color="green", style="bold")
+                
+                print(f"DEBUG: Created final output node {final_node_id} connected from {source_node}")
 
     # Debug: Check if s4 nodes are in the DOT source
     dot_source = dot.source
@@ -691,6 +967,312 @@ def build_combined_backward_formula(transforms: List[Dict[str, Any]],
     
     return backward_exprs, input_symbols, output_symbols
 
+def build_backward_transformation_graph_from_pytensor(descriptors, variables):
+    """
+    Build a Graphviz DOT graph using pytensor objects in backward direction.
+    
+    This generates the inverse transformation graph, starting from final outputs
+    and working backwards to the original inputs using sympy_backward methods.
+    """
+    dot = graphviz.Digraph(format="png")
+    dot.attr(rankdir="LR", splines="ortho")  # Left to Right like forward graph
+    dot.attr('node', shape='box', style='rounded,filled')
+
+    timestamp = int(time.time() * 1000)
+    var_comment = f"Backward Variables: {sorted(variables.items())} - Time: {timestamp}"
+    dot.attr(comment=var_comment)
+    
+    vars_display = ", ".join(f"{k}={v}" for k, v in sorted(variables.items())[:5])
+    dot.node("backward_title", f"Backward Graph - Variables: {vars_display}", shape="note", style="filled", fillcolor="lightblue")
+
+    if not descriptors:
+        return dot
+
+    parser = TensorTransformParser()
+    
+    realistic_var_names = [
+        'b_lds_block_desc',
+        'b_lds_block_desc_permuted', 
+        'b_lds_block_desc_unmerged',
+        'b_lds_block_desc_kn'
+    ]
+    
+    pytensor_descriptors = []
+    descriptor_registry = {}
+    
+    # First, build all descriptors (same as forward)
+    for i, desc_str in enumerate(descriptors):
+        try:
+            parser.descriptor_registry = descriptor_registry
+            tensor_desc = parser.create_pytensor_descriptor(desc_str, variables)
+            pytensor_descriptors.append(tensor_desc)
+            
+            print(f"DEBUG BACKWARD: Created pytensor descriptor {i} with {len(tensor_desc.get_transforms())} transforms")
+            
+            if i < len(realistic_var_names):
+                var_name = realistic_var_names[i]
+                descriptor_registry[var_name] = tensor_desc
+                
+        except Exception as e:
+            st.error(f"Failed to create pytensor descriptor {i}: {e}")
+            dot.node(f"backward_error_{i}", f"Error: {str(e)[:50]}...", fillcolor="#ffcccc")
+            continue
+
+    if not pytensor_descriptors:
+        st.error("No valid descriptors could be created for backward graph")
+        return dot
+
+    # Start from the final descriptor's output dimensions (these become our "input" nodes for backward)
+    final_descriptor = pytensor_descriptors[-1]
+    final_output_dims = final_descriptor.get_num_of_dimension()
+    
+    print(f"DEBUG BACKWARD: Final descriptor has {final_output_dims} output dimensions")
+    
+    # Create starting nodes (final outputs become backward inputs)
+    prev_stage_output_nodes = {}
+    current_formulas = {}
+    
+    for k in range(final_output_dims):
+        node_id = f"backward_start_d{k}"
+        prev_stage_output_nodes[k] = node_id
+        
+        try:
+            dim_length = final_descriptor.get_length(k) if hasattr(final_descriptor, 'get_length') else '?'
+            dim_label = f"out{k} ({dim_length})"
+        except:
+            dim_label = f"out{k}"
+        dot.node(node_id, dim_label, fillcolor="#ccffcc")  # Light green for final outputs
+        current_formulas[node_id] = sp.Symbol(f"out{k}")
+    
+    # Process descriptors in REVERSE order for backward graph
+    actual_stage_num = len(pytensor_descriptors)
+    for stage_idx in range(len(pytensor_descriptors) - 1, -1, -1):
+        tensor_desc = pytensor_descriptors[stage_idx]
+        print(f"DEBUG BACKWARD: Processing stage_idx={stage_idx} in reverse")
+        
+        stage_output_nodes = {}
+        next_formulas = {}
+        
+        all_transforms = tensor_desc.get_transforms()
+        all_lower_idss = tensor_desc.get_lower_dimension_hidden_idss()
+        all_upper_idss = tensor_desc.get_upper_dimension_hidden_idss()
+        
+        print(f"DEBUG BACKWARD: Stage {stage_idx} has {len(all_transforms)} total transforms")
+        
+        # Determine which transforms to process for this stage (same logic as forward)
+        desc_str = descriptors[stage_idx].strip() if stage_idx < len(descriptors) else ""
+        is_naive_descriptor = "make_naive_tensor_descriptor" in desc_str
+        is_transform_descriptor = "transform_tensor_descriptor" in desc_str
+        
+        if is_naive_descriptor:
+            new_transforms = all_transforms
+            new_lower_idss = all_lower_idss
+            new_upper_idss = all_upper_idss
+        elif is_transform_descriptor:
+            parser = TensorTransformParser()
+            try:
+                parsed_desc = parser.parse_tensor_descriptor(desc_str)
+                if parsed_desc['type'] == 'transform':
+                    stage_transform_count = len(parsed_desc['transforms'])
+                    print(f"DEBUG BACKWARD: Stage {stage_idx} descriptor defines {stage_transform_count} transforms")
+                    
+                    new_transforms = all_transforms[-stage_transform_count:] if stage_transform_count > 0 else []
+                    new_lower_idss = all_lower_idss[-stage_transform_count:] if stage_transform_count > 0 else []
+                    new_upper_idss = all_upper_idss[-stage_transform_count:] if stage_transform_count > 0 else []
+                else:
+                    new_transforms = all_transforms
+                    new_lower_idss = all_lower_idss
+                    new_upper_idss = all_upper_idss
+            except Exception as e:
+                print(f"DEBUG BACKWARD: Failed to parse descriptor for stage {stage_idx}, using all transforms: {e}")
+                new_transforms = all_transforms
+                new_lower_idss = all_lower_idss
+                new_upper_idss = all_upper_idss
+        else:
+            new_transforms = all_transforms
+            new_lower_idss = all_lower_idss
+            new_upper_idss = all_upper_idss
+        
+        print(f"DEBUG BACKWARD: Stage {stage_idx} will process {len(new_transforms)} new transforms")
+        
+        # Skip stages with no transforms
+        if not new_transforms:
+            print(f"DEBUG BACKWARD: Stage {stage_idx} has no new transforms to process, skipping")
+            continue
+            
+        print(f"DEBUG BACKWARD: Stage {stage_idx} proceeding, using actual stage number {actual_stage_num}")
+        
+        # Process transforms in REVERSE order for backward direction
+        for i in range(len(new_transforms) - 1, -1, -1):
+            transform = new_transforms[i]
+            if i >= len(new_lower_idss) or i >= len(new_upper_idss):
+                continue
+                
+            # For backward: we swap the interpretation
+            # What was "upper" in forward becomes "lower" in backward (input)
+            # What was "lower" in forward becomes "upper" in backward (output)
+            backward_input_indices = new_upper_idss[i]  # These are our inputs for backward
+            backward_output_indices = new_lower_idss[i]  # These are our outputs for backward
+            
+            print(f"DEBUG BACKWARD: Transform {i} - backward_input_indices: {backward_input_indices}, backward_output_indices: {backward_output_indices}")
+            print(f"DEBUG BACKWARD: Transform {i} type: {transform.__class__.__name__}")
+            print(f"DEBUG BACKWARD: prev_stage_output_nodes keys: {list(prev_stage_output_nodes.keys())}")
+            
+            # Get input symbols for this backward transform
+            input_symbols = []
+            for idx in backward_input_indices:
+                if idx in prev_stage_output_nodes:
+                    prev_node_id = prev_stage_output_nodes[idx]
+                    if prev_node_id in current_formulas:
+                        input_symbols.append(current_formulas[prev_node_id])
+                    else:
+                        input_symbols.append(sp.Symbol(f"back_d_{idx}"))
+                else:
+                    input_symbols.append(sp.Symbol(f"back_d_{idx}"))
+
+            try:
+                # Apply the BACKWARD transform
+                if isinstance(transform, pytensor.tensor_descriptor.UnmergeTransform):
+                    # For UnmergeTransform: backward goes from multiple inputs to single output
+                    # This is the reverse of the normal unmerge operation
+                    if len(input_symbols) > 1:
+                        # Multiple inputs -> single output (reverse of unmerge)
+                        output_formulas = transform.sympy_forward(input_symbols)
+                    else:
+                        # Single input -> multiple outputs (normal unmerge direction)
+                        output_formulas = transform.sympy_backward(input_symbols)
+                elif isinstance(transform, pytensor.tensor_descriptor.EmbedTransform):
+                    # For EmbedTransform in backward: 
+                    # If we have 1 input, use sympy_backward (linear -> coordinates)
+                    # If we have multiple inputs, use sympy_forward (coordinates -> linear)
+                    if len(input_symbols) == 1:
+                        output_formulas = transform.sympy_backward(input_symbols)
+                    else:
+                        output_formulas = transform.sympy_forward(input_symbols)
+                elif isinstance(transform, pytensor.tensor_descriptor.MergeTransform):
+                    # For MergeTransform in backward:
+                    # If we have 1 input, use sympy_backward (merged -> components)
+                    # If we have multiple inputs, use sympy_forward (components -> merged)
+                    if len(input_symbols) == 1:
+                        output_formulas = transform.sympy_backward(input_symbols)
+                    else:
+                        output_formulas = transform.sympy_forward(input_symbols)
+                elif isinstance(transform, pytensor.tensor_descriptor.XorTransform):
+                    # XOR is self-inverse, so backward is the same as forward
+                    output_formulas = transform.sympy_backward(input_symbols)
+                elif isinstance(transform, pytensor.tensor_descriptor.PassThroughTransform):
+                    # PassThrough is identity in both directions
+                    output_formulas = transform.sympy_backward(input_symbols)
+                else:
+                    # Default: use backward method
+                    output_formulas = transform.sympy_backward(input_symbols)
+                
+                # Create output nodes for this backward transform
+                print(f"DEBUG BACKWARD: Transform {i} has {len(output_formulas)} output formulas for {len(backward_output_indices)} backward output indices")
+                
+                # Create output nodes for each formula
+                for j, output_idx in enumerate(backward_output_indices):
+                    if j < len(output_formulas):
+                        node_id = f"back_s{actual_stage_num}_t{i}_d{output_idx}"
+                        stage_output_nodes[output_idx] = node_id
+                        
+                        print(f"DEBUG BACKWARD: Creating node {node_id} for stage {stage_idx} transform {i}")
+                        
+                        formula = output_formulas[j]
+                        next_formulas[node_id] = formula
+                        
+                        # Substitute variables and simplify
+                        substituted_formula = formula.subs(variables)
+                        simplified_formula = sp.simplify(substituted_formula)
+                        
+                        try:
+                            formula_str = str(simplified_formula)
+                            
+                            # Pretty print simple formulas
+                            if (not any(func in formula_str for func in ['floor', 'ceiling', 'sqrt', 'sin', 'cos', 'tan']) 
+                                and '/' not in formula_str and '**' not in formula_str):
+                                try:
+                                    pretty_str = sp.pretty(simplified_formula, use_unicode=False)
+                                    if '\n' not in pretty_str:
+                                        formula_str = pretty_str
+                                except:
+                                    pass
+                            
+                            # Clean up XOR notation
+                            import re
+                            formula_str = formula_str.replace('XorFunction', 'xor')
+                            formula_str = formula_str.replace('⊕', ' xor ')
+                            formula_str = re.sub(r'xor\(([^,]+),\s*([^)]+)\)', r'\1 xor \2', formula_str)
+                            
+                        except Exception:
+                            formula_str = f"back_d{output_idx}"
+                        
+                        label = f'<<FONT POINT-SIZE="12">{formula_str}</FONT>>'
+                        dot.node(node_id, label, fillcolor="#ffccff")  # Light purple for backward nodes
+                        print(f"DEBUG BACKWARD: Added DOT node {node_id} with label {formula_str}")
+                        
+                        # Create edges FROM input nodes TO this output node (normal left-to-right flow)
+                        for input_idx in backward_input_indices:
+                            if input_idx in prev_stage_output_nodes:
+                                transform_name = f"{transform.__class__.__name__.replace('Transform', '')}⁻¹"
+                                dot.edge(prev_stage_output_nodes[input_idx], node_id, 
+                                       label=transform_name, color="blue")
+                
+            except Exception as e:
+                st.warning(f"Failed to generate backward formula for transform {transform}: {e}")
+                # Create error nodes
+                for j, output_idx in enumerate(backward_output_indices):
+                    node_id = f"back_s{actual_stage_num}_t{i}_d{output_idx}"
+                    stage_output_nodes[output_idx] = node_id
+                    next_formulas[node_id] = sp.Symbol(f"back_d{output_idx}")
+                    dot.node(node_id, f"back_d{output_idx}", fillcolor="#ffcccc")
+                    
+                    # Create edges for error case
+                    for input_idx in backward_input_indices:
+                        if input_idx in prev_stage_output_nodes:
+                            transform_name = f"{transform.__class__.__name__.replace('Transform', '')}⁻¹"
+                            dot.edge(prev_stage_output_nodes[input_idx], node_id, 
+                                   label=transform_name, color="red")
+        
+        # Update for next stage (going backwards)
+        if stage_output_nodes:
+            prev_stage_output_nodes.update(stage_output_nodes)
+            current_formulas.update(next_formulas)
+            print(f"DEBUG BACKWARD: Stage {stage_idx} completed, merged stage outputs with existing nodes")
+            print(f"DEBUG BACKWARD: Available nodes for next stage: {list(prev_stage_output_nodes.keys())}")
+            actual_stage_num -= 1
+        else:
+            print(f"DEBUG BACKWARD: Stage {stage_idx} completed with no output nodes")
+
+    # Create final output nodes for backward graph (original input dimensions)
+    if pytensor_descriptors:
+        first_descriptor = pytensor_descriptors[0]
+        first_input_dims = first_descriptor.get_num_of_dimension()
+        
+        print(f"DEBUG BACKWARD: Creating {first_input_dims} final output nodes")
+        
+        for k in range(first_input_dims):
+            # Check if we have a node that should connect to this final output
+            if k in prev_stage_output_nodes:
+                final_node_id = f"backward_output_d{k}"
+                
+                try:
+                    dim_length = first_descriptor.get_length(k) if hasattr(first_descriptor, 'get_length') else '?'
+                    dim_label = f"in{k} ({dim_length})"
+                except:
+                    dim_label = f"in{k}"
+                
+                # Create final output node with distinct styling
+                dot.node(final_node_id, dim_label, fillcolor="#ff6666", style="filled,bold", shape="box")
+                
+                # Connect from the last stage node to final output
+                source_node = prev_stage_output_nodes[k]
+                dot.edge(source_node, final_node_id, color="red", style="bold")
+                
+                print(f"DEBUG BACKWARD: Created final output node {final_node_id} connected from {source_node}")
+
+    return dot
+
 def main():
     """Main function for the Streamlit app."""
     st.set_page_config(layout="wide")
@@ -780,7 +1362,7 @@ def main():
         parsed_descriptors = [substitute_descriptor(d, user_vars) for d in parsed_descriptors]
 
         st.markdown("---")
-        st.header("Transformation Pipeline Graph")
+        st.header("Transformation Pipeline Graphs")
         
         if 'last_variables' not in st.session_state:
             st.session_state.last_variables = {}
@@ -796,14 +1378,20 @@ def main():
                 st.error("No descriptors found in the current code")
                 return
             
-            dot = build_transformation_graph_from_pytensor(descriptors, st.session_state.variables)
-            
             if variables_changed:
-                st.success("Graph updated with new variable values!")
+                st.success("Graphs updated with new variable values!")
             
-            st.graphviz_chart(dot)
+            # Always display both graphs vertically
+            st.subheader("Forward Transformation Graph")
+            dot_forward = build_transformation_graph_from_pytensor(descriptors, st.session_state.variables)
+            st.graphviz_chart(dot_forward)
+            
+            st.subheader("Backward Transformation Graph")
+            dot_backward = build_backward_transformation_graph_from_pytensor(descriptors, st.session_state.variables)
+            st.graphviz_chart(dot_backward)
+                    
         except Exception as e:
-            st.error(f"Failed to build graph: {e}")
+            st.error(f"Failed to build graphs: {e}")
             import traceback
             st.text(traceback.format_exc())
 

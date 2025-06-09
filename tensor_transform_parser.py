@@ -394,13 +394,35 @@ class TensorTransformParser:
         
         elif transform_type == 'merge':
             values = transform_dict.get('values', [])
-            lengths = []
             
-            # Flatten all values to get individual input lengths
-            for val in values:
-                lengths.extend(self._flatten_merge_lengths(val, variables))
+            # Check if any values contain nested merges
+            has_nested_merge = any(isinstance(val, dict) and val.get('type') == 'merge' for val in values)
+            
+            if has_nested_merge:
+                # Create a hierarchical transform representation
+                # Store the hierarchy information for the graph builder
+                hierarchical_info = {
+                    'type': 'hierarchical_merge',
+                    'structure': values,
+                    'is_hierarchical': True
+                }
                 
-            return MergeTransform(lengths=lengths)
+                # For now, still create a single MergeTransform but with hierarchy metadata
+                # The graph builder will use this information to create proper nodes
+                lengths = []
+                for val in values:
+                    lengths.extend(self._flatten_merge_lengths(val, variables))
+                
+                merge_transform = MergeTransform(lengths=lengths)
+                # Add hierarchy information as an attribute
+                merge_transform._hierarchy_info = hierarchical_info
+                return merge_transform
+            else:
+                # Regular flat merge - use existing logic
+                lengths = []
+                for val in values:
+                    lengths.extend(self._flatten_merge_lengths(val, variables))
+                return MergeTransform(lengths=lengths)
         
         elif transform_type == 'unmerge':
             values = transform_dict.get('values', [])
