@@ -273,7 +273,7 @@ class TileDistributionEncodingPedantic:
 
                     if rh_major_for_p == 0: # If P maps to an R-dimension
                          if 0 <= rh_minor_for_p < self.NDimR: # Check rh_minor_for_p is a valid R index
-                            ps_over_rs_derivative_tmp[idim_p][rh_minor_for_p] = p_over_rh_derivative
+                            ps_over_rs_derivative_tmp[idim_p][r_dim_idx] = p_over_rh_derivative
                     
                     if rh_length > 0:
                         p_over_rh_derivative *= rh_length
@@ -506,20 +506,64 @@ class TileDistributionPedantic:
             })
 
         # 2. Unmerge Transforms (for HsLengthss)
-        for idim_x in range(NDimXs):
-            h_minor_lengths = list(HsLengthss_[idim_x])
-            ndim_h_minor = len(h_minor_lengths)
-            if ndim_h_minor > 0:
+        # FIXED: Only create hidden dimensions for H components that are actually used by Y dimensions
+        # First, collect which H components are actually used
+        used_h_components = set()
+        for iDimY in range(NDimYs):
+            rh_major = Ys2RHsMajor_[iDimY]
+            rh_minor = Ys2RHsMinor_[iDimY]
+            if rh_major > 0:  # H component (not R)
+                h_idx = rh_major - 1
+                used_h_components.add((h_idx, rh_minor))
+        
+        # Also collect H components used by P dimensions
+        for iDimP in range(NDimPs):
+            p2RHsMajor_current_P = Ps2RHssMajor_[iDimP]
+            p2RHsMinor_current_P = Ps2RHssMinor_[iDimP]
+            if not isinstance(p2RHsMajor_current_P, list):
+                p2RHsMajor_current_P = [p2RHsMajor_current_P]
+            if not isinstance(p2RHsMinor_current_P, list):
+                p2RHsMinor_current_P = [p2RHsMinor_current_P]
+            
+            for rh_major, rh_minor in zip(p2RHsMajor_current_P, p2RHsMinor_current_P):
+                if rh_major > 0:  # H component (not R)
+                    h_idx = rh_major - 1
+                    used_h_components.add((h_idx, rh_minor))
+        
+        
+        # Create hidden dimensions only for used H components, grouped by H sequence
+        h_sequence_to_components = {}
+        for h_idx, h_minor in used_h_components:
+            if h_idx not in h_sequence_to_components:
+                h_sequence_to_components[h_idx] = []
+            h_sequence_to_components[h_idx].append(h_minor)
+        
+        # Sort components within each H sequence for consistent ordering
+        for h_idx in h_sequence_to_components:
+            h_sequence_to_components[h_idx].sort()
+        
+        
+        # Create Unmerge transforms for each H sequence that has used components
+        for h_idx in sorted(h_sequence_to_components.keys()):
+            if h_idx < NDimXs:  # Valid H sequence index
+                used_components = h_sequence_to_components[h_idx]
                 dst_dim_ids_for_unmerge = []
-                for i in range(ndim_h_minor):
-                    hid = next_available_hidden_id
-                    dst_dim_ids_for_unmerge.append(hid)
-                    rh_map[(idim_x + 1, i)] = {'id': hid, 'length': h_minor_lengths[i]} # rh_major for H0 is 1, ...
-                    next_available_hidden_id += 1
-                psys_to_xs_transforms.append({
-                    "Name": "Unmerge", "MetaData": h_minor_lengths,
-                    "SrcDimIds": [idim_x], "DstDimIds": dst_dim_ids_for_unmerge # Src is X0, X1...
-                })
+                h_minor_lengths = []
+                
+                for h_minor in used_components:
+                    if h_minor < len(HsLengthss_[h_idx]):
+                        hid = next_available_hidden_id
+                        dst_dim_ids_for_unmerge.append(hid)
+                        length = HsLengthss_[h_idx][h_minor]
+                        h_minor_lengths.append(length)
+                        rh_map[(h_idx + 1, h_minor)] = {'id': hid, 'length': length}
+                        next_available_hidden_id += 1
+                
+                if dst_dim_ids_for_unmerge:  # Only create transform if we have components
+                    psys_to_xs_transforms.append({
+                        "Name": "Unmerge", "MetaData": h_minor_lengths,
+                        "SrcDimIds": [h_idx], "DstDimIds": dst_dim_ids_for_unmerge
+                    })
 
         # 3. Merge Transforms (for Ps dimensions)
         p_merged_hidden_ids = [] # Stores the final hidden ID for each P-dim after merge
@@ -1246,63 +1290,122 @@ class TileDistributionPedantic:
 
         # --- Process VectorDimensions --- 
         if self.NDimYs > 0:
-            # IMPROVED INFERENCE: Find Ys that map to the highest/last position in H sequences
-            # Group vector dimensions by which H sequence they belong to (for M/N dimensions)
-            vector_dimensions_by_h = {}  # Maps H-idx to list of (value, y_idx)
+            # IMPROVED H-SEQUENCE POSITION HEURISTIC
+            # Mimics C++ logic: stride=1 (last position) + largest length
+            # BUT: Strongly prioritize last positions - only consider first positions if no last positions exist
             
-            # Find Y dimensions that map to the last position of an H sequence
+            last_position_candidates = []  # Y dimensions at last positions
+            other_position_candidates = []  # Y dimensions at other positions
+            
             for y_idx in range(self.NDimYs):
                 if y_idx < len(self.DstrEncode.Ys2RHsMajor) and y_idx < len(self.DstrEncode.Ys2RHsMinor):
                     y_major = self.DstrEncode.Ys2RHsMajor[y_idx]
                     y_minor = self.DstrEncode.Ys2RHsMinor[y_idx]
                     
-                    # If Y maps to H sequence (major > 0)
+                    # Only consider Y dimensions that map to H sequences (not R)
                     if y_major > 0 and y_major <= len(self.DstrEncode.HsLengthss):
                         h_idx = y_major - 1  # Convert to 0-based index
                         h_seq = self.DstrEncode.HsLengthss[h_idx]
                         
-                        # Check if it maps to the last element of the H sequence
-                        if y_minor == len(h_seq) - 1:
-                            val = h_seq[y_minor]
-                            if val > 0:
-                                if h_idx not in vector_dimensions_by_h:
-                                    vector_dimensions_by_h[h_idx] = []
-                                vector_dimensions_by_h[h_idx].append((val, y_idx))
+                        if y_minor < len(h_seq):
+                            length = h_seq[y_minor]
+                            
+                            # Check if this is the last position in the H sequence
+                            is_last_position = (y_minor == len(h_seq) - 1)
+                            
+                            # Only consider dimensions with reasonable vector lengths
+                            if length > 1:  # Must be vectorizable
+                                if is_last_position:
+                                    # Last position gets highest priority for vectorization
+                                    position_score = 1.0
+                                    last_position_candidates.append((y_idx, length, h_idx, position_score))
+                                    print(f"DEBUG: Last position vector candidate: Y{y_idx} -> H{h_idx}[{y_minor}] = {length}")
+                                else:
+                                    # Non-last positions get lower priority
+                                    position_score = (len(h_seq) - y_minor) / len(h_seq) * 0.5  # Max 0.5 for non-last
+                                    other_position_candidates.append((y_idx, length, h_idx, position_score))
+                                    print(f"DEBUG: Other position vector candidate: Y{y_idx} -> H{h_idx}[{y_minor}] = {length}")
             
-            # Use the found vector dimensions, or fall back to prior heuristic
-            if vector_dimensions_by_h:
-                # Process each H sequence's vector dimensions
-                all_vector_values = []
-                all_vector_y_indices = []
+            # Choose vector dimensions: prioritize last positions strongly
+            vector_candidates = []
+            if last_position_candidates:
+                # If we have last position candidates, use only those
+                vector_candidates = last_position_candidates
+                print(f"DEBUG: Using last position candidates only: {len(last_position_candidates)} found")
+            elif other_position_candidates:
+                # Only if no last position candidates exist, consider others
+                vector_candidates = other_position_candidates
+                print(f"DEBUG: No last position candidates, using others: {len(other_position_candidates)} found")
+            
+            if vector_candidates:
+                # Sort by: 1) Position score (last positions first), 2) Length (larger first)
+                vector_candidates.sort(key=lambda x: (x[3], x[1]), reverse=True)
                 
-                # Sort by H-index to have consistent ordering (H0 first, then H1, etc.)
-                for h_idx in sorted(vector_dimensions_by_h.keys()):
-                    # For each H, combine its vector dimensions (usually just one per H)
-                    h_vectors = vector_dimensions_by_h[h_idx]
-                    h_combined_value = 1
-                    for val, y_idx in h_vectors:
-                        h_combined_value *= val
-                        all_vector_y_indices.append(y_idx)
-                    
-                    all_vector_values.append(h_combined_value)
+                # Group by H-sequence to get best candidate from each
+                best_per_h = {}
+                for y_idx, length, h_idx, pos_score in vector_candidates:
+                    if h_idx not in best_per_h or (pos_score, length) > (best_per_h[h_idx][3], best_per_h[h_idx][1]):
+                        best_per_h[h_idx] = (y_idx, length, h_idx, pos_score)
                 
-                # Store multi-dimensional vector information
-                hierarchical_info['VectorDimensions'] = all_vector_values
-                hierarchical_info['VectorDimensionYSIndex'] = all_vector_y_indices[0] if all_vector_y_indices else -1
-                # Still calculate combined value for compatibility
+                # SPECIAL CASE: Multi-dimensional vectorization within same H-sequence
+                # Check if we have last position candidates and other candidates in the same H-sequence
+                # BUT: Be more conservative - only include other Y dimensions if they're also at
+                # positions that suggest vectorization (e.g., second-to-last, or specific patterns)
+                if False and last_position_candidates and other_position_candidates:
+                    for y_idx, length, h_idx, pos_score in last_position_candidates:
+                        # Look for other Y dimensions in the same H-sequence
+                        for other_y_idx, other_length, other_h_idx, other_pos_score in other_position_candidates:
+                            if other_h_idx == h_idx and other_length > 1:
+                                # More conservative check: only include if it's close to the end
+                                # or if the H-sequence is specifically designed for multi-dim vectors
+                                h_seq = self.DstrEncode.HsLengthss[h_idx]
+                                other_y_minor = self.DstrEncode.Ys2RHsMinor[other_y_idx]
+                                
+                                # Only include if:
+                                # 1. It's the second-to-last position, OR
+                                # 2. The H-sequence has exactly 2 elements (common 2D vector pattern)
+                                is_second_to_last = (other_y_minor == len(h_seq) - 2)
+                                is_two_element_sequence = (len(h_seq) == 2)
+                                
+                                if is_second_to_last or is_two_element_sequence:
+                                    # Found another vectorizable dimension in the same H-sequence
+                                    print(f"DEBUG: Found multi-dim vector in H{h_idx}: Y{y_idx} (last) + Y{other_y_idx} (conservative)")
+                                    # Add it as a separate H-sequence entry with modified h_idx to avoid collision
+                                    multi_dim_key = f"{h_idx}_multi"
+                                    best_per_h[multi_dim_key] = (other_y_idx, other_length, h_idx, 0.9)
+                                else:
+                                    print(f"DEBUG: Skipping Y{other_y_idx} in H{h_idx} - not conservative vector pattern (pos={other_y_minor}, len={len(h_seq)})")
+                
+                # Take the overall best candidates
+                final_candidates = sorted(best_per_h.values(), key=lambda x: (x[3], x[1]), reverse=True)
+                
+                # Extract vector dimensions (up to 2 for M/N dimensions)
+                vector_dimensions = []
+                vector_y_indices = []
+                for y_idx, length, h_idx, pos_score in final_candidates[:2]:  # Limit to 2 dimensions
+                    vector_dimensions.append(length)
+                    vector_y_indices.append(y_idx)
+                
+                hierarchical_info['VectorDimensions'] = vector_dimensions
+                hierarchical_info['VectorDimensionYSIndex'] = vector_y_indices[0] if vector_y_indices else -1
+                
+                # Calculate combined vector value
                 combined_vector_value = 1
-                for val in all_vector_values:
+                for val in vector_dimensions:
                     combined_vector_value *= val
-                hierarchical_info['VectorK'] = combined_vector_value  # Total vector elements
+                hierarchical_info['VectorK'] = combined_vector_value
                 
-                print(f"DEBUG: Found vector dimensions from Ys mapping to last H positions by H sequence: {vector_dimensions_by_h}")
-                print(f"DEBUG: Vector dimensions: {all_vector_values}")
+                print(f"DEBUG: Improved vector dimension inference:")
+                print(f"DEBUG:   Last position candidates: {last_position_candidates}")
+                print(f"DEBUG:   Other position candidates: {other_position_candidates}")
+                print(f"DEBUG:   Final vector dimensions: {vector_dimensions}")
+                
             elif self.DstrEncode.detail.get('ys_lengths_'):
-                # Fall back to old heuristic - use last Y if its length is typical for vectors
+                # Fallback to old heuristic - use last Y if its length is typical for vectors
                 last_ys_len = self.DstrEncode.detail['ys_lengths_'][-1]
                 if 1 < last_ys_len <= 16:
                     hierarchical_info['VectorDimensions'] = [last_ys_len]
-                    hierarchical_info['VectorDimensionYSIndex'] = self.NDimYs - 1 # Index of the last YS dim
+                    hierarchical_info['VectorDimensionYSIndex'] = self.NDimYs - 1
 
         # --- Process ThreadPerWarp ---
         # Default to [1,1] initially
@@ -1400,10 +1503,49 @@ class TileDistributionPedantic:
         # --- Process Repeat --- 
         # Default repeat is [1,1] (set at initialization)
         # IMPROVED INFERENCE: Find Ys that map to the first position in H sequences
+        # BUT: If a Y dimension is already identified as a vector dimension, 
+        # it should NOT also be counted as a repeat factor
         repeat_y_indices = []
         repeat_values = []
         
+        # Get the vector dimension Y indices to exclude them from repeat calculation
+        vector_y_indices_set = set()
+        
+        # Add all Y indices that contributed to the final vector dimensions
+        # We need to check which Y dimensions actually ended up in VectorDimensions
+        if hierarchical_info.get('VectorDimensions'):
+            # Find which Y dimensions correspond to the vector lengths
+            vector_lengths = hierarchical_info['VectorDimensions']
+            for y_idx in range(self.NDimYs):
+                if y_idx < len(self.DstrEncode.Ys2RHsMajor) and y_idx < len(self.DstrEncode.Ys2RHsMinor):
+                    y_major = self.DstrEncode.Ys2RHsMajor[y_idx]
+                    y_minor = self.DstrEncode.Ys2RHsMinor[y_idx]
+                    
+                    if y_major > 0 and y_major <= len(self.DstrEncode.HsLengthss):
+                        h_idx = y_major - 1
+                        if y_minor < len(self.DstrEncode.HsLengthss[h_idx]):
+                            length = self.DstrEncode.HsLengthss[h_idx][y_minor]
+                            # Only exclude if this Y is at the LAST position in its H-sequence
+                            # (i.e., it's actually a vector dimension, not just matching length)
+                            is_last_position = (y_minor == len(self.DstrEncode.HsLengthss[h_idx]) - 1)
+                            if length in vector_lengths and length > 1 and is_last_position:
+                                vector_y_indices_set.add(y_idx)
+                                print(f"DEBUG: Excluding Y{y_idx} (length={length}, last_pos={is_last_position}) from repeat calculation (vector dimension)")
+                            elif length in vector_lengths and length > 1:
+                                print(f"DEBUG: NOT excluding Y{y_idx} (length={length}, last_pos={is_last_position}) - not at last position")
+        
+        # Legacy fallback
+        if 'VectorDimensionYSIndex' in hierarchical_info and hierarchical_info['VectorDimensionYSIndex'] != -1:
+            vector_y_indices_set.add(hierarchical_info['VectorDimensionYSIndex'])
+        
+        print(f"DEBUG: Vector Y indices to exclude from repeat: {vector_y_indices_set}")
+        
         for y_idx in range(self.NDimYs):
+            # Skip Y dimensions that are already vector dimensions
+            if y_idx in vector_y_indices_set:
+                print(f"DEBUG: Skipping Y{y_idx} for repeat calculation (it's a vector dimension)")
+                continue
+                
             if y_idx < len(self.DstrEncode.Ys2RHsMajor) and y_idx < len(self.DstrEncode.Ys2RHsMinor):
                 y_major = self.DstrEncode.Ys2RHsMajor[y_idx]
                 y_minor = self.DstrEncode.Ys2RHsMinor[y_idx]
@@ -1419,6 +1561,7 @@ class TileDistributionPedantic:
                         if val > 0:
                             repeat_y_indices.append(y_idx)
                             repeat_values.append(val)
+                            print(f"DEBUG: Found repeat factor Y{y_idx} -> H{h_idx}[0] = {val}")
         
         # Use found repeat factors if available
         if repeat_y_indices:
@@ -1435,7 +1578,9 @@ class TileDistributionPedantic:
                 repeat_n = sorted_repeats[1][1]
             
             hierarchical_info['Repeat'] = [max(1, repeat_m), max(1, repeat_n)]
-            print(f"DEBUG: Found repeat factors from Ys mapping to first H positions: {sorted_repeats}")
+            print(f"DEBUG: Final repeat factors after excluding vector dims: {sorted_repeats}")
+        else:
+            print(f"DEBUG: No repeat factors found (all first-position Ys are vector dimensions)")
         # Otherwise, it stays at default [1,1]
         
         # Calculate BlockSize from derived/default TPW and WPB
@@ -1487,6 +1632,29 @@ class TileDistributionPedantic:
                 for val in hierarchical_info['VectorDimensions']:
                     combined_value *= val
                 hierarchical_info['VectorK'] = combined_value
+
+        # DEBUG: Special analysis for the user's specific example
+        print(f"DEBUG: Special analysis for current encoding:")
+        print(f"DEBUG:   Ys2RHsMajor = {self.DstrEncode.Ys2RHsMajor}")
+        print(f"DEBUG:   Ys2RHsMinor = {self.DstrEncode.Ys2RHsMinor}")
+        print(f"DEBUG:   HsLengthss = {self.DstrEncode.HsLengthss}")
+        
+        # Analyze Y mappings
+        for y_idx in range(self.NDimYs):
+            if y_idx < len(self.DstrEncode.Ys2RHsMajor) and y_idx < len(self.DstrEncode.Ys2RHsMinor):
+                y_major = self.DstrEncode.Ys2RHsMajor[y_idx]
+                y_minor = self.DstrEncode.Ys2RHsMinor[y_idx]
+                
+                if y_major > 0 and y_major <= len(self.DstrEncode.HsLengthss):
+                    h_idx = y_major - 1
+                    if y_minor < len(self.DstrEncode.HsLengthss[h_idx]):
+                        length = self.DstrEncode.HsLengthss[h_idx][y_minor]
+                        print(f"DEBUG:   Y{y_idx} -> H{h_idx}[{y_minor}] = {length}")
+                        
+                        # Check if this is a vector dimension (last position in H sequence)
+                        is_last_position = (y_minor == len(self.DstrEncode.HsLengthss[h_idx]) - 1)
+                        is_first_position = (y_minor == 0)
+                        print(f"DEBUG:     Y{y_idx}: last_pos={is_last_position}, first_pos={is_first_position}, length={length}")
 
         return hierarchical_info
 
@@ -1590,7 +1758,6 @@ class TileDistributionPedantic:
         # Effective top dimension IDs and their names/lengths
         top_dim_ids_ordered = adaptor['TopView']['_effective_display_order_ids_']
         top_dim_id_to_name = adaptor['TopView']['TopDimensionIdToName']
-        # top_dim_name_to_len = adaptor['TopView']['TopDimensionNameLengths']
 
         # Map input ps_coords and ys_coords to their respective hidden IDs
         current_ps_idx = 0
@@ -1599,7 +1766,6 @@ class TileDistributionPedantic:
             dim_name = top_dim_id_to_name.get(str(top_hid)) # JSON keys are strings
             if dim_name is None and isinstance(top_hid, int): # try int key if str failed
                  dim_name = top_dim_id_to_name.get(top_hid)
-
 
             if dim_name and dim_name.startswith("P"):
                 if current_ps_idx < len(ps_coords):
@@ -1623,11 +1789,14 @@ class TileDistributionPedantic:
         for i, y_coord_val in enumerate(ys_coords):
             y_rh_major = self.DstrEncode.Ys2RHsMajor[i]
             y_rh_minor = self.DstrEncode.Ys2RHsMinor[i]
-            y_hid = self.DstrDetail['rh_map'][(y_rh_major, y_rh_minor)]['id']
-            all_hid_coords[y_hid] = y_coord_val
+            rh_key = (y_rh_major, y_rh_minor)
+            if rh_key in self.DstrDetail['rh_map']:
+                y_hid = self.DstrDetail['rh_map'][rh_key]['id']
+                all_hid_coords[y_hid] = y_coord_val
+            else:
+                print(f"DEBUG: WARNING: Y{i} -> RH({y_rh_major},{y_rh_minor}) not found in rh_map")
             # Also ensure Y-dims listed in TopView are covered
             # (Handled by the loop over top_dim_ids_ordered if Y hids are correctly there)
-
 
         # Invert "Merge" transforms for P-dimensions to get underlying H/R hidden coordinates
         # P-dimensions in TopView are already hidden IDs resulting from a merge.
@@ -1655,7 +1824,6 @@ class TileDistributionPedantic:
                 else:
                     continue # Skip if P-dim not resolvable here
 
-
             p_coord = all_hid_coords[p_hid_to_find]
 
             # Find the Merge transform that produced this p_hid
@@ -1675,9 +1843,7 @@ class TileDistributionPedantic:
                     all_hid_coords[src_hids_for_p[i]] = component_coord
                     temp_p_val //= lengths_for_p_merge[i]
                 if temp_p_val != 0: # Should be 0 if p_coord was valid for these lengths
-                    # print(f"Warning: P-coord decomposition for P_hid {p_hid_to_find} had remainder {temp_p_val}")
-                    pass
-
+                    print(f"DEBUG: Warning: P-coord decomposition for P_hid {p_hid_to_find} had remainder {temp_p_val}")
 
         # Now all_hid_coords should contain values for all elemental H and R hidden dimensions
 
@@ -1690,7 +1856,6 @@ class TileDistributionPedantic:
         # Order of X dimension calculation matters if BottomDimensionIdToName uses integer keys
         # that imply order (0, 1, ... NDimX-1)
         x_dim_indices_sorted = sorted([int(k) for k in adaptor['BottomView']['BottomDimensionIdToName'].keys()])
-
 
         for x_logical_idx in x_dim_indices_sorted: # Assumes X0, X1, ...
             # Find the Unmerge transform for this X dimension
@@ -1746,7 +1911,6 @@ class TileDistributionPedantic:
                 else:
                     # print(f"Warning: No Unmerge transform found for X{x_logical_idx}")
                     xs_coords[x_logical_idx] = 0 # Or raise error
-
 
         return xs_coords
 

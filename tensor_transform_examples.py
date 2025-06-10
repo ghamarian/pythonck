@@ -2,7 +2,9 @@
 Provides example tensor descriptor transformation strings.
 """
 
-def get_transform_examples() -> dict[str, str]:
+from typing import Dict
+
+def get_transform_examples() -> Dict[str, str]:
     """Returns a dictionary of example tensor descriptor transformations."""
     examples = {
         "Simple Pass-Through & Merge": """
@@ -305,11 +307,38 @@ constexpr auto b_lds_block_desc = transform_tensor_descriptor(
                make_merge_transform_v3_division_mod(make_tuple(BK0, number<KPack>{}))),
     make_tuple(sequence<1, 0>{}, sequence<2, 3>{}),
     make_tuple(sequence<0>{}, sequence<1>{}));
+""",
+        "A Grid Desc Multi-Transform Example": """
+const auto a_grid_desc_mraw_kraw = make_naive_tensor_descriptor(make_tuple(M, K), make_tuple(StrideA, I1));
+
+const auto a_grid_desc_ak0_m_ak1 = transform_tensor_descriptor(
+    a_grid_desc_mraw_kraw,
+    make_tuple(make_unmerge_transform(make_tuple(K / KPerBlock, AK0Number, AK1Value)),
+               make_pass_through_transform(M)),
+    make_tuple(Sequence<1>{}, Sequence<0>{}),
+    make_tuple(Sequence<0, 1, 3>{}, Sequence<2>{}));
+
+const auto a_grid_desc_permuted = transform_tensor_descriptor(
+    a_grid_desc_ak0_m_ak1,
+    make_tuple(make_pass_through_transform(K / KPerBlock),
+               make_xor_with_modulo_transform(make_tuple(M, AK0Number)),
+               make_pass_through_transform(AK1Value)),
+    make_tuple(Sequence<0>{}, Sequence<2, 1>{}, Sequence<3>{}),
+    make_tuple(Sequence<0>{}, Sequence<2, 1>{}, Sequence<3>{}));
+
+const auto a_grid_desc = transform_tensor_descriptor(
+    a_grid_desc_permuted,
+    make_tuple(
+        make_merge_transform_v3_division_mod(make_tuple(K / KPerBlock, AK0Number)),
+        make_pass_through_transform(M),
+        make_pass_through_transform(AK1Value)),
+    make_tuple(Sequence<0, 1>{}, Sequence<2>{}, Sequence<3>{}),
+    make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}));
 """
     }
     return examples
 
-def get_default_variables() -> dict[str, dict[str, int]]:
+def get_default_variables() -> Dict[str, Dict[str, int]]:
     """Returns a dictionary of default variables for each example."""
     return {
         "Simple Pass-Through & Merge": {
@@ -388,5 +417,14 @@ def get_default_variables() -> dict[str, dict[str, int]]:
             'NPerBlock': 64,
             'KPack': 4,
             'KPerBlock': 32,
+        },
+        "A Grid Desc Multi-Transform Example": {
+            'M': 1024,
+            'K': 512,
+            'StrideA': 512,
+            'I1': 1,
+            'KPerBlock': 64,
+            'AK0Number': 8,
+            'AK1Value': 4,
         },
     } 

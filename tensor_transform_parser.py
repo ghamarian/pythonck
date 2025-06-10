@@ -102,9 +102,9 @@ class TensorTransformParser:
             if not item: continue
             # Try parsing as a transform first
             if any(t in item for t in ['make_pass_through_transform', 'make_merge_transform', 
-                                     'make_xor_transform', 'make_unmerge_transform']):
+                                     'make_xor_transform', 'make_xor_with_modulo_transform', 'make_unmerge_transform']):
                 result.append(self.parse_transform(item))
-            elif item.startswith('sequence<'):
+            elif item.startswith(('sequence<', 'Sequence<')):
                 result.append(self.parse_sequence(item))
             elif item.startswith('make_tuple('):
                 # A nested tuple implies a merge
@@ -133,9 +133,9 @@ class TensorTransformParser:
     def parse_sequence(self, sequence_str: str) -> List[int]:
         """Parse a sequence expression."""
         content = sequence_str.strip()
-        # Use regex to robustly find content within sequence<...> or sequence<...>{}
+        # Use regex to robustly find content within sequence<...> or Sequence<...> (case-insensitive)
         # This will capture the content between the angle brackets.
-        match = re.match(r'sequence<(.*?)>(?:\{\})?$', content)
+        match = re.match(r'[Ss]equence<(.*?)>(?:\{\})?$', content)
         if not match:
             raise ValueError(f"Invalid sequence format: {sequence_str}")
         
@@ -192,6 +192,17 @@ class TensorTransformParser:
                     'values': values
                 }
         
+        # Handle xor_with_modulo transform
+        elif transform_str.startswith('make_xor_with_modulo_transform'):
+            match = re.match(r'make_xor_with_modulo_transform\((.*)\)', transform_str, re.DOTALL)
+            if match:
+                tuple_content = match.group(1).strip()
+                values = self.parse_make_tuple(tuple_content)
+                return {
+                    'type': 'xor_with_modulo',
+                    'values': values
+                }
+        
         # Handle unmerge transform
         elif transform_str.startswith('make_unmerge_transform'):
             match = re.match(r'make_unmerge_transform\((.*)\)', transform_str, re.DOTALL)
@@ -242,19 +253,47 @@ class TensorTransformParser:
             }
         
         # Check for regular make_naive_tensor_descriptor
-        # Pattern: make_naive_tensor_descriptor(lengths_tuple, strides_tuple, vector_length, offset)
-        naive_match = re.search(r'make_naive_tensor_descriptor\s*\(\s*make_tuple\s*\((.*?)\)\s*,\s*make_tuple\s*\((.*?)\)\s*,\s*(.*?)\s*,\s*(.*?)\s*\)', descriptor_str, re.DOTALL)
-        if naive_match:
-            # Parse all components
-            lengths_str = naive_match.group(1).strip()
-            strides_str = naive_match.group(2).strip()
-            vector_length_str = naive_match.group(3).strip()
-            offset_str = naive_match.group(4).strip()
+        # Support both formats:
+        # 1) make_naive_tensor_descriptor(lengths_tuple, strides_tuple, vector_length, offset)
+        # 2) make_naive_tensor_descriptor(lengths_tuple, strides_tuple) - with defaults
+        
+        # Try 4-parameter version first
+        naive_match_4 = re.search(r'make_naive_tensor_descriptor\s*\(\s*make_tuple\s*\((.*?)\)\s*,\s*make_tuple\s*\((.*?)\)\s*,\s*(.*?)\s*,\s*(.*?)\s*\)', descriptor_str, re.DOTALL)
+        if naive_match_4:
+            # Parse all components (4-parameter version)
+            lengths_str = naive_match_4.group(1).strip()
+            strides_str = naive_match_4.group(2).strip()
+            vector_length_str = naive_match_4.group(3).strip()
+            offset_str = naive_match_4.group(4).strip()
             
             lengths = self.parse_make_tuple(lengths_str)
             strides = self.parse_make_tuple(strides_str)
             vector_length = self._parse_value_expr(vector_length_str)
             offset = self._parse_value_expr(offset_str)
+            
+            return {
+                'type': 'naive',
+                'lengths': lengths,
+                'strides': strides,
+                'vector_length': vector_length,
+                'offset': offset,
+                'transforms': [],
+                'lower_dimensions': [],
+                'upper_dimensions': []
+            }
+        
+        # Try 2-parameter version (with defaults)
+        naive_match_2 = re.search(r'make_naive_tensor_descriptor\s*\(\s*make_tuple\s*\((.*?)\)\s*,\s*make_tuple\s*\((.*?)\)\s*\)', descriptor_str, re.DOTALL)
+        if naive_match_2:
+            # Parse components (2-parameter version with defaults)
+            lengths_str = naive_match_2.group(1).strip()
+            strides_str = naive_match_2.group(2).strip()
+            
+            lengths = self.parse_make_tuple(lengths_str)
+            strides = self.parse_make_tuple(strides_str)
+            # Use defaults for optional parameters
+            vector_length = sp.sympify(-1)  # number<-1>{}
+            offset = sp.sympify(-1)         # number<-1>{}
             
             return {
                 'type': 'naive',
@@ -534,6 +573,41 @@ class TensorTransformParser:
             # XOR requires exactly 2 dimensions
             if len(lengths) != 2:
                 raise ValueError(f"XOR transform requires exactly 2 dimensions, got {len(lengths)}")
+            
+            return XorTransform(lengths=lengths)
+        
+        elif transform_type == 'xor_with_modulo':
+            # XOR with modulo transform - same as regular XOR for our purposes
+            values = transform_dict.get('values', [])
+            lengths = []
+            for val in values:
+                if isinstance(val, dict):
+                    # For XOR, we expect the values to be numbers or expressions, not transforms
+                    # So we extract the values directly
+                    if val.get('type') == 'pass_through':
+                        value = val.get('value', 1)
+                        safe_variables = {k: v for k, v in variables.items() if not isinstance(v, list)}
+                        if isinstance(value, sp.Basic):
+                            lengths.append(int(value.subs(safe_variables)))
+                        else:
+                            lengths.append(int(value))
+                    else:
+                        nested_transform = self.create_pytensor_transform(val, variables)
+                        if hasattr(nested_transform, 'length'):
+                            lengths.append(nested_transform.length)
+                        elif hasattr(nested_transform, 'get_upper_lengths'):
+                            lengths.extend(nested_transform.get_upper_lengths())
+                        else:
+                            lengths.append(1)
+                elif isinstance(val, sp.Basic):
+                    safe_variables = {k: v for k, v in variables.items() if not isinstance(v, list)}
+                    lengths.append(int(val.subs(safe_variables)))
+                else:
+                    lengths.append(int(val))
+            
+            # XOR requires exactly 2 dimensions
+            if len(lengths) != 2:
+                raise ValueError(f"XOR with modulo transform requires exactly 2 dimensions, got {len(lengths)}")
             
             return XorTransform(lengths=lengths)
         
