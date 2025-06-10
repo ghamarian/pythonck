@@ -6,6 +6,7 @@ import streamlit as st
 import sympy as sp
 import re
 import time
+import math
 from tensor_transform_parser import TensorTransformParser
 from pytensor.tensor_descriptor import (
     Transform, PassThroughTransform, MergeTransform, UnmergeTransform,
@@ -47,7 +48,12 @@ def get_transform_length(transform: Dict[str, Any], variables: Dict[str, Any]) -
     
     if transform_type == 'pass_through':
         value = transform.get('value', sp.Integer(1))
-        return value.subs(variables) if isinstance(value, sp.Basic) else value
+        if isinstance(value, sp.Basic):
+            # Filter variables to only include numeric values that SymPy can handle
+            safe_vars = {k: v for k, v in variables.items() if isinstance(v, (int, float, complex, sp.Basic))}
+            return value.subs(safe_vars)
+        else:
+            return value
         
     elif transform_type in ('merge', 'xor'):
         total_length = sp.Integer(1)
@@ -78,6 +84,17 @@ def display_variable_controls():
         # If not in session state, try to get from defaults
         if current_value is None:
             current_value = example_defaults.get(var, 1)
+        
+        # Skip variables that are lists (not suitable for number_input)
+        if isinstance(current_value, list):
+            updated_variables[var] = current_value
+            continue
+        
+        # Ensure current_value is numeric
+        try:
+            current_value = int(current_value) if isinstance(current_value, (int, float)) else 1
+        except (ValueError, TypeError):
+            current_value = 1
         
         if '::' in var:
             namespace, var_name = var.split('::')
@@ -110,7 +127,13 @@ def substitute_descriptor(descriptor, user_vars):
     elif isinstance(descriptor, list):
         return [substitute_descriptor(item, user_vars) for item in descriptor]
     elif isinstance(descriptor, sp.Basic):
-        return descriptor.subs(user_vars)
+        # Filter user_vars to only include numeric values that SymPy can handle
+        safe_vars = {}
+        for k, v in user_vars.items():
+            if isinstance(v, (int, float, complex, sp.Basic)):
+                safe_vars[k] = v
+            # Skip lists, dicts, and other complex types
+        return descriptor.subs(safe_vars)
     else:
         return descriptor
 
@@ -218,7 +241,9 @@ def create_hierarchical_merge_nodes(transform, input_symbols, lower_indices, upp
                     created_intermediate_nodes.append(intermediate_info)
                     
                     # Substitute variables and create the DOT node
-                    substituted_formula = intermediate_formula.subs(variables)
+                    # Filter variables to only include numeric values that SymPy can handle
+                    safe_vars = {k: v for k, v in variables.items() if isinstance(v, (int, float, complex, sp.Basic))}
+                    substituted_formula = intermediate_formula.subs(safe_vars)
                     simplified_formula = sp.simplify(substituted_formula)
                     
                     try:
@@ -739,7 +764,9 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                             next_formulas[node_id] = formula
                             
                             # Substitute variables and simplify
-                            substituted_formula = formula.subs(variables)
+                            # Filter variables to only include numeric values that SymPy can handle
+                            safe_vars = {k: v for k, v in variables.items() if isinstance(v, (int, float, complex, sp.Basic))}
+                            substituted_formula = formula.subs(safe_vars)
                             simplified_formula = sp.simplify(substituted_formula)
                             
                             try:
@@ -828,7 +855,16 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                                                label=transform_name)
                     
                 except Exception as e:
-                    st.warning(f"Failed to generate formula for transform {transform}: {e}")
+                    # Provide more helpful error messages for common issues
+                    error_msg = str(e)
+                    if "doesn't match transform dimension" in error_msg:
+                        if hasattr(transform, 'ndim') and hasattr(transform, 'lengths'):
+                            error_msg += f"\nTransform '{transform.__class__.__name__}' with lengths {transform.lengths} expects {transform.ndim} input symbols."
+                            error_msg += f"\nCheck that the upper_dimensions in your descriptor match the transform's expected input count."
+                    elif "SympifyError" in error_msg and "[" in error_msg and "]" in error_msg:
+                        error_msg += f"\nThe transform received a list instead of a numeric value. Check your variable definitions."
+                    
+                    st.warning(f"Failed to generate formula for transform {transform}: {error_msg}")
                     # Create error nodes with actual stage number
                     for j, output_idx in enumerate(upper_indices):
                         node_id = f"s{actual_stage_num}_t{i}_d{output_idx}"
@@ -872,10 +908,82 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
 
     # Create final output nodes for forward graph
     if pytensor_descriptors:
-        final_descriptor = pytensor_descriptors[-1]
+        # BUGFIX: The last descriptor contains ALL accumulated transforms, but we need 
+        # only the final stage transforms. Extract just the final transforms.
+        full_descriptor = pytensor_descriptors[-1]
+        
+        # Get the final stage's transform count
+        final_stage_idx = len(pytensor_descriptors) - 1
+        if final_stage_idx < len(descriptors):
+            desc_str = descriptors[final_stage_idx].strip()
+            parser = TensorTransformParser()
+            try:
+                parsed_desc = parser.parse_tensor_descriptor(desc_str)
+                if parsed_desc['type'] == 'transform':
+                    final_stage_transform_count = len(parsed_desc['transforms'])
+                    print(f"DEBUG: Final stage has {final_stage_transform_count} transforms")
+                    
+                    # Create a final descriptor with only the last stage's transforms
+                    all_transforms = full_descriptor.get_transforms()
+                    all_lower_idss = full_descriptor.get_lower_dimension_hidden_idss()
+                    all_upper_idss = full_descriptor.get_upper_dimension_hidden_idss()
+                    
+                    final_transforms = all_transforms[-final_stage_transform_count:]
+                    final_lower_idss = all_lower_idss[-final_stage_transform_count:]
+                    final_upper_idss = all_upper_idss[-final_stage_transform_count:]
+                    
+                    # Build the final descriptor using the pytensor library
+                    from pytensor.tensor_descriptor import transform_tensor_descriptor
+                    
+                    # Use the previous stage's descriptor as input
+                    if len(pytensor_descriptors) > 1:
+                        input_descriptor = pytensor_descriptors[-2]
+                    else:
+                        input_descriptor = pytensor_descriptors[0]
+                    
+                    # FIXED: Instead of trying to create a new descriptor (which accumulates all transforms),
+                    # manually calculate the lengths from the final MergeTransforms
+                    print(f"DEBUG: Created corrected final descriptor with {len(final_transforms)} transforms")
+                    print(f"DEBUG: Final transforms: {[t.__class__.__name__ for t in final_transforms]}")
+                    
+                    # Create a simple wrapper that returns the correct lengths
+                    class FixedFinalDescriptor:
+                        def __init__(self, transforms):
+                            self.final_transforms = transforms
+                            
+                        def get_num_of_dimension(self):
+                            return len(self.final_transforms)
+                            
+                        def get_length(self, dim):
+                            if dim < len(self.final_transforms):
+                                transform = self.final_transforms[dim]
+                                if hasattr(transform, 'get_upper_lengths'):
+                                    lengths = transform.get_upper_lengths()
+                                    return lengths[0] if lengths else 1
+                                elif hasattr(transform, 'lengths'):
+                                    return math.prod(transform.lengths) if transform.lengths else 1
+                            return 1
+                    
+                    final_descriptor = FixedFinalDescriptor(final_transforms)
+                    
+                else:
+                    final_descriptor = full_descriptor
+            except Exception as e:
+                print(f"DEBUG: Failed to create corrected final descriptor: {e}")
+                final_descriptor = full_descriptor
+        else:
+            final_descriptor = full_descriptor
+            
         final_output_dims = final_descriptor.get_num_of_dimension()
         
+        # Debug the final descriptor issue
         print(f"DEBUG: Creating {final_output_dims} final output nodes")
+        print(f"DEBUG: Final descriptor type: {type(final_descriptor)}")
+        
+        # Check the final dimension lengths
+        for k in range(final_output_dims):
+            expected_length = final_descriptor.get_length(k)
+            print(f"DEBUG: Final descriptor get_length({k}) = {expected_length}")
         
         # Create output stage subgraph for visual separation
         with dot.subgraph(name='cluster_output') as output_cluster:
@@ -893,6 +1001,8 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                         dim_label = f"out{k} ({dim_length})"
                     except:
                         dim_label = f"out{k}"
+                    
+                    print(f"DEBUG: Final label for dimension {k}: {dim_label}")
                     
                     # Create final output node with distinct styling within output cluster
                     output_cluster.node(final_node_id, dim_label, fillcolor="#66ff66", style="filled,bold", shape="box")
@@ -1052,7 +1162,53 @@ def build_backward_transformation_graph_from_pytensor(descriptors, variables):
         return dot
 
     # Start from the final descriptor's output dimensions (these become our "input" nodes for backward)
-    final_descriptor = pytensor_descriptors[-1]
+    # BUGFIX: Apply the same fix as forward graph - use only final stage transforms
+    full_descriptor = pytensor_descriptors[-1]
+    
+    # Get the final stage's transform count (same logic as forward graph)
+    final_stage_idx = len(pytensor_descriptors) - 1
+    if final_stage_idx < len(descriptors):
+        desc_str = descriptors[final_stage_idx].strip()
+        parser = TensorTransformParser()
+        try:
+            parsed_desc = parser.parse_tensor_descriptor(desc_str)
+            if parsed_desc['type'] == 'transform':
+                final_stage_transform_count = len(parsed_desc['transforms'])
+                print(f"DEBUG BACKWARD: Final stage has {final_stage_transform_count} transforms")
+                
+                # Create a final descriptor with only the last stage's transforms
+                all_transforms = full_descriptor.get_transforms()
+                final_transforms = all_transforms[-final_stage_transform_count:]
+                
+                # Create the same FixedFinalDescriptor for backward graph
+                class FixedFinalDescriptor:
+                    def __init__(self, transforms):
+                        self.final_transforms = transforms
+                        
+                    def get_num_of_dimension(self):
+                        return len(self.final_transforms)
+                        
+                    def get_length(self, dim):
+                        if dim < len(self.final_transforms):
+                            transform = self.final_transforms[dim]
+                            if hasattr(transform, 'get_upper_lengths'):
+                                lengths = transform.get_upper_lengths()
+                                return lengths[0] if lengths else 1
+                            elif hasattr(transform, 'lengths'):
+                                return math.prod(transform.lengths) if transform.lengths else 1
+                        return 1
+                
+                final_descriptor = FixedFinalDescriptor(final_transforms)
+                print(f"DEBUG BACKWARD: Created corrected backward final descriptor with {len(final_transforms)} transforms")
+                
+            else:
+                final_descriptor = full_descriptor
+        except Exception as e:
+            print(f"DEBUG BACKWARD: Failed to create corrected final descriptor: {e}")
+            final_descriptor = full_descriptor
+    else:
+        final_descriptor = full_descriptor
+        
     final_output_dims = final_descriptor.get_num_of_dimension()
     
     print(f"DEBUG BACKWARD: Final descriptor has {final_output_dims} output dimensions")
@@ -1160,7 +1316,10 @@ def build_backward_transformation_graph_from_pytensor(descriptors, variables):
                     input_symbols.append(sp.Symbol(f"back_d_{idx}"))
 
             try:
-                # Apply the BACKWARD transform
+                # Initialize variable for hierarchical merge tracking
+                hierarchical_intermediate_nodes = []
+                
+                # Apply the transform
                 if isinstance(transform, pytensor.tensor_descriptor.UnmergeTransform):
                     # For UnmergeTransform: backward goes from multiple inputs to single output
                     # This is the reverse of the normal unmerge operation
@@ -1211,7 +1370,9 @@ def build_backward_transformation_graph_from_pytensor(descriptors, variables):
                         next_formulas[node_id] = formula
                         
                         # Substitute variables and simplify
-                        substituted_formula = formula.subs(variables)
+                        # Filter variables to only include numeric values that SymPy can handle
+                        safe_vars = {k: v for k, v in variables.items() if isinstance(v, (int, float, complex, sp.Basic))}
+                        substituted_formula = formula.subs(safe_vars)
                         simplified_formula = sp.simplify(substituted_formula)
                         
                         try:
@@ -1505,14 +1666,28 @@ def main():
                         except:
                             json_desc['dimension_lengths'] = 'Could not compute'
                         
-                        # Add parsing details
+                        # Add parsing details with proper JSON serialization
+                        def make_json_serializable(obj):
+                            """Convert any object to a JSON-serializable format."""
+                            import sympy as sp
+                            if isinstance(obj, sp.Basic):
+                                return str(obj)
+                            elif isinstance(obj, dict):
+                                return {k: make_json_serializable(v) for k, v in obj.items()}
+                            elif isinstance(obj, list):
+                                return [make_json_serializable(item) for item in obj]
+                            elif hasattr(obj, '__dict__'):
+                                return str(obj)  # Convert complex objects to strings
+                            else:
+                                return obj
+                        
                         if parsed_dict['type'] == 'naive':
-                            json_desc['lengths'] = [str(l) for l in parsed_dict['lengths']]
-                            json_desc['strides'] = [str(s) for s in parsed_dict['strides']]
-                            json_desc['vector_length'] = str(parsed_dict['vector_length'])
-                            json_desc['offset'] = str(parsed_dict['offset'])
+                            json_desc['lengths'] = make_json_serializable(parsed_dict['lengths'])
+                            json_desc['strides'] = make_json_serializable(parsed_dict['strides'])
+                            json_desc['vector_length'] = make_json_serializable(parsed_dict['vector_length'])
+                            json_desc['offset'] = make_json_serializable(parsed_dict['offset'])
                         elif parsed_dict['type'] == 'transform':
-                            json_desc['input_descriptor'] = parsed_dict['input_descriptor']
+                            json_desc['input_descriptor'] = str(parsed_dict['input_descriptor'])
                             json_desc['transforms'] = []
                             for j, transform in enumerate(parsed_dict['transforms']):
                                 json_transform = {
@@ -1520,13 +1695,13 @@ def main():
                                     'type': transform['type']
                                 }
                                 if 'values' in transform:
-                                    json_transform['values'] = [str(v) for v in transform['values']]
+                                    json_transform['values'] = make_json_serializable(transform['values'])
                                 if 'value' in transform:
-                                    json_transform['value'] = str(transform['value'])
+                                    json_transform['value'] = make_json_serializable(transform['value'])
                                 json_desc['transforms'].append(json_transform)
                             
-                            json_desc['lower_dimensions'] = parsed_dict['lower_dimensions']
-                            json_desc['upper_dimensions'] = parsed_dict['upper_dimensions']
+                            json_desc['lower_dimensions'] = make_json_serializable(parsed_dict['lower_dimensions'])
+                            json_desc['upper_dimensions'] = make_json_serializable(parsed_dict['upper_dimensions'])
                         
                         parsing_results['descriptors'].append(json_desc)
                         

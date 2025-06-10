@@ -27,13 +27,22 @@ class TensorTransformParser:
         # Handle typename arithmetic_sequence_gen<start, N, step>::type{} template
         typename_match = re.match(r'typename\s+arithmetic_sequence_gen<([^>]+)>::type\{\}', s)
         if typename_match:
-            # For arithmetic sequence generation, we'll return a sequence symbol
-            # The content inside <> should be start, length, step
+            # For arithmetic sequence generation, we need to return a special marker
+            # that indicates this should generate a sequence from start to start+N*step-step
+            # The content inside <> should be start, N, step
             content = typename_match.group(1).strip()
             parts = [p.strip() for p in content.split(',')]
-            if len(parts) >= 2:
-                # Return a symbol representing the sequence length (second parameter)
-                return sp.Symbol(parts[1]) if parts[1].isalpha() else sp.Integer(int(parts[1]))
+            if len(parts) >= 3:
+                start_param = parts[0]
+                n_param = parts[1]  
+                step_param = parts[2]
+                # Return a special dict that marks this as an arithmetic sequence generator
+                return {
+                    'type': 'arithmetic_sequence_gen',
+                    'start': sp.Symbol(start_param) if start_param.isalpha() else sp.Integer(int(start_param)),
+                    'n': sp.Symbol(n_param) if n_param.isalpha() else sp.Integer(int(n_param)),
+                    'step': sp.Symbol(step_param) if step_param.isalpha() else sp.Integer(int(step_param))
+                }
             else:
                 return sp.Symbol('seq_len')
 
@@ -114,9 +123,12 @@ class TensorTransformParser:
                     'values': nested_result
                 })
             else:
-                # Check if this is a bare variable name that might refer to a list
-                # We'll handle this in the transform creation phase
-                if re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', item):
+                # Parse the value expression and check if it's an arithmetic sequence generator
+                parsed_value = self._parse_value_expr(item)
+                if isinstance(parsed_value, dict) and parsed_value.get('type') == 'arithmetic_sequence_gen':
+                    # This is an arithmetic sequence generator - add it directly
+                    result.append(parsed_value)
+                elif re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', item):
                     # This is a bare variable name - could be a list reference
                     result.append({
                         'type': 'variable_reference',
@@ -126,7 +138,7 @@ class TensorTransformParser:
                     # Otherwise, it's a value expression that we treat as a pass_through length
                     result.append({
                         'type': 'pass_through',
-                        'value': self._parse_value_expr(item)
+                        'value': parsed_value
                     })
         return result
     
@@ -576,6 +588,31 @@ class TensorTransformParser:
             
             return XorTransform(lengths=lengths)
         
+        elif transform_type == 'arithmetic_sequence_gen':
+            # Handle arithmetic sequence generation
+            start = transform_dict.get('start', 0)
+            n = transform_dict.get('n', 1)
+            step = transform_dict.get('step', 1)
+            
+            # Substitute variables
+            safe_variables = {k: v for k, v in variables.items() if not isinstance(v, list)}
+            if isinstance(start, sp.Basic):
+                start = int(start.subs(safe_variables))
+            if isinstance(n, sp.Basic):
+                n = int(n.subs(safe_variables))
+            if isinstance(step, sp.Basic):
+                step = int(step.subs(safe_variables))
+            
+            # Generate the sequence: [start, start+step, start+2*step, ..., start+(n-1)*step]
+            sequence = [start + i * step for i in range(n)]
+            
+            # Return a special marker that indicates this is a sequence
+            # This will be handled by the descriptor builder
+            return {
+                'type': 'sequence_literal',
+                'sequence': sequence
+            }
+        
         elif transform_type == 'xor_with_modulo':
             # XOR with modulo transform - same as regular XOR for our purposes
             values = transform_dict.get('values', [])
@@ -776,9 +813,57 @@ class TensorTransformParser:
                 transform_obj = self.create_pytensor_transform(transform_dict, variables)
                 transforms.append(transform_obj)
             
-            # Convert dimension indices
-            lower_dims = parsed_dict['lower_dimensions']
-            upper_dims = parsed_dict['upper_dimensions']
+            # Convert dimension indices, handling sequence literals
+            lower_dims = []
+            for dim_item in parsed_dict['lower_dimensions']:
+                if isinstance(dim_item, dict) and dim_item.get('type') == 'sequence_literal':
+                    # Convert sequence literal to actual sequence
+                    lower_dims.append(dim_item['sequence'])
+                elif isinstance(dim_item, dict) and dim_item.get('type') == 'arithmetic_sequence_gen':
+                    # Handle arithmetic sequence generator directly
+                    seq_transform = self.create_pytensor_transform(dim_item, variables)
+                    if isinstance(seq_transform, dict) and seq_transform.get('type') == 'sequence_literal':
+                        lower_dims.append(seq_transform['sequence'])
+                    else:
+                        lower_dims.append([0])  # fallback
+                elif isinstance(dim_item, list):
+                    lower_dims.append(dim_item)
+                else:
+                    lower_dims.append(dim_item)
+            
+            upper_dims = []
+            for dim_item in parsed_dict['upper_dimensions']:
+                if isinstance(dim_item, dict) and dim_item.get('type') == 'sequence_literal':
+                    # Convert sequence literal to actual sequence
+                    upper_dims.append(dim_item['sequence'])
+                elif isinstance(dim_item, dict) and dim_item.get('type') == 'arithmetic_sequence_gen':
+                    # Handle arithmetic sequence generator directly
+                    seq_transform = self.create_pytensor_transform(dim_item, variables)
+                    if isinstance(seq_transform, dict) and seq_transform.get('type') == 'sequence_literal':
+                        upper_dims.append(seq_transform['sequence'])
+                    else:
+                        upper_dims.append([0])  # fallback
+                elif isinstance(dim_item, list):
+                    upper_dims.append(dim_item)
+                else:
+                    upper_dims.append(dim_item)
+            
+            # Validate dimension compatibility before creating descriptor
+            for i, (transform, lower_dim_list, upper_dim_list) in enumerate(zip(transforms, lower_dims, upper_dims)):
+                if hasattr(transform, 'ndim'):
+                    expected_inputs = transform.ndim
+                    if isinstance(upper_dim_list, list) and len(upper_dim_list) != expected_inputs:
+                        # Provide helpful suggestion for common arithmetic sequence issues
+                        if len(upper_dim_list) > expected_inputs:
+                            suggestion = f"Consider reducing N from {len(upper_dim_list)} to {expected_inputs} in your arithmetic_sequence_gen"
+                        else:
+                            suggestion = f"Consider increasing N from {len(upper_dim_list)} to {expected_inputs} in your arithmetic_sequence_gen"
+                        
+                        raise ValueError(
+                            f"Transform {i} ({transform.__class__.__name__}) with lengths {transform.lengths} "
+                            f"expects {expected_inputs} upper dimensions but got {len(upper_dim_list)}. "
+                            f"{suggestion}."
+                        )
             
             return transform_tensor_descriptor(
                 input_descriptor=input_descriptor,

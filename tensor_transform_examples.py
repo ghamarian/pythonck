@@ -386,7 +386,7 @@ def get_default_variables() -> Dict[str, Dict[str, int]]:
             'BK1': 1,
         },
         "Arithmetic Sequence Transform": {
-            'N': 4,
+            'N': 2,
             'lengths': [2, 2],
         },
         "A LDS Block Desc Example": {
