@@ -334,6 +334,20 @@ const auto a_grid_desc = transform_tensor_descriptor(
         make_pass_through_transform(AK1Value)),
     make_tuple(Sequence<0, 1>{}, Sequence<2>{}, Sequence<3>{}),
     make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}));
+""",
+        "Arithmetic Sequence with Explicit Lengths": """
+transform_tensor_descriptor(
+    desc_0,
+    make_tuple(make_unmerge_transform(make_tuple(A, B, C))),
+    make_tuple(sequence<0>{}),
+    make_tuple(typename arithmetic_sequence_gen<0, N, 1>::type{}))
+""",
+        "Arithmetic Sequence with List Variable": """
+transform_tensor_descriptor(
+    desc_0,
+    make_tuple(make_unmerge_transform(lengths)),
+    make_tuple(sequence<0>{}),
+    make_tuple(typename arithmetic_sequence_gen<0, N, 1>::type{}))
 """
     }
     return examples
@@ -426,5 +440,16 @@ def get_default_variables() -> Dict[str, Dict[str, int]]:
             'KPerBlock': 64,
             'AK0Number': 8,
             'AK1Value': 4,
+        },
+        "Arithmetic Sequence with Explicit Lengths": {
+            'A': 2,
+            'B': 4,
+            'C': 8,
+            'N': 3,
+        },
+        "Arithmetic Sequence with List Variable": {
+            # Demo of list variable - 'lengths' will show as list control in webapp
+            'N': 3,
+            'lengths': [2, 4, 8],  # This will be editable as a list in the UI
         },
     } 

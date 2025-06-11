@@ -13,12 +13,190 @@ from pytensor.tensor_descriptor import (
     EmbedTransform, OffsetTransform, PadTransform, ReplicateTransform
 )
 
+def extract_descriptor_references(code: str) -> set:
+    """Extract descriptor names that are used as first parameters in tensor descriptor functions or declared as descriptors."""
+    import re
+    
+    descriptor_names = set()
+    
+    # Pattern 1: First parameter in transform_tensor_descriptor calls
+    # This matches: transform_tensor_descriptor(first_param, ...)
+    transform_pattern = r'transform_tensor_descriptor\s*\(\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*,'
+    matches = re.findall(transform_pattern, code)
+    descriptor_names.update(matches)
+    
+    # Pattern 2: Variable declarations that create descriptors
+    # This matches: constexpr auto variable_name = make_naive_tensor_descriptor... or transform_tensor_descriptor...
+    declaration_pattern = r'(?:constexpr\s+auto|auto)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(?:make_naive_tensor_descriptor|transform_tensor_descriptor)'
+    matches = re.findall(declaration_pattern, code)
+    descriptor_names.update(matches)
+    
+    return descriptor_names
+
+def get_cpp_keywords():
+    """Get the complete set of C++ keywords and function names that should not be treated as variables."""
+    return {
+        # C++ keywords
+        'typename', 'type', 'constexpr', 'auto', 'const', 'static', 'namespace', 'class', 'struct',
+        'template', 'using', 'true', 'false', 'nullptr', 'void', 'int', 'float', 'double', 'char',
+        'bool', 'size_t', 'index_t', 'return', 'if', 'else', 'for', 'while', 'do', 'switch', 'case',
+        'default', 'break', 'continue', 'public', 'private', 'protected', 'virtual', 'override',
+        'final', 'inline', 'extern', 'friend', 'operator', 'new', 'delete', 'this', 'sizeof',
+        
+        # Tensor library specific keywords
+        'arithmetic_sequence_gen', 'sequence', 'Sequence', 'number', 'make_tuple',
+        'transform_tensor_descriptor', 'make_naive_tensor_descriptor', 'make_naive_tensor_descriptor_packed',
+        'make_pass_through_transform', 'make_merge_transform', 'make_unmerge_transform',
+        'make_xor_transform', 'make_xor_with_modulo_transform', 'make_merge_transform_v3_division_mod',
+        'make_embed_transform', 'make_offset_transform', 'make_pad_transform', 'make_replicate_transform',
+        
+        # Common variable patterns that aren't actual variables
+        'gen', 'transform', 'descriptor', 'tensor', 'make', 'get', 'set', 'create', 'build'
+    }
+
 class TensorTransformParser:
     """Parser for tensor descriptor transformations."""
     
     def __init__(self):
         """Initialize the parser."""
         self.descriptor_registry = {}  # Registry for resolving variable references
+        self.default_warnings = []  # Track when default values are used
+    
+    def get_default_warnings(self):
+        """Get list of warnings about default values used."""
+        return self.default_warnings.copy()
+    
+    def clear_default_warnings(self):
+        """Clear the list of default warnings."""
+        self.default_warnings = []
+    
+    def extract_list_variables(self, descriptor_str: str) -> Dict[str, Dict[str, Any]]:
+        """
+        Extract variables that should be lists based on their usage context.
+        
+        Returns:
+            Dict mapping variable names to their list metadata:
+            {
+                'variable_name': {
+                    'type': 'list',
+                    'context': 'unmerge_lengths',  # or 'merge_lengths', etc.
+                    'expected_type': 'int',
+                    'default_length': 2,
+                    'default_value': [2, 2]
+                }
+            }
+        """
+        list_variables = {}
+        
+        try:
+            # Parse the descriptor to find list variable contexts
+            parsed_dict = self.parse_tensor_descriptor(descriptor_str)
+            
+            if parsed_dict['type'] == 'transform':
+                # Analyze transforms to find list variables
+                for transform in parsed_dict['transforms']:
+                    if transform['type'] == 'unmerge':
+                        # Check if unmerge has a single variable reference (not make_tuple)
+                        # This means: make_unmerge_transform(lengths) vs make_unmerge_transform(make_tuple(A, B, C))
+                        if (len(transform['values']) == 1 and 
+                            isinstance(transform['values'][0], dict) and 
+                            transform['values'][0].get('type') == 'variable_reference'):
+                            
+                            var_name = transform['values'][0].get('name')
+                            if var_name:
+                                list_variables[var_name] = {
+                                    'type': 'list',
+                                    'context': 'unmerge_lengths',
+                                    'expected_type': 'int',
+                                    'default_length': 3,
+                                    'default_value': [2, 4, 8],
+                                    'description': f'List of output dimensions for unmerge transform'
+                                }
+                    
+                    elif transform['type'] == 'merge':
+                        # Similar logic for merge - only if it's a single variable reference
+                        if (len(transform['values']) == 1 and 
+                            isinstance(transform['values'][0], dict) and 
+                            transform['values'][0].get('type') == 'variable_reference'):
+                            
+                            var_name = transform['values'][0].get('name')
+                            if var_name:
+                                list_variables[var_name] = {
+                                    'type': 'list',
+                                    'context': 'merge_lengths',
+                                    'expected_type': 'int',
+                                    'default_length': 3,
+                                    'default_value': [2, 4, 8],
+                                    'description': f'List of input dimensions for merge transform'
+                                }
+                
+                # Also check upper dimensions for arithmetic sequence parameters
+                for upper_dim in parsed_dict['upper_dimensions']:
+                    if isinstance(upper_dim, dict) and upper_dim.get('type') == 'arithmetic_sequence_gen':
+                        # Extract N parameter from arithmetic sequence
+                        n_param = upper_dim.get('n')
+                        if isinstance(n_param, sp.Symbol):
+                            var_name = str(n_param)
+                            # N should correspond to the length of any list variables
+                            # Update default_length for list variables to match N
+                            for list_var in list_variables.values():
+                                list_var['linked_to_N'] = var_name
+                                
+        except Exception as e:
+            # If parsing fails, we'll just return empty dict
+            pass
+        
+        return list_variables
+
+    def get_variable_info(self, descriptor_str: str) -> Dict[str, Dict[str, Any]]:
+        """
+        Get comprehensive information about all variables in the descriptor.
+        
+        Returns:
+            Dict mapping variable names to their metadata:
+            {
+                'variable_name': {
+                    'type': 'scalar' | 'list',
+                    'default_value': value,
+                    'description': str,
+                    ...
+                }
+            }
+        """
+        variable_info = {}
+        
+        # Get scalar variables (existing functionality)
+        scalar_vars = self.extract_variables(descriptor_str)
+        for var in scalar_vars:
+            variable_info[var] = {
+                'type': 'scalar',
+                'default_value': 1,
+                'description': f'Scalar parameter {var}'
+            }
+        
+        # Get list variables (new functionality)
+        list_vars = self.extract_list_variables(descriptor_str)
+        for var_name, var_data in list_vars.items():
+            variable_info[var_name] = var_data
+        
+        return variable_info
+
+    def extract_variables(self, descriptor_str: str) -> set:
+        """Extract scalar variables from the descriptor string."""
+        # Get all identifiers
+        identifiers = re.findall(r'[a-zA-Z_][a-zA-Z0-9_]*', descriptor_str)
+        
+        # Filter out C++ keywords and descriptor references
+        cpp_keywords = get_cpp_keywords()
+        descriptor_references = extract_descriptor_references(descriptor_str)
+        
+        # Only keep actual variables
+        variables = set()
+        for identifier in identifiers:
+            if identifier not in cpp_keywords and identifier not in descriptor_references:
+                variables.add(identifier)
+        
+        return variables
     
     def _parse_value_expr(self, expr_str: str) -> sp.Expr:
         """Parse a string into a SymPy expression, keeping variables symbolic."""
@@ -66,8 +244,14 @@ class TensorTransformParser:
         # Find all identifiers (potential variables) in the string
         identifiers = re.findall(r'[a-zA-Z_][a-zA-Z0-9_]*', s)
         
-        # Create a dictionary of SymPy symbols for the identifiers
-        local_dict = {i: sp.Symbol(i) for i in identifiers}
+        # Filter out C++ keywords and function names that shouldn't be treated as variables
+        cpp_keywords = get_cpp_keywords()
+        
+        # Only create symbols for actual variables, not C++ keywords
+        variable_identifiers = [i for i in identifiers if i not in cpp_keywords]
+        
+        # Create a dictionary of SymPy symbols for the actual variables
+        local_dict = {i: sp.Symbol(i) for i in variable_identifiers}
 
         try:
             # Use sympify to parse the string into a SymPy expression.
@@ -220,11 +404,23 @@ class TensorTransformParser:
             match = re.match(r'make_unmerge_transform\((.*)\)', transform_str, re.DOTALL)
             if match:
                 tuple_content = match.group(1).strip()
-                values = self.parse_make_tuple(tuple_content)
-                return {
-                    'type': 'unmerge',
-                    'values': values
-                }
+                # Check if the content is just a variable name (not a make_tuple)
+                if re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', tuple_content):
+                    # This is a variable reference, not a tuple
+                    return {
+                        'type': 'unmerge',
+                        'values': [{
+                            'type': 'variable_reference',
+                            'name': tuple_content
+                        }]
+                    }
+                else:
+                    # This is a tuple or more complex expression
+                    values = self.parse_make_tuple(tuple_content)
+                    return {
+                        'type': 'unmerge',
+                        'values': values
+                    }
         
         try:
             # Fallback for raw values/expressions, treat as pass_through
@@ -386,6 +582,8 @@ class TensorTransformParser:
                         return [int(var_value)]
                 else:
                     # Variable not found, default to 1
+                    warning = f"Variable '{var_name}' not defined, using default value [1]"
+                    self.default_warnings.append(warning)
                     return [1]
             elif val.get('type') == 'merge':
                 # Nested merge: flatten its components
@@ -441,6 +639,8 @@ class TensorTransformParser:
                     return PassThroughTransform(length=int(var_value))
             else:
                 # Variable not found, default to 1
+                warning = f"Variable '{var_name}' not defined, using default value 1"
+                self.default_warnings.append(warning)
                 return PassThroughTransform(length=1)
         
         elif transform_type == 'merge':
@@ -493,6 +693,8 @@ class TensorTransformParser:
                                 lengths.append(int(var_value))
                         else:
                             # Variable not found, default to 1
+                            warning = f"Variable '{var_name}' not defined, using default value 1"
+                            self.default_warnings.append(warning)
                             lengths.append(1)
                     else:
                         nested_transform = self.create_pytensor_transform(val, variables)
@@ -670,6 +872,9 @@ class TensorTransformParser:
         
         if variables is None:
             variables = {}
+        
+        # Clear warnings at the start of each parsing operation
+        self.clear_default_warnings()
         
         # Parse the descriptor string
         parsed_dict = self.parse_tensor_descriptor(descriptor_str)

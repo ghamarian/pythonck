@@ -7,7 +7,7 @@ import sympy as sp
 import re
 import time
 import math
-from tensor_transform_parser import TensorTransformParser
+from tensor_transform_parser import TensorTransformParser, get_cpp_keywords, extract_descriptor_references
 from pytensor.tensor_descriptor import (
     Transform, PassThroughTransform, MergeTransform, UnmergeTransform,
     EmbedTransform, OffsetTransform, PadTransform, ReplicateTransform
@@ -21,6 +21,18 @@ import pytensor.tensor_descriptor
 def get_transform_examples_with_multi():
     examples = get_transform_examples()
     return examples
+
+def handle_parser_warnings(parser, context=""):
+    """Handle default value warnings from the parser."""
+    warnings = parser.get_default_warnings()
+    if warnings:
+        for warning in warnings:
+            st.warning(f"⚠️ {warning}")
+        if context:
+            st.info(f"💡 Tip: Set values for these variables in the 'Template Variables' section for {context}.")
+        else:
+            st.info("💡 Tip: Set values for these variables in the 'Template Variables' section above for more control.")
+    return warnings
 
 def initialize_session_state():
     """Initialize all required session state variables."""
@@ -64,12 +76,12 @@ def get_transform_length(transform: Dict[str, Any], variables: Dict[str, Any]) -
     return sp.Integer(1)
 
 def display_variable_controls():
-    """Display number inputs for adjusting template variables."""
+    """Display controls for adjusting template variables (both scalars and lists)."""
     st.subheader("Template Variables")
     
     updated_variables = {}
     
-    if not hasattr(st.session_state, 'variable_names') or not st.session_state.variable_names:
+    if not hasattr(st.session_state, 'variable_info') or not st.session_state.variable_info:
         st.info("No template variables detected in code. Parse your code to find variables.")
         return
     
@@ -77,44 +89,93 @@ def display_variable_controls():
     default_vars = get_default_variables()
     example_defaults = default_vars.get(st.session_state.selected_example, {})
     
-    for var in st.session_state.variable_names:
-        # First try to get current value from session state
-        current_value = st.session_state.variables.get(var)
-        
-        # If not in session state, try to get from defaults
-        if current_value is None:
-            current_value = example_defaults.get(var, 1)
-        
-        # Skip variables that are lists (not suitable for number_input)
-        if isinstance(current_value, list):
-            updated_variables[var] = current_value
-            continue
-        
-        # Ensure current_value is numeric
-        try:
-            current_value = int(current_value) if isinstance(current_value, (int, float)) else 1
-        except (ValueError, TypeError):
-            current_value = 1
-        
-        if '::' in var:
-            namespace, var_name = var.split('::')
-            display_name = f"{namespace}::{var_name}"
-        else:
-            display_name = var
-        
-        value = st.number_input(
-            display_name,
-            min_value=1,
-            value=current_value,
-            key=f"var_{var}"
-        )
-        
-        updated_variables[var] = value
+    # Group variables by type
+    scalar_vars = {}
+    list_vars = {}
     
+    for var_name, var_info in st.session_state.variable_info.items():
+        if var_info.get('type') == 'list':
+            list_vars[var_name] = var_info
+        else:
+            scalar_vars[var_name] = var_info
+    
+    # Display scalar variables
+    if scalar_vars:
+        st.markdown("**Scalar Variables**")
+        for var_name, var_info in scalar_vars.items():
+            # Get current value
+            current_value = st.session_state.variables.get(var_name)
+            if current_value is None:
+                current_value = example_defaults.get(var_name, var_info.get('default_value', 1))
+            
+            # Ensure current_value is numeric
+            try:
+                current_value = int(current_value) if isinstance(current_value, (int, float)) else 1
+            except (ValueError, TypeError):
+                current_value = 1
+            
+            # Display control
+            display_name = var_name
+            if 'description' in var_info:
+                display_name += f" ({var_info['description']})"
+            
+            value = st.number_input(
+                display_name,
+                min_value=1,
+                value=current_value,
+                key=f"var_{var_name}"
+            )
+            updated_variables[var_name] = value
+    
+    # Display list variables
+    if list_vars:
+        st.markdown("**List Variables**")
+        for var_name, var_info in list_vars.items():
+            # Get current value
+            current_value = st.session_state.variables.get(var_name)
+            if current_value is None:
+                current_value = example_defaults.get(var_name, var_info.get('default_value', [2, 2]))
+            
+            # Ensure current_value is a list
+            if not isinstance(current_value, list):
+                current_value = var_info.get('default_value', [2, 2])
+            
+            # Display list control
+            st.markdown(f"**{var_name}**")
+            if 'description' in var_info:
+                st.caption(var_info['description'])
+            
+            # Convert list to comma-separated string for text input
+            list_str = ", ".join(map(str, current_value))
+            
+            new_list_str = st.text_input(
+                f"Values for {var_name} (comma-separated)",
+                value=list_str,
+                key=f"list_{var_name}",
+                help=f"Enter {var_info.get('expected_type', 'int')} values separated by commas, e.g., '2, 4, 8'"
+            )
+            
+            # Parse the input back to a list
+            try:
+                if new_list_str.strip():
+                    new_list = [int(x.strip()) for x in new_list_str.split(',') if x.strip()]
+                    if not new_list:  # Empty list
+                        new_list = var_info.get('default_value', [2, 4, 8])
+                else:
+                    new_list = var_info.get('default_value', [2, 4, 8])
+                updated_variables[var_name] = new_list
+            except ValueError:
+                st.error(f"Invalid input for {var_name}. Please enter integers separated by commas.")
+                updated_variables[var_name] = current_value
+            
+            # Show preview of current list
+            st.caption(f"Current list: {updated_variables.get(var_name, current_value)}")
+    
+    # Check for changes
     variables_changed = False
     if hasattr(st.session_state, 'variables'):
         for var, value in updated_variables.items():
-            if var in st.session_state.variables and st.session_state.variables[var] != value:
+            if var not in st.session_state.variables or st.session_state.variables[var] != value:
                 variables_changed = True
                 break
     
@@ -1534,17 +1595,10 @@ def main():
                 parsed_descriptors = [parser.parse_tensor_descriptor(desc) for desc in descriptor_texts]
                 st.session_state.parsed_descriptor = parsed_descriptors
                 
-                # Extract variable names from the code
+                # Extract variable information from the code using enhanced parser
                 all_code = "\n".join(descriptor_texts)
-                variable_names = set()
-                template_vars = re.findall(r'number<([a-zA-Z0-9_ / * + -]+)>{}', all_code)
-                for var in template_vars:
-                    variable_names.update(re.findall(r'[a-zA-Z_][a-zA-Z0-9_]*', var))
-                raw_vars = re.findall(r'\b([a-zA-Z_][a-zA-Z0-9_]*)\b', all_code)
-                cpp_keywords = {'make_tuple', 'sequence', 'transform_tensor_descriptor', 'make_pass_through_transform', 
-                               'make_merge_transform', 'number', 'true', 'false', 'nullptr'}
-                variable_names.update(var for var in raw_vars if var not in cpp_keywords)
-                st.session_state.variable_names = sorted(variable_names)
+                variable_info = parser.get_variable_info(all_code)
+                st.session_state.variable_info = variable_info
                 
                 # Get default values for the current example
                 default_vars = get_default_variables()
@@ -1552,18 +1606,21 @@ def main():
                 
                 # Create new variables dict preserving existing values where possible
                 new_variables = {}
-                for var in st.session_state.variable_names:
+                for var_name, var_data in variable_info.items():
                     # First try to get existing value from session state
-                    if var in st.session_state.variables:
-                        new_variables[var] = st.session_state.variables[var]
-                    # Then try defaults
-                    elif var in example_defaults:
-                        new_variables[var] = example_defaults[var]
-                    # Finally fall back to 1
+                    if var_name in st.session_state.variables:
+                        new_variables[var_name] = st.session_state.variables[var_name]
+                    # Then try defaults from example
+                    elif var_name in example_defaults:
+                        new_variables[var_name] = example_defaults[var_name]
+                    # Finally use variable's default value
                     else:
-                        new_variables[var] = 1
+                        new_variables[var_name] = var_data.get('default_value', 1)
                 
                 st.session_state.variables = new_variables
+                
+                # Keep variable_names for backward compatibility
+                st.session_state.variable_names = sorted(variable_info.keys())
                 st.success(f"Parsed {len(parsed_descriptors)} descriptor(s) successfully!")
             except Exception as e:
                 st.error(f"Failed to parse descriptor(s): {e}")
@@ -1645,7 +1702,15 @@ def main():
                         parsed_dict = parser.parse_tensor_descriptor(desc_str)
                         
                         # Create pytensor descriptor
+                        parser.clear_default_warnings()  # Clear any previous warnings
                         tensor_desc = parser.create_pytensor_descriptor(desc_str, st.session_state.variables)
+                        
+                        # Check for default value warnings
+                        warnings = parser.get_default_warnings()
+                        if warnings:
+                            for warning in warnings:
+                                st.warning(f"⚠️ {warning}")
+                            st.info("💡 Tip: Set values for these variables in the 'Template Variables' section above for more control.")
                         
                         if i < len(variable_names):
                             descriptor_registry[variable_names[i]] = tensor_desc
