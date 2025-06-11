@@ -56,20 +56,29 @@ def format_cpp_code(code: str) -> str:
         # Clean up spacing around operators and keywords
         formatted_line = line
         
-        # Add spaces around operators
-        formatted_line = re.sub(r'([=<>!]+)', r' \1 ', formatted_line)
+        # Add spaces around operators, but avoid template brackets
+        # First handle = operators
+        formatted_line = re.sub(r'([^<>=!])=([^=])', r'\1 = \2', formatted_line)
+        # Handle comparison operators (==, !=, <=, >=) but not template brackets
+        formatted_line = re.sub(r'([^<>])([!<>]=?)([^<>=])', r'\1 \2 \3', formatted_line)
         formatted_line = re.sub(r'\s+', ' ', formatted_line)  # Remove extra spaces
         
-        # Fix spacing around template brackets
+        # Fix template brackets - ensure no spaces inside
         formatted_line = re.sub(r'<\s+', '<', formatted_line)
         formatted_line = re.sub(r'\s+>', '>', formatted_line)
+        # Fix spaces before template brackets (e.g., "sequence <0>" -> "sequence<0>")
+        formatted_line = re.sub(r'([a-zA-Z_][a-zA-Z0-9_]*)\s+<', r'\1<', formatted_line)
+        # Fix spaces before :: (scope resolution operator)
+        formatted_line = re.sub(r'\s+::', r'::', formatted_line)
         
         # Fix spacing around parentheses
         formatted_line = re.sub(r'\(\s+', '(', formatted_line)
         formatted_line = re.sub(r'\s+\)', ')', formatted_line)
         
-        # Add proper spacing after commas
+        # Add proper spacing after commas, but not before {} 
         formatted_line = re.sub(r',(?!\s)', ', ', formatted_line)
+        # Fix unwanted space before {} that might have been introduced
+        formatted_line = re.sub(r'>\s+{', r'>{', formatted_line)
         
         # Add the formatted line with indentation
         formatted_lines.append(indent + formatted_line)
@@ -1690,9 +1699,8 @@ def main():
                     st.rerun()
             else:
                 if st.button("✏️ Edit Code", help="Return to code editor"):
-                    # Apply formatting automatically when switching back to edit mode
-                    formatted_code = format_cpp_code(st.session_state.original_code)
-                    st.session_state.current_code = formatted_code
+                    # Return to original code without applying formatting
+                    st.session_state.current_code = st.session_state.original_code
                     st.session_state.format_mode = False
                     st.rerun()
         

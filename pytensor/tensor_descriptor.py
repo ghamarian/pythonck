@@ -592,9 +592,11 @@ class XorTransform(Transform):
     
     Attributes:
         lengths: Lengths of the two dimensions to XOR
+        apply_modulo: Whether to apply modulo operation (matches C++ ApplyModulo template parameter)
     """
     
     lengths: List[int]
+    apply_modulo: bool = True
     
     def __post_init__(self):
         """Validate XOR transform has exactly 2 dimensions."""
@@ -614,22 +616,31 @@ class XorTransform(Transform):
         return self.lengths
     
     def calculate_lower_index(self, idx_upper: MultiIndex) -> MultiIndex:
-        """Calculate lower index by applying XOR."""
+        """Calculate lower index by applying XOR (upper -> lower direction)."""
         if len(idx_upper) != 2:
             raise ValueError("XOR transform expects 2D upper index")
         
-        # Apply XOR: lower[0] = upper[0] ^ upper[1], lower[1] = upper[1]
+        # Match C++ CalculateLowerIndex: lower[0] = upper[0], lower[1] = upper[1] ^ f(upper[0])
         x, y = idx_upper[0], idx_upper[1]
-        return MultiIndex(2, [x ^ y, y])
+        if self.apply_modulo:
+            xor_value = x % self.lengths[1]
+        else:
+            xor_value = x
+        return MultiIndex(2, [x, y ^ xor_value])
     
     def calculate_upper_index(self, idx_lower: MultiIndex) -> MultiIndex:
-        """Calculate upper index by applying inverse XOR."""
+        """Calculate upper index by applying inverse XOR (lower -> upper direction)."""
         if len(idx_lower) != 2:
             raise ValueError("XOR transform expects 2D lower index")
         
-        # Inverse XOR: upper[0] = lower[0] ^ lower[1], upper[1] = lower[1]
+        # Inverse operation: since XOR is self-inverse, use same formula with lower indices
+        # upper[0] = lower[0], upper[1] = lower[1] ^ f(lower[0])
         x, y = idx_lower[0], idx_lower[1]
-        return MultiIndex(2, [x ^ y, y])
+        if self.apply_modulo:
+            xor_value = x % self.lengths[1]
+        else:
+            xor_value = x
+        return MultiIndex(2, [x, y ^ xor_value])
     
     def is_valid_upper_index_always_mapped_to_valid_lower_index(self) -> bool:
         """XOR transform preserves validity."""
@@ -643,22 +654,56 @@ class XorTransform(Transform):
         return True
     
     def sympy_forward(self, input_symbols: List[sp.Expr]) -> List[sp.Expr]:
-        """Apply XOR to symbols."""
+        """Apply XOR transform in forward direction (lower → upper).
+        
+        This mirrors calculate_upper_index: takes lower coordinate symbols 
+        and produces upper coordinate symbols.
+        """
         if len(input_symbols) != 2:
             raise ValueError("XOR transform expects 2D input")
         
-        x, y = input_symbols[0], input_symbols[1]
-        # XOR in symbolic form: x ⊕ y using proper XOR symbol
-        return [Xor(x, y), y]
+        # Forward direction: lower → upper
+        # input_symbols[0], input_symbols[1] are LOWER coordinate symbols
+        # We want to compute UPPER coordinate symbols
+        lower_x, lower_y = input_symbols[0], input_symbols[1]
+        
+        # From C++ CalculateLowerIndex: lower[1] = upper[1] ^ f(upper[0]) 
+        # So to get upper from lower: upper[1] = lower[1] ^ f(upper[0])
+        # But since upper[0] = lower[0], we have: upper[1] = lower[1] ^ f(lower[0])
+        upper_x = lower_x  # First dimension passes through
+        if self.apply_modulo:
+            xor_expr = lower_x % self.lengths[1]
+        else:
+            xor_expr = lower_x
+        upper_y = Xor(lower_y, xor_expr)
+        
+        return [upper_x, upper_y]
     
     def sympy_backward(self, output_symbols: List[sp.Expr]) -> List[sp.Expr]:
-        """Apply inverse XOR to symbols."""
+        """Apply XOR transform in backward direction (upper → lower).
+        
+        This mirrors calculate_lower_index and exactly matches the C++ 
+        CalculateLowerIndex implementation.
+        """
         if len(output_symbols) != 2:
             raise ValueError("XOR transform expects 2D output")
         
-        x, y = output_symbols[0], output_symbols[1]
-        # Inverse XOR: same operation in symbolic form (XOR is its own inverse)
-        return [Xor(x, y), y]
+        # Backward direction: upper → lower  
+        # output_symbols[0], output_symbols[1] are UPPER coordinate symbols
+        # We want to compute LOWER coordinate symbols
+        upper_x, upper_y = output_symbols[0], output_symbols[1]
+        
+        # From C++ CalculateLowerIndex: 
+        # lower[0] = upper[0]
+        # lower[1] = upper[1] ^ f(upper[0])
+        lower_x = upper_x  # First dimension passes through
+        if self.apply_modulo:
+            xor_expr = upper_x % self.lengths[1]
+        else:
+            xor_expr = upper_x
+        lower_y = Xor(upper_y, xor_expr)
+        
+        return [lower_x, lower_y]
     
     def calculate_upper_dimension_safe_vector_length_strides(
         self,
@@ -671,7 +716,7 @@ class XorTransform(Transform):
     
     def __repr__(self) -> str:
         """String representation."""
-        return f"XorTransform(lengths={self.lengths})"
+        return f"XorTransform(lengths={self.lengths}, apply_modulo={self.apply_modulo})"
 
 
 @dataclass
