@@ -1553,10 +1553,17 @@ def build_backward_transformation_graph_from_pytensor(descriptors, variables):
             print(f"DEBUG BACKWARD: prev_stage_output_nodes keys: {list(prev_stage_output_nodes.keys())}")
             
             # Get input symbols for this backward transform
+            # FIXED: Map hidden dimension IDs to logical indices
+            top_dim_ids = tensor_desc.get_top_dimension_hidden_ids()
+            hidden_to_logical = {hidden_id: logical_idx for logical_idx, hidden_id in enumerate(top_dim_ids)}
+            
             input_symbols = []
             for idx in backward_input_indices:
-                if idx in prev_stage_output_nodes:
-                    prev_node_id = prev_stage_output_nodes[idx]
+                # Map hidden dimension ID to logical index
+                logical_idx = hidden_to_logical.get(idx, idx)
+                
+                if logical_idx in prev_stage_output_nodes:
+                    prev_node_id = prev_stage_output_nodes[logical_idx]
                     if prev_node_id in current_formulas:
                         input_symbols.append(current_formulas[prev_node_id])
                     else:
