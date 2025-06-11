@@ -475,6 +475,7 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
     """
     Build a Graphviz DOT graph using pytensor objects and their sympy methods.
     """
+    import math  # Needed for math.prod() in FixedFinalDescriptor
     dot = graphviz.Digraph(format="png")
     dot.attr(rankdir="LR", splines="ortho", compound="true")
     dot.attr('node', shape='box', style='rounded,filled')
@@ -579,18 +580,17 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
             all_upper_idss = first_desc.get_upper_dimension_hidden_idss()
             all_lower_idss = first_desc.get_lower_dimension_hidden_idss()
             
-            # Find the maximum dimension referenced in any transform
+            # Find the maximum INPUT dimension referenced in any transform
+            # Only look at lower_ids since those represent input dimensions
             max_dim_needed = 0
             for lower_ids in all_lower_idss:
                 if lower_ids:
                     max_dim_needed = max(max_dim_needed, max(lower_ids) + 1)
-            for upper_ids in all_upper_idss:
-                if upper_ids:
-                    max_dim_needed = max(max_dim_needed, max(upper_ids) + 1)
+            # NOTE: Don't look at upper_ids - those are OUTPUT dimensions, not input!
             
             if max_dim_needed > max_input_dim:
                 max_input_dim = max_dim_needed
-                print(f"DEBUG: max_input_dim updated to {max_input_dim} based on pytensor transforms")
+                print(f"DEBUG: max_input_dim updated to {max_input_dim} based on transform INPUT requirements")
     
     print(f"DEBUG: is_first_naive_packed = {is_first_naive_packed}")
     
@@ -640,14 +640,31 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                 
                 print(f"DEBUG: Created input {node_id} mapped to index {k}")
                 
-                # Get dimension length from first descriptor if possible
+                # Get dimension length - for unmerge transforms, calculate required input size
                 try:
                     first_desc = pytensor_descriptors[0]
-                    if k < first_desc.get_num_of_dimension():
-                        dim_length = first_desc.get_length(k) if hasattr(first_desc, 'get_length') else '?'
-                        dim_label = f"d{k} ({dim_length})"
+                    
+                    # Check if this is an unmerge transform case
+                    all_transforms = first_desc.get_transforms()
+                    if (len(all_transforms) > 0 and 
+                        isinstance(all_transforms[0], pytensor.tensor_descriptor.UnmergeTransform)):
+                        
+                        # For unmerge: input dimension should have size = product of unmerge lengths
+                        unmerge_transform = all_transforms[0]
+                        if hasattr(unmerge_transform, 'lengths') and unmerge_transform.lengths:
+                            import math
+                            required_input_size = math.prod(unmerge_transform.lengths)
+                            dim_label = f"d{k} ({required_input_size})"
+                            print(f"DEBUG: Input d{k} calculated for unmerge with lengths {unmerge_transform.lengths} -> size {required_input_size}")
+                        else:
+                            dim_label = f"d{k}"
                     else:
-                        dim_label = f"d{k}"
+                        # Regular case: use descriptor's reported length
+                        if k < first_desc.get_num_of_dimension():
+                            dim_length = first_desc.get_length(k) if hasattr(first_desc, 'get_length') else '?'
+                            dim_label = f"d{k} ({dim_length})"
+                        else:
+                            dim_label = f"d{k}"
                 except:
                     dim_label = f"d{k}"
                 input_cluster.node(node_id, dim_label, fillcolor="#ffcccc")
@@ -1085,25 +1102,69 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                     print(f"DEBUG: Created corrected final descriptor with {len(final_transforms)} transforms")
                     print(f"DEBUG: Final transforms: {[t.__class__.__name__ for t in final_transforms]}")
                     
-                    # Create a simple wrapper that returns the correct lengths
+                    # FIXED: Count actual output dimensions like backward graph does
+                    # Instead of just counting transforms, look at upper dimension indices
+                    all_upper_idss = full_descriptor.get_upper_dimension_hidden_idss()
+                    final_upper_idss = all_upper_idss[-final_stage_transform_count:]
+                    
+                    # Count actual output dimensions by looking at the upper dimension indices
+                    all_final_upper_dims = []
+                    for upper_ids in final_upper_idss:
+                        all_final_upper_dims.extend(upper_ids)
+                    
+                    # The number of unique upper dimension indices is the actual output count
+                    actual_output_dims = len(set(all_final_upper_dims)) if all_final_upper_dims else 1
+                    
+                    print(f"DEBUG: Forward graph final stage upper dimension indices: {final_upper_idss}")
+                    print(f"DEBUG: Forward graph all final upper dims: {all_final_upper_dims}")
+                    print(f"DEBUG: Forward graph unique final upper dims count: {actual_output_dims}")
+                    
+                    # Create a wrapper that returns the actual output dimension count
                     class FixedFinalDescriptor:
-                        def __init__(self, transforms):
+                        def __init__(self, transforms, actual_dims):
                             self.final_transforms = transforms
+                            self.actual_output_dims = actual_dims
                             
                         def get_num_of_dimension(self):
-                            return len(self.final_transforms)
+                            return self.actual_output_dims
                             
                         def get_length(self, dim):
-                            if dim < len(self.final_transforms):
-                                transform = self.final_transforms[dim]
-                                if hasattr(transform, 'get_upper_lengths'):
-                                    lengths = transform.get_upper_lengths()
-                                    return lengths[0] if lengths else 1
-                                elif hasattr(transform, 'lengths'):
-                                    return math.prod(transform.lengths) if transform.lengths else 1
+                            # FIXED: For multiple transforms, we need to find which transform 
+                            # outputs to this dimension and get its output length
+                            if not self.final_transforms or dim >= self.actual_output_dims:
+                                return 1
+                            
+                            # Get the upper dimension mappings to find which transform outputs to this dim
+                            all_upper_idss = full_descriptor.get_upper_dimension_hidden_idss()
+                            final_upper_idss = all_upper_idss[-len(self.final_transforms):]
+                            
+                            # Find which transform outputs to dimension 'dim'
+                            for i, (transform, upper_ids) in enumerate(zip(self.final_transforms, final_upper_idss)):
+                                if dim in upper_ids:
+                                    # Found the transform that outputs to this dimension
+                                    if isinstance(transform, pytensor.tensor_descriptor.UnmergeTransform):
+                                        # For UnmergeTransform: each output dimension has its individual length
+                                        if hasattr(transform, 'lengths') and transform.lengths:
+                                            # Find which output position this dimension corresponds to
+                                            dim_position = upper_ids.index(dim)
+                                            if dim_position < len(transform.lengths):
+                                                return transform.lengths[dim_position]
+                                        return 1
+                                    elif hasattr(transform, 'lengths'):
+                                        # For merge transforms, output length = product of input lengths
+                                        result = math.prod(transform.lengths) if transform.lengths else 1
+                                        return result
+                                    elif hasattr(transform, 'get_upper_lengths'):
+                                        lengths = transform.get_upper_lengths()
+                                        # For transforms with single output, get that length
+                                        return lengths[0] if lengths else 1
+                                    else:
+                                        return 1
+                            
+                            # Fallback if not found
                             return 1
                     
-                    final_descriptor = FixedFinalDescriptor(final_transforms)
+                    final_descriptor = FixedFinalDescriptor(final_transforms, actual_output_dims)
                     
                 else:
                     final_descriptor = full_descriptor
@@ -1252,6 +1313,7 @@ def build_backward_transformation_graph_from_pytensor(descriptors, variables):
     This generates the inverse transformation graph, starting from final outputs
     and working backwards to the original inputs using sympy_backward methods.
     """
+    import math  # Needed for math.prod() in FixedFinalDescriptor
     dot = graphviz.Digraph(format="png")
     dot.attr(rankdir="LR", splines="ortho")  # Left to Right like forward graph
     dot.attr('node', shape='box', style='rounded,filled')
@@ -1319,25 +1381,67 @@ def build_backward_transformation_graph_from_pytensor(descriptors, variables):
                 all_transforms = full_descriptor.get_transforms()
                 final_transforms = all_transforms[-final_stage_transform_count:]
                 
-                # Create the same FixedFinalDescriptor for backward graph
+                # Use the SAME FixedFinalDescriptor logic as forward graph
+                all_upper_idss = full_descriptor.get_upper_dimension_hidden_idss()
+                final_upper_idss = all_upper_idss[-final_stage_transform_count:]
+                
+                # Count actual output dimensions by looking at the upper dimension indices
+                all_final_upper_dims = []
+                for upper_ids in final_upper_idss:
+                    all_final_upper_dims.extend(upper_ids)
+                
+                # The number of unique upper dimension indices is the actual output count
+                actual_output_dims = len(set(all_final_upper_dims)) if all_final_upper_dims else 1
+                
+                print(f"DEBUG BACKWARD: Backward graph final stage upper dimension indices: {final_upper_idss}")
+                print(f"DEBUG BACKWARD: Backward graph all final upper dims: {all_final_upper_dims}")
+                print(f"DEBUG BACKWARD: Backward graph unique final upper dims count: {actual_output_dims}")
+                
+                # Create the same FixedFinalDescriptor as forward graph
                 class FixedFinalDescriptor:
-                    def __init__(self, transforms):
+                    def __init__(self, transforms, actual_dims):
                         self.final_transforms = transforms
+                        self.actual_output_dims = actual_dims
                         
                     def get_num_of_dimension(self):
-                        return len(self.final_transforms)
+                        return self.actual_output_dims
                         
                     def get_length(self, dim):
-                        if dim < len(self.final_transforms):
-                            transform = self.final_transforms[dim]
-                            if hasattr(transform, 'get_upper_lengths'):
-                                lengths = transform.get_upper_lengths()
-                                return lengths[0] if lengths else 1
-                            elif hasattr(transform, 'lengths'):
-                                return math.prod(transform.lengths) if transform.lengths else 1
+                        # FIXED: Use same logic as forward graph
+                        if not self.final_transforms or dim >= self.actual_output_dims:
+                            return 1
+                        
+                        # Get the upper dimension mappings to find which transform outputs to this dim
+                        all_upper_idss = full_descriptor.get_upper_dimension_hidden_idss()
+                        final_upper_idss = all_upper_idss[-len(self.final_transforms):]
+                        
+                        # Find which transform outputs to dimension 'dim'
+                        for i, (transform, upper_ids) in enumerate(zip(self.final_transforms, final_upper_idss)):
+                            if dim in upper_ids:
+                                # Found the transform that outputs to this dimension
+                                if isinstance(transform, pytensor.tensor_descriptor.UnmergeTransform):
+                                    # For UnmergeTransform: each output dimension has its individual length
+                                    if hasattr(transform, 'lengths') and transform.lengths:
+                                        # Find which output position this dimension corresponds to
+                                        dim_position = upper_ids.index(dim)
+                                        if dim_position < len(transform.lengths):
+                                            return transform.lengths[dim_position]
+                                    return 1
+                                elif hasattr(transform, 'lengths'):
+                                    # For merge transforms, output length = product of input lengths
+                                    result = math.prod(transform.lengths) if transform.lengths else 1
+                                    return result
+                                elif hasattr(transform, 'get_upper_lengths'):
+                                    lengths = transform.get_upper_lengths()
+                                    # For transforms with single output, get that length
+                                    return lengths[0] if lengths else 1
+                                else:
+                                    return 1
+                        
+                        # Fallback if not found
                         return 1
                 
-                final_descriptor = FixedFinalDescriptor(final_transforms)
+                final_descriptor = FixedFinalDescriptor(final_transforms, actual_output_dims)
                 print(f"DEBUG BACKWARD: Created corrected backward final descriptor with {len(final_transforms)} transforms")
                 
             else:
@@ -1356,7 +1460,12 @@ def build_backward_transformation_graph_from_pytensor(descriptors, variables):
     prev_stage_output_nodes = {}
     current_formulas = {}
     
-    for k in range(final_output_dims):
+    # FIXED: Use the same final_descriptor as forward graph for consistency
+    actual_output_dims = final_descriptor.get_num_of_dimension()
+    
+    print(f"DEBUG BACKWARD: Using {actual_output_dims} final descriptor dimensions for starting nodes")
+    
+    for k in range(actual_output_dims):
         node_id = f"backward_start_d{k}"
         prev_stage_output_nodes[k] = node_id
         
@@ -1365,6 +1474,7 @@ def build_backward_transformation_graph_from_pytensor(descriptors, variables):
             dim_label = f"out{k} ({dim_length})"
         except:
             dim_label = f"out{k}"
+        print(f"DEBUG BACKWARD: Creating starting node {node_id} with label {dim_label}")
         dot.node(node_id, dim_label, fillcolor="#ccffcc")  # Light green for final outputs
         current_formulas[node_id] = sp.Symbol(f"out{k}")
     

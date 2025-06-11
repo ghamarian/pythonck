@@ -446,7 +446,49 @@ class TensorTransformParser:
                 'upper_dimensions': []
             }
         
-        # Check for make_naive_tensor_descriptor_packed first
+        # Check for transform_tensor_descriptor FIRST (before naive patterns)
+        # This prevents naive patterns from matching inside transform_tensor_descriptor
+        pattern = r'transform_tensor_descriptor\s*\(\s*(.*?)\s*,\s*make_tuple\s*\((.*?)\)\s*,\s*make_tuple\s*\((.*?)\)\s*,\s*make_tuple\s*\((.*?)\)\s*\)'
+        match = re.search(pattern, descriptor_str, re.DOTALL)
+        
+        if match:
+            input_desc = match.group(1).strip()
+            transforms_str = match.group(2).strip()
+            lower_dims_str = match.group(3).strip()
+            upper_dims_str = match.group(4).strip()
+            
+            # Parse each component
+            transforms = self.parse_make_tuple(transforms_str)
+            lower_dims = self.parse_make_tuple(lower_dims_str)
+            upper_dims = self.parse_make_tuple(upper_dims_str)
+            
+            # Ensure transforms are properly typed
+            for i, transform in enumerate(transforms):
+                if isinstance(transform, dict):
+                    # Keep existing transforms as is
+                    continue
+                elif isinstance(transform, (int, float)):
+                    # Convert numbers to pass-through transforms
+                    transforms[i] = {
+                        'type': 'pass_through',
+                        'value': transform
+                    }
+                elif isinstance(transform, list):
+                    # Convert lists to merge transforms
+                    transforms[i] = {
+                        'type': 'merge',
+                        'values': transform
+                    }
+            
+            return {
+                'type': 'transform',
+                'input_descriptor': input_desc,
+                'transforms': transforms,
+                'lower_dimensions': lower_dims,
+                'upper_dimensions': upper_dims
+            }
+        
+        # Check for make_naive_tensor_descriptor_packed
         naive_packed_match = re.search(r'make_naive_tensor_descriptor_packed\s*\(\s*make_tuple\s*\((.*?)\)\s*\)', descriptor_str, re.DOTALL)
         if naive_packed_match:
             # Parse the tuple of dimensions
@@ -514,48 +556,8 @@ class TensorTransformParser:
                 'upper_dimensions': []
             }
         
-        # Otherwise, try to parse as a transform_tensor_descriptor
-        pattern = r'transform_tensor_descriptor\s*\(\s*(.*?)\s*,\s*make_tuple\s*\((.*?)\)\s*,\s*make_tuple\s*\((.*?)\)\s*,\s*make_tuple\s*\((.*?)\)\s*\)'
-        match = re.search(pattern, descriptor_str, re.DOTALL)
-        
-        if not match:
-            raise ValueError(f"Invalid tensor descriptor format. Unable to parse: {descriptor_str[:200]}...")
-        
-        input_desc = match.group(1).strip()
-        transforms_str = match.group(2).strip()
-        lower_dims_str = match.group(3).strip()
-        upper_dims_str = match.group(4).strip()
-        
-        # Parse each component
-        transforms = self.parse_make_tuple(transforms_str)
-        lower_dims = self.parse_make_tuple(lower_dims_str)
-        upper_dims = self.parse_make_tuple(upper_dims_str)
-        
-        # Ensure transforms are properly typed
-        for i, transform in enumerate(transforms):
-            if isinstance(transform, dict):
-                # Keep existing transforms as is
-                continue
-            elif isinstance(transform, (int, float)):
-                # Convert numbers to pass-through transforms
-                transforms[i] = {
-                    'type': 'pass_through',
-                    'value': transform
-                }
-            elif isinstance(transform, list):
-                # Convert lists to merge transforms
-                transforms[i] = {
-                    'type': 'merge',
-                    'values': transform
-                }
-        
-        return {
-            'type': 'transform',
-            'input_descriptor': input_desc,
-            'transforms': transforms,
-            'lower_dimensions': lower_dims,
-            'upper_dimensions': upper_dims
-        }
+        # If no patterns matched, this is an error
+        raise ValueError(f"Invalid tensor descriptor format. Unable to parse: {descriptor_str[:200]}...")
     
     def _flatten_merge_lengths(self, val, variables):
         """Recursively flatten merge structures to get individual input lengths."""
