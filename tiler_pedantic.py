@@ -273,7 +273,7 @@ class TileDistributionEncodingPedantic:
 
                     if rh_major_for_p == 0: # If P maps to an R-dimension
                          if 0 <= rh_minor_for_p < self.NDimR: # Check rh_minor_for_p is a valid R index
-                            ps_over_rs_derivative_tmp[idim_p][r_dim_idx] = p_over_rh_derivative
+                            ps_over_rs_derivative_tmp[idim_p][rh_minor_for_p] = p_over_rh_derivative
                     
                     if rh_length > 0:
                         p_over_rh_derivative *= rh_length
