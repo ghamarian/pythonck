@@ -1187,14 +1187,73 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
             
         final_output_dims = final_descriptor.get_num_of_dimension()
         
+        # FIXED: For multi-stage examples, only look at the FINAL stage transforms
+        # not all accumulated transforms in the descriptor
+        max_transform_output_dim = final_output_dims - 1
+        if len(pytensor_descriptors) > 1:
+            # Multi-stage: only consider the final stage's expected output dimensions
+            final_stage_idx = len(pytensor_descriptors) - 1
+            if final_stage_idx < len(descriptors):
+                desc_str = descriptors[final_stage_idx].strip()
+                parser = TensorTransformParser()
+                try:
+                    parsed_desc = parser.parse_tensor_descriptor(desc_str)
+                    if parsed_desc['type'] == 'transform' and 'output_sequences' in parsed_desc:
+                        # Look at the output sequences to determine actual output dimensions
+                        output_sequences = parsed_desc['output_sequences']
+                        for seq in output_sequences:
+                            if seq:  # Non-empty sequence
+                                max_transform_output_dim = max(max_transform_output_dim, max(seq))
+                        print(f"DEBUG: Multi-stage final output sequences: {output_sequences}, max output dim: {max_transform_output_dim}")
+                except Exception as e:
+                    print(f"DEBUG: Failed to parse final stage output sequences: {e}")
+                    # Fallback: use descriptor's dimension count
+                    pass
+        else:
+            # Single stage: look at transform outputs as before
+            if pytensor_descriptors:
+                tensor_desc = pytensor_descriptors[-1]
+                all_upper_idss = tensor_desc.get_upper_dimension_hidden_idss()
+                # Only look at the final stage transforms
+                final_stage_idx = len(pytensor_descriptors) - 1
+                if final_stage_idx < len(descriptors):
+                    desc_str = descriptors[final_stage_idx].strip()
+                    if "transform_tensor_descriptor" in desc_str:
+                        parser = TensorTransformParser()
+                        try:
+                            parsed_desc = parser.parse_tensor_descriptor(desc_str)
+                            if parsed_desc['type'] == 'transform':
+                                final_stage_transform_count = len(parsed_desc['transforms'])
+                                # Only consider the last N transforms where N is the final stage count
+                                final_upper_idss = all_upper_idss[-final_stage_transform_count:] if final_stage_transform_count > 0 else []
+                                for upper_ids in final_upper_idss:
+                                    if upper_ids:
+                                        max_transform_output_dim = max(max_transform_output_dim, max(upper_ids))
+                                print(f"DEBUG: Single-stage final transforms output to max dim: {max_transform_output_dim}")
+                        except:
+                            # Fallback to all transforms
+                            for upper_ids in all_upper_idss:
+                                if upper_ids:
+                                    max_transform_output_dim = max(max_transform_output_dim, max(upper_ids))
+                    else:
+                        # Non-transform descriptor, use all
+                        for upper_ids in all_upper_idss:
+                            if upper_ids:
+                                max_transform_output_dim = max(max_transform_output_dim, max(upper_ids))
+        
+        actual_final_output_dims = max(final_output_dims, max_transform_output_dim + 1)
+        
         # Debug the final descriptor issue
-        print(f"DEBUG: Creating {final_output_dims} final output nodes")
+        print(f"DEBUG: Creating {actual_final_output_dims} final output nodes (descriptor dims: {final_output_dims}, max transform output: {max_transform_output_dim})")
         print(f"DEBUG: Final descriptor type: {type(final_descriptor)}")
         
         # Check the final dimension lengths
-        for k in range(final_output_dims):
-            expected_length = final_descriptor.get_length(k)
-            print(f"DEBUG: Final descriptor get_length({k}) = {expected_length}")
+        for k in range(actual_final_output_dims):
+            if k < final_output_dims:
+                expected_length = final_descriptor.get_length(k)
+                print(f"DEBUG: Final descriptor get_length({k}) = {expected_length}")
+            else:
+                print(f"DEBUG: Final descriptor get_length({k}) = ? (beyond descriptor dims)")
         
         # Create output stage subgraph for visual separation
         with dot.subgraph(name='cluster_output') as output_cluster:
@@ -1202,27 +1261,32 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                               label='Output Stage', 
                               fontsize='14', fontweight='bold')
             
-            for k in range(final_output_dims):
-                # Check if we have a node that should connect to this final output
-                if k in prev_stage_output_nodes:
-                    final_node_id = f"forward_output_d{k}"
-                    
-                    try:
-                        dim_length = final_descriptor.get_length(k) if hasattr(final_descriptor, 'get_length') else '?'
+            for k in range(actual_final_output_dims):
+                final_node_id = f"forward_output_d{k}"
+                
+                try:
+                    if k < final_output_dims and hasattr(final_descriptor, 'get_length'):
+                        dim_length = final_descriptor.get_length(k)
                         dim_label = f"out{k} ({dim_length})"
-                    except:
+                    else:
                         dim_label = f"out{k}"
-                    
-                    print(f"DEBUG: Final label for dimension {k}: {dim_label}")
-                    
-                    # Create final output node with distinct styling within output cluster
-                    output_cluster.node(final_node_id, dim_label, fillcolor="#66ff66", style="filled,bold", shape="box")
-                    
-                    # Connect from the last stage node to final output
+                except:
+                    dim_label = f"out{k}"
+                
+                print(f"DEBUG: Final label for dimension {k}: {dim_label}")
+                
+                # Create final output node with distinct styling within output cluster
+                output_cluster.node(final_node_id, dim_label, fillcolor="#66ff66", style="filled,bold", shape="box")
+                
+                # Connect from the last stage node to final output if connection exists
+                if k in prev_stage_output_nodes:
                     source_node = prev_stage_output_nodes[k]
                     dot.edge(source_node, final_node_id, color="green", style="bold")
-                    
                     print(f"DEBUG: Created final output node {final_node_id} connected from {source_node}")
+                else:
+                    print(f"DEBUG: Created final output node {final_node_id} with no incoming connection (dimension {k} not in prev_stage_output_nodes)")
+                    # This can happen when transforms create new dimensions or when there's a mismatch
+                    # between the number of outputs from the last stage and the final descriptor's dimensions
 
 
     
@@ -1737,28 +1801,82 @@ def build_backward_transformation_graph_from_pytensor(descriptors, variables):
                 print(f"DEBUG BACKWARD: Created final storage output {final_node_id} connected from {source_node}")
         else:
             # For regular descriptors, create logical dimension outputs
+            # FIXED: For multi-stage examples, be more conservative about final output dimensions
             first_input_dims = first_descriptor.get_num_of_dimension()
-            print(f"DEBUG BACKWARD: Creating {first_input_dims} final output nodes")
             
-            for k in range(first_input_dims):
-                # Check if we have a node that should connect to this final output
-                if k in prev_stage_output_nodes:
-                    final_node_id = f"backward_output_d{k}"
-                    
+            # For multi-stage examples, the final stage should determine the output dimensions
+            max_output_dim = first_input_dims - 1
+            if len(pytensor_descriptors) > 1:
+                # Multi-stage: look at the final stage's input sequences to determine expected inputs
+                final_stage_idx = len(pytensor_descriptors) - 1
+                if final_stage_idx < len(descriptors):
+                    desc_str = descriptors[final_stage_idx].strip()
+                    parser = TensorTransformParser()
                     try:
-                        dim_length = first_descriptor.get_length(k) if hasattr(first_descriptor, 'get_length') else '?'
-                        dim_label = f"in{k} ({dim_length})"
-                    except:
-                        dim_label = f"in{k}"
-                    
-                    # Create final output node with distinct styling
-                    dot.node(final_node_id, dim_label, fillcolor="#ff6666", style="filled,bold", shape="box")
-                    
-                    # Connect from the last stage node to final output
+                        parsed_desc = parser.parse_tensor_descriptor(desc_str)
+                        if parsed_desc['type'] == 'transform' and 'input_sequences' in parsed_desc:
+                            # Look at input sequences to determine what the original inputs should be
+                            input_sequences = parsed_desc['input_sequences']
+                            for seq in input_sequences:
+                                if seq:  # Non-empty sequence
+                                    max_output_dim = max(max_output_dim, max(seq))
+                            print(f"DEBUG BACKWARD: Multi-stage final input sequences: {input_sequences}, max input dim: {max_output_dim}")
+                    except Exception as e:
+                        print(f"DEBUG BACKWARD: Failed to parse final stage input sequences: {e}")
+                        # Fallback: use first descriptor's dimension count
+                        pass
+            else:
+                # Single stage: look at transform outputs as before, but only for final stage transforms
+                if pytensor_descriptors:
+                    tensor_desc = pytensor_descriptors[-1]
+                    all_lower_idss = tensor_desc.get_lower_dimension_hidden_idss()
+                    # Only consider the final stage transforms
+                    final_stage_idx = len(pytensor_descriptors) - 1
+                    if final_stage_idx < len(descriptors):
+                        desc_str = descriptors[final_stage_idx].strip()
+                        if "transform_tensor_descriptor" in desc_str:
+                            parser = TensorTransformParser()
+                            try:
+                                parsed_desc = parser.parse_tensor_descriptor(desc_str)
+                                if parsed_desc['type'] == 'transform':
+                                    final_stage_transform_count = len(parsed_desc['transforms'])
+                                    # Only consider the last N transforms where N is the final stage count
+                                    final_lower_idss = all_lower_idss[-final_stage_transform_count:] if final_stage_transform_count > 0 else []
+                                    for lower_ids in final_lower_idss:
+                                        if lower_ids:
+                                            max_output_dim = max(max_output_dim, max(lower_ids))
+                                    print(f"DEBUG BACKWARD: Single-stage final transforms expect inputs up to dim: {max_output_dim}")
+                            except:
+                                # Fallback: only add one extra dimension beyond descriptor count
+                                max_output_dim = max(max_output_dim, first_input_dims)
+                        else:
+                            # Non-transform descriptor: use descriptor count
+                            pass
+            
+            actual_output_dims = max_output_dim + 1
+            print(f"DEBUG BACKWARD: Creating {actual_output_dims} final output nodes (descriptor dims: {first_input_dims}, max transform output: {max_output_dim})")
+            
+            for k in range(actual_output_dims):
+                final_node_id = f"backward_output_d{k}"
+                
+                try:
+                    dim_length = first_descriptor.get_length(k) if hasattr(first_descriptor, 'get_length') else '?'
+                    dim_label = f"in{k} ({dim_length})"
+                except:
+                    dim_label = f"in{k}"
+                
+                # Create final output node with distinct styling
+                dot.node(final_node_id, dim_label, fillcolor="#ff6666", style="filled,bold", shape="box")
+                
+                # Connect from the last stage node to final output if connection exists
+                if k in prev_stage_output_nodes:
                     source_node = prev_stage_output_nodes[k]
                     dot.edge(source_node, final_node_id, color="red", style="bold")
-                    
                     print(f"DEBUG BACKWARD: Created final output node {final_node_id} connected from {source_node}")
+                else:
+                    print(f"DEBUG BACKWARD: Created final output node {final_node_id} with no incoming connection (dimension {k} not in prev_stage_output_nodes)")
+                    # This can happen when transforms create new dimensions or when there's a mismatch
+                    # between the number of outputs from the last stage and the final descriptor's dimensions
 
     return dot
 
