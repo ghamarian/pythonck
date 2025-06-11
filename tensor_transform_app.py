@@ -474,6 +474,9 @@ def create_hierarchical_merge_nodes(transform, input_symbols, lower_indices, upp
 def build_transformation_graph_from_pytensor(descriptors, variables):
     """
     Build a Graphviz DOT graph using pytensor objects and their sympy methods.
+    
+    This creates the Upper → Lower transformation graph, showing how logical 
+    dimensions (upper) are transformed to physical memory layout (lower).
     """
     import math  # Needed for math.prod() in FixedFinalDescriptor
     dot = graphviz.Digraph(format="png")
@@ -498,7 +501,7 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
     dot.attr(comment=var_comment)
     
     vars_display = ", ".join(f"{k}={v}" for k, v in sorted(variables.items())[:5])
-    dot.node("title", f"Variables: {vars_display}", shape="note", style="filled", fillcolor="lightyellow")
+    dot.node("title", f"Upper → Lower Graph - Variables: {vars_display}", shape="note", style="filled", fillcolor="lightyellow")
 
     if not descriptors:
         return dot
@@ -792,13 +795,22 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                     # Initialize variable for hierarchical merge tracking
                     hierarchical_intermediate_nodes = []
                     
-                    # Apply the transform
+                    # Apply the transform - use new upper/lower terminology
+                    # In forward graph, we're going from inputs to outputs
+                    # This means: upper → lower transformation direction
                     if isinstance(transform, pytensor.tensor_descriptor.UnmergeTransform):
-                        if len(input_symbols) != 1:
-                            merged_input = input_symbols[0] if len(input_symbols) == 1 else sum(input_symbols)
-                            output_formulas = transform.sympy_backward([merged_input])
+                        # UnmergeTransform: upper (multiple) → lower (single) 
+                        # Forward direction depends on what we have as input
+                        if len(input_symbols) == len(transform.lengths):
+                            # Multiple inputs → single output (upper → lower)
+                            output_formulas = transform.sympy_upper_to_lower(input_symbols)
+                        elif len(input_symbols) == 1:
+                            # Single input → multiple outputs (lower → upper)
+                            output_formulas = transform.sympy_lower_to_upper(input_symbols)
                         else:
-                            output_formulas = transform.sympy_backward(input_symbols)
+                            # Fallback: try to combine inputs first, then unmerge
+                            merged_input = sum(input_symbols) if len(input_symbols) > 1 else input_symbols[0]
+                            output_formulas = transform.sympy_lower_to_upper([merged_input])
                     elif isinstance(transform, pytensor.tensor_descriptor.EmbedTransform):
                         # EmbedTransform direction depends on the context:
                         # - For the first (naive) descriptor: multi-dimensional coordinates -> linear address  
@@ -825,10 +837,10 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                                     coordinate_symbols.append(sp.Symbol(f"d{dim_idx}"))
                             
                             try:
-                                output_formulas = transform.sympy_forward(coordinate_symbols)
-                                print(f"DEBUG: EmbedTransform.sympy_forward({coordinate_symbols}) -> {output_formulas}")
+                                output_formulas = transform.sympy_upper_to_lower(coordinate_symbols)
+                                print(f"DEBUG: EmbedTransform.sympy_upper_to_lower({coordinate_symbols}) -> {output_formulas}")
                             except Exception as embed_error:
-                                print(f"DEBUG: EmbedTransform.sympy_forward failed: {embed_error}")
+                                print(f"DEBUG: EmbedTransform.sympy_upper_to_lower failed: {embed_error}")
                                 # Fallback: create simple sum
                                 output_formulas = [sum(coordinate_symbols)]
                         else:
@@ -840,10 +852,10 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                                 single_input = sp.Symbol("d0")
                             
                             try:
-                                output_formulas = transform.sympy_backward([single_input])
-                                print(f"DEBUG: EmbedTransform.sympy_backward([{single_input}]) -> {len(output_formulas)} outputs")
+                                output_formulas = transform.sympy_lower_to_upper([single_input])
+                                print(f"DEBUG: EmbedTransform.sympy_lower_to_upper([{single_input}]) -> {len(output_formulas)} outputs")
                             except Exception as embed_error:
-                                print(f"DEBUG: EmbedTransform.sympy_backward failed: {embed_error}")
+                                print(f"DEBUG: EmbedTransform.sympy_lower_to_upper failed: {embed_error}")
                                 # Fallback: create coordinate symbols
                                 output_formulas = [sp.Symbol(f"coord{i}") for i in range(len(upper_indices))]
                     elif isinstance(transform, pytensor.tensor_descriptor.MergeTransform):
@@ -859,42 +871,41 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                             # Store intermediate node info for custom edge creation
                             hierarchical_intermediate_nodes = intermediate_node_info
                         else:
-                            # Regular flat merge - use existing logic
-                            # MergeTransform has INCONSISTENT sympy method naming!
-                            # For MergeTransform: sympy_forward does calculate_upper_index (lower->upper)
-                            # We need to handle this inconsistency
+                            # Regular flat merge - use new upper/lower methods
+                            # MergeTransform: upper (multiple) → lower (single)
                             if len(lower_indices) > 1 and len(upper_indices) == 1:
-                                # Case: multiple inputs -> 1 output (6D -> 1D)
-                                # This should use calculate_upper_index: lower -> upper
-                                # For MergeTransform, this is sympy_forward (inconsistent naming!)
+                                # Case: multiple inputs -> 1 output (multiple upper → single lower)
                                 try:
-                                    output_formulas = transform.sympy_forward(input_symbols)
-                                    print(f"DEBUG: MergeTransform.sympy_forward({input_symbols}) -> {len(output_formulas)} outputs")
+                                    output_formulas = transform.sympy_upper_to_lower(input_symbols)
+                                    print(f"DEBUG: MergeTransform.sympy_upper_to_lower({input_symbols}) -> {len(output_formulas)} outputs")
                                 except Exception as merge_error:
-                                    print(f"DEBUG: MergeTransform.sympy_forward failed: {merge_error}")
+                                    print(f"DEBUG: MergeTransform.sympy_upper_to_lower failed: {merge_error}")
                                     formula = sum(input_symbols) if input_symbols else sp.Symbol("merged")
                                     output_formulas = [formula]
                             else:
-                                # Case: 1 input -> multiple outputs (1D -> 6D)
-                                # This should use calculate_lower_index: upper -> lower
-                                # For MergeTransform, this is sympy_backward (inconsistent naming!)
+                                # Case: 1 input -> multiple outputs (single lower → multiple upper)
                                 single_input = input_symbols[0] if input_symbols else sp.Symbol("merged")
                                 try:
-                                    output_formulas = transform.sympy_backward([single_input])
-                                    print(f"DEBUG: MergeTransform.sympy_backward({single_input}) -> {len(output_formulas)} outputs")
+                                    output_formulas = transform.sympy_lower_to_upper([single_input])
+                                    print(f"DEBUG: MergeTransform.sympy_lower_to_upper({single_input}) -> {len(output_formulas)} outputs")
                                 except Exception as merge_error:
-                                    print(f"DEBUG: MergeTransform.sympy_backward failed: {merge_error}")
+                                    print(f"DEBUG: MergeTransform.sympy_lower_to_upper failed: {merge_error}")
                                     output_formulas = [sp.Symbol(f"comp{i}") for i in range(len(upper_indices))]
                     elif isinstance(transform, pytensor.tensor_descriptor.UnmergeTransform):
-                        # UnmergeTransform should follow same pattern as MergeTransform
-                        # (they likely have the same inconsistent naming)
-                        if len(input_symbols) != 1:
-                            merged_input = input_symbols[0] if len(input_symbols) == 1 else sum(input_symbols)
-                            output_formulas = transform.sympy_backward([merged_input])
+                        # Additional UnmergeTransform handling (same logic as above)
+                        if len(input_symbols) == len(transform.lengths):
+                            # Multiple inputs → single output (upper → lower)
+                            output_formulas = transform.sympy_upper_to_lower(input_symbols)
+                        elif len(input_symbols) == 1:
+                            # Single input → multiple outputs (lower → upper)
+                            output_formulas = transform.sympy_lower_to_upper(input_symbols)
                         else:
-                            output_formulas = transform.sympy_backward(input_symbols)
+                            # Fallback: try to combine inputs first, then unmerge
+                            merged_input = sum(input_symbols) if len(input_symbols) > 1 else input_symbols[0]
+                            output_formulas = transform.sympy_lower_to_upper([merged_input])
                     else:
-                        output_formulas = transform.sympy_forward(input_symbols)
+                        # Default: assume upper → lower for forward direction
+                        output_formulas = transform.sympy_upper_to_lower(input_symbols)
                     
                     # Create output nodes for this transform
                     print(f"DEBUG: Transform {i} has {len(output_formulas)} output formulas for {len(upper_indices)} upper indices")
@@ -1308,10 +1319,10 @@ def build_combined_backward_formula(transforms: List[Dict[str, Any]],
 
 def build_backward_transformation_graph_from_pytensor(descriptors, variables):
     """
-    Build a Graphviz DOT graph using pytensor objects in backward direction.
+    Build a Graphviz DOT graph using pytensor objects in lower → upper direction.
     
-    This generates the inverse transformation graph, starting from final outputs
-    and working backwards to the original inputs using sympy_backward methods.
+    This shows the reverse transformation: starting from physical memory layout (lower)
+    and working backwards to logical dimensions (upper) using sympy_lower_to_upper methods.
     """
     import math  # Needed for math.prod() in FixedFinalDescriptor
     dot = graphviz.Digraph(format="png")
@@ -1575,41 +1586,48 @@ def build_backward_transformation_graph_from_pytensor(descriptors, variables):
                 # Initialize variable for hierarchical merge tracking
                 hierarchical_intermediate_nodes = []
                 
-                # Apply the transform
+                # Apply the transform - use new upper/lower terminology
+                # In backward graph, we're going from final outputs back to inputs
+                # This means: lower → upper transformation direction
                 if isinstance(transform, pytensor.tensor_descriptor.UnmergeTransform):
-                    # For UnmergeTransform: backward goes from multiple inputs to single output
-                    # This is the reverse of the normal unmerge operation
-                    if len(input_symbols) > 1:
-                        # Multiple inputs -> single output (reverse of unmerge)
-                        output_formulas = transform.sympy_forward(input_symbols)
+                    # UnmergeTransform: upper (multiple) → lower (single)
+                    # Backward direction depends on what we have as input
+                    if len(input_symbols) == 1:
+                        # Single input → multiple outputs (lower → upper)
+                        output_formulas = transform.sympy_lower_to_upper(input_symbols)
+                    elif len(input_symbols) == len(transform.lengths):
+                        # Multiple inputs → single output (upper → lower)
+                        output_formulas = transform.sympy_upper_to_lower(input_symbols)
                     else:
-                        # Single input -> multiple outputs (normal unmerge direction)
-                        output_formulas = transform.sympy_backward(input_symbols)
+                        # Fallback: assume single input, try to unmerge
+                        merged_input = sum(input_symbols) if len(input_symbols) > 1 else input_symbols[0]
+                        output_formulas = transform.sympy_lower_to_upper([merged_input])
                 elif isinstance(transform, pytensor.tensor_descriptor.EmbedTransform):
-                    # For EmbedTransform in backward: 
-                    # If we have 1 input, use sympy_backward (linear -> coordinates)
-                    # If we have multiple inputs, use sympy_forward (coordinates -> linear)
+                    # EmbedTransform: upper (multiple) → lower (single) 
+                    # In backward direction: lower → upper, so single input → multiple outputs
                     if len(input_symbols) == 1:
-                        output_formulas = transform.sympy_backward(input_symbols)
+                        output_formulas = transform.sympy_lower_to_upper(input_symbols)
                     else:
-                        output_formulas = transform.sympy_forward(input_symbols)
+                        # Multiple inputs means we're going upper → lower
+                        output_formulas = transform.sympy_upper_to_lower(input_symbols)
                 elif isinstance(transform, pytensor.tensor_descriptor.MergeTransform):
-                    # For MergeTransform in backward:
-                    # If we have 1 input, use sympy_backward (merged -> components)
-                    # If we have multiple inputs, use sympy_forward (components -> merged)
+                    # MergeTransform: upper (multiple) → lower (single)
+                    # In backward direction: lower → upper, so single input → multiple outputs
                     if len(input_symbols) == 1:
-                        output_formulas = transform.sympy_backward(input_symbols)
+                        output_formulas = transform.sympy_lower_to_upper(input_symbols)
                     else:
-                        output_formulas = transform.sympy_forward(input_symbols)
+                        # Multiple inputs means we're going upper → lower
+                        output_formulas = transform.sympy_upper_to_lower(input_symbols)
                 elif isinstance(transform, pytensor.tensor_descriptor.XorTransform):
-                    # XOR is self-inverse, so backward is the same as forward
-                    output_formulas = transform.sympy_backward(input_symbols)
+                    # XOR: upper (2D) → lower (2D), self-inverse
+                    # Use lower → upper for backward direction
+                    output_formulas = transform.sympy_lower_to_upper(input_symbols)
                 elif isinstance(transform, pytensor.tensor_descriptor.PassThroughTransform):
                     # PassThrough is identity in both directions
-                    output_formulas = transform.sympy_backward(input_symbols)
+                    output_formulas = transform.sympy_lower_to_upper(input_symbols)
                 else:
-                    # Default: use backward method
-                    output_formulas = transform.sympy_backward(input_symbols)
+                    # Default: use lower → upper method
+                    output_formulas = transform.sympy_lower_to_upper(input_symbols)
                 
                 # Create output nodes for this backward transform
                 print(f"DEBUG BACKWARD: Transform {i} has {len(output_formulas)} output formulas for {len(backward_output_indices)} backward output indices")
@@ -1887,11 +1905,13 @@ def main():
                 st.success("Graphs updated with new variable values!")
             
             # Always display both graphs vertically
-            st.subheader("Forward Transformation Graph")
+            st.subheader("Upper → Lower Transformation Graph")
+            st.caption("Shows how logical dimensions (upper) transform to physical memory layout (lower)")
             dot_forward = build_transformation_graph_from_pytensor(descriptors, st.session_state.variables)
             st.graphviz_chart(dot_forward)
             
-            st.subheader("Backward Transformation Graph")
+            st.subheader("Lower → Upper Transformation Graph")
+            st.caption("Shows how physical memory layout (lower) transforms back to logical dimensions (upper)")
             dot_backward = build_backward_transformation_graph_from_pytensor(descriptors, st.session_state.variables)
             st.graphviz_chart(dot_backward)
                     
@@ -2028,6 +2048,10 @@ def main():
                 st.error(f"Failed to generate parsing debug info: {e}")
                 import traceback
                 st.text(traceback.format_exc())
+
+# Function aliases for proper upper/lower terminology
+build_upper_to_lower_transformation_graph = build_transformation_graph_from_pytensor
+build_lower_to_upper_transformation_graph = build_backward_transformation_graph_from_pytensor
 
 if __name__ == "__main__":
     main() 

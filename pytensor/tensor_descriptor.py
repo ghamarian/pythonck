@@ -74,14 +74,23 @@ class Transform(ABC):
         pass
     
     @abstractmethod
-    def sympy_forward(self, input_symbols: List[sp.Expr]) -> List[sp.Expr]:
-        """Calculate forward transformation using SymPy expressions."""
+    def sympy_upper_to_lower(self, input_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Calculate upper to lower transformation using SymPy expressions (logical -> physical)."""
         pass
     
     @abstractmethod
-    def sympy_backward(self, output_symbols: List[sp.Expr]) -> List[sp.Expr]:
-        """Calculate backward transformation using SymPy expressions."""
+    def sympy_lower_to_upper(self, output_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Calculate lower to upper transformation using SymPy expressions (physical -> logical)."""
         pass
+    
+    # Backward compatibility aliases
+    def sympy_forward(self, input_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Deprecated: Use sympy_upper_to_lower instead."""
+        return self.sympy_upper_to_lower(input_symbols)
+    
+    def sympy_backward(self, output_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Deprecated: Use sympy_lower_to_upper instead."""
+        return self.sympy_lower_to_upper(output_symbols)
 
 
 class EmbedTransform(Transform):
@@ -147,8 +156,8 @@ class EmbedTransform(Transform):
                 return False
         return True
     
-    def sympy_forward(self, input_symbols: List[sp.Expr]) -> List[sp.Expr]:
-        """Calculate linear offset from multi-dimensional symbols."""
+    def sympy_upper_to_lower(self, input_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Calculate linear offset from multi-dimensional symbols (upper -> lower)."""
         if len(input_symbols) != self.ndim:
             raise ValueError(f"Input symbols {len(input_symbols)} doesn't match transform dimension {self.ndim}")
         
@@ -158,8 +167,8 @@ class EmbedTransform(Transform):
         
         return [offset]
     
-    def sympy_backward(self, output_symbols: List[sp.Expr]) -> List[sp.Expr]:
-        """Calculate multi-dimensional symbols from linear offset symbol."""
+    def sympy_lower_to_upper(self, output_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Calculate multi-dimensional symbols from linear offset symbol (lower -> upper)."""
         if len(output_symbols) != 1:
             raise ValueError("Output must be 1D for embed transform")
         
@@ -238,8 +247,8 @@ class UnmergeTransform(Transform):
                 return False
         return True
     
-    def sympy_forward(self, input_symbols: List[sp.Expr]) -> List[sp.Expr]:
-        """Calculate linear offset from multi-dimensional symbols."""
+    def sympy_upper_to_lower(self, input_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Calculate linear offset from multi-dimensional symbols (upper -> lower)."""
         if len(input_symbols) != self.ndim:
             raise ValueError(f"Input symbols {len(input_symbols)} doesn't match transform dimension {self.ndim}")
         
@@ -249,8 +258,8 @@ class UnmergeTransform(Transform):
         
         return [offset]
     
-    def sympy_backward(self, output_symbols: List[sp.Expr]) -> List[sp.Expr]:
-        """Calculate multi-dimensional symbols from linear offset symbol."""
+    def sympy_lower_to_upper(self, output_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Calculate multi-dimensional symbols from linear offset symbol (lower -> upper)."""
         if len(output_symbols) != 1:
             raise ValueError("Output must be 1D for unmerge transform")
         
@@ -305,15 +314,15 @@ class OffsetTransform(Transform):
         """Check if index is within element space."""
         return 0 <= idx_upper[0] < self.element_space_size
 
-    def sympy_forward(self, input_symbols: List[sp.Expr]) -> List[sp.Expr]:
-        """Add offset to symbol."""
+    def sympy_upper_to_lower(self, input_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Add offset to symbol (upper -> lower)."""
         if len(input_symbols) != 1:
             raise ValueError("Offset transform expects 1D input")
         
         return [input_symbols[0] + self.offset]
     
-    def sympy_backward(self, output_symbols: List[sp.Expr]) -> List[sp.Expr]:
-        """Subtract offset from symbol."""
+    def sympy_lower_to_upper(self, output_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Subtract offset from symbol (lower -> upper)."""
         if len(output_symbols) != 1:
             raise ValueError("Offset transform expects 1D output")
         
@@ -365,14 +374,14 @@ class PassThroughTransform(Transform):
         """Check if index is within bounds."""
         return 0 <= idx_upper[0] < self.length
     
-    def sympy_forward(self, input_symbols: List[sp.Expr]) -> List[sp.Expr]:
-        """Pass through symbols unchanged."""
+    def sympy_upper_to_lower(self, input_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Pass through symbols unchanged (upper -> lower)."""
         if len(input_symbols) != 1:
             raise ValueError("PassThrough transform expects 1D input")
         return input_symbols
     
-    def sympy_backward(self, output_symbols: List[sp.Expr]) -> List[sp.Expr]:
-        """Pass through symbols unchanged."""
+    def sympy_lower_to_upper(self, output_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Pass through symbols unchanged (lower -> upper)."""
         if len(output_symbols) != 1:
             raise ValueError("PassThrough transform expects 1D output")
         return output_symbols
@@ -436,23 +445,23 @@ class PadTransform(Transform):
         """Check if index is within padded bounds."""
         return 0 <= idx_upper[0] < self.get_upper_lengths()[0]
     
-    def sympy_forward(self, input_symbols: List[sp.Expr]) -> List[sp.Expr]:
-        """Adjust symbol for padding (subtract left pad)."""
+    def sympy_upper_to_lower(self, input_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Adjust symbol for padding - subtract left pad (upper -> lower)."""
         if len(input_symbols) != 1:
             raise ValueError("Pad transform expects 1D input")
         
-        # For forward: upper -> lower, subtract left padding
+        # For upper -> lower: subtract left padding
         # But clamp to valid range [0, lower_length-1]
         adjusted = input_symbols[0] - self.left_pad
         clamped = sp.Max(0, sp.Min(adjusted, self.lower_length - 1))
         return [clamped]
     
-    def sympy_backward(self, output_symbols: List[sp.Expr]) -> List[sp.Expr]:
-        """Add padding offset to symbol."""
+    def sympy_lower_to_upper(self, output_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Add padding offset to symbol (lower -> upper)."""
         if len(output_symbols) != 1:
             raise ValueError("Pad transform expects 1D output")
         
-        # For backward: lower -> upper, add left padding
+        # For lower -> upper: add left padding
         return [output_symbols[0] + self.left_pad]
     
     def calculate_upper_dimension_safe_vector_length_strides(
@@ -533,11 +542,13 @@ class MergeTransform(Transform):
         """Check if index is within merged bounds."""
         return 0 <= idx_upper[0] < self.get_upper_lengths()[0]
     
-    def sympy_forward(self, input_symbols: List[sp.Expr]) -> List[sp.Expr]:
-        """Merge multiple symbols into one (lower -> upper)."""
+    def sympy_upper_to_lower(self, input_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Merge multiple symbols into one (upper -> lower)."""
         if len(input_symbols) != len(self.lengths):
             raise ValueError(f"Input symbols {len(input_symbols)} doesn't match lengths {len(self.lengths)}")
         
+        # Upper level: multiple separate dimensions
+        # Lower level: single merged dimension
         # Compute: result = sum(input_symbols[i] * stride[i])
         result = 0
         stride = 1
@@ -547,13 +558,13 @@ class MergeTransform(Transform):
         
         return [result]
     
-    def sympy_backward(self, output_symbols: List[sp.Expr]) -> List[sp.Expr]:
-        """Unmerge one symbol into multiple (upper -> lower)."""
+    def sympy_lower_to_upper(self, output_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Unmerge one symbol into multiple (lower -> upper)."""
         if len(output_symbols) != 1:
-            raise ValueError("Merge transform expects 1D output")
+            raise ValueError("Merge transform expects 1D input for lower->upper")
         
         merged_symbol = output_symbols[0]
-        lower_symbols = []
+        upper_symbols = []
         
         # Calculate strides
         strides = [1]
@@ -562,9 +573,9 @@ class MergeTransform(Transform):
         
         # Extract each dimension using division and modulo
         for i in range(len(self.lengths)):
-            lower_symbols.append((merged_symbol // strides[i]) % self.lengths[i])
+            upper_symbols.append((merged_symbol // strides[i]) % self.lengths[i])
         
-        return lower_symbols
+        return upper_symbols
     
     def calculate_upper_dimension_safe_vector_length_strides(
         self,
@@ -653,45 +664,19 @@ class XorTransform(Transform):
                 return False
         return True
     
-    def sympy_forward(self, input_symbols: List[sp.Expr]) -> List[sp.Expr]:
-        """Apply XOR transform in forward direction (lower → upper).
-        
-        This mirrors calculate_upper_index: takes lower coordinate symbols 
-        and produces upper coordinate symbols.
-        """
-        if len(input_symbols) != 2:
-            raise ValueError("XOR transform expects 2D input")
-        
-        # Forward direction: lower → upper
-        # input_symbols[0], input_symbols[1] are LOWER coordinate symbols
-        # We want to compute UPPER coordinate symbols
-        lower_x, lower_y = input_symbols[0], input_symbols[1]
-        
-        # From C++ CalculateLowerIndex: lower[1] = upper[1] ^ f(upper[0]) 
-        # So to get upper from lower: upper[1] = lower[1] ^ f(upper[0])
-        # But since upper[0] = lower[0], we have: upper[1] = lower[1] ^ f(lower[0])
-        upper_x = lower_x  # First dimension passes through
-        if self.apply_modulo:
-            xor_expr = lower_x % self.lengths[1]
-        else:
-            xor_expr = lower_x
-        upper_y = Xor(lower_y, xor_expr)
-        
-        return [upper_x, upper_y]
-    
-    def sympy_backward(self, output_symbols: List[sp.Expr]) -> List[sp.Expr]:
-        """Apply XOR transform in backward direction (upper → lower).
+    def sympy_upper_to_lower(self, input_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Apply XOR transform in upper → lower direction.
         
         This mirrors calculate_lower_index and exactly matches the C++ 
         CalculateLowerIndex implementation.
         """
-        if len(output_symbols) != 2:
-            raise ValueError("XOR transform expects 2D output")
+        if len(input_symbols) != 2:
+            raise ValueError("XOR transform expects 2D input")
         
-        # Backward direction: upper → lower  
-        # output_symbols[0], output_symbols[1] are UPPER coordinate symbols
+        # Upper → lower direction
+        # input_symbols[0], input_symbols[1] are UPPER coordinate symbols
         # We want to compute LOWER coordinate symbols
-        upper_x, upper_y = output_symbols[0], output_symbols[1]
+        upper_x, upper_y = input_symbols[0], input_symbols[1]
         
         # From C++ CalculateLowerIndex: 
         # lower[0] = upper[0]
@@ -704,6 +689,32 @@ class XorTransform(Transform):
         lower_y = Xor(upper_y, xor_expr)
         
         return [lower_x, lower_y]
+    
+    def sympy_lower_to_upper(self, output_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Apply XOR transform in lower → upper direction.
+        
+        This mirrors calculate_upper_index: takes lower coordinate symbols 
+        and produces upper coordinate symbols.
+        """
+        if len(output_symbols) != 2:
+            raise ValueError("XOR transform expects 2D output")
+        
+        # Lower → upper direction
+        # output_symbols[0], output_symbols[1] are LOWER coordinate symbols
+        # We want to compute UPPER coordinate symbols
+        lower_x, lower_y = output_symbols[0], output_symbols[1]
+        
+        # From C++ CalculateLowerIndex: lower[1] = upper[1] ^ f(upper[0]) 
+        # So to get upper from lower: upper[1] = lower[1] ^ f(upper[0])
+        # But since upper[0] = lower[0], we have: upper[1] = lower[1] ^ f(lower[0])
+        upper_x = lower_x  # First dimension passes through
+        if self.apply_modulo:
+            xor_expr = lower_x % self.lengths[1]
+        else:
+            xor_expr = lower_x
+        upper_y = Xor(lower_y, xor_expr)
+        
+        return [upper_x, upper_y]
     
     def calculate_upper_dimension_safe_vector_length_strides(
         self,
@@ -764,17 +775,35 @@ class ReplicateTransform(Transform):
                 return False
         return True
     
-    def sympy_forward(self, input_symbols: List[sp.Expr]) -> List[sp.Expr]:
-        """Replicate has no input symbols."""
-        if len(input_symbols) != 0:
-            raise ValueError("Replicate transform expects no input symbols")
+    def sympy_upper_to_lower(self, input_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Replicate upper → lower (creates empty list).
+        
+        ReplicateTransform is special: it can handle both cases:
+        - Proper upper→lower: N symbols → 0 symbols (empty list)
+        - Legacy case: 0 symbols → 0 symbols (for backward compatibility)
+        """
+        # Accept either the correct number of input symbols or empty list for compatibility
+        if len(input_symbols) != 0 and len(input_symbols) != len(self.upper_lengths):
+            raise ValueError(f"Input symbols {len(input_symbols)} doesn't match upper lengths {len(self.upper_lengths)}")
         return []
     
-    def sympy_backward(self, output_symbols: List[sp.Expr]) -> List[sp.Expr]:
-        """Replicate creates zeros for all output dimensions."""
-        if len(output_symbols) != len(self.upper_lengths):
-            raise ValueError(f"Output symbols {len(output_symbols)} doesn't match upper lengths {len(self.upper_lengths)}")
-        return []
+    def sympy_lower_to_upper(self, output_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Replicate lower → upper (creates zeros for all dimensions).
+        
+        ReplicateTransform is special: it can handle both cases:
+        - Proper lower→upper: 0 symbols → N symbols (zeros)  
+        - Legacy case: 1 symbol → 0 symbols (for backward compatibility)
+        """
+        # Accept either empty list or single symbol for compatibility
+        if len(output_symbols) != 0 and len(output_symbols) != 1:
+            raise ValueError(f"Replicate transform expects 0 or 1 output symbols, got {len(output_symbols)}")
+        
+        if len(output_symbols) == 0:
+            # Proper lower→upper: 0 inputs → N outputs (zeros)
+            return [sp.Integer(0)] * len(self.upper_lengths)
+        else:
+            # Legacy case: 1 input → 0 outputs (for backward compatibility)
+            return []
     
     def calculate_upper_dimension_safe_vector_length_strides(
         self,
