@@ -18,6 +18,75 @@ from typing import Dict, Any, List, Tuple
 import graphviz
 import pytensor.tensor_descriptor
 
+def format_cpp_code(code: str) -> str:
+    """
+    Format C++ tensor descriptor code with proper indentation and spacing.
+    """
+    if not code.strip():
+        return code
+    
+    lines = code.split('\n')
+    formatted_lines = []
+    indent_level = 0
+    
+    # Keywords that should be followed by proper spacing
+    cpp_keywords = [
+        'constexpr', 'auto', 'const', 'make_tuple', 'make_naive_tensor_descriptor',
+        'transform_tensor_descriptor', 'make_pass_through_transform', 'make_merge_transform',
+        'make_unmerge_transform', 'make_xor_transform', 'sequence', 'number', 'typename'
+    ]
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            formatted_lines.append("")
+            continue
+        
+        # Adjust indent level based on braces and parentheses
+        open_count = line.count('(') + line.count('{')
+        close_count = line.count(')') + line.count('}')
+        
+        # Decrease indent before adding line if it closes more than it opens
+        if close_count > open_count:
+            indent_level = max(0, indent_level - (close_count - open_count))
+        
+        # Add proper indentation
+        indent = "    " * indent_level  # 4 spaces per level
+        
+        # Clean up spacing around operators and keywords
+        formatted_line = line
+        
+        # Add spaces around operators
+        formatted_line = re.sub(r'([=<>!]+)', r' \1 ', formatted_line)
+        formatted_line = re.sub(r'\s+', ' ', formatted_line)  # Remove extra spaces
+        
+        # Fix spacing around template brackets
+        formatted_line = re.sub(r'<\s+', '<', formatted_line)
+        formatted_line = re.sub(r'\s+>', '>', formatted_line)
+        
+        # Fix spacing around parentheses
+        formatted_line = re.sub(r'\(\s+', '(', formatted_line)
+        formatted_line = re.sub(r'\s+\)', ')', formatted_line)
+        
+        # Add proper spacing after commas
+        formatted_line = re.sub(r',(?!\s)', ', ', formatted_line)
+        
+        # Add the formatted line with indentation
+        formatted_lines.append(indent + formatted_line)
+        
+        # Increase indent after adding line if it opens more than it closes
+        if open_count > close_count:
+            indent_level += (open_count - close_count)
+    
+    # Join lines and clean up
+    formatted_code = '\n'.join(formatted_lines)
+    
+    # Remove trailing whitespace from each line
+    formatted_code = '\n'.join(line.rstrip() for line in formatted_code.split('\n'))
+    
+    # Ensure proper line ending
+    return formatted_code.strip() + '\n' if formatted_code.strip() else ""
+
 def get_transform_examples_with_multi():
     examples = get_transform_examples()
     return examples
@@ -1566,6 +1635,9 @@ def main():
             st.session_state.current_code = examples[st.session_state.selected_example]
             st.session_state.parsed_descriptor = None
             
+            # Exit format mode when changing examples so user sees the new code
+            st.session_state.format_mode = False
+            
             # Update variables with defaults for the new example
             default_vars = get_default_variables()
             if st.session_state.selected_example in default_vars:
@@ -1580,16 +1652,52 @@ def main():
             on_change=on_example_change
         )
         
-        st.session_state.current_code = st.text_area(
-            "Tensor Descriptor Code",
-            value=st.session_state.current_code,
-            height=300,
-            key="code_editor"
-        )
+        # Initialize format mode state
+        if 'format_mode' not in st.session_state:
+            st.session_state.format_mode = False
+        if 'original_code' not in st.session_state:
+            st.session_state.original_code = ""
+        
+        # Code editor
+        if st.session_state.format_mode:
+            # Show formatted code preview
+            st.markdown("**Formatted Code Preview**")
+            formatted_code = format_cpp_code(st.session_state.original_code)
+            st.code(formatted_code, language="cpp", line_numbers=True)
+        else:
+            # Normal code editor
+            st.session_state.current_code = st.text_area(
+                "Tensor Descriptor Code",
+                value=st.session_state.current_code,
+                height=300,
+                key="code_editor"
+            )
 
         parser = TensorTransformParser()
         
-        if st.button("Parse and Generate Formulas"):
+        # Action buttons
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            parse_clicked = st.button("Parse and Generate Formulas")
+        
+        with col2:
+            # Format/Edit toggle button
+            if not st.session_state.format_mode:
+                if st.button("🎨 Format Code", help="Preview formatted C++ code"):
+                    st.session_state.original_code = st.session_state.current_code
+                    st.session_state.format_mode = True
+                    st.rerun()
+            else:
+                if st.button("✏️ Edit Code", help="Return to code editor"):
+                    # Apply formatting automatically when switching back to edit mode
+                    formatted_code = format_cpp_code(st.session_state.original_code)
+                    st.session_state.current_code = formatted_code
+                    st.session_state.format_mode = False
+                    st.rerun()
+        
+        # Handle parse button click
+        if parse_clicked:
             try:
                 descriptor_texts = extract_descriptors_from_text(st.session_state.current_code)
                 parsed_descriptors = [parser.parse_tensor_descriptor(desc) for desc in descriptor_texts]
