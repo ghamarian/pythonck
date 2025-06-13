@@ -24,6 +24,14 @@ from visualizer import visualize_hierarchical_tiles
 from visualizer import visualize_y_space_structure
 from examples import get_examples, get_default_variables
 
+# Add new imports for transformation graph visualization
+import graphviz
+import sympy as sp
+from pytensor.tensor_descriptor import (
+    Transform, PassThroughTransform, MergeTransform, UnmergeTransform,
+    EmbedTransform, OffsetTransform, PadTransform, ReplicateTransform
+)
+
 # Set page config
 st.set_page_config(
     page_title="Tile Distribution Visualizer",
@@ -760,6 +768,91 @@ Here, Y1 maps to H0[3] (Vector_M) and Y3 maps to H1[3] (Vector_N). If each has v
             """)
         # --- End Explanation ---
 
+        # Transformation Pipeline Graphs
+        st.subheader("Transformation Pipeline")
+        
+        try:
+            if st.session_state.encoding is not None:
+                # Build and display the transformation graph
+                # Use variables if they exist, otherwise empty dict for hardcoded examples
+                variables = st.session_state.variables if hasattr(st.session_state, 'variables') and st.session_state.variables else {}
+                
+                transformation_graph = build_tile_distribution_transformation_graph(
+                    st.session_state.encoding, 
+                    variables
+                )
+                
+                st.markdown("""
+                **This transformation pipeline shows:**
+                - **Input**: X dimensions (logical tensor dimensions)
+                - **Replicate**: Creates R dimensions for data replication
+                - **Unmerge**: Splits each X dimension into H components (hierarchical structure)
+                - **Merge**: Combines RH components to create P dimensions (thread mapping)
+                - **Output**: P dimensions (thread indices)
+                
+                This is the underlying transformation that maps logical tensor coordinates to thread assignments.
+                
+                **Note**: Y dimensions have their own separate Y↔D transformation graph for spatial output mapping.
+                """)
+                
+                st.graphviz_chart(transformation_graph)
+                
+                # Build and display the Y↔D transformation graph
+                st.markdown("---")
+                st.markdown("### Y↔D Transformation (Spatial Coordinates ↔ Linearized Memory)")
+                
+                y_to_d_graph = build_y_to_d_transformation_graph(
+                    st.session_state.encoding, 
+                    variables
+                )
+                
+                st.markdown("""
+                **This Y↔D transformation shows:**
+                - **Input**: D (linearized memory address, single dimension)
+                - **Transform**: UnmergeTransform splits linear address into spatial coordinates
+                - **Output**: Y dimensions (multi-dimensional spatial coordinates)
+                
+                Each Y dimension gets its size from the RH space (R or H dimensions) as specified by Ys2RHsMajor/Minor mappings.
+                This transformation is separate from the main X→RH→P pipeline above.
+                """)
+                
+                st.graphviz_chart(y_to_d_graph)
+                
+                # Show the transformation details in debug mode
+                if st.session_state.debug_mode:
+                    with st.expander("Transformation Details (Debug)"):
+                        try:
+                            transforms, lower_dims, upper_dims = extract_transforms_from_tile_distribution(
+                                st.session_state.encoding, st.session_state.variables
+                            )
+                            
+                            st.write("**Extracted Transforms:**")
+                            for i, (transform, lower, upper) in enumerate(zip(transforms, lower_dims, upper_dims)):
+                                st.write(f"Transform {i+1}: {transform['name']}")
+                                st.write(f"  - Type: {transform['type']}")
+                                st.write(f"  - Lengths: {transform.get('lengths', 'N/A')}")
+                                st.write(f"  - Lower dims: {lower}")
+                                st.write(f"  - Upper dims: {upper}")
+                                st.write("")
+                        except Exception as e:
+                            st.error(f"Error extracting transformation details: {str(e)}")
+                            st.exception(e)
+            else:
+                st.info("Parse a tile distribution encoding to see the transformation pipeline.")
+                
+                # Debug information to help user understand what's missing
+                if st.session_state.debug_mode:
+                    st.write("**Debug Info:**")
+                    st.write(f"- encoding exists: {st.session_state.encoding is not None}")
+                    st.write(f"- variables exists: {bool(st.session_state.variables) if hasattr(st.session_state, 'variables') else False}")
+                    if hasattr(st.session_state, 'encoding') and st.session_state.encoding:
+                        st.write(f"- encoding keys: {list(st.session_state.encoding.keys())}")
+                    if hasattr(st.session_state, 'variables') and st.session_state.variables:
+                        st.write(f"- variables: {st.session_state.variables}")
+        except Exception as e:
+            st.error(f"Error creating transformation pipeline visualization: {str(e)}")
+            if st.session_state.debug_mode:
+                st.exception(e)
 
         # Performance metrics
         if st.session_state.tile_distribution is not None:
@@ -893,6 +986,536 @@ def calculate_distribution():
             st.exception(e)
         st.session_state.tile_distribution = None
         return False
+
+def extract_transforms_from_tile_distribution(encoding_dict: Dict, variables: Dict) -> Tuple[List[Dict], List[List[int]], List[List[int]]]:
+    """
+    Extract transformation data from tile distribution encoding, similar to _make_adaptor_encoding_for_tile_distribution.
+    
+    Args:
+        encoding_dict: Tile distribution encoding dictionary
+        variables: Variable values
+        
+    Returns:
+        Tuple of (transforms, lower_dimension_idss, upper_dimension_idss)
+    """
+    # Extract components from encoding
+    rs_lengths = encoding_dict.get('RsLengths', [])
+    hs_lengthss = encoding_dict.get('HsLengthss', [])
+    ps_to_rhss_major = encoding_dict.get('Ps2RHssMajor', [])
+    ps_to_rhss_minor = encoding_dict.get('Ps2RHssMinor', [])
+    ys_to_rhs_major = encoding_dict.get('Ys2RHsMajor', [])
+    ys_to_rhs_minor = encoding_dict.get('Ys2RHsMinor', [])
+    
+    # Resolve variables in lengths
+    def resolve_value(val):
+        if isinstance(val, str) and val in variables:
+            return variables[val]
+        elif isinstance(val, (int, float)):
+            return int(val)
+        else:
+            return 1
+    
+    # Resolve all length values
+    resolved_rs_lengths = [resolve_value(val) for val in rs_lengths]
+    resolved_hs_lengthss = [[resolve_value(val) for val in hs_lengths] for hs_lengths in hs_lengthss]
+    
+    # Get dimensions
+    ndim_x = len(hs_lengthss)
+    
+    # Initialize arrays for hidden dimensions (similar to _make_adaptor_encoding_for_tile_distribution)
+    MAX_NUM_DIM = 20
+    rh_major_minor_to_hidden_ids = [[0] * MAX_NUM_DIM for _ in range(ndim_x + 1)]
+    rh_major_minor_to_hidden_lengths = [[0] * MAX_NUM_DIM for _ in range(ndim_x + 1)]
+    
+    # Initialize transforms and dimension tracking
+    transforms = []
+    lower_dimension_idss = []
+    upper_dimension_idss = []
+    hidden_dim_cnt = ndim_x  # Start after X dimensions
+    
+    # 1. Add replicate transform for R dimensions
+    if resolved_rs_lengths:
+        ndim_r_minor = len(resolved_rs_lengths)
+        transforms.append({
+            'type': 'replicate',
+            'lengths': resolved_rs_lengths,
+            'name': 'ReplicateTransform'
+        })
+        
+        # Lower dimensions: none (replicate creates from nothing)
+        lower_dimension_idss.append([])
+        
+        # Upper dimensions: new hidden dimensions for R
+        r_upper_dims = list(range(hidden_dim_cnt, hidden_dim_cnt + ndim_r_minor))
+        upper_dimension_idss.append(r_upper_dims)
+        
+        # Update hidden dimension mappings for R (rh_major=0)
+        for i in range(ndim_r_minor):
+            rh_major_minor_to_hidden_ids[0][i] = hidden_dim_cnt
+            rh_major_minor_to_hidden_lengths[0][i] = resolved_rs_lengths[i]
+            hidden_dim_cnt += 1
+    
+    # 2. Add unmerge transforms for X dimensions → H components
+    for idim_x in range(ndim_x):
+        h_minor_lengths = resolved_hs_lengthss[idim_x]
+        ndim_h_minor = len(h_minor_lengths)
+        
+        if ndim_h_minor > 0:
+            transforms.append({
+                'type': 'unmerge',
+                'lengths': h_minor_lengths,
+                'name': 'UnmergeTransform'
+            })
+            
+            # Lower dimensions: the X dimension
+            lower_dimension_idss.append([idim_x])
+            
+            # Upper dimensions: new hidden dimensions for H
+            h_upper_dims = list(range(hidden_dim_cnt, hidden_dim_cnt + ndim_h_minor))
+            upper_dimension_idss.append(h_upper_dims)
+            
+            # Update hidden dimension mappings for H (rh_major = idim_x + 1)
+            for i in range(ndim_h_minor):
+                rh_major_minor_to_hidden_ids[idim_x + 1][i] = hidden_dim_cnt
+                rh_major_minor_to_hidden_lengths[idim_x + 1][i] = h_minor_lengths[i]
+                hidden_dim_cnt += 1
+    
+    # 3. Add merge transforms for P dimensions
+    ndim_p = len(ps_to_rhss_major)
+    # Ensure both major and minor arrays have the same length
+    ndim_p_minor = len(ps_to_rhss_minor)
+    actual_ndim_p = min(ndim_p, ndim_p_minor)
+    
+    print(f"DEBUG MERGE: ndim_p={ndim_p}, ndim_p_minor={ndim_p_minor}, actual_ndim_p={actual_ndim_p}")
+    print(f"DEBUG MERGE: ps_to_rhss_major={ps_to_rhss_major}")
+    print(f"DEBUG MERGE: ps_to_rhss_minor={ps_to_rhss_minor}")
+    
+    for i_dim_p in range(actual_ndim_p):
+        p2RHsMajor = ps_to_rhss_major[i_dim_p]
+        p2RHsMinor = ps_to_rhss_minor[i_dim_p]
+        
+        print(f"DEBUG MERGE P{i_dim_p}: p2RHsMajor={p2RHsMajor}, p2RHsMinor={p2RHsMinor}")
+        print(f"DEBUG MERGE P{i_dim_p}: len check: {len(p2RHsMajor)} == {len(p2RHsMinor)} and {len(p2RHsMajor)} > 0 = {len(p2RHsMajor) == len(p2RHsMinor) and len(p2RHsMajor) > 0}")
+        
+        if len(p2RHsMajor) == len(p2RHsMinor) and len(p2RHsMajor) > 0:
+            # Collect the hidden dimensions that this P merges from
+            merge_lower_dims = []
+            merge_lengths = []
+            
+            for j in range(len(p2RHsMajor)):
+                rh_major = p2RHsMajor[j]
+                rh_minor = p2RHsMinor[j]
+                
+                print(f"DEBUG MERGE P{i_dim_p}[{j}]: rh_major={rh_major}, rh_minor={rh_minor}")
+                print(f"DEBUG MERGE P{i_dim_p}[{j}]: bounds check: {rh_major} < {len(rh_major_minor_to_hidden_ids)} and {rh_minor} < {MAX_NUM_DIM}")
+                
+                if rh_major < len(rh_major_minor_to_hidden_ids) and rh_minor < MAX_NUM_DIM:
+                    hidden_id = rh_major_minor_to_hidden_ids[rh_major][rh_minor]
+                    hidden_length = rh_major_minor_to_hidden_lengths[rh_major][rh_minor]
+                    print(f"DEBUG MERGE P{i_dim_p}[{j}]: hidden_id={hidden_id}, hidden_length={hidden_length}")
+                    merge_lower_dims.append(hidden_id)
+                    merge_lengths.append(hidden_length)
+                else:
+                    print(f"DEBUG MERGE P{i_dim_p}[{j}]: BOUNDS CHECK FAILED")
+            
+            print(f"DEBUG MERGE P{i_dim_p}: merge_lower_dims={merge_lower_dims}")
+            
+            if merge_lower_dims:
+                print(f"DEBUG MERGE P{i_dim_p}: CREATING MERGE TRANSFORM")
+                transforms.append({
+                    'type': 'merge',
+                    'lengths': merge_lengths,
+                    'name': 'MergeTransform'
+                })
+                
+                # Lower dimensions: the hidden dimensions being merged
+                lower_dimension_idss.append(merge_lower_dims)
+                
+                # Upper dimensions: new P dimension
+                p_upper_dim = hidden_dim_cnt
+                upper_dimension_idss.append([p_upper_dim])
+                hidden_dim_cnt += 1
+            else:
+                print(f"DEBUG MERGE P{i_dim_p}: NO MERGE LOWER DIMS - SKIPPING")
+        else:
+            print(f"DEBUG MERGE P{i_dim_p}: LENGTH CHECK FAILED - SKIPPING")
+    
+    return transforms, lower_dimension_idss, upper_dimension_idss
+
+def build_tile_distribution_transformation_graph(encoding_dict: Dict, variables: Dict) -> graphviz.Digraph:
+    """
+    Build a transformation graph for tile distribution similar to tensor_transform_app.py.
+    
+    Args:
+        encoding_dict: Tile distribution encoding dictionary
+        variables: Variable values
+        
+    Returns:
+        Graphviz DOT graph showing the transformation pipeline
+    """
+    dot = graphviz.Digraph(format="png")
+    dot.attr(rankdir="LR", splines="ortho", compound="true")
+    dot.attr('node', shape='box', style='rounded,filled')
+    
+    # Add title
+    vars_display = ", ".join(f"{k}={v}" for k, v in sorted(variables.items())[:5])
+    dot.node("title", f"Tile Distribution Transformation Graph\\nVariables: {vars_display}", 
+             shape="note", style="filled", fillcolor="lightyellow")
+    
+    try:
+        # Define resolve_value function locally
+        def resolve_value(val):
+            if isinstance(val, str) and val in variables:
+                return variables[val]
+            elif isinstance(val, (int, float)):
+                return int(val)
+            else:
+                return 1
+        
+        # Get input dimensions (X dimensions) and output dimensions (P,Y dimensions)
+        ndim_x = len(encoding_dict.get('HsLengthss', []))
+        ndim_p = len(encoding_dict.get('Ps2RHssMajor', []))
+        ndim_y = len(encoding_dict.get('Ys2RHsMajor', []))
+        
+        # Extract transforms from tile distribution and get RH mapping
+        transforms, lower_dimension_idss, upper_dimension_idss = extract_transforms_from_tile_distribution(
+            encoding_dict, variables
+        )
+        
+        # Debug output for transforms
+        print(f"DEBUG TRANSFORMS: Found {len(transforms)} transforms")
+        for i, (transform, lower_dims, upper_dims) in enumerate(zip(transforms, lower_dimension_idss, upper_dimension_idss)):
+            print(f"  Transform {i}: {transform['type']} - {transform['name']}")
+            print(f"    Lower dims: {lower_dims}")
+            print(f"    Upper dims: {upper_dims}")
+            if 'lengths' in transform:
+                print(f"    Lengths: {transform['lengths']}")
+        
+        if not transforms:
+            dot.node("no_transforms", "No transforms found", fillcolor="#ffcccc")
+            return dot
+        
+        # Also extract the RH mapping for Y dimensions
+        # Re-run the RH mapping logic to get the hidden dimension mappings
+        rs_lengths = encoding_dict.get('RsLengths', [])
+        hs_lengthss = encoding_dict.get('HsLengthss', [])
+        resolved_rs_lengths = [resolve_value(val) for val in rs_lengths]
+        resolved_hs_lengthss = [[resolve_value(val) for val in hs_lengths] for hs_lengths in hs_lengthss]
+        
+        # Rebuild the RH mapping (same logic as extract_transforms_from_tile_distribution)
+        MAX_NUM_DIM = 20
+        rh_major_minor_to_hidden_ids = [[0] * MAX_NUM_DIM for _ in range(ndim_x + 1)]
+        hidden_dim_cnt = ndim_x
+        
+        # Map R dimensions
+        if resolved_rs_lengths:
+            for i in range(len(resolved_rs_lengths)):
+                rh_major_minor_to_hidden_ids[0][i] = hidden_dim_cnt
+                hidden_dim_cnt += 1
+        
+        # Map H dimensions
+        for idim_x in range(ndim_x):
+            h_minor_lengths = resolved_hs_lengthss[idim_x]
+            for i in range(len(h_minor_lengths)):
+                rh_major_minor_to_hidden_ids[idim_x + 1][i] = hidden_dim_cnt
+                hidden_dim_cnt += 1
+        
+        # Create input stage - Bottom dimensions (X dimensions)
+        with dot.subgraph(name='cluster_input') as input_cluster:
+            input_cluster.attr(style='filled', fillcolor='#ffeeee', label='Input Stage (X Dimensions - Logical Tensor)')
+            input_cluster.attr(fontsize='14', fontweight='bold')
+            
+            prev_stage_nodes = {}
+            for x_idx in range(ndim_x):
+                node_id = f"input_x{x_idx}"
+                input_cluster.node(node_id, f"X{x_idx}", fillcolor="#ffcccc")
+                prev_stage_nodes[x_idx] = node_id
+        
+        # Process each transform as a stage
+        for stage_idx, (transform, lower_dims, upper_dims) in enumerate(
+            zip(transforms, lower_dimension_idss, upper_dimension_idss)
+        ):
+            stage_color = ['#eeffee', '#eeeeff', '#ffffe0', '#f0e0ff'][stage_idx % 4]
+            
+            with dot.subgraph(name=f'cluster_stage_{stage_idx}') as stage_cluster:
+                stage_cluster.attr(style='filled', fillcolor=stage_color, 
+                                 label=f'Stage {stage_idx + 1}: {transform["name"]}', 
+                                 fontsize='14', fontweight='bold')
+                
+                # Create output nodes for this transform
+                for out_idx, upper_dim in enumerate(upper_dims):
+                    node_id = f"s{stage_idx}_out{upper_dim}"
+                    
+                    # Create formula based on transform type
+                    if transform['type'] == 'replicate':
+                        formula = f"R{out_idx} (replicated)"
+                        
+                    elif transform['type'] == 'unmerge':
+                        # For unmerge, show which X dimension is being split
+                        if lower_dims and lower_dims[0] < ndim_x:
+                            x_dim = lower_dims[0]
+                            formula = f"X{x_dim}_H{out_idx}"
+                        else:
+                            formula = f"H{out_idx}"
+                            
+                    elif transform['type'] == 'merge':
+                        # For merge, calculate which P dimension this is
+                        # Count how many merge transforms we've seen so far
+                        merge_count = sum(1 for i in range(stage_idx) if transforms[i]['type'] == 'merge')
+                        formula = f"P{merge_count}"
+                    else:
+                        formula = f"dim{upper_dim}"
+                    
+                    # Add length information if available
+                    if 'lengths' in transform and out_idx < len(transform['lengths']):
+                        length = transform['lengths'][out_idx]
+                        formula += f" ({length})"
+                    
+                    stage_cluster.node(node_id, formula, fillcolor="#c0ffc0")
+                    
+                    # Create edges from inputs to this output BEFORE updating prev_stage_nodes
+                    transform_name = transform['name'].replace('Transform', '')
+                    
+                    if transform['type'] == 'replicate':
+                        # Replicate has no input connections (creates from nothing)
+                        pass
+                    else:
+                        for lower_dim in lower_dims:
+                            if lower_dim in prev_stage_nodes:
+                                print(f"DEBUG EDGE: Creating edge from {prev_stage_nodes[lower_dim]} -> {node_id} (label={transform_name})")
+                                dot.edge(prev_stage_nodes[lower_dim], node_id, 
+                                       label=transform_name)
+                            else:
+                                print(f"DEBUG EDGE: Missing source node for lower_dim {lower_dim} in prev_stage_nodes: {list(prev_stage_nodes.keys())}")
+                    
+                    # Update for next stage (do this AFTER creating edges)
+                    prev_stage_nodes[upper_dim] = node_id
+        
+        # Create final output stage - Top dimensions (P,Y dimensions)
+        if transforms:
+            with dot.subgraph(name='cluster_output') as output_cluster:
+                output_cluster.attr(style='filled', fillcolor='#e8ffe8', 
+                                  label='Output Stage (P,Y Dimensions - Thread Mapping)', 
+                                  fontsize='14', fontweight='bold')
+                
+                # Debug output (will be visible in debug mode)
+                print(f"DEBUG Graph: ndim_p={ndim_p}, ndim_y={ndim_y}, ndim_x={ndim_x}")
+                print(f"DEBUG Graph: Ps2RHssMajor={encoding_dict.get('Ps2RHssMajor', [])}")
+                print(f"DEBUG Graph: Ys2RHsMajor={encoding_dict.get('Ys2RHsMajor', [])}")
+                
+                # Track which nodes produce P and Y outputs
+                py_source_nodes = []
+                
+                # Find P dimension source nodes (from merge transforms)
+                rs_lengths = encoding_dict.get('RsLengths', [])
+                resolved_rs_lengths_local = [resolve_value(val) for val in rs_lengths]
+                merge_stage_start = (1 if resolved_rs_lengths_local else 0) + ndim_x  # After replicate and unmerge
+                for p_idx in range(ndim_p):
+                    merge_stage_idx = merge_stage_start + p_idx
+                    if merge_stage_idx < len(transforms):
+                        # The merge transform outputs to a P dimension
+                        for hidden_dim, node_id in prev_stage_nodes.items():
+                            if f"s{merge_stage_idx}_out" in node_id:
+                                py_source_nodes.append(('P', p_idx, node_id))
+                                break
+                
+                # Find Y dimension source nodes (they are part of top_dim_ids, not transforms)
+                # Y dimensions reference existing RH hidden dimensions via Ys2RHsMajor/Minor
+                ys_to_rhs_major = encoding_dict.get('Ys2RHsMajor', [])
+                ys_to_rhs_minor = encoding_dict.get('Ys2RHsMinor', [])
+                
+                for y_idx in range(ndim_y):
+                    if y_idx < len(ys_to_rhs_major) and y_idx < len(ys_to_rhs_minor):
+                        rh_major = resolve_value(ys_to_rhs_major[y_idx])
+                        rh_minor = resolve_value(ys_to_rhs_minor[y_idx])
+                        
+                        # Get the exact hidden dimension ID that this Y maps to
+                        if (rh_major < len(rh_major_minor_to_hidden_ids) and 
+                            rh_minor < MAX_NUM_DIM):
+                            target_hidden_id = rh_major_minor_to_hidden_ids[rh_major][rh_minor]
+                            
+                            # Find the node with this hidden dimension ID
+                            for node_id in prev_stage_nodes.values():
+                                if f"_out{target_hidden_id}" in node_id:
+                                    py_source_nodes.append(('Y', y_idx, node_id))
+                                    break
+                
+                # Create final P dimension outputs
+                if ndim_p > 0:
+                    for p_idx in range(ndim_p):
+                        final_node_id = f"final_P{p_idx}"
+                        output_cluster.node(final_node_id, f"P{p_idx}\\n(thread partition)", 
+                                          fillcolor="#66ff66", style="filled,bold")
+                        
+                        # Connect from source if found
+                        for dim_type, idx, src_node in py_source_nodes:
+                            if dim_type == 'P' and idx == p_idx:
+                                dot.edge(src_node, final_node_id, 
+                                       label="Thread Mapping", color="green", style="bold")
+                                break
+                
+                # Create final Y dimension outputs (they are top dimension IDs, not transforms)
+                if ndim_y > 0:
+                    for y_idx in range(ndim_y):
+                        final_node_id = f"final_Y{y_idx}"
+                        output_cluster.node(final_node_id, f"Y{y_idx}\\n(spatial coord)", 
+                                          fillcolor="#66ccff", style="filled,bold")
+                        
+                        # Connect from source RH hidden dimension if found
+                        for dim_type, idx, src_node in py_source_nodes:
+                            if dim_type == 'Y' and idx == y_idx:
+                                dot.edge(src_node, final_node_id, 
+                                       label="Top Dimension", color="blue", style="bold")
+                                break
+                
+                # Add explanation note
+                note_node_id = "explanation_note"
+                note_text = f"X→RH→(P,Y) Transformation Pipeline\\nInput: {ndim_x} X dims → Output: {ndim_p} P dims + {ndim_y} Y dims"
+                note_text += "\\n\\nThe PsYs→Xs Adaptor uses this pipeline\\nto map (P,Y) thread coordinates to X tensor indices"
+                if ndim_y > 0:
+                    note_text += "\\n\\nY dims also have separate Y↔D\\ntransformation for memory layout"
+                output_cluster.node(note_node_id, note_text,
+                                  fillcolor="#ffffcc", style="filled,dashed", shape="note")
+        
+    except Exception as e:
+        error_msg = f"Error building transformation graph: {str(e)}"
+        dot.node("error", error_msg, fillcolor="#ffcccc")
+        if st.session_state.get('debug_mode', False):
+            st.exception(e)
+    
+    return dot
+
+def build_y_to_d_transformation_graph(encoding_dict: Dict, variables: Dict) -> graphviz.Digraph:
+    """
+    Build the Y↔D transformation graph showing spatial coordinates to linearized memory mapping.
+    
+    Args:
+        encoding_dict: Tile distribution encoding dictionary
+        variables: Variable values
+        
+    Returns:
+        Graphviz DOT graph showing the Y↔D transformation pipeline
+    """
+    dot = graphviz.Digraph(format="png")
+    dot.attr(rankdir="LR", splines="ortho", compound="true")
+    dot.attr('node', shape='box', style='rounded,filled')
+    
+    # Add title
+    vars_display = ", ".join(f"{k}={v}" for k, v in sorted(variables.items())[:3])
+    dot.node("y_title", f"Y↔D Transformation Graph\\nVariables: {vars_display}", 
+             shape="note", style="filled", fillcolor="lightcyan")
+    
+    try:
+        # Define resolve_value function locally
+        def resolve_value(val):
+            if isinstance(val, str) and val in variables:
+                return variables[val]
+            elif isinstance(val, (int, float)):
+                return int(val)
+            else:
+                return 1
+        
+        # Get Y dimension mappings
+        ys_to_rhs_major = encoding_dict.get('Ys2RHsMajor', [])
+        ys_to_rhs_minor = encoding_dict.get('Ys2RHsMinor', [])
+        ndim_y = len(ys_to_rhs_major)
+        
+        if ndim_y == 0:
+            dot.node("no_y", "No Y dimensions found", fillcolor="#ffcccc")
+            return dot
+        
+        # Calculate Y dimension lengths from RH space (same logic as _make_adaptor_encoding_for_tile_distribution)
+        rs_lengths = encoding_dict.get('RsLengths', [])
+        hs_lengthss = encoding_dict.get('HsLengthss', [])
+        resolved_rs_lengths = [resolve_value(val) for val in rs_lengths]
+        resolved_hs_lengthss = [[resolve_value(val) for val in hs_lengths] for hs_lengths in hs_lengthss]
+        
+        # Build RH length lookup (same as in main transform function)
+        rh_major_minor_to_lengths = {}
+        
+        # Add R lengths (rh_major=0)
+        for i, r_length in enumerate(resolved_rs_lengths):
+            rh_major_minor_to_lengths[(0, i)] = r_length
+        
+        # Add H lengths (rh_major=1,2,3...)
+        for x_idx, h_lengths in enumerate(resolved_hs_lengthss):
+            for h_idx, h_length in enumerate(h_lengths):
+                rh_major_minor_to_lengths[(x_idx + 1, h_idx)] = h_length
+        
+        # Calculate Y lengths and total D length
+        y_lengths = []
+        d_length = 1
+        
+        for y_idx in range(ndim_y):
+            rh_major = ys_to_rhs_major[y_idx]
+            rh_minor = ys_to_rhs_minor[y_idx]
+            
+            y_length = rh_major_minor_to_lengths.get((rh_major, rh_minor), 1)
+            y_lengths.append(y_length)
+            d_length *= y_length
+        
+        # Create input stage (D dimension - linearized memory)
+        with dot.subgraph(name='cluster_y_input') as input_cluster:
+            input_cluster.attr(style='filled', fillcolor='#ffeeee', label='Input: Linearized Memory')
+            input_cluster.attr(fontsize='14', fontweight='bold')
+            
+            input_cluster.node("d_input", f"D (size: {d_length})", fillcolor="#ffcccc")
+        
+        # Create transformation stage
+        with dot.subgraph(name='cluster_y_transform') as transform_cluster:
+            transform_cluster.attr(style='filled', fillcolor='#eeeeff', label='UnmergeTransform')
+            transform_cluster.attr(fontsize='14', fontweight='bold')
+            
+            # Show the unmerge operation
+            unmerge_formula = f"D → Y[{', '.join(map(str, y_lengths))}]"
+            transform_cluster.node("y_unmerge", unmerge_formula, fillcolor="#c0c0ff")
+            
+            # Connect D input to unmerge
+            dot.edge("d_input", "y_unmerge", label="Unmerge")
+        
+        # Create output stage (Y dimensions - spatial coordinates)
+        with dot.subgraph(name='cluster_y_output') as output_cluster:
+            output_cluster.attr(style='filled', fillcolor='#e8ffe8', label='Output: Spatial Coordinates')
+            output_cluster.attr(fontsize='14', fontweight='bold')
+            
+            # Create Y dimension outputs
+            for y_idx in range(ndim_y):
+                y_node_id = f"y_output_{y_idx}"
+                y_length = y_lengths[y_idx]
+                
+                # Show which RH location this Y maps to
+                rh_major = ys_to_rhs_major[y_idx]
+                rh_minor = ys_to_rhs_minor[y_idx]
+                if rh_major == 0:
+                    source_info = f"from R[{rh_minor}]"
+                else:
+                    source_info = f"from H[{rh_major-1}][{rh_minor}]"
+                
+                y_label = f"Y{y_idx} (size: {y_length})\\n{source_info}"
+                output_cluster.node(y_node_id, y_label, fillcolor="#66ffff")
+                
+                # Connect from unmerge to Y output
+                dot.edge("y_unmerge", y_node_id, label=f"Y{y_idx}")
+        
+        # Add explanation
+        with dot.subgraph(name='cluster_y_explanation') as explain_cluster:
+            explain_cluster.attr(style='filled', fillcolor='#fffff0', label='Explanation')
+            explain_cluster.attr(fontsize='12')
+            
+            explanation = f"This transforms between:\\n• Linear memory address (D)\\n• Multi-dimensional coordinates (Y)\\n\\nFormula: D = Y0*{y_lengths[1:]} + Y1*{y_lengths[2:] if len(y_lengths) > 2 else [1]} + ..."
+            if len(y_lengths) <= 3:  # Simplify for small cases
+                if len(y_lengths) == 2:
+                    explanation = f"Formula: D = Y0*{y_lengths[1]} + Y1"
+                elif len(y_lengths) == 3:
+                    explanation = f"Formula: D = Y0*{y_lengths[1]*y_lengths[2]} + Y1*{y_lengths[2]} + Y2"
+            
+            explain_cluster.node("y_explain", explanation, fillcolor="#fffff0", shape="note")
+        
+    except Exception as e:
+        error_msg = f"Error building Y↔D graph: {str(e)}"
+        dot.node("y_error", error_msg, fillcolor="#ffcccc")
+    
+    return dot
 
 if __name__ == "__main__":
     main() 
