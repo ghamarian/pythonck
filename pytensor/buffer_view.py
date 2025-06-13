@@ -191,7 +191,7 @@ class BufferView(Generic[T]):
             self.set(index, linear_offset, is_valid_element, value, vector_size, oob_conditional_check)
         elif operation == MemoryOperationEnum.ADD:
             current = self.get(index, linear_offset, is_valid_element, vector_size, oob_conditional_check)
-            if isinstance(current, np.ndarray) and isinstance(value, np.ndarray):
+            if isinstance(current, np.ndarray) and isinstance(value, np.ndarray): #if is for clarity, but not needed
                 new_value = current + value
             else:
                 new_value = current + value

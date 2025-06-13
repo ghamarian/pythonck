@@ -14,6 +14,10 @@ from pytensor.tensor_coordinate import (
     coordinate_has_valid_offset, coordinate_has_valid_offset_assuming_top_index_is_valid,
     adaptor_coordinate_is_valid, adaptor_coordinate_is_valid_assuming_top_index_is_valid
 )
+from pytensor.tensor_descriptor import (
+    EmbedTransform, MergeTransform, UnmergeTransform, PadTransform
+)
+from pytensor.tensor_adaptor import make_single_stage_tensor_adaptor
 
 
 class TestMultiIndex:
@@ -398,6 +402,120 @@ class TestCoordinateMovement:
         move_tensor_coordinate(adaptor, coord, MultiIndex(1, [1]))
         assert coord.get_index()[0] == 4  # 3 + 1
         assert coord.get_offset() == 8  # Updated
+
+    def test_embed_transform_movement(self):
+        """Test moving coordinates with EmbedTransform."""
+        # Create a 2D to 1D embedding transform
+        transform = UnmergeTransform([4, 3])  # 4x3 2D space
+        adaptor = make_single_stage_tensor_adaptor(
+            [transform],
+            [[0]],  # Bottom dimension
+            [[0, 1]]  # Top dimensions
+        )
+        
+        # Create initial coordinate at (1,1)
+        coord = make_tensor_coordinate(adaptor, [1, 1])
+        assert coord.get_offset() == 4  # 1 * 3 + 1
+        
+        # Move in first dimension
+        move_tensor_coordinate(adaptor, coord, [1, 0])
+        assert coord.get_offset() == 7  # 2 * 3 + 1
+        
+        # Move in second dimension
+        move_tensor_coordinate(adaptor, coord, [0, 1])
+        assert coord.get_offset() == 8  # 2 * 3 + 2
+
+    def test_merge_transform_movement(self):
+        """Test moving coordinates with MergeTransform using TensorAdaptorCoordinate."""
+        # Create a merge transform combining two dimensions
+        transform = MergeTransform([3, 4])  # Merge 3x4 into 12
+        adaptor = make_single_stage_tensor_adaptor(
+            [transform],
+            [[0, 1]],  # LowerDimensionOldTopIdss - two dimensions to merge
+            [[0]]  # UpperDimensionNewTopIdss - one dimension after merge
+        )
+        
+        # Create initial coordinate at [1, 2] in the original 3x4 space
+        # Use TensorAdaptorCoordinate directly since we need multiple bottom dimensions
+        # coord = make_tensor_adaptor_coordinate(adaptor, MultiIndex(1, [6]))  # 6 in merged space
+        coord = make_tensor_adaptor_coordinate(adaptor, [6])  # 6 in merged space
+        
+        # Check that the bottom index correctly represents [1, 2] in original space
+        bottom_idx = coord.get_bottom_index()
+        assert bottom_idx.to_list() == [1, 2]  # Should be [1, 2] since 6 = 1 * 4 + 2
+        
+        # Move in merged space
+        move_tensor_adaptor_coordinate(adaptor, coord,  [1])
+        bottom_idx = coord.get_bottom_index()
+        assert bottom_idx.to_list() == [1, 3]  # Should be [1, 3] since 7 = 1 * 4 + 3
+        
+        # Move again to cross dimension boundary
+        move_tensor_adaptor_coordinate(adaptor, coord, MultiIndex(1, [1]))
+        bottom_idx = coord.get_bottom_index()
+        assert bottom_idx.to_list() == [2, 0]  # Should be [2, 0] since 8 = 2 * 4 + 0
+
+    def test_chain_of_real_transforms(self):
+        """Test moving coordinates through a chain of real transforms."""
+        # Create a chain that goes: 1D -> 2D -> 1D
+        # 1. UnmergeTransform: Split 1D into 2D (12 -> 3x4)  
+        # 2. MergeTransform: Merge 2D back to 1D (3x4 -> 12)
+        transforms = [
+            UnmergeTransform([3, 4]),  # Split 12 into 3x4
+            MergeTransform([3, 4])     # Merge 3x4 back to 12
+        ]
+        
+        adaptor = make_single_stage_tensor_adaptor(
+            transforms,
+            [[0], [0, 1]],     # Lower dimensions for each transform
+            [[0, 1], [0]]      # Upper dimensions for each transform  
+        )
+        
+        # The final result has 2 top dimensions from the UnmergeTransform
+        # Create initial coordinate at (1, 2) in the 3x4 space
+        coord = make_tensor_coordinate(adaptor, [1, 2])
+        initial_offset = coord.get_offset()
+        assert initial_offset == 6  # 1 * 4 + 2 = 6
+        
+        # Move in first dimension
+        move_tensor_coordinate(adaptor, coord, [1, 0])
+        assert coord.get_offset() == 10  # 2 * 4 + 2 = 10
+        
+        # Move in second dimension  
+        move_tensor_coordinate(adaptor, coord, [0, 1])
+        assert coord.get_offset() == 11  # 2 * 4 + 3 = 11
+
+    def test_pad_transform_movement(self):
+        """Test moving coordinates with PadTransform."""
+        # Create a pad transform: lower_length=2, left_pad=1, right_pad=0
+        # This means: original space [0,1] -> padded space [0,1,2] (length 3)
+        transform = PadTransform(2, 1, 0)
+        adaptor = make_single_stage_tensor_adaptor(
+            [transform],
+            [[0]],  # Lower dimension (input to transform)
+            [[0]]   # Upper dimension (output from transform)
+        )
+        
+        # Test that the transform works correctly by checking hidden indices
+        # Create coordinate at padded index 1
+        coord = make_tensor_coordinate(adaptor, [1])
+        
+        # Check that the transform correctly maps padded index 1 to original index 0
+        # (1 - 1 left_pad = 0, clamped to [0,1])
+        hidden_idx = coord.get_hidden_index()
+        assert hidden_idx[0] == 0  # Should be 0 after transform
+        assert hidden_idx[1] == 1  # Top index should be 1
+        
+        # Move to padded index 2
+        move_tensor_coordinate(adaptor, coord, [1])
+        hidden_idx = coord.get_hidden_index()
+        assert hidden_idx[0] == 1  # Should be 1 after transform (2 - 1 = 1)
+        assert hidden_idx[1] == 2  # Top index should be 2
+        
+        # Move to padded index 3 (out of bounds)
+        move_tensor_coordinate(adaptor, coord, [1])
+        hidden_idx = coord.get_hidden_index()
+        assert hidden_idx[0] == 1  # Should be clamped to 1 (3 - 1 = 2, clamped to max 1)
+        assert hidden_idx[1] == 3  # Top index should be 3
 
 
 class TestCoordinateValidation:
