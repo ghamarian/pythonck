@@ -470,45 +470,34 @@ class TileWindowWithStaticDistribution:
                 # (matches C++ tile_dstr.get_ys_to_d_descriptor().calculate_offset(idx_ys))
                 d_offset = ys_to_d_desc.calculate_offset(idx_ys)
                 
-                # DIRECT COORDINATE CALCULATION: Instead of relying on the adaptor,
-                # calculate the bottom tensor coordinate directly from Y indices
-                # This assumes a simple mapping where Y dimensions map to window dimensions
-                if len(idx_ys) >= 2:
-                    # 2D case: Y[0] -> window row, Y[1] -> window col
-                    window_row = idx_ys[0] if len(idx_ys) > 0 else 0
-                    window_col = idx_ys[1] if len(idx_ys) > 1 else 0
-                    tensor_row = self.window_origin[0] + window_row
-                    tensor_col = self.window_origin[1] + window_col
-                    tensor_indices = [tensor_row, tensor_col]
-                elif len(idx_ys) == 1:
-                    # 1D case: Y[0] maps to first window dimension
-                    window_offset = idx_ys[0]
-                    tensor_indices = [self.window_origin[0] + window_offset, self.window_origin[1]]
-                else:
-                    # 0D case: use window origin
-                    tensor_indices = list(self.window_origin)
-                
-                # Create coordinate directly from tensor indices
-                from .tensor_coordinate import make_tensor_coordinate
-                direct_coord = make_tensor_coordinate(
-                    self.bottom_tensor_view.tensor_desc,
-                    tensor_indices
-                )
-                
+                # Check bounds if requested
                 if oob_conditional_check:
-                    # Check if coordinate is valid
-                    if not self._is_coordinate_valid(direct_coord):
+                    if not self._is_coordinate_valid(bottom_tensor_coord):
+                        # Move coordinate for next access before continuing
+                        if i_coord_access < num_access_per_coord - 1:
+                            self._move_coordinates_for_next_access(
+                                window_adaptor_coord, bottom_tensor_coord, 
+                                i_access, y_lengths, ndim_y
+                            )
                         continue
                 
                 # Get element from distributed tensor
                 value = src_tensor.get_thread_data(d_offset)
                 
-                # Update (accumulate) in bottom tensor using the direct coordinate
+                # Update (accumulate) in bottom tensor using the precomputed coordinate
                 # (matches C++ get_bottom_tensor_view().update_vectorized_elements())
-                offset = direct_coord.get_offset()
+                offset = bottom_tensor_coord.get_offset()
                 current_value = self.bottom_tensor_view.get_element_by_offset(offset)
                 
                 self.bottom_tensor_view.set_element_by_offset(offset, current_value + value)
+                
+                # Move thread coordinate for next access
+                # (matches C++ move_window_adaptor_and_bottom_tensor_thread_coordinate)
+                if i_coord_access < num_access_per_coord - 1:
+                    self._move_coordinates_for_next_access(
+                        window_adaptor_coord, bottom_tensor_coord, 
+                        i_access, y_lengths, ndim_y
+                    )
     
     def update_raw(self, src_tensor: StaticDistributedTensor,
                    oob_conditional_check: bool = True,

@@ -186,8 +186,7 @@ class TestTileWindowWithStaticDistribution:
         dist = make_tile_distribution(
             ps_ys_to_xs_adaptor=adaptor,
             ys_to_d_descriptor=descriptor,
-            encoding=encoding,
-            partition_index_func=lambda: [0]
+            encoding=encoding
         )
         
         # Create window
@@ -238,8 +237,7 @@ class TestTileWindowWithStaticDistribution:
         dist = make_tile_distribution(
             ps_ys_to_xs_adaptor=adaptor,
             ys_to_d_descriptor=descriptor,
-            encoding=encoding,
-            partition_index_func=lambda: [0]
+            encoding=encoding
         )
         
         # Create window
@@ -293,8 +291,7 @@ class TestTileWindowWithStaticDistribution:
         dist = make_tile_distribution(
             ps_ys_to_xs_adaptor=adaptor,
             ys_to_d_descriptor=descriptor,
-            encoding=encoding,
-            partition_index_func=lambda: [0]
+            encoding=encoding
         )
         
         window = TileWindowWithStaticDistribution(
@@ -362,8 +359,7 @@ class TestMakeTileWindow:
         dist = make_tile_distribution(
             ps_ys_to_xs_adaptor=adaptor,
             ys_to_d_descriptor=descriptor,
-            encoding=encoding,
-            partition_index_func=lambda: [0]
+            encoding=encoding
         )
         
         window = make_tile_window(

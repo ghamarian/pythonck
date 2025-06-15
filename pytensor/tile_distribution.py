@@ -63,20 +63,11 @@ class TileDistribution:
         ps_ys_to_xs_adaptor: Adaptor mapping from (P,Y) to X dimensions
         ys_to_d_descriptor: Descriptor mapping from Y to linearized D dimension
         encoding: Static tile distribution encoding
-        partition_index_func: Function to get current partition index
     """
     
     ps_ys_to_xs_adaptor: TensorAdaptor
     ys_to_d_descriptor: TensorDescriptor
     encoding: TileDistributionEncoding
-    partition_index_func: Optional[callable] = None
-    
-    def __post_init__(self):
-        """Validate distribution after initialization."""
-        # Set default partition index function
-        if self.partition_index_func is None:
-            # Default: single thread (partition index = [0])
-            self.partition_index_func = lambda: [0] * self.encoding.ndim_p
     
     @property
     def ndim_x(self) -> int:
@@ -99,8 +90,27 @@ class TileDistribution:
         return self.encoding.ndim_r
     
     def get_partition_index(self) -> List[int]:
-        """Get current partition index."""
-        return self.partition_index_func()
+        """
+        Get current partition index.
+        
+        This matches the C++ implementation which directly calls hardware intrinsics:
+        - For NDimP == 1: returns [get_lane_id()]
+        - For NDimP == 2: returns [get_warp_id(), get_lane_id()]
+        """
+        # Import here to avoid circular imports
+        try:
+            from .tile_window_utils import get_warp_id, get_lane_id
+            
+            if self.ndim_p == 1:
+                return [get_lane_id()]
+            elif self.ndim_p == 2:
+                return [get_warp_id(), get_lane_id()]
+            else:
+                # For other cases, return zeros (fallback)
+                return [0] * self.ndim_p
+        except ImportError:
+            # Fallback if tile_window_utils is not available
+            return [0] * self.ndim_p
     
     def calculate_index(self, partition_index: Optional[List[int]] = None) -> MultiIndex:
         """
@@ -263,8 +273,7 @@ def make_tile_distribution_encoding(rs_lengths: List[int],
 
 def make_tile_distribution(ps_ys_to_xs_adaptor: TensorAdaptor,
                          ys_to_d_descriptor: TensorDescriptor,
-                         encoding: TileDistributionEncoding,
-                         partition_index_func: Optional[callable] = None) -> TileDistribution:
+                         encoding: TileDistributionEncoding) -> TileDistribution:
     """
     Create a tile distribution.
     
@@ -272,7 +281,6 @@ def make_tile_distribution(ps_ys_to_xs_adaptor: TensorAdaptor,
         ps_ys_to_xs_adaptor: Adaptor mapping from (P,Y) to X dimensions
         ys_to_d_descriptor: Descriptor mapping from Y to linearized D dimension
         encoding: Static tile distribution encoding
-        partition_index_func: Function to get current partition index
         
     Returns:
         TileDistribution instance
@@ -280,8 +288,7 @@ def make_tile_distribution(ps_ys_to_xs_adaptor: TensorAdaptor,
     return TileDistribution(
         ps_ys_to_xs_adaptor=ps_ys_to_xs_adaptor,
         ys_to_d_descriptor=ys_to_d_descriptor,
-        encoding=encoding,
-        partition_index_func=partition_index_func
+        encoding=encoding
     )
 
 

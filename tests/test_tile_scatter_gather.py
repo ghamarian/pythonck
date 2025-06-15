@@ -49,8 +49,7 @@ class TestTileScatterGather:
         dist = make_tile_distribution(
             ps_ys_to_xs_adaptor=adaptor,
             ys_to_d_descriptor=descriptor,
-            encoding=encoding,
-            partition_index_func=lambda: [0]
+            encoding=encoding
         )
         
         # Create page index array
@@ -103,8 +102,7 @@ class TestTileScatterGather:
         dist = make_tile_distribution(
             ps_ys_to_xs_adaptor=adaptor,
             ys_to_d_descriptor=descriptor,
-            encoding=encoding,
-            partition_index_func=lambda: [0]
+            encoding=encoding
         )
         
         # Page indices select rows 0 and 2
@@ -160,8 +158,7 @@ class TestTileScatterGather:
         dist = make_tile_distribution(
             ps_ys_to_xs_adaptor=adaptor,
             ys_to_d_descriptor=descriptor,
-            encoding=encoding,
-            partition_index_func=lambda: [0]
+            encoding=encoding
         )
         
         # Page indices select rows 1 and 3
@@ -223,8 +220,7 @@ class TestTileScatterGather:
         dist = make_tile_distribution(
             ps_ys_to_xs_adaptor=adaptor,
             ys_to_d_descriptor=descriptor,
-            encoding=encoding,
-            partition_index_func=lambda: [0]
+            encoding=encoding
         )
         
         page_idx = np.array([0, 1], dtype=np.int32)
@@ -278,8 +274,7 @@ class TestTileScatterGather:
         dist = make_tile_distribution(
             ps_ys_to_xs_adaptor=adaptor,
             ys_to_d_descriptor=descriptor,
-            encoding=encoding,
-            partition_index_func=lambda: [0]
+            encoding=encoding
         )
         
         page_idx = np.array([0, 1], dtype=np.int32)

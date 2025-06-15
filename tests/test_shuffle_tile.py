@@ -44,8 +44,7 @@ class TestShuffleTile:
         dist = make_tile_distribution(
             ps_ys_to_xs_adaptor=adaptor,
             ys_to_d_descriptor=descriptor,
-            encoding=encoding,
-            partition_index_func=lambda: [0]
+            encoding=encoding
         )
         
         # Create input tensor
@@ -109,15 +108,13 @@ class TestShuffleTile:
         dist_in = make_tile_distribution(
             ps_ys_to_xs_adaptor=adaptor,
             ys_to_d_descriptor=descriptor,
-            encoding=encoding_in,
-            partition_index_func=lambda: [0]
+            encoding=encoding_in
         )
         
         dist_out = make_tile_distribution(
             ps_ys_to_xs_adaptor=adaptor,
             ys_to_d_descriptor=descriptor,
-            encoding=encoding_out,
-            partition_index_func=lambda: [0]
+            encoding=encoding_out
         )
         
         # Create tensors
@@ -172,8 +169,7 @@ class TestShuffleTile:
         dist = make_tile_distribution(
             ps_ys_to_xs_adaptor=adaptor,
             ys_to_d_descriptor=descriptor,
-            encoding=encoding,
-            partition_index_func=lambda: [0]
+            encoding=encoding
         )
         
         # Create input tensor with float32
@@ -248,15 +244,13 @@ class TestShuffleTile:
         dist1 = make_tile_distribution(
             ps_ys_to_xs_adaptor=adaptor1,
             ys_to_d_descriptor=descriptor1,
-            encoding=encoding1,
-            partition_index_func=lambda: [0]
+            encoding=encoding1
         )
         
         dist2 = make_tile_distribution(
             ps_ys_to_xs_adaptor=adaptor2,
             ys_to_d_descriptor=descriptor2,
-            encoding=encoding2,
-            partition_index_func=lambda: [0]
+            encoding=encoding2
         )
         
         # Create tensors

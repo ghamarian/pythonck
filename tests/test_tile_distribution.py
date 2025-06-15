@@ -219,27 +219,31 @@ class TestTileDistribution:
         encoding = TileDistributionEncoding(
             rs_lengths=[],
             hs_lengthss=[[8]],
-            ps_to_rhss_major=[[1], [1]],
-            ps_to_rhss_minor=[[0], [0]],
+            ps_to_rhss_major=[[1]],  # Only 1 P dimension to match adaptor
+            ps_to_rhss_minor=[[0]],
             ys_to_rhs_major=[1],
             ys_to_rhs_minor=[0]
         )
         
-        # Custom partition function
-        def my_partition_func():
-            return [1, 3]
+        # Set the simulated thread position
+        from pytensor.partition_simulation import set_global_thread_position
+        set_global_thread_position(warp_id=1, lane_id=3)
         
         dist = TileDistribution(
             ps_ys_to_xs_adaptor=adaptor,
             ys_to_d_descriptor=descriptor,
-            encoding=encoding,
-            partition_index_func=my_partition_func
+            encoding=encoding
         )
         
-        assert dist.get_partition_index() == [1, 3]
+        # For NDimP=1, should return [lane_id] = [3]
+        assert dist.get_partition_index() == [3]
     
     def test_default_partition_index(self):
         """Test default partition index."""
+        # Reset to default thread position
+        from pytensor.partition_simulation import set_global_thread_position
+        set_global_thread_position(warp_id=0, lane_id=0)
+        
         transform = UnmergeTransform([8])
         
         adaptor = make_single_stage_tensor_adaptor(
@@ -253,8 +257,8 @@ class TestTileDistribution:
         encoding = TileDistributionEncoding(
             rs_lengths=[],
             hs_lengthss=[[8]],
-            ps_to_rhss_major=[[1], [1]],
-            ps_to_rhss_minor=[[0], [0]],
+            ps_to_rhss_major=[[1]],  # Only 1 P dimension to match adaptor
+            ps_to_rhss_minor=[[0]],
             ys_to_rhs_major=[1],
             ys_to_rhs_minor=[0]
         )
@@ -265,8 +269,8 @@ class TestTileDistribution:
             encoding=encoding
         )
         
-        # Should default to zeros
-        assert dist.get_partition_index() == [0, 0]
+        # Should default to zeros - for NDimP=1, should return [0]
+        assert dist.get_partition_index() == [0]
     
     def test_calculate_index(self):
         """Test calculating X index from partition index."""

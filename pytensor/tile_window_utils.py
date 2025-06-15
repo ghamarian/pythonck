@@ -1,7 +1,8 @@
 """
 Python implementation of tile_window_utils.hpp from Composable Kernels.
 
-This module provides utility functions for tile window operations.
+This module provides utility functions for tile window operations,
+including hardware simulation functions for testing.
 """
 
 from typing import TypeVar, Tuple, Any
@@ -83,14 +84,18 @@ def get_warp_id() -> int:
     Get the current warp ID.
     
     In GPU programming, this would return the hardware warp/wave ID.
-    In Python, we simulate this by returning 0.
+    In Python, we simulate this using the partition simulation if available.
     
     Returns:
-        Simulated warp ID (always 0 in Python)
+        Simulated warp ID
     """
-    # In Python simulation, we don't have actual warps
-    # This would be replaced by actual hardware intrinsic in GPU code
-    return 0
+    # Try to use partition simulation if available
+    try:
+        from .partition_simulation import get_simulated_warp_id
+        return get_simulated_warp_id()
+    except ImportError:
+        # Fallback to 0 if partition simulation is not available
+        return 0
 
 
 def get_lane_id() -> int:
@@ -98,39 +103,45 @@ def get_lane_id() -> int:
     Get the current lane ID within a warp.
     
     In GPU programming, this would return the hardware lane ID.
-    In Python, we simulate this by returning 0.
+    In Python, we simulate this using the partition simulation if available.
     
     Returns:
-        Simulated lane ID (always 0 in Python)
+        Simulated lane ID
     """
-    # In Python simulation, we don't have actual lanes
-    # This would be replaced by actual hardware intrinsic in GPU code
-    return 0
+    # Try to use partition simulation if available
+    try:
+        from .partition_simulation import get_simulated_lane_id
+        return get_simulated_lane_id()
+    except ImportError:
+        # Fallback to 0 if partition simulation is not available
+        return 0
 
 
-def m0_set_with_memory(value: int) -> None:
+def m0_set_with_memory(value: int):
     """
-    Set the m0 register value (simulated).
+    Set m0 register with memory value.
     
-    On AMD GPUs, m0 is a special register used for memory operations.
+    In GPU programming, this would set the m0 register for memory operations.
     In Python, this is a no-op simulation.
     
     Args:
         value: Value to set in m0 register
     """
-    # In Python, this is a simulation - no actual register to set
+    # In Python simulation, this is a no-op
+    # In actual GPU code, this would set the m0 register
     pass
 
 
-def m0_inc_with_memory(increment: int) -> None:
+def m0_inc_with_memory(increment: int):
     """
-    Increment the m0 register value (simulated).
+    Increment m0 register with memory value.
     
-    On AMD GPUs, this increments the m0 register used for memory operations.
+    In GPU programming, this would increment the m0 register.
     In Python, this is a no-op simulation.
     
     Args:
         increment: Value to add to m0 register
     """
-    # In Python, this is a simulation - no actual register to increment
+    # In Python simulation, this is a no-op
+    # In actual GPU code, this would increment the m0 register
     pass 
