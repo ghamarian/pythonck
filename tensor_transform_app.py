@@ -276,7 +276,6 @@ def substitute_descriptor(descriptor, user_vars):
     else:
         return descriptor
 
-
 def create_hierarchical_merge_nodes(transform, input_symbols, lower_indices, upper_indices,
                                    structure, variables, dot, stage_idx, transform_idx, 
                                    actual_stage_num, prev_stage_output_nodes):
@@ -469,7 +468,6 @@ def create_hierarchical_merge_nodes(transform, input_symbols, lower_indices, upp
     else:
         # Fallback
         return ([sum(input_symbols) if input_symbols else sp.Symbol("merged")], created_intermediate_nodes)
-
 
 def build_transformation_graph_from_pytensor(descriptors, variables):
     """
