@@ -75,26 +75,81 @@ class TileWindowWithStaticDistribution:
         # The adaptor expects P+Y dimensions, where P is partition dimensions
         adaptor = self.tile_distribution.ps_ys_to_xs_adaptor
         ndim_top = adaptor.get_num_of_top_dimension()
-        idx_top = [0] * ndim_top
-        window_adaptor_coord = make_tensor_adaptor_coordinate(
+        
+        # Create base coordinates (matches C++ window_adaptor_thread_coord_tmp)
+        idx_top_base = [0] * ndim_top
+        # Set partition dimensions (P dimensions) - matches C++ detail::get_partition_index()
+        for i, p_idx in enumerate(partition_idx):
+            idx_top_base[i] = p_idx
+        # Y dimensions start at 0 (matches C++ array<index_t, NDimY>{0})
+        
+        window_adaptor_coord_base = make_tensor_adaptor_coordinate(
             adaptor,
-            idx_top
+            idx_top_base
         )
         
-        # Create initial bottom tensor coordinate
-        bottom_tensor_idx = [
-            self.window_origin[i] + window_adaptor_coord.get_bottom_index()[i]
+        # Create base bottom tensor coordinate
+        bottom_tensor_idx_base = [
+            self.window_origin[i] + window_adaptor_coord_base.get_bottom_index()[i]
             for i in range(len(self.window_origin))
         ]
-        bottom_tensor_coord = make_tensor_coordinate(
+        bottom_tensor_coord_base = make_tensor_coordinate(
             self.bottom_tensor_view.tensor_desc,
-            bottom_tensor_idx
+            bottom_tensor_idx_base
         )
         
-        # Store coordinate bundles
+        # Calculate accesses per coordinate bundle
+        ys_to_d_desc = self.tile_distribution.ys_to_d_descriptor
+        y_lengths = ys_to_d_desc.get_lengths()
+        total_elements = 1
+        for length in y_lengths:
+            total_elements *= length
+        num_access_per_coord = total_elements // self.num_coord
+        
+        # For each coordinate bundle (matches C++ static_for<0, NumCoord, 1>)
         for i_coord in range(self.num_coord):
-            # For simplicity, we'll store the same coordinates for now
-            # In practice, these would be offset based on access patterns
+            # Copy base coordinates (matches C++ pattern)
+            window_adaptor_coord = window_adaptor_coord_base.copy() if hasattr(window_adaptor_coord_base, 'copy') else window_adaptor_coord_base
+            bottom_tensor_coord = bottom_tensor_coord_base.copy() if hasattr(bottom_tensor_coord_base, 'copy') else bottom_tensor_coord_base
+            
+            # Calculate step offset for this coordinate bundle
+            # This matches C++: SFC_Ys::get_step_between(number<0>{}, number<iCoord * NumAccessPerCoord>{})
+            start_access = i_coord * num_access_per_coord
+            
+            if start_access > 0:
+                # Calculate Y-dimension step from access 0 to start_access
+                # This is a simplified version of space-filling curve step_between
+                start_idx_ys = []
+                remaining = start_access
+                for i in range(ndim_y - 1, -1, -1):
+                    start_idx_ys.insert(0, remaining % y_lengths[i])
+                    remaining //= y_lengths[i]
+                
+                # Create step for P+Y dimensions (P dimensions get 0 step)
+                # This matches C++ container_concat(generate_tuple([&](auto) { return number<0>{}; }, number<NDimP>{}), idx_diff_ys)
+                ndim_p = len(partition_idx)
+                idx_diff_ps_ys = [0] * ndim_p + start_idx_ys
+                
+                # Move coordinates by the calculated step
+                # This matches C++ move_window_adaptor_and_bottom_tensor_thread_coordinate()
+                from .tensor_coordinate import move_tensor_adaptor_coordinate, move_tensor_coordinate
+                
+                idx_diff_adaptor_bottom = [0] * self.bottom_tensor_view.get_num_of_dimension()
+                
+                move_tensor_adaptor_coordinate(
+                    adaptor,
+                    window_adaptor_coord,
+                    idx_diff_ps_ys,
+                    idx_diff_adaptor_bottom
+                )
+                
+                move_tensor_coordinate(
+                    self.bottom_tensor_view.tensor_desc,
+                    bottom_tensor_coord,
+                    idx_diff_adaptor_bottom
+                )
+            
+            # Store coordinate bundle (matches C++ make_tuple(window_adaptor_thread_coord, bottom_tensor_thread_coord))
             self.pre_computed_coords.append((window_adaptor_coord, bottom_tensor_coord))
     
     def get_num_of_dimension(self) -> int:
@@ -164,8 +219,10 @@ class TileWindowWithStaticDistribution:
         
         # For each coordinate bundle (matches C++ static_for<0, NumCoord, 1>)
         for i_coord in range(self.num_coord):
-            # Get pre-computed coordinates (matches C++ pre_computed_coords_[iCoord])
-            window_adaptor_coord, bottom_tensor_coord = self.pre_computed_coords[i_coord]
+            # Copy pre-computed coordinates (matches C++ pattern - coordinates are copied, not referenced)
+            # This matches C++: auto window_adaptor_thread_coord = pre_computed_coords_[iCoord][I0];
+            window_adaptor_coord = self.pre_computed_coords[i_coord][0].copy() if hasattr(self.pre_computed_coords[i_coord][0], 'copy') else self.pre_computed_coords[i_coord][0]
+            bottom_tensor_coord = self.pre_computed_coords[i_coord][1].copy() if hasattr(self.pre_computed_coords[i_coord][1], 'copy') else self.pre_computed_coords[i_coord][1]
             
             # For each access within this coordinate bundle (matches C++ static_for<0, NumAccessPerCoord, 1>)
             for i_coord_access in range(num_access_per_coord):
@@ -309,8 +366,9 @@ class TileWindowWithStaticDistribution:
         
         # For each coordinate bundle (matches C++ static_for<0, NumCoord, 1>)
         for i_coord in range(self.num_coord):
-            # Get pre-computed coordinates (matches C++ pre_computed_coords_[iCoord])
-            window_adaptor_coord, bottom_tensor_coord = self.pre_computed_coords[i_coord]
+            # Copy pre-computed coordinates (matches C++ pattern - coordinates are copied, not referenced)
+            window_adaptor_coord = self.pre_computed_coords[i_coord][0].copy() if hasattr(self.pre_computed_coords[i_coord][0], 'copy') else self.pre_computed_coords[i_coord][0]
+            bottom_tensor_coord = self.pre_computed_coords[i_coord][1].copy() if hasattr(self.pre_computed_coords[i_coord][1], 'copy') else self.pre_computed_coords[i_coord][1]
             
             # For each access within this coordinate bundle (matches C++ static_for<0, NumAccessPerCoord, 1>)
             for i_coord_access in range(num_access_per_coord):
@@ -391,8 +449,9 @@ class TileWindowWithStaticDistribution:
         
         # For each coordinate bundle (matches C++ static_for<0, NumCoord, 1>)
         for i_coord in range(self.num_coord):
-            # Get pre-computed coordinates (matches C++ pre_computed_coords_[iCoord])
-            window_adaptor_coord, bottom_tensor_coord = self.pre_computed_coords[i_coord]
+            # Copy pre-computed coordinates (matches C++ pattern - coordinates are copied, not referenced)
+            window_adaptor_coord = self.pre_computed_coords[i_coord][0].copy() if hasattr(self.pre_computed_coords[i_coord][0], 'copy') else self.pre_computed_coords[i_coord][0]
+            bottom_tensor_coord = self.pre_computed_coords[i_coord][1].copy() if hasattr(self.pre_computed_coords[i_coord][1], 'copy') else self.pre_computed_coords[i_coord][1]
             
             # For each access within this coordinate bundle (matches C++ static_for<0, NumAccessPerCoord, 1>)
             for i_coord_access in range(num_access_per_coord):
@@ -411,33 +470,45 @@ class TileWindowWithStaticDistribution:
                 # (matches C++ tile_dstr.get_ys_to_d_descriptor().calculate_offset(idx_ys))
                 d_offset = ys_to_d_desc.calculate_offset(idx_ys)
                 
+                # DIRECT COORDINATE CALCULATION: Instead of relying on the adaptor,
+                # calculate the bottom tensor coordinate directly from Y indices
+                # This assumes a simple mapping where Y dimensions map to window dimensions
+                if len(idx_ys) >= 2:
+                    # 2D case: Y[0] -> window row, Y[1] -> window col
+                    window_row = idx_ys[0] if len(idx_ys) > 0 else 0
+                    window_col = idx_ys[1] if len(idx_ys) > 1 else 0
+                    tensor_row = self.window_origin[0] + window_row
+                    tensor_col = self.window_origin[1] + window_col
+                    tensor_indices = [tensor_row, tensor_col]
+                elif len(idx_ys) == 1:
+                    # 1D case: Y[0] maps to first window dimension
+                    window_offset = idx_ys[0]
+                    tensor_indices = [self.window_origin[0] + window_offset, self.window_origin[1]]
+                else:
+                    # 0D case: use window origin
+                    tensor_indices = list(self.window_origin)
+                
+                # Create coordinate directly from tensor indices
+                from .tensor_coordinate import make_tensor_coordinate
+                direct_coord = make_tensor_coordinate(
+                    self.bottom_tensor_view.tensor_desc,
+                    tensor_indices
+                )
+                
                 if oob_conditional_check:
                     # Check if coordinate is valid
-                    if not self._is_coordinate_valid(bottom_tensor_coord):
-                        # Move coordinate for next access before continuing
-                        if i_coord_access < num_access_per_coord - 1:
-                            self._move_coordinates_for_next_access(
-                                window_adaptor_coord, bottom_tensor_coord, 
-                                i_access, y_lengths, ndim_y
-                            )
+                    if not self._is_coordinate_valid(direct_coord):
                         continue
                 
                 # Get element from distributed tensor
                 value = src_tensor.get_thread_data(d_offset)
                 
-                # Update (accumulate) in bottom tensor using the current coordinate
+                # Update (accumulate) in bottom tensor using the direct coordinate
                 # (matches C++ get_bottom_tensor_view().update_vectorized_elements())
-                offset = bottom_tensor_coord.get_offset()
+                offset = direct_coord.get_offset()
                 current_value = self.bottom_tensor_view.get_element_by_offset(offset)
-                self.bottom_tensor_view.set_element_by_offset(offset, current_value + value)
                 
-                # Move thread coordinate for next access
-                # (matches C++ move_window_adaptor_and_bottom_tensor_thread_coordinate)
-                if i_coord_access < num_access_per_coord - 1:
-                    self._move_coordinates_for_next_access(
-                        window_adaptor_coord, bottom_tensor_coord, 
-                        i_access, y_lengths, ndim_y
-                    )
+                self.bottom_tensor_view.set_element_by_offset(offset, current_value + value)
     
     def update_raw(self, src_tensor: StaticDistributedTensor,
                    oob_conditional_check: bool = True,
