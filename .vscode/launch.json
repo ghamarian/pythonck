@@ -7,7 +7,7 @@
             "request": "launch",
             "module": "pytest",
             "args": [
-                "${workspaceFolder}/tests/test_store_tile.py",
+                "${workspaceFolder}/tests/test_tile_window.py",
                 "-v"
             ],
             "console": "integratedTerminal",

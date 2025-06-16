@@ -243,6 +243,15 @@ class TileDistribution:
         Get vector strides for each Y dimension.
         Matches C++ get_window_adaptor_ys_safe_vector_length_strides().
         """
+        # Extract the actual strides from the tensor descriptor's EmbedTransform
+        # instead of calculating our own (which was wrong)
+        transforms = self.ys_to_d_descriptor.get_transforms()
+        
+        # For naive tensor descriptors, the first transform is always an EmbedTransform
+        if len(transforms) > 0 and hasattr(transforms[0], 'strides'):
+            return transforms[0].strides
+        
+        # Fallback to calculated strides if no EmbedTransform found
         strides = [1]  # First dimension has stride 1
         lengths = self.get_y_vector_lengths()
         for i in range(1, self.ndim_y):
