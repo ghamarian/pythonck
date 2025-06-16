@@ -101,6 +101,15 @@ class TensorAdaptorCoordinate:
             raise ValueError(f"Index size {idx.size} doesn't match ndim_hidden {self.ndim_hidden}")
         self.idx_hidden = idx
 
+    def copy(self) -> 'TensorAdaptorCoordinate':
+        """Create a copy of this TensorAdaptorCoordinate."""
+        return TensorAdaptorCoordinate(
+            ndim_hidden=self.ndim_hidden,
+            bottom_dimension_hidden_ids=self.bottom_dimension_hidden_ids.copy(),
+            top_dimension_hidden_ids=self.top_dimension_hidden_ids.copy(),
+            idx_hidden=self.idx_hidden.copy()
+        )
+
 
 @dataclass
 class TensorCoordinate(TensorAdaptorCoordinate):

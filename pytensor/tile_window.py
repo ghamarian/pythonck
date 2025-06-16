@@ -189,6 +189,42 @@ class TileWindowWithStaticDistribution:
         
         return dst_tensor
     
+    def _traverse_window(self, process_access, oob_conditional_check: bool = True):
+        """
+        Generic traversal of the window, applying a processing function at each access.
+        
+        Args:
+            process_access: A function to call for each access. It will receive
+                            access_info, bottom_tensor_coord, and ys_to_d_desc.
+            oob_conditional_check: Whether to check out-of-bounds access.
+        """
+        ys_to_d_desc = self.tile_distribution.ys_to_d_descriptor
+        num_access_per_coord = self.traits.num_access // self.num_coord
+        
+        for i_coord in range(self.num_coord):
+            window_adaptor_coord = self.pre_computed_coords[i_coord][0].copy()
+            bottom_tensor_coord = self.pre_computed_coords[i_coord][1].copy()
+            
+            for i_coord_access in range(num_access_per_coord):
+                i_access = i_coord * num_access_per_coord + i_coord_access
+                access_info = self.traits.get_vectorized_access_info(i_access)
+                
+                if oob_conditional_check and not self._is_coordinate_valid(bottom_tensor_coord):
+                    if i_coord_access < num_access_per_coord - 1:
+                        self._move_coordinates_for_next_access(
+                            window_adaptor_coord, bottom_tensor_coord, i_access,
+                            access_info['vector_indices'], access_info['vector_dim']
+                        )
+                    continue
+                
+                process_access(access_info, bottom_tensor_coord, ys_to_d_desc)
+                
+                if i_coord_access < num_access_per_coord - 1:
+                    self._move_coordinates_for_next_access(
+                        window_adaptor_coord, bottom_tensor_coord, i_access,
+                        access_info['vector_indices'], access_info['vector_dim']
+                    )
+
     def _analyze_y_dimensions(self):
         """
         Analyze Y dimensions to determine optimal access patterns.
@@ -222,52 +258,15 @@ class TileWindowWithStaticDistribution:
             dst_tensor: Destination distributed tensor
             oob_conditional_check: Whether to check out-of-bounds access
         """
-        # Get Y to D descriptor for mapping
-        ys_to_d_desc = self.tile_distribution.ys_to_d_descriptor
-        
-        # Calculate accesses per coordinate bundle
-        num_access_per_coord = self.traits.num_access // self.num_coord
-        
-        # For each coordinate bundle
-        for i_coord in range(self.num_coord):
-            # Copy pre-computed coordinates
-            window_adaptor_coord = self.pre_computed_coords[i_coord][0].copy() if hasattr(self.pre_computed_coords[i_coord][0], 'copy') else self.pre_computed_coords[i_coord][0]
-            bottom_tensor_coord = self.pre_computed_coords[i_coord][1].copy() if hasattr(self.pre_computed_coords[i_coord][1], 'copy') else self.pre_computed_coords[i_coord][1]
+        def process_load(access_info, bottom_tensor_coord, ys_to_d_desc):
+            offset = bottom_tensor_coord.get_offset()
+            values = [self.bottom_tensor_view.get_element_by_offset(offset + j) for j in range(access_info['vector_size'])]
             
-            # For each access within this coordinate bundle
-            for i_coord_access in range(num_access_per_coord):
-                i_access = i_coord * num_access_per_coord + i_coord_access
-                
-                # Get vectorized access information
-                access_info = self.traits.get_vectorized_access_info(i_access)
-                
-                if oob_conditional_check:
-                    if not self._is_coordinate_valid(bottom_tensor_coord):
-                        if i_coord_access < num_access_per_coord - 1:
-                            self._move_coordinates_for_next_access(
-                                window_adaptor_coord, bottom_tensor_coord, 
-                                i_access, access_info['vector_indices'], access_info['vector_dim']
-                            )
-                        continue
-                
-                # Get elements from bottom tensor using vectorized access
-                offset = bottom_tensor_coord.get_offset()
-                values = []
-                for j in range(access_info['vector_size']):
-                    value = self.bottom_tensor_view.get_element_by_offset(offset + j)
-                    values.append(value)
-                
-                # Store in distributed tensor at the correct D-dimension positions
-                for j, idx_ys in enumerate(access_info['vector_indices']):
-                    d_offset = ys_to_d_desc.calculate_offset(idx_ys)
-                    dst_tensor.set_thread_data(d_offset, values[j])
-                
-                # Move thread coordinate for next access
-                if i_coord_access < num_access_per_coord - 1:
-                    self._move_coordinates_for_next_access(
-                        window_adaptor_coord, bottom_tensor_coord, 
-                        i_access, access_info['vector_indices'], access_info['vector_dim']
-                    )
+            for j, idx_ys in enumerate(access_info['vector_indices']):
+                d_offset = ys_to_d_desc.calculate_offset(idx_ys)
+                dst_tensor.set_thread_data(d_offset, values[j])
+
+        self._traverse_window(process_load, oob_conditional_check)
     
     def _move_coordinates_for_next_access(self, window_adaptor_coord, bottom_tensor_coord, 
                                         i_access, vector_indices, vector_dim):
@@ -306,6 +305,15 @@ class TileWindowWithStaticDistribution:
             idx_diff_adaptor_bottom
         )
     
+    def _gather_values_from_src(self, src_tensor, access_info, ys_to_d_desc):
+        """Gathers values from the source distributed tensor for a vectorized access."""
+        values = []
+        for j, idx_ys in enumerate(access_info['vector_indices']):
+            d_offset = ys_to_d_desc.calculate_offset(idx_ys)
+            value = src_tensor.get_thread_data(d_offset)
+            values.append(value)
+        return values
+
     def load_raw(self, dst_tensor: StaticDistributedTensor,
                  oob_conditional_check: bool = True,
                  pre_nop: bool = False):
@@ -332,52 +340,13 @@ class TileWindowWithStaticDistribution:
             src_tensor: Source distributed tensor
             oob_conditional_check: Whether to check out-of-bounds access
         """
-        # Get Y to D descriptor for mapping
-        ys_to_d_desc = self.tile_distribution.ys_to_d_descriptor
-        
-        # Calculate accesses per coordinate bundle
-        num_access_per_coord = self.traits.num_access // self.num_coord
-        
-        # For each coordinate bundle
-        for i_coord in range(self.num_coord):
-            # Copy pre-computed coordinates
-            window_adaptor_coord = self.pre_computed_coords[i_coord][0].copy() if hasattr(self.pre_computed_coords[i_coord][0], 'copy') else self.pre_computed_coords[i_coord][0]
-            bottom_tensor_coord = self.pre_computed_coords[i_coord][1].copy() if hasattr(self.pre_computed_coords[i_coord][1], 'copy') else self.pre_computed_coords[i_coord][1]
-            
-            # For each access within this coordinate bundle
-            for i_coord_access in range(num_access_per_coord):
-                i_access = i_coord * num_access_per_coord + i_coord_access
-                
-                # Get vectorized access information
-                access_info = self.traits.get_vectorized_access_info(i_access)
-                
-                if oob_conditional_check:
-                    if not self._is_coordinate_valid(bottom_tensor_coord):
-                        if i_coord_access < num_access_per_coord - 1:
-                            self._move_coordinates_for_next_access(
-                                window_adaptor_coord, bottom_tensor_coord, 
-                                i_access, access_info['vector_indices'], access_info['vector_dim']
-                            )
-                        continue
-                
-                # Gather values from src_tensor
-                values = []
-                for j, idx_ys in enumerate(access_info['vector_indices']):
-                    d_offset = ys_to_d_desc.calculate_offset(idx_ys)
-                    value = src_tensor.get_thread_data(d_offset)
-                    values.append(value)
-                
-                # Store in bottom tensor using vectorized access
-                offset = bottom_tensor_coord.get_offset()
-                for j in range(access_info['vector_size']):
-                    self.bottom_tensor_view.set_element_by_offset(offset + j, values[j])
-                
-                # Move thread coordinate for next access
-                if i_coord_access < num_access_per_coord - 1:
-                    self._move_coordinates_for_next_access(
-                        window_adaptor_coord, bottom_tensor_coord, 
-                        i_access, access_info['vector_indices'], access_info['vector_dim']
-                    )
+        def process_store(access_info, bottom_tensor_coord, ys_to_d_desc):
+            values = self._gather_values_from_src(src_tensor, access_info, ys_to_d_desc)
+            offset = bottom_tensor_coord.get_offset()
+            for j in range(access_info['vector_size']):
+                self.bottom_tensor_view.set_element_by_offset(offset + j, values[j])
+
+        self._traverse_window(process_store, oob_conditional_check)
     
     def store_raw(self, src_tensor: StaticDistributedTensor, oob_conditional_check: bool = True):
         """
@@ -388,7 +357,7 @@ class TileWindowWithStaticDistribution:
             oob_conditional_check: Whether to check out-of-bounds access
         """
         # Similar to store but with raw access patterns
-        self.store(src_tensor, oob_conditional_check=True)
+        self.store(src_tensor, oob_conditional_check)
     
     def update(self, src_tensor: StaticDistributedTensor,
                oob_conditional_check: bool = True):
@@ -399,54 +368,14 @@ class TileWindowWithStaticDistribution:
             src_tensor: Source distributed tensor
             oob_conditional_check: Whether to check out-of-bounds access
         """
-        # Get Y to D descriptor for mapping
-        ys_to_d_desc = self.tile_distribution.ys_to_d_descriptor
-        
-        # Calculate accesses per coordinate bundle
-        num_access_per_coord = self.traits.num_access // self.num_coord
-        
-        # For each coordinate bundle
-        for i_coord in range(self.num_coord):
-            # Copy pre-computed coordinates
-            window_adaptor_coord = self.pre_computed_coords[i_coord][0].copy() if hasattr(self.pre_computed_coords[i_coord][0], 'copy') else self.pre_computed_coords[i_coord][0]
-            bottom_tensor_coord = self.pre_computed_coords[i_coord][1].copy() if hasattr(self.pre_computed_coords[i_coord][1], 'copy') else self.pre_computed_coords[i_coord][1]
-            
-            # For each access within this coordinate bundle
-            for i_coord_access in range(num_access_per_coord):
-                i_access = i_coord * num_access_per_coord + i_coord_access
-                
-                # Get vectorized access information
-                access_info = self.traits.get_vectorized_access_info(i_access)
-                
-                # Check bounds if requested
-                if oob_conditional_check:
-                    if not self._is_coordinate_valid(bottom_tensor_coord):
-                        if i_coord_access < num_access_per_coord - 1:
-                            self._move_coordinates_for_next_access(
-                                window_adaptor_coord, bottom_tensor_coord, 
-                                i_access, access_info['vector_indices'], access_info['vector_dim']
-                            )
-                        continue
-                
-                # Gather values from src_tensor
-                values = []
-                for j, idx_ys in enumerate(access_info['vector_indices']):
-                    d_offset = ys_to_d_desc.calculate_offset(idx_ys)
-                    value = src_tensor.get_thread_data(d_offset)
-                    values.append(value)
-                
-                # Update (accumulate) in bottom tensor using vectorized access
-                offset = bottom_tensor_coord.get_offset()
-                for j in range(access_info['vector_size']):
-                    current_value = self.bottom_tensor_view.get_element_by_offset(offset + j)
-                    self.bottom_tensor_view.set_element_by_offset(offset + j, current_value + values[j])
-                
-                # Move thread coordinate for next access
-                if i_coord_access < num_access_per_coord - 1:
-                    self._move_coordinates_for_next_access(
-                        window_adaptor_coord, bottom_tensor_coord, 
-                        i_access, access_info['vector_indices'], access_info['vector_dim']
-                    )
+        def process_update(access_info, bottom_tensor_coord, ys_to_d_desc):
+            values = self._gather_values_from_src(src_tensor, access_info, ys_to_d_desc)
+            offset = bottom_tensor_coord.get_offset()
+            for j in range(access_info['vector_size']):
+                current_value = self.bottom_tensor_view.get_element_by_offset(offset + j)
+                self.bottom_tensor_view.set_element_by_offset(offset + j, current_value + values[j])
+
+        self._traverse_window(process_update, oob_conditional_check)
     
     def update_raw(self, src_tensor: StaticDistributedTensor,
                    oob_conditional_check: bool = True,
