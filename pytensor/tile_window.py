@@ -202,6 +202,7 @@ class TileWindowWithStaticDistribution:
         num_access_per_coord = self.traits.num_access // self.num_coord
         
         for i_coord in range(self.num_coord):
+            # Get fresh copies of the pre-computed coordinates
             window_adaptor_coord = self.pre_computed_coords[i_coord][0].copy()
             bottom_tensor_coord = self.pre_computed_coords[i_coord][1].copy()
             
@@ -212,8 +213,7 @@ class TileWindowWithStaticDistribution:
                 if oob_conditional_check and not self._is_coordinate_valid(bottom_tensor_coord):
                     if i_coord_access < num_access_per_coord - 1:
                         self._move_coordinates_for_next_access(
-                            window_adaptor_coord, bottom_tensor_coord, i_access,
-                            access_info['vector_indices'], access_info['vector_dim']
+                            window_adaptor_coord, bottom_tensor_coord, i_access
                         )
                     continue
                 
@@ -221,8 +221,7 @@ class TileWindowWithStaticDistribution:
                 
                 if i_coord_access < num_access_per_coord - 1:
                     self._move_coordinates_for_next_access(
-                        window_adaptor_coord, bottom_tensor_coord, i_access,
-                        access_info['vector_indices'], access_info['vector_dim']
+                        window_adaptor_coord, bottom_tensor_coord, i_access
                     )
 
     def _analyze_y_dimensions(self):
@@ -259,27 +258,38 @@ class TileWindowWithStaticDistribution:
             oob_conditional_check: Whether to check out-of-bounds access
         """
         def process_load(access_info, bottom_tensor_coord, ys_to_d_desc):
-            offset = bottom_tensor_coord.get_offset()
-            values = [self.bottom_tensor_view.get_element_by_offset(offset + j) for j in range(access_info['vector_size'])]
-            
+            # For each vector element in this access
             for j, idx_ys in enumerate(access_info['vector_indices']):
+                # Calculate tensor coordinate for this Y index
+                # Ensure we don't go out of bounds when mapping Y dimensions to tensor dimensions
+                tensor_indices = []
+                for i in range(len(self.window_origin)):
+                    y_idx = idx_ys[i] if i < len(idx_ys) else 0
+                    tensor_indices.append(self.window_origin[i] + y_idx)
+                
+                # Get element from tensor view
+                value = self.bottom_tensor_view.get_element(tensor_indices)
+                
+                # Store in distributed tensor
                 d_offset = ys_to_d_desc.calculate_offset(idx_ys)
-                dst_tensor.set_thread_data(d_offset, values[j])
+                dst_tensor.set_thread_data(d_offset, value)
 
         self._traverse_window(process_load, oob_conditional_check)
     
-    def _move_coordinates_for_next_access(self, window_adaptor_coord, bottom_tensor_coord, 
-                                        i_access, vector_indices, vector_dim):
+    def _move_coordinates_for_next_access(self, window_adaptor_coord, bottom_tensor_coord, i_access):
         """
         Move coordinates to the next access position using space-filling curve step.
+        
+        NOTE: This method is no longer used since we compute coordinates directly from Y indices,
+        but keeping it for potential future optimizations.
         """
         # Get next access indices
         next_access_info = self.traits.get_vectorized_access_info(i_access + 1)
+        current_access_info = self.traits.get_vectorized_access_info(i_access)
         
         # Calculate step difference in Y dimensions
-        # This logic now works for both single and multi-Y-dimension cases
         idx_diff_ys = [
-            next_access_info['base_indices'][i] - vector_indices[0][i]
+            next_access_info['base_indices'][i] - current_access_info['base_indices'][i]
             for i in range(self.tile_distribution.ndim_y)
         ]
         
@@ -288,17 +298,14 @@ class TileWindowWithStaticDistribution:
         ndim_p = len(partition_idx)
         idx_diff_ps_ys = [0] * ndim_p + idx_diff_ys
         
-        # Move window adaptor coordinate
-        idx_diff_adaptor_bottom = [0] * self.bottom_tensor_view.get_num_of_dimension()
-        
-        move_tensor_adaptor_coordinate(
+        # Move window adaptor coordinate and get the resulting diff in bottom coordinates
+        idx_diff_adaptor_bottom = move_tensor_adaptor_coordinate(
             self.tile_distribution.ps_ys_to_xs_adaptor,
             window_adaptor_coord,
-            idx_diff_ps_ys,
-            idx_diff_adaptor_bottom
+            MultiIndex(len(idx_diff_ps_ys), idx_diff_ps_ys)
         )
         
-        # Move bottom tensor coordinate
+        # Move bottom tensor coordinate by the calculated diff
         move_tensor_coordinate(
             self.bottom_tensor_view.tensor_desc,
             bottom_tensor_coord,
@@ -341,10 +348,21 @@ class TileWindowWithStaticDistribution:
             oob_conditional_check: Whether to check out-of-bounds access
         """
         def process_store(access_info, bottom_tensor_coord, ys_to_d_desc):
-            values = self._gather_values_from_src(src_tensor, access_info, ys_to_d_desc)
-            offset = bottom_tensor_coord.get_offset()
-            for j in range(access_info['vector_size']):
-                self.bottom_tensor_view.set_element_by_offset(offset + j, values[j])
+            # For each vector element in this access
+            for j, idx_ys in enumerate(access_info['vector_indices']):
+                # Get value from distributed tensor
+                d_offset = ys_to_d_desc.calculate_offset(idx_ys)
+                value = src_tensor.get_thread_data(d_offset)
+                
+                # Calculate tensor coordinate for this Y index
+                # Ensure we don't go out of bounds when mapping Y dimensions to tensor dimensions
+                tensor_indices = []
+                for i in range(len(self.window_origin)):
+                    y_idx = idx_ys[i] if i < len(idx_ys) else 0
+                    tensor_indices.append(self.window_origin[i] + y_idx)
+                
+                # Store in tensor view
+                self.bottom_tensor_view.set_element(tensor_indices, value)
 
         self._traverse_window(process_store, oob_conditional_check)
     
@@ -668,15 +686,17 @@ class LoadStoreTraits:
         # Get Y dimension lengths
         y_lengths = self.tile_distribution.ys_to_d_descriptor.get_lengths()
         
-        # Create dimension access order (simple sequential for now)
-        dim_access_order = list(range(self.ndim_y))
+        # Create dimension access order, pushing vector dimension to the end
+        dim_access_order = [i for i in range(self.ndim_y) if i != self.vector_dim_y]
+        dim_access_order.append(self.vector_dim_y)
         
         # Create space-filling curve
         from .space_filling_curve import SpaceFillingCurve
         return SpaceFillingCurve(
             tensor_lengths=y_lengths,
             dim_access_order=dim_access_order,
-            scalars_per_access=self.scalars_per_access
+            scalars_per_access=self.scalars_per_access,
+            snake_curved=True  # Enable snake curve like C++
         )
     
     def _calculate_num_access(self):
@@ -709,7 +729,7 @@ class LoadStoreTraits:
             # Single Y dimension case
             base_indices = idx_ys_start
             vector_indices = [[base_indices[0] + j] for j in range(self.scalar_per_vector)]
-            return {
+            result = {
                 'base_indices': base_indices,
                 'vector_indices': vector_indices,
                 'vector_dim': 0,
@@ -724,12 +744,14 @@ class LoadStoreTraits:
                 idx_ys[self.vector_dim_y] = idx_ys_start[self.vector_dim_y] + j
                 vector_indices.append(idx_ys)
             
-            return {
+            result = {
                 'base_indices': idx_ys_start,
                 'vector_indices': vector_indices,
                 'vector_dim': self.vector_dim_y,
                 'vector_size': self.scalar_per_vector
             }
+        
+        return result
 
 
 def make_tile_window(tensor_view: TensorView,

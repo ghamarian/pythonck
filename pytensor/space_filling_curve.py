@@ -48,10 +48,13 @@ class SpaceFillingCurve:
             self.scalar_per_vector *= scalar
         
         # Calculate access lengths (tensor_lengths / scalars_per_access)
-        self.access_lengths = [
-            tensor_lengths[i] // scalars_per_access[i]
-            for i in range(self.ndim)
-        ]
+        self.access_lengths = []
+        for i in range(self.ndim):
+            # Calculate how many accesses are needed in this dimension
+            # If we access scalars_per_access[i] elements at a time, 
+            # we need ceil(tensor_lengths[i] / scalars_per_access[i]) accesses
+            access_count = (tensor_lengths[i] + scalars_per_access[i] - 1) // scalars_per_access[i]
+            self.access_lengths.append(access_count)
         
         # Reorder access lengths by dimension order
         self.ordered_access_lengths = [
@@ -79,34 +82,22 @@ class SpaceFillingCurve:
         Returns:
             List of indices for each dimension
         """
-        # Calculate indices in ordered dimensions
+        # Calculate indices in ordered dimensions first
         ordered_indices = []
         remaining = i_access
         
+        # Calculate indices in the order of ordered_access_lengths
         for i in range(len(self.ordered_access_lengths) - 1, -1, -1):
             length = self.ordered_access_lengths[i]
             idx = remaining % length
-            
-            # Apply snake pattern if enabled
-            if self.snake_curved and i < len(self.ordered_access_lengths) - 1:
-                higher_dim_is_odd = False
-                tmp = remaining
-                for j in range(i + 1, len(self.ordered_access_lengths)):
-                    tmp //= self.ordered_access_lengths[j]
-                    if tmp % 2 == 1:
-                        higher_dim_is_odd = True
-                        break
-                
-                if higher_dim_is_odd:
-                    idx = length - 1 - idx
-            
             ordered_indices.insert(0, idx)
             remaining //= length
         
-        # Reorder indices back to original dimension order
+        # Now map back to original dimension order
         indices = [0] * self.ndim
         for i, ordered_idx in enumerate(ordered_indices):
             original_dim = self.dim_access_order[i]
+            # Apply the scalar multiplication AFTER getting the access index
             indices[original_dim] = ordered_idx * self.scalars_per_access[original_dim]
         
         return indices
