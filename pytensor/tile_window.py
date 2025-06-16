@@ -11,14 +11,18 @@ from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
 
 from .tensor_view import TensorView
-from .tile_distribution import TileDistribution
+from .tile_distribution import (
+    TileDistribution, 
+    TileDistributedIndex
+)
 from .static_distributed_tensor import StaticDistributedTensor
 from .tensor_coordinate import (
     MultiIndex, TensorCoordinate, TensorAdaptorCoordinate,
     make_tensor_coordinate, move_tensor_coordinate, make_tensor_adaptor_coordinate,
-    coordinate_has_valid_offset
+    coordinate_has_valid_offset, move_tensor_adaptor_coordinate
 )
 from .tensor_descriptor import TensorAdaptor
+from .space_filling_curve import SpaceFillingCurve
 
 
 @dataclass
@@ -60,6 +64,12 @@ class TileWindowWithStaticDistribution:
         if window_adaptor.get_num_of_bottom_dimension() != ndim_bottom:
             raise ValueError("Window adaptor bottom dimensions must match tensor dimensions")
         
+        # Initialize load/store traits
+        self.traits = LoadStoreTraits(
+            tile_distribution=self.tile_distribution,
+            data_type=self.bottom_tensor_view.dtype
+        )
+        
         # Pre-compute coordinates for efficient access
         self._precompute_coordinates()
     
@@ -99,12 +109,7 @@ class TileWindowWithStaticDistribution:
         )
         
         # Calculate accesses per coordinate bundle
-        ys_to_d_desc = self.tile_distribution.ys_to_d_descriptor
-        y_lengths = ys_to_d_desc.get_lengths()
-        total_elements = 1
-        for length in y_lengths:
-            total_elements *= length
-        num_access_per_coord = total_elements // self.num_coord
+        num_access_per_coord = self.traits.num_access // self.num_coord
         
         # For each coordinate bundle (matches C++ static_for<0, NumCoord, 1>)
         for i_coord in range(self.num_coord):
@@ -117,23 +122,14 @@ class TileWindowWithStaticDistribution:
             start_access = i_coord * num_access_per_coord
             
             if start_access > 0:
-                # Calculate Y-dimension step from access 0 to start_access
-                # This is a simplified version of space-filling curve step_between
-                start_idx_ys = []
-                remaining = start_access
-                for i in range(ndim_y - 1, -1, -1):
-                    start_idx_ys.insert(0, remaining % y_lengths[i])
-                    remaining //= y_lengths[i]
+                # Get Y indices for this access
+                start_idx_ys = self.traits.get_y_indices(start_access)
                 
                 # Create step for P+Y dimensions (P dimensions get 0 step)
-                # This matches C++ container_concat(generate_tuple([&](auto) { return number<0>{}; }, number<NDimP>{}), idx_diff_ys)
                 ndim_p = len(partition_idx)
                 idx_diff_ps_ys = [0] * ndim_p + start_idx_ys
                 
                 # Move coordinates by the calculated step
-                # This matches C++ move_window_adaptor_and_bottom_tensor_thread_coordinate()
-                from .tensor_coordinate import move_tensor_adaptor_coordinate, move_tensor_coordinate
-                
                 idx_diff_adaptor_bottom = [0] * self.bottom_tensor_view.get_num_of_dimension()
                 
                 move_tensor_adaptor_coordinate(
@@ -149,7 +145,7 @@ class TileWindowWithStaticDistribution:
                     idx_diff_adaptor_bottom
                 )
             
-            # Store coordinate bundle (matches C++ make_tuple(window_adaptor_thread_coord, bottom_tensor_thread_coord))
+            # Store coordinate bundle
             self.pre_computed_coords.append((window_adaptor_coord, bottom_tensor_coord))
     
     def get_num_of_dimension(self) -> int:
@@ -193,6 +189,30 @@ class TileWindowWithStaticDistribution:
         
         return dst_tensor
     
+    def _analyze_y_dimensions(self):
+        """
+        Analyze Y dimensions to determine optimal access patterns.
+        Matches C++ load_store_traits::get_vector_dim_y_scalar_per_vector().
+        """
+        # Get vector lengths and strides for each Y dimension
+        ys_vector_lengths = self.tile_distribution.get_y_vector_lengths()
+        ys_vector_strides = self.tile_distribution.get_y_vector_strides()
+        
+        # Find dimension with stride 1 and maximum length (like C++ implementation)
+        vector_dim_y = 0
+        scalar_per_vector = 1
+        
+        for i in range(self.tile_distribution.ndim_y):
+            if ys_vector_strides[i] == 1 and ys_vector_lengths[i] > scalar_per_vector:
+                scalar_per_vector = ys_vector_lengths[i]
+                vector_dim_y = i
+        
+        return {
+            'vector_dim_y': vector_dim_y,
+            'scalar_per_vector': scalar_per_vector,
+            'vector_strides': ys_vector_strides
+        }
+    
     def load_into(self, dst_tensor: StaticDistributedTensor, 
                   oob_conditional_check: bool = True):
         """
@@ -205,106 +225,71 @@ class TileWindowWithStaticDistribution:
         # Get Y to D descriptor for mapping
         ys_to_d_desc = self.tile_distribution.ys_to_d_descriptor
         
-        # Create a simplified space-filling curve for Y dimensions
-        y_lengths = ys_to_d_desc.get_lengths()
-        ndim_y = len(y_lengths)
-        
-        # Calculate total number of accesses needed
-        total_elements = 1
-        for length in y_lengths:
-            total_elements *= length
-        
         # Calculate accesses per coordinate bundle
-        num_access_per_coord = total_elements // self.num_coord
+        num_access_per_coord = self.traits.num_access // self.num_coord
         
-        # For each coordinate bundle (matches C++ static_for<0, NumCoord, 1>)
+        # For each coordinate bundle
         for i_coord in range(self.num_coord):
-            # Copy pre-computed coordinates (matches C++ pattern - coordinates are copied, not referenced)
-            # This matches C++: auto window_adaptor_thread_coord = pre_computed_coords_[iCoord][I0];
+            # Copy pre-computed coordinates
             window_adaptor_coord = self.pre_computed_coords[i_coord][0].copy() if hasattr(self.pre_computed_coords[i_coord][0], 'copy') else self.pre_computed_coords[i_coord][0]
             bottom_tensor_coord = self.pre_computed_coords[i_coord][1].copy() if hasattr(self.pre_computed_coords[i_coord][1], 'copy') else self.pre_computed_coords[i_coord][1]
             
-            # For each access within this coordinate bundle (matches C++ static_for<0, NumAccessPerCoord, 1>)
+            # For each access within this coordinate bundle
             for i_coord_access in range(num_access_per_coord):
-                # Calculate global access index (matches C++ iAccess = iCoord * NumAccessPerCoord + iCoordAccess)
                 i_access = i_coord * num_access_per_coord + i_coord_access
                 
-                # Get Y-dimension indices for this access using space-filling curve
-                # (matches C++ idx_ys_start = SFC_Ys::get_index(iAccess))
-                idx_ys = []
-                remaining = i_access
-                for i in range(ndim_y - 1, -1, -1):
-                    idx_ys.insert(0, remaining % y_lengths[i])
-                    remaining //= y_lengths[i]
+                # Get vectorized access information
+                access_info = self.traits.get_vectorized_access_info(i_access)
                 
-                # Calculate D-dimension offset using ys_to_d_descriptor
-                # (matches C++ tile_dstr.get_ys_to_d_descriptor().calculate_offset(idx_ys))
-                d_offset = ys_to_d_desc.calculate_offset(idx_ys)
-                
-                # Check bounds if requested
                 if oob_conditional_check:
                     if not self._is_coordinate_valid(bottom_tensor_coord):
-                        # Move coordinate for next access before continuing
                         if i_coord_access < num_access_per_coord - 1:
                             self._move_coordinates_for_next_access(
                                 window_adaptor_coord, bottom_tensor_coord, 
-                                i_access, y_lengths, ndim_y
+                                i_access, access_info['vector_indices'], access_info['vector_dim']
                             )
                         continue
                 
-                # Get element from bottom tensor using the current coordinate
-                # (matches C++ get_bottom_tensor_view().get_vectorized_elements())
+                # Get elements from bottom tensor using vectorized access
                 offset = bottom_tensor_coord.get_offset()
-                value = self.bottom_tensor_view.get_element_by_offset(offset)
+                values = []
+                for j in range(access_info['vector_size']):
+                    value = self.bottom_tensor_view.get_element_by_offset(offset + j)
+                    values.append(value)
                 
-                # Store in distributed tensor at the correct D-dimension position
-                # (matches C++ dst_tensor.get_thread_buffer().at<d>() = ...)
-                dst_tensor.set_thread_data(d_offset, value)
+                # Store in distributed tensor at the correct D-dimension positions
+                for j, idx_ys in enumerate(access_info['vector_indices']):
+                    d_offset = ys_to_d_desc.calculate_offset(idx_ys)
+                    dst_tensor.set_thread_data(d_offset, values[j])
                 
                 # Move thread coordinate for next access
-                # (matches C++ move_window_adaptor_and_bottom_tensor_thread_coordinate)
                 if i_coord_access < num_access_per_coord - 1:
                     self._move_coordinates_for_next_access(
                         window_adaptor_coord, bottom_tensor_coord, 
-                        i_access, y_lengths, ndim_y
+                        i_access, access_info['vector_indices'], access_info['vector_dim']
                     )
     
     def _move_coordinates_for_next_access(self, window_adaptor_coord, bottom_tensor_coord, 
-                                        i_access, y_lengths, ndim_y):
+                                        i_access, vector_indices, vector_dim):
         """
         Move coordinates to the next access position using space-filling curve step.
-        
-        This matches the C++ pattern:
-        idx_diff_ys = SFC_Ys::get_forward_step(iAccess)
-        idx_diff_ps_ys = container_concat(zeros_for_P_dims, idx_diff_ys)
-        move_window_adaptor_and_bottom_tensor_thread_coordinate(...)
         """
-        # Calculate step to next position in Y dimensions
-        # This is a simplified version of SFC_Ys::get_forward_step(iAccess)
-        current_idx_ys = []
-        remaining = i_access
-        for i in range(ndim_y - 1, -1, -1):
-            current_idx_ys.insert(0, remaining % y_lengths[i])
-            remaining //= y_lengths[i]
-        
-        next_idx_ys = []
-        remaining = i_access + 1
-        for i in range(ndim_y - 1, -1, -1):
-            next_idx_ys.insert(0, remaining % y_lengths[i])
-            remaining //= y_lengths[i]
+        # Get next access indices
+        next_access_info = self.traits.get_vectorized_access_info(i_access + 1)
         
         # Calculate step difference in Y dimensions
-        idx_diff_ys = [next_idx_ys[i] - current_idx_ys[i] for i in range(ndim_y)]
+        # This logic now works for both single and multi-Y-dimension cases
+        idx_diff_ys = [
+            next_access_info['base_indices'][i] - vector_indices[0][i]
+            for i in range(self.tile_distribution.ndim_y)
+        ]
         
         # Create step for P+Y dimensions (P dimensions get 0 step)
-        # This matches C++ container_concat(zeros_for_P_dims, idx_diff_ys)
         partition_idx = self.tile_distribution.get_partition_index()
         ndim_p = len(partition_idx)
         idx_diff_ps_ys = [0] * ndim_p + idx_diff_ys
         
         # Move window adaptor coordinate
-        # This matches C++ move_tensor_adaptor_coordinate()
-        from .tensor_coordinate import move_tensor_adaptor_coordinate
         idx_diff_adaptor_bottom = [0] * self.bottom_tensor_view.get_num_of_dimension()
         
         move_tensor_adaptor_coordinate(
@@ -315,8 +300,6 @@ class TileWindowWithStaticDistribution:
         )
         
         # Move bottom tensor coordinate
-        # This matches C++ move_tensor_coordinate()
-        from .tensor_coordinate import move_tensor_coordinate
         move_tensor_coordinate(
             self.bottom_tensor_view.tensor_desc,
             bottom_tensor_coord,
@@ -352,73 +335,57 @@ class TileWindowWithStaticDistribution:
         # Get Y to D descriptor for mapping
         ys_to_d_desc = self.tile_distribution.ys_to_d_descriptor
         
-        # Create a simplified space-filling curve for Y dimensions
-        y_lengths = ys_to_d_desc.get_lengths()
-        ndim_y = len(y_lengths)
-        
-        # Calculate total number of accesses needed
-        total_elements = 1
-        for length in y_lengths:
-            total_elements *= length
-        
         # Calculate accesses per coordinate bundle
-        num_access_per_coord = total_elements // self.num_coord
+        num_access_per_coord = self.traits.num_access // self.num_coord
         
-        # For each coordinate bundle (matches C++ static_for<0, NumCoord, 1>)
+        # For each coordinate bundle
         for i_coord in range(self.num_coord):
-            # Copy pre-computed coordinates (matches C++ pattern - coordinates are copied, not referenced)
+            # Copy pre-computed coordinates
             window_adaptor_coord = self.pre_computed_coords[i_coord][0].copy() if hasattr(self.pre_computed_coords[i_coord][0], 'copy') else self.pre_computed_coords[i_coord][0]
             bottom_tensor_coord = self.pre_computed_coords[i_coord][1].copy() if hasattr(self.pre_computed_coords[i_coord][1], 'copy') else self.pre_computed_coords[i_coord][1]
             
-            # For each access within this coordinate bundle (matches C++ static_for<0, NumAccessPerCoord, 1>)
+            # For each access within this coordinate bundle
             for i_coord_access in range(num_access_per_coord):
-                # Calculate global access index (matches C++ iAccess = iCoord * NumAccessPerCoord + iCoordAccess)
                 i_access = i_coord * num_access_per_coord + i_coord_access
                 
-                # Get Y-dimension indices for this access using space-filling curve
-                # (matches C++ idx_ys_start = SFC_Ys::get_index(iAccess))
-                idx_ys = []
-                remaining = i_access
-                for i in range(ndim_y - 1, -1, -1):
-                    idx_ys.insert(0, remaining % y_lengths[i])
-                    remaining //= y_lengths[i]
-                
-                # Calculate D-dimension offset using ys_to_d_descriptor
-                # (matches C++ tile_dstr.get_ys_to_d_descriptor().calculate_offset(idx_ys))
-                d_offset = ys_to_d_desc.calculate_offset(idx_ys)
+                # Get vectorized access information
+                access_info = self.traits.get_vectorized_access_info(i_access)
                 
                 if oob_conditional_check:
-                    # Check if coordinate is valid
                     if not self._is_coordinate_valid(bottom_tensor_coord):
-                        # Move coordinate for next access before continuing
                         if i_coord_access < num_access_per_coord - 1:
                             self._move_coordinates_for_next_access(
                                 window_adaptor_coord, bottom_tensor_coord, 
-                                i_access, y_lengths, ndim_y
+                                i_access, access_info['vector_indices'], access_info['vector_dim']
                             )
                         continue
                 
-                # Get element from distributed tensor
-                value = src_tensor.get_thread_data(d_offset)
+                # Gather values from src_tensor
+                values = []
+                for j, idx_ys in enumerate(access_info['vector_indices']):
+                    d_offset = ys_to_d_desc.calculate_offset(idx_ys)
+                    value = src_tensor.get_thread_data(d_offset)
+                    values.append(value)
                 
-                # Store in bottom tensor using the current coordinate
+                # Store in bottom tensor using vectorized access
                 offset = bottom_tensor_coord.get_offset()
-                self.bottom_tensor_view.set_element_by_offset(offset, value)
+                for j in range(access_info['vector_size']):
+                    self.bottom_tensor_view.set_element_by_offset(offset + j, values[j])
                 
                 # Move thread coordinate for next access
-                # (matches C++ move_window_adaptor_and_bottom_tensor_thread_coordinate)
                 if i_coord_access < num_access_per_coord - 1:
                     self._move_coordinates_for_next_access(
                         window_adaptor_coord, bottom_tensor_coord, 
-                        i_access, y_lengths, ndim_y
+                        i_access, access_info['vector_indices'], access_info['vector_dim']
                     )
     
-    def store_raw(self, src_tensor: StaticDistributedTensor):
+    def store_raw(self, src_tensor: StaticDistributedTensor, oob_conditional_check: bool = True):
         """
         Store data using raw memory operations.
         
         Args:
             src_tensor: Source distributed tensor
+            oob_conditional_check: Whether to check out-of-bounds access
         """
         # Similar to store but with raw access patterns
         self.store(src_tensor, oob_conditional_check=True)
@@ -435,68 +402,50 @@ class TileWindowWithStaticDistribution:
         # Get Y to D descriptor for mapping
         ys_to_d_desc = self.tile_distribution.ys_to_d_descriptor
         
-        # Create a simplified space-filling curve for Y dimensions
-        y_lengths = ys_to_d_desc.get_lengths()
-        ndim_y = len(y_lengths)
-        
-        # Calculate total number of accesses needed
-        total_elements = 1
-        for length in y_lengths:
-            total_elements *= length
-        
         # Calculate accesses per coordinate bundle
-        num_access_per_coord = total_elements // self.num_coord
+        num_access_per_coord = self.traits.num_access // self.num_coord
         
-        # For each coordinate bundle (matches C++ static_for<0, NumCoord, 1>)
+        # For each coordinate bundle
         for i_coord in range(self.num_coord):
-            # Copy pre-computed coordinates (matches C++ pattern - coordinates are copied, not referenced)
+            # Copy pre-computed coordinates
             window_adaptor_coord = self.pre_computed_coords[i_coord][0].copy() if hasattr(self.pre_computed_coords[i_coord][0], 'copy') else self.pre_computed_coords[i_coord][0]
             bottom_tensor_coord = self.pre_computed_coords[i_coord][1].copy() if hasattr(self.pre_computed_coords[i_coord][1], 'copy') else self.pre_computed_coords[i_coord][1]
             
-            # For each access within this coordinate bundle (matches C++ static_for<0, NumAccessPerCoord, 1>)
+            # For each access within this coordinate bundle
             for i_coord_access in range(num_access_per_coord):
-                # Calculate global access index (matches C++ iAccess = iCoord * NumAccessPerCoord + iCoordAccess)
                 i_access = i_coord * num_access_per_coord + i_coord_access
                 
-                # Get Y-dimension indices for this access using space-filling curve
-                # (matches C++ idx_ys_start = SFC_Ys::get_index(iAccess))
-                idx_ys = []
-                remaining = i_access
-                for i in range(ndim_y - 1, -1, -1):
-                    idx_ys.insert(0, remaining % y_lengths[i])
-                    remaining //= y_lengths[i]
-                
-                # Calculate D-dimension offset using ys_to_d_descriptor
-                # (matches C++ tile_dstr.get_ys_to_d_descriptor().calculate_offset(idx_ys))
-                d_offset = ys_to_d_desc.calculate_offset(idx_ys)
+                # Get vectorized access information
+                access_info = self.traits.get_vectorized_access_info(i_access)
                 
                 # Check bounds if requested
                 if oob_conditional_check:
                     if not self._is_coordinate_valid(bottom_tensor_coord):
-                        # Move coordinate for next access before continuing
                         if i_coord_access < num_access_per_coord - 1:
                             self._move_coordinates_for_next_access(
                                 window_adaptor_coord, bottom_tensor_coord, 
-                                i_access, y_lengths, ndim_y
+                                i_access, access_info['vector_indices'], access_info['vector_dim']
                             )
                         continue
                 
-                # Get element from distributed tensor
-                value = src_tensor.get_thread_data(d_offset)
+                # Gather values from src_tensor
+                values = []
+                for j, idx_ys in enumerate(access_info['vector_indices']):
+                    d_offset = ys_to_d_desc.calculate_offset(idx_ys)
+                    value = src_tensor.get_thread_data(d_offset)
+                    values.append(value)
                 
-                # Update (accumulate) in bottom tensor using the precomputed coordinate
-                # (matches C++ get_bottom_tensor_view().update_vectorized_elements())
+                # Update (accumulate) in bottom tensor using vectorized access
                 offset = bottom_tensor_coord.get_offset()
-                current_value = self.bottom_tensor_view.get_element_by_offset(offset)
-                
-                self.bottom_tensor_view.set_element_by_offset(offset, current_value + value)
+                for j in range(access_info['vector_size']):
+                    current_value = self.bottom_tensor_view.get_element_by_offset(offset + j)
+                    self.bottom_tensor_view.set_element_by_offset(offset + j, current_value + values[j])
                 
                 # Move thread coordinate for next access
-                # (matches C++ move_window_adaptor_and_bottom_tensor_thread_coordinate)
                 if i_coord_access < num_access_per_coord - 1:
                     self._move_coordinates_for_next_access(
                         window_adaptor_coord, bottom_tensor_coord, 
-                        i_access, y_lengths, ndim_y
+                        i_access, access_info['vector_indices'], access_info['vector_dim']
                     )
     
     def update_raw(self, src_tensor: StaticDistributedTensor,
@@ -722,6 +671,136 @@ class TileWindowWithStaticLengths:
                 raise IndexError(f"Window index {indices[i]} out of bounds for dimension {i}")
         
         self.bottom_tensor_view[tuple(tensor_indices)] = value
+
+
+class LoadStoreTraits:
+    """
+    Python equivalent of C++ load_store_traits.
+    Handles vectorization and access patterns for tile windows.
+    """
+    
+    def __init__(self, tile_distribution, data_type):
+        self.tile_distribution = tile_distribution
+        self.data_type = data_type
+        self.ndim_y = tile_distribution.ndim_y
+        
+        # Initialize vectorization info
+        vector_info = self._get_vector_dim_y_scalar_per_vector()
+        self.vector_dim_y = vector_info[0]
+        self.scalar_per_vector = vector_info[1]
+        
+        # PackedSize is always 1 in Python (no SIMD)
+        self.packed_size = 1
+        
+        # Create space-filling curve
+        self.scalars_per_access = self._get_scalars_per_access()
+        self.sfc_ys = self._get_space_filling_curve()
+        
+        # Calculate number of accesses
+        self.num_access = self._calculate_num_access()
+    
+    def _get_vector_dim_y_scalar_per_vector(self):
+        """
+        Find best Y dimension for vectorization.
+        Matches C++ get_vector_dim_y_scalar_per_vector().
+        """
+        # Get vector lengths and strides
+        ys_vector_lengths = self.tile_distribution.get_y_vector_lengths()
+        ys_vector_strides = self.tile_distribution.get_y_vector_strides()
+        
+        # Find dimension with stride 1 and maximum length
+        vector_dim_y = 0
+        scalar_per_vector = 1
+        
+        for i in range(self.ndim_y):
+            if ys_vector_strides[i] == 1 and ys_vector_lengths[i] > scalar_per_vector:
+                scalar_per_vector = ys_vector_lengths[i]
+                vector_dim_y = i
+        
+        return (vector_dim_y, scalar_per_vector)
+    
+    def _get_scalars_per_access(self):
+        """
+        Get number of scalars to access per dimension.
+        Matches C++ scalars_per_access_.
+        """
+        if self.ndim_y == 1:
+            return [self.scalar_per_vector]
+        else:
+            scalars_per_access = [1] * self.ndim_y
+            scalars_per_access[self.vector_dim_y] = self.scalar_per_vector
+            return scalars_per_access
+    
+    def _get_space_filling_curve(self):
+        """
+        Create space-filling curve for memory access pattern.
+        Matches C++ get_space_filling_curve().
+        """
+        # Get Y dimension lengths
+        y_lengths = self.tile_distribution.ys_to_d_descriptor.get_lengths()
+        
+        # Create dimension access order (simple sequential for now)
+        dim_access_order = list(range(self.ndim_y))
+        
+        # Create space-filling curve
+        from .space_filling_curve import SpaceFillingCurve
+        return SpaceFillingCurve(
+            tensor_lengths=y_lengths,
+            dim_access_order=dim_access_order,
+            scalars_per_access=self.scalars_per_access
+        )
+    
+    def _calculate_num_access(self):
+        """
+        Calculate total number of accesses needed.
+        Matches C++ NumAccess calculation.
+        """
+        return self.sfc_ys.get_num_of_access()
+    
+    def get_y_indices(self, i_access):
+        """
+        Get Y indices for a given access index.
+        Matches C++ SFC_Ys::get_index().
+        """
+        return self.sfc_ys.get_index(i_access)
+    
+    def get_vectorized_access_info(self, i_access):
+        """
+        Get vectorized access information for a given access index.
+        This combines several C++ operations into one Python-friendly interface.
+        """
+        # Get base Y indices
+        idx_ys_start = self.get_y_indices(i_access)
+        
+        # Ensure idx_ys_start is a list
+        if not isinstance(idx_ys_start, list):
+            idx_ys_start = [idx_ys_start]
+            
+        if self.ndim_y == 1:
+            # Single Y dimension case
+            base_indices = idx_ys_start
+            vector_indices = [[base_indices[0] + j] for j in range(self.scalar_per_vector)]
+            return {
+                'base_indices': base_indices,
+                'vector_indices': vector_indices,
+                'vector_dim': 0,
+                'vector_size': self.scalar_per_vector
+            }
+        else:
+            # Multiple Y dimensions case
+            vector_indices = []
+            for j in range(self.scalar_per_vector):
+                idx_ys = list(idx_ys_start)  # Copy base indices
+                # Modify vector dimension index
+                idx_ys[self.vector_dim_y] = idx_ys_start[self.vector_dim_y] + j
+                vector_indices.append(idx_ys)
+            
+            return {
+                'base_indices': idx_ys_start,
+                'vector_indices': vector_indices,
+                'vector_dim': self.vector_dim_y,
+                'vector_size': self.scalar_per_vector
+            }
 
 
 def make_tile_window(tensor_view: TensorView,

@@ -180,27 +180,44 @@ class TileDistribution:
         """Get distributed spans for each X dimension."""
         return self.encoding.get_distributed_spans()
     
-    def get_y_indices_from_distributed_indices(self, distributed_indices: List[TileDistributedIndex]) -> List[int]:
+    def get_y_indices_from_distributed_indices(self, distributed_indices: Union[int, List[TileDistributedIndex]]) -> List[int]:
         """
-        Get Y indices from distributed indices.
+        Get Y indices from either an access index or distributed indices.
+        This matches C++ get_y_indices_from_distributed_indices().
         
         Args:
-            distributed_indices: Distributed indices for each X dimension
+            distributed_indices: Either:
+                - An integer access index for direct Y calculation
+                - List of distributed indices for each X dimension
             
         Returns:
-            Y dimension indices
+            List of Y dimension indices
         """
         y_indices = [0] * self.ndim_y
         
-        # Map from distributed indices to Y indices using encoding
-        for y_idx in range(self.ndim_y):
-            span_major = self.encoding.ys_to_rhs_major[y_idx] - 1  # -1 to convert to X index
-            span_minor = self.encoding.ys_to_rhs_minor[y_idx]
+        if isinstance(distributed_indices, int):
+            # Handle integer access index case (from load_into/store/update)
+            i_access = distributed_indices
+            y_lengths = self.ys_to_d_descriptor.get_lengths()
             
-            if 0 <= span_major < len(distributed_indices):
-                dstr_index = distributed_indices[span_major]
-                if span_minor < len(dstr_index.partial_indices):
-                    y_indices[y_idx] = dstr_index.partial_indices[span_minor]
+            # Calculate Y indices directly from access index
+            remaining = i_access
+            for y_idx in range(self.ndim_y - 1, -1, -1):
+                y_indices[y_idx] = remaining % y_lengths[y_idx]
+                remaining //= y_lengths[y_idx]
+        else:
+            # Handle distributed indices case (from direct calls/tests)
+            # Map from distributed indices to Y indices using encoding
+            for y_idx in range(self.ndim_y):
+                span_major = self.encoding.ys_to_rhs_major[y_idx] - 1  # -1 to convert from 1-based RH to 0-based X index
+                span_minor = self.encoding.ys_to_rhs_minor[y_idx]
+                
+                # Get the distributed index for this span
+                if 0 <= span_major < len(distributed_indices):
+                    dstr_index = distributed_indices[span_major]
+                    # Get the specific component's index
+                    if span_minor < len(dstr_index.partial_indices):
+                        y_indices[y_idx] = dstr_index.partial_indices[span_minor]
         
         return y_indices
     
@@ -213,6 +230,25 @@ class TileDistribution:
         """String representation."""
         return (f"TileDistribution(ndim_x={self.ndim_x}, ndim_y={self.ndim_y}, "
                 f"ndim_p={self.ndim_p}, ndim_r={self.ndim_r})")
+
+    def get_y_vector_lengths(self) -> List[int]:
+        """
+        Get vector lengths for each Y dimension.
+        Matches C++ get_window_adaptor_ys_safe_vector_length_strides().
+        """
+        return [self.ys_to_d_descriptor.get_lengths()[i] for i in range(self.ndim_y)]
+
+    def get_y_vector_strides(self) -> List[int]:
+        """
+        Get vector strides for each Y dimension.
+        Matches C++ get_window_adaptor_ys_safe_vector_length_strides().
+        """
+        strides = [1]  # First dimension has stride 1
+        lengths = self.get_y_vector_lengths()
+        for i in range(1, self.ndim_y):
+            stride = strides[-1] * lengths[i-1]
+            strides.append(stride)
+        return strides
 
 
 def make_tile_distributed_span(partial_lengths: List[int]) -> TileDistributedSpan:
