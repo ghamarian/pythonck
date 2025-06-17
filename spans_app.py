@@ -15,6 +15,8 @@ import os
 import traceback
 import json
 from typing import Dict, Any, Optional
+import io
+from contextlib import redirect_stdout
 
 # Add current directory to path for imports
 sys.path.append('.')
@@ -244,21 +246,31 @@ def generate_step_by_step_explanation(tile_dist: TileDistributionPedantic) -> st
     explanation.append("- Lower H index within same H sequence gets lower span_minor")
     explanation.append("- -1 values indicate unused span positions (skipped during iteration)")
     
-    # Step 8: Final distributed_spans_lengthss_ (original step 7)
     explanation.append("STEP 8: Final distributed_spans_lengthss_")
     explanation.append("distributed_spans_lengthss_:")
     for span_major in range(len(distributed_spans)):
-        explanation.append(f'H{span_major}: {distributed_spans[span_major]}')
-        for span_minor in range(len(distributed_spans[span_major])):
-            length = distributed_spans[span_major][span_minor]
-            if length >= 0:
-                # Find which Y maps to this span position
-                y_idx = -1
-                for i in range(tile_dist.NDimYs):
-                    if detail['ys_to_span_major_'][i] == span_major and detail['ys_to_span_minor_'][i] == span_minor:
-                        y_idx = i
-                        break
-                explanation.append(f'  [H{span_major}][span_minor={span_minor}] = {length} (Y{y_idx})')
+        explanation.append(f"  H{span_major}: {distributed_spans[span_major]}")
+    
+    explanation.append("")
+    
+    # Step 9: Y-Dimension to X-Span Mapping
+    explanation.append("STEP 9: Y-Dimension to X-Span Mapping")
+    explanation.append("This shows the final mapping from each logical Y-dimension to its place in an X-dimension's span.")
+    
+    ys_to_span_major = detail.get('ys_to_span_major_')
+    ys_to_span_minor = detail.get('ys_to_span_minor_')
+
+    if ys_to_span_major is not None and ys_to_span_minor is not None:
+        for y_idx in range(tile_dist.NDimYs):
+            span_major = ys_to_span_major[y_idx]
+            span_minor = ys_to_span_minor[y_idx]
+            
+            if span_major != -1:
+                explanation.append(f"  Y{y_idx} -> X-Span[{span_major}] (at position/span_minor {span_minor})")
+            else:
+                explanation.append(f"  Y{y_idx} -> Maps to an R-dimension (not in an X-span)")
+    else:
+        explanation.append("  Could not find ys_to_span_major_ or ys_to_span_minor_ in detail dictionary.")
     
     explanation.append("")
     
@@ -1050,9 +1062,6 @@ auto partition_index = array<index_t, {st.session_state.tile_dist.NDimPs}>{{...}
             encoding_output = []
             
             # Capture the print output
-            import io
-            from contextlib import redirect_stdout
-            
             f = io.StringIO()
             with redirect_stdout(f):
                 st.session_state.tile_dist.DstrEncode.print_encoding()

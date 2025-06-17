@@ -210,15 +210,11 @@ class TileWindowWithStaticDistribution:
                 i_access = i_coord * num_access_per_coord + i_coord_access
                 access_info = self.traits.get_vectorized_access_info(i_access)
                 
-                if oob_conditional_check and not self._is_coordinate_valid(bottom_tensor_coord):
-                    if i_coord_access < num_access_per_coord - 1:
-                        self._move_coordinates_for_next_access(
-                            window_adaptor_coord, bottom_tensor_coord, i_access
-                        )
-                    continue
-                
-                process_access(access_info, bottom_tensor_coord, ys_to_d_desc)
-                
+                # Process access only if the coordinate is valid
+                if not oob_conditional_check or self._is_coordinate_valid(bottom_tensor_coord):
+                    process_access(access_info, bottom_tensor_coord, ys_to_d_desc)
+
+                # Move to the next access coordinates for the next iteration
                 if i_coord_access < num_access_per_coord - 1:
                     self._move_coordinates_for_next_access(
                         window_adaptor_coord, bottom_tensor_coord, i_access
