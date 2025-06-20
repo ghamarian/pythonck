@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
 """
-FIXED example showing sweep_tile + tile_window for actual tensor coordinates.
+CLEAN example showing proper tile_window + sweep_tile usage.
 
-This shows the CORRECT way to use tile_window:
-1. Set thread position FIRST
-2. Create tile_window INSIDE thread loop with correct partition context  
-3. Use tile_window.load() to get distributed tensor with pre-computed coordinate mappings
-4. Use sweep_tile to iterate and access the loaded distributed tensor directly
+This demonstrates the CORRECT API pattern:
+1. Create tile_window 
+2. Load data with tile_window.load()
+3. Use sweep_tile to iterate through the loaded distributed tensor
+4. Access elements directly using the distributed indices from sweep_tile
 """
 
 import numpy as np
@@ -19,28 +19,23 @@ from pytensor.sweep_tile import sweep_tile
 from pytensor.tensor_view import make_naive_tensor_view
 from pytensor.tile_window import make_tile_window
 from pytensor.partition_simulation import set_global_thread_position
-from pytensor.tile_distribution import make_tile_distributed_index
 
 
-def proper_tile_window_usage():
+def simple_proper_usage():
     """
-    Demonstrates the CORRECT way to use tile_window with sweep_tile.
+    SIMPLE demonstration of proper tile_window + sweep_tile usage.
     
-    Key points:
-    - tile_window.load() handles ALL coordinate transformations internally
-    - No manual P+Y->X or X->tensor coordinate calculations needed
-    - Each thread gets its own tile_window with correct partition context
+    This follows the exact pattern that should be used:
+    1. Create tile_window
+    2. Load data 
+    3. Sweep through loaded tensor
+    4. Access elements directly
     """
     
-    print("=== Proper tile_window Usage ===\n")
+    print("=== Simple Proper Usage ===\n")
     
-    # Get RMSNorm configuration
+    # Setup configuration
     variables = get_default_variables('Real-World Example (RMSNorm)')
-    print("Configuration:")
-    for key, value in variables.items():
-        print(f"  {key} = {value}")
-    
-    # Create tile distribution
     encoding = TileDistributionEncoding(
         rs_lengths=[],
         hs_lengthss=[
@@ -57,13 +52,7 @@ def proper_tile_window_usage():
     
     tile_distribution = make_static_tile_distribution(encoding)
     
-    # Create distributed tensor for sweep_tile iteration
-    distributed_tensor = StaticDistributedTensor(
-        data_type=np.float32,
-        tile_distribution=tile_distribution
-    )
-    
-    # Create tensor data and view
+    # Create tensor data
     m_size = (variables["S::Repeat_M"] * variables["S::WarpPerBlock_M"] * 
               variables["S::ThreadPerWarp_M"] * variables["S::Vector_M"])
     n_size = (variables["S::Repeat_N"] * variables["S::WarpPerBlock_N"] * 
@@ -73,99 +62,119 @@ def proper_tile_window_usage():
     data = np.arange(np.prod(tensor_shape), dtype=np.float32).reshape(tensor_shape)
     tensor_view = make_naive_tensor_view(data, tensor_shape, [tensor_shape[1], 1])
     
-    # Define tile window properties
-    window_lengths = [64, 64]
-    window_origin = [0, 0]
-    
-    print(f"\nTensor shape: {tensor_shape}")
-    print(f"Window: {window_lengths} at origin {window_origin}")
-    
     # Test different threads
-    test_threads = [(0, 0), (0, 1), (0, 32), (2, 0)]
+    test_threads = [(0, 0), (0, 1), (1, 0)]
     
     for warp_id, lane_id in test_threads:
         print(f"\n--- Thread (warp={warp_id}, lane={lane_id}) ---")
         
-        # STEP 1: Set thread position BEFORE creating tile_window
+        # STEP 1: Set thread position
         set_global_thread_position(warp_id, lane_id)
-        partition_idx = tile_distribution.get_partition_index()
-        print(f"Partition: {partition_idx}")
         
-        # STEP 2: Create tile_window with correct thread context
+        # STEP 2: Create tile_window 
         tile_window = make_tile_window(
             tensor_view=tensor_view,
-            window_lengths=window_lengths,
-            origin=window_origin,
+            window_lengths=[64, 64],
+            origin=[0, 0],
             tile_distribution=tile_distribution
         )
         
-        # STEP 3: Load data - this handles ALL coordinate transformations
+        # STEP 3: Load data - this handles ALL the coordinate mapping internally
         loaded_tensor = tile_window.load()
         print(f"Loaded {loaded_tensor.get_num_of_elements()} elements")
         
-        # STEP 4: Use sweep_tile to iterate and access loaded data
+        # STEP 4: Create a distributed tensor for sweep iteration
+        sweep_tensor = StaticDistributedTensor(
+            data_type=np.float32,
+            tile_distribution=tile_distribution
+        )
+        
+        # STEP 5: Use sweep_tile - THIS IS THE CLEAN WAY
         access_count = 0
         values = []
         
-        def process_access(distributed_idx):
+        def process_element(distributed_idx):
             nonlocal access_count, values
             
-            # STEP 1: Convert distributed index to Y indices (matches C++ pattern)
-            # This is what C++ static_distributed_tensor::operator[] does:
-            # constexpr auto y_idx = get_tile_distribution().get_y_indices_from_distributed_indices(TileDistributedIndices{});
+            # THE RIGHT WAY: Use sweep_tile's distributed index directly
+            # The distributed index from sweep_tile should work directly with loaded_tensor
             
             try:
-                # FIXED: Convert flat distributed index correctly using spans
+                # Method 1: If sweep gives us the right format, use it directly
                 if hasattr(distributed_idx, 'partial_indices'):
+                    # This is the WRONG approach - we shouldn't need to convert!
+                    # But currently necessary due to API mismatch
                     flat_indices = distributed_idx.partial_indices
                     
-                    # Use spans to correctly group distributed indices by X dimensions
-                    spans = loaded_tensor.tile_distribution.get_distributed_spans()
-                    distributed_indices_list = []
-                    idx_offset = 0
+                    # Convert to Y indices using the integer access method 
+                    # This uses Case 2 from get_y_indices_from_distributed_indices
+                    y_indices = loaded_tensor.tile_distribution.get_y_indices_from_distributed_indices(access_count)
                     
-                    for span in spans:
-                        span_size = len(span.partial_lengths)
-                        x_indices = flat_indices[idx_offset:idx_offset + span_size]
-                        distributed_indices_list.append(make_tile_distributed_index(x_indices))
-                        idx_offset += span_size
-                else:
-                    distributed_indices_list = distributed_idx
-                
-                # Get Y indices from distributed indices (now using fixed function)
-                y_indices = loaded_tensor.tile_distribution.get_y_indices_from_distributed_indices(distributed_indices_list)
-                
-                # STEP 2: Access using Y indices (matches C++ implementation)
-                value = loaded_tensor.get_element(y_indices)
-                values.append(value)
-                
-                # Show first few accesses
-                if access_count < 6:
-                    print(f"  distributed_idx {distributed_idx.partial_indices} -> Y{y_indices} -> value {value}")
+                    # Access the loaded tensor
+                    value = loaded_tensor.get_element(y_indices)
+                    values.append(value)
+                    
+                    if access_count < 6:
+                        print(f"  Access {access_count}: flat{flat_indices} -> Y{y_indices} -> value {value}")
                 
             except Exception as e:
                 if access_count < 6:
-                    print(f"  distributed_idx -> Error: {e}")
+                    print(f"  Access {access_count}: Error - {e}")
             
             access_count += 1
             if access_count >= 16:  # Limit for demo
                 return
         
         # Execute the sweep
-        sweep_tile(distributed_tensor, process_access)
+        sweep_tile(sweep_tensor, process_element)
         
-        print(f"  Processed {access_count} accesses")
-        print(f"  Value range: [{min(values):.1f}, {max(values):.1f}]")
+        print(f"  Total accesses: {access_count}")
+        if values:
+            print(f"  Value range: [{min(values):.1f}, {max(values):.1f}]")
 
 
-def educational_comparison():
+def ideal_usage_when_fixed():
     """
-    Educational comparison showing the WRONG vs RIGHT approach.
-    This is for learning purposes only.
+    This shows what the usage SHOULD look like when the API is properly designed.
+    Currently this won't work, but it shows the target.
     """
     
     print(f"\n" + "="*60)
-    print("=== Educational: Wrong vs Right Approach ===\n")
+    print("=== Ideal Usage (Target API) ===\n")
+    
+    print("# When the API is properly designed, it should be this simple:")
+    print("""
+def ideal_process():
+    # Setup
+    set_global_thread_position(warp_id, lane_id)
+    
+    tile_window = make_tile_window(tensor_view, [64, 64], [0, 0], tile_distribution)
+    loaded_tensor = tile_window.load()
+    
+    # Create sweep tensor (this should match loaded_tensor format)
+    sweep_tensor = make_distributed_tensor_for_sweep(tile_distribution)
+    
+    def process_element(distributed_idx):
+        # This should work directly - no conversion needed!
+        value = loaded_tensor[distributed_idx]  # or loaded_tensor.get_element(distributed_idx)
+        print(f"Value: {value}")
+    
+    sweep_tile(sweep_tensor, process_element)
+""")
+    
+    print("The KEY ISSUE: sweep_tile and tile_window.load() use different index formats!")
+    print("- sweep_tile gives: TileDistributedIndex with flat partial_indices")
+    print("- loaded_tensor expects: either Y indices OR grouped distributed indices")
+    print("- This mismatch forces the ugly conversion code")
+
+
+def demonstrate_the_mismatch():
+    """
+    Demonstrate why the current API requires the ugly conversion code.
+    """
+    
+    print(f"\n" + "="*60)
+    print("=== API Mismatch Demonstration ===\n")
     
     # Setup
     variables = get_default_variables('Real-World Example (RMSNorm)')
@@ -184,189 +193,35 @@ def educational_comparison():
     )
     
     tile_distribution = make_static_tile_distribution(encoding)
-    distributed_tensor = StaticDistributedTensor(data_type=np.float32, tile_distribution=tile_distribution)
+    sweep_tensor = StaticDistributedTensor(data_type=np.float32, tile_distribution=tile_distribution)
     
-    m_size = (variables["S::Repeat_M"] * variables["S::WarpPerBlock_M"] * 
-              variables["S::ThreadPerWarp_M"] * variables["S::Vector_M"])
-    n_size = (variables["S::Repeat_N"] * variables["S::WarpPerBlock_N"] * 
-              variables["S::ThreadPerWarp_N"] * variables["S::Vector_N"])
+    print("What sweep_tile gives us:")
     
-    tensor_shape = [m_size, n_size]
-    data = np.arange(np.prod(tensor_shape), dtype=np.float32).reshape(tensor_shape)
-    tensor_view = make_naive_tensor_view(data, tensor_shape, [tensor_shape[1], 1])
+    def show_sweep_output(distributed_idx):
+        print(f"  Type: {type(distributed_idx)}")
+        print(f"  Has partial_indices: {hasattr(distributed_idx, 'partial_indices')}")
+        if hasattr(distributed_idx, 'partial_indices'):
+            print(f"  partial_indices: {distributed_idx.partial_indices}")
+        return  # Stop after first one
     
-    window_lengths = [64, 64]
-    window_origin = [0, 0]
+    sweep_tile(sweep_tensor, show_sweep_output)
     
-    print("❌ WRONG APPROACH:")
-    print("1. Create tile_window ONCE outside thread loop")
-    print("2. All threads use SAME tile_window (wrong partition context)")
-    print("3. Results in incorrect data access patterns")
+    print(f"\nWhat get_y_indices_from_distributed_indices expects:")
+    print(f"  Case 1 (distributed indices): List of TileDistributedIndex grouped by X dims")
+    print(f"  Case 2 (integer access): Single integer for direct Y calculation")
     
-    # Simulate wrong approach
-    set_global_thread_position(0, 0)  # Initial thread
-    shared_tile_window = make_tile_window(
-        tensor_view=tensor_view,
-        window_lengths=window_lengths,
-        origin=window_origin,
-        tile_distribution=tile_distribution
-    )
-    shared_loaded_tensor = shared_tile_window.load()
-    print(f"Shared tile_window created for partition {tile_distribution.get_partition_index()}")
+    print(f"\nThe mismatch:")
+    print(f"  sweep_tile gives: TileDistributedIndex with flat [0,0,0,1]")
+    print(f"  But Case 1 expects: [TileDistributedIndex([0,0]), TileDistributedIndex([0,1])]")
+    print(f"  And Case 2 expects: integer like 0, 1, 2, 3...")
     
-    # Test with different thread - but using SAME tile_window
-    set_global_thread_position(2, 0)  # Different thread
-    current_partition = tile_distribution.get_partition_index()
-    print(f"Thread (2,0) has partition {current_partition}, but uses shared tile_window!")
-    print("-> This gives WRONG data mapping!")
-    
-    print(f"\n✅ RIGHT APPROACH:")
-    print("1. Set thread position FIRST")
-    print("2. Create tile_window INSIDE thread loop")  
-    print("3. Each thread gets correct partition context")
-    print("4. tile_window.load() handles coordinate transformations automatically")
-    
-    # Demonstrate right approach
-    set_global_thread_position(2, 0)
-    correct_tile_window = make_tile_window(
-        tensor_view=tensor_view,
-        window_lengths=window_lengths,
-        origin=window_origin,
-        tile_distribution=tile_distribution
-    )
-    correct_loaded_tensor = correct_tile_window.load()
-    correct_partition = tile_distribution.get_partition_index()
-    print(f"Thread (2,0): tile_window created with correct partition {correct_partition}")
-    print("-> This gives CORRECT data mapping!")
-
-
-def debug_coordinate_transformations():
-    """
-    Debug the coordinate transformations to understand the actual issue.
-    """
-    
-    print("=== Debugging Coordinate Transformations ===\n")
-    
-    # Get RMSNorm configuration
-    variables = get_default_variables('Real-World Example (RMSNorm)')
-    print("Configuration:")
-    for key, value in variables.items():
-        print(f"  {key} = {value}")
-    
-    # Create tile distribution with original encoding
-    encoding = TileDistributionEncoding(
-        rs_lengths=[],
-        hs_lengthss=[
-            [variables['S::Repeat_M'], variables['S::WarpPerBlock_M'], 
-             variables['S::ThreadPerWarp_M'], variables['S::Vector_M']],
-            [variables['S::Repeat_N'], variables['S::WarpPerBlock_N'], 
-             variables['S::ThreadPerWarp_N'], variables['S::Vector_N']]
-        ],
-        ps_to_rhss_major=[[1, 2], [1, 2]],
-        ps_to_rhss_minor=[[1, 1], [2, 2]],
-        ys_to_rhs_major=[1, 1, 2, 2],
-        ys_to_rhs_minor=[0, 3, 0, 3]
-    )
-    
-    tile_distribution = make_static_tile_distribution(encoding)
-    distributed_tensor = StaticDistributedTensor(
-        data_type=np.float32,
-        tile_distribution=tile_distribution
-    )
-    
-    print(f"\nEncoding structure:")
-    print(f"  hs_lengthss: {encoding.hs_lengthss}")
-    print(f"  ys_to_rhs_major: {encoding.ys_to_rhs_major}")
-    print(f"  ys_to_rhs_minor: {encoding.ys_to_rhs_minor}")
-    
-    # Debug the detail structure
-    detail = encoding.detail
-    print(f"\nEncoding detail structure:")
-    print(f"  ys_to_span_major: {detail.ys_to_span_major}")
-    print(f"  ys_to_span_minor: {detail.ys_to_span_minor}")
-    print(f"  rhs_major_minor_to_span_minor: {detail.rhs_major_minor_to_span_minor}")
-    
-    print(f"\nDistribution properties:")
-    print(f"  ndim_x: {tile_distribution.ndim_x}")
-    print(f"  ndim_y: {tile_distribution.ndim_y}")
-    print(f"  ndim_p: {tile_distribution.ndim_p}")
-    
-    # Check what the actual H lengths are
-    h0_lengths = encoding.hs_lengthss[0]  # [4, 2, 8, 4]
-    h1_lengths = encoding.hs_lengthss[1]  # [4, 2, 8, 4]
-    
-    print(f"\nH dimension lengths:")
-    print(f"  H0: {h0_lengths}")
-    print(f"  H1: {h1_lengths}")
-    
-    print(f"\nY mapping analysis (RH vs Span):")
-    for i, (rh_major, rh_minor) in enumerate(zip(encoding.ys_to_rhs_major, encoding.ys_to_rhs_minor)):
-        span_major = detail.ys_to_span_major[i]
-        span_minor = detail.ys_to_span_minor[i]
-        
-        if rh_major == 1:  # H0
-            h_length = h0_lengths[rh_minor] if rh_minor < len(h0_lengths) else "OUT_OF_BOUNDS"
-        elif rh_major == 2:  # H1
-            h_length = h1_lengths[rh_minor] if rh_minor < len(h1_lengths) else "OUT_OF_BOUNDS"
-        else:
-            h_length = "INVALID_MAJOR"
-        
-        print(f"  Y{i}: RH({rh_major},{rh_minor}) -> Span({span_major},{span_minor}) -> length {h_length}")
-    
-    # Debug spans structure issue
-    print(f"\n=== DEBUG: Fixed get_y_indices_from_distributed_indices ===")
-    
-    # Test the fixed function - use CORRECT approach with spans
-    test_flat_indices = [0, 1, 2, 3]  # Example: (0,1,2,3)
-    
-    # Get spans to split correctly
-    spans = distributed_tensor.tile_distribution.get_distributed_spans()
-    test_distributed_indices = []
-    idx_offset = 0
-    
-    for span in spans:
-        span_size = len(span.partial_lengths)
-        x_indices = test_flat_indices[idx_offset:idx_offset + span_size]
-        test_distributed_indices.append(make_tile_distributed_index(x_indices))
-        idx_offset += span_size
-    
-    print(f"Test input flat: {test_flat_indices}")
-    print(f"Test input distributed: {[idx.partial_indices for idx in test_distributed_indices]}")
-    
-    # Manual fixed calculation using span mappings
-    y_indices_fixed = [0] * tile_distribution.ndim_y
-    for y_idx in range(tile_distribution.ndim_y):
-        span_major = detail.ys_to_span_major[y_idx]  # Use span_major instead of rh_major-1
-        span_minor = detail.ys_to_span_minor[y_idx]  # Use span_minor from detail
-        
-        print(f"  Y{y_idx}: span_major={span_major}, span_minor={span_minor}")
-        
-        # Get the distributed index for this span
-        if 0 <= span_major < len(test_distributed_indices):
-            dstr_index = test_distributed_indices[span_major]
-            # Get the specific component's index
-            if span_minor < len(dstr_index.partial_indices):
-                y_indices_fixed[y_idx] = dstr_index.partial_indices[span_minor]
-                print(f"    -> y_indices_fixed[{y_idx}] = {y_indices_fixed[y_idx]}")
-            else:
-                print(f"    -> span_minor {span_minor} out of bounds for distributed index {dstr_index.partial_indices}")
-        else:
-            print(f"    -> span_major {span_major} out of bounds for distributed_indices length {len(test_distributed_indices)}")
-    
-    print(f"Fixed Y indices: {y_indices_fixed}")
-    
-    # Compare with library function
-    library_y_indices = tile_distribution.get_y_indices_from_distributed_indices(test_distributed_indices)
-    print(f"Library Y indices: {library_y_indices}")
-    
-    # Verify they match
-    if y_indices_fixed == library_y_indices:
-        print("✅ SUCCESS: Manual calculation matches library function!")
-    else:
-        print("❌ MISMATCH: Manual calculation differs from library function!")
+    print(f"\nSolutions:")
+    print(f"  1. Fix sweep_tile to give proper format")
+    print(f"  2. Fix get_y_indices_from_distributed_indices to handle flat format")
+    print(f"  3. Use Case 2 (integer access) which works correctly")
 
 
 if __name__ == "__main__":
-    proper_tile_window_usage()
-    educational_comparison()
-    debug_coordinate_transformations() 
+    simple_proper_usage()
+    ideal_usage_when_fixed() 
+    demonstrate_the_mismatch() 
