@@ -224,22 +224,15 @@ class TileWindowWithStaticDistribution:
                     # Matches C++: constexpr auto idx_diff_ys = SFC_Ys::get_forward_step(iAccess);
                     idx_diff_ys = self.traits.sfc_ys.get_forward_step(i_access)
                     
-                    # Use both coordinates as intended, but move them directly to avoid 
-                    # the adaptor coordinate transformation bug. For PassThroughTransform,
-                    # this gives the same result as the full transformation would.
-                    
-                    # Move window adaptor coordinate directly in Y dimensions
-                    adaptor_top = window_adaptor_coord.get_top_index()
+                    # Matches C++: constexpr auto idx_diff_ps_ys = container_concat(
+                    #              generate_tuple([&](auto) { return number<0>{}; }, number<NDimP>{}), idx_diff_ys);
                     ndim_p = len(self.tile_distribution.get_partition_index())
-                    # Update Y dimensions (skip P dimensions at start)
-                    for i, step in enumerate(idx_diff_ys):
-                        adaptor_top[ndim_p + i] += step
+                    idx_diff_ps_ys = [0] * ndim_p + idx_diff_ys
                     
-                    # Move bottom tensor coordinate by Y step (since PassThrough maps Y->X directly)
-                    move_tensor_coordinate(
-                        self.bottom_tensor_view.tensor_desc,
-                        bottom_tensor_coord,
-                        idx_diff_ys
+                    # Matches C++: move_window_adaptor_and_bottom_tensor_thread_coordinate(
+                    #              window_adaptor_thread_coord, bottom_tensor_thread_coord, idx_diff_ps_ys);
+                    self._move_window_adaptor_and_bottom_tensor_coordinate(
+                        window_adaptor_coord, bottom_tensor_coord, idx_diff_ps_ys
                     )
 
     def _move_window_adaptor_and_bottom_tensor_coordinate(self, 

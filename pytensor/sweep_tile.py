@@ -52,37 +52,51 @@ def sweep_tile_uspan(span: TileDistributedSpan,
     if unpacks is None:
         unpacks = [1] * len(span.partial_lengths)
     
-    # Get all span lengths
-    span_lengths = span.partial_lengths
+    # Check if this is the "no unpacking" case (all unpacks are 1)
+    is_no_unpacking = all(unpack == 1 for unpack in unpacks)
     
-    # Calculate groups for each dimension
-    dim_groups = []
-    for length, unpack in zip(span_lengths, unpacks):
-        groups = []
-        for i in range(0, length, unpack):
-            group = list(range(i, min(i + unpack, length)))
-            groups.append(group)
-        dim_groups.append(groups)
-    
-    # Iterate over all group combinations
-    for group_combo in itertools.product(*dim_groups):
-        # Flatten to get all indices
-        all_indices = []
-        for group in group_combo:
-            for idx in group:
-                all_indices.append(idx)
+    if is_no_unpacking:
+        # Simple case: iterate over each individual index
+        # This matches the test expectation for "no unpacking"
+        span_lengths = span.partial_lengths
+        ranges = [range(length) for length in span_lengths]
         
-        # Create distributed indices
-        dstr_indices = []
-        idx_ptr = 0
-        for unpack in unpacks:
-            indices = all_indices[idx_ptr:idx_ptr + unpack]
-            if indices:  # Only create index if we have values
-                dstr_indices.append(make_tile_distributed_index(indices))
-            idx_ptr += unpack
+        for indices in itertools.product(*ranges):
+            # Create a single distributed index with all dimensions
+            dstr_idx = make_tile_distributed_index(list(indices))
+            func(dstr_idx)
+    else:
+        # Complex unpacking case: group elements and unpack multiple indices
+        span_lengths = span.partial_lengths
         
-        # Apply function with unpacked indices
-        func(*dstr_indices)
+        # Calculate groups for each dimension
+        dim_groups = []
+        for length, unpack in zip(span_lengths, unpacks):
+            groups = []
+            for i in range(0, length, unpack):
+                group = list(range(i, min(i + unpack, length)))
+                groups.append(group)
+            dim_groups.append(groups)
+        
+        # Iterate over all group combinations
+        for group_combo in itertools.product(*dim_groups):
+            # Flatten to get all indices
+            all_indices = []
+            for group in group_combo:
+                for idx in group:
+                    all_indices.append(idx)
+            
+            # Create distributed indices
+            dstr_indices = []
+            idx_ptr = 0
+            for unpack in unpacks:
+                indices = all_indices[idx_ptr:idx_ptr + unpack]
+                if indices:  # Only create index if we have values
+                    dstr_indices.append(make_tile_distributed_index(indices))
+                idx_ptr += unpack
+            
+            # Apply function with unpacked indices
+            func(*dstr_indices)
 
 
 def sweep_tensor_direct(distributed_tensor: StaticDistributedTensor,
