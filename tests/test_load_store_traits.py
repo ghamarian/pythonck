@@ -1,5 +1,6 @@
 """
 Tests for LoadStoreTraits class from tile_window module.
+Updated to verify C++ alignment behavior.
 """
 
 import pytest
@@ -20,7 +21,7 @@ from pytensor.space_filling_curve import SpaceFillingCurve
 
 
 class TestLoadStoreTraits:
-    """Test cases for LoadStoreTraits class."""
+    """Test cases for LoadStoreTraits class with C++ alignment behavior."""
     
     def _create_simple_tile_distribution(self, y_lengths, y_strides):
         """Helper to create a simple tile distribution for testing."""
@@ -79,7 +80,7 @@ class TestLoadStoreTraits:
         assert hasattr(traits, 'num_access')
     
     def test_single_y_dimension(self):
-        """Test LoadStoreTraits with single Y dimension."""
+        """Test LoadStoreTraits with single Y dimension - C++ aligned behavior."""
         # Create 1D distribution
         tile_dist = self._create_simple_tile_distribution([8], [1])
         
@@ -87,12 +88,12 @@ class TestLoadStoreTraits:
         
         assert traits.ndim_y == 1
         assert traits.vector_dim_y == 0  # Only dimension available
-        assert traits.scalar_per_vector == 8  # Full length since stride is 1
-        assert traits.scalars_per_access == [8]  # Single dimension
-        assert traits.num_access == 1  # Only one access needed for 8 elements
+        assert traits.scalar_per_vector == 1  # C++ alignment: single element access
+        assert traits.scalars_per_access == [1]  # C++ alignment: [1] for single dimension
+        assert traits.num_access == 8  # C++ alignment: 8 individual accesses
     
     def test_multiple_y_dimensions(self):
-        """Test LoadStoreTraits with multiple Y dimensions."""
+        """Test LoadStoreTraits with multiple Y dimensions - C++ aligned behavior."""
         # Create 2D distribution with different strides
         tile_dist = self._create_simple_tile_distribution([4, 6], [4, 1])
         
@@ -101,9 +102,9 @@ class TestLoadStoreTraits:
         assert traits.ndim_y == 2
         # Should choose dimension 1 (index 1) since it has stride 1 and length 6
         assert traits.vector_dim_y == 1
-        assert traits.scalar_per_vector == 6
-        assert traits.scalars_per_access == [1, 6]  # [1, 6] for [dim0, dim1]
-        assert traits.num_access == 4  # 4 accesses needed (4 * 1 = 4 elements total)
+        assert traits.scalar_per_vector == 1  # C++ alignment: single element access
+        assert traits.scalars_per_access == [1, 1]  # C++ alignment: [1, 1] for both dimensions
+        assert traits.num_access == 24  # C++ alignment: 4 * 6 = 24 individual accesses
     
     def test_vector_dim_selection(self):
         """Test that vector dimension is correctly selected based on stride and length."""
@@ -111,19 +112,19 @@ class TestLoadStoreTraits:
         tile_dist1 = self._create_simple_tile_distribution([8, 4], [1, 4])
         traits1 = LoadStoreTraits(tile_dist1, np.float32)
         assert traits1.vector_dim_y == 0
-        assert traits1.scalar_per_vector == 8
+        assert traits1.scalar_per_vector == 1  # C++ alignment
         
         # Test case 2: Second dimension has stride 1, longer length
         tile_dist2 = self._create_simple_tile_distribution([4, 8], [4, 1])
         traits2 = LoadStoreTraits(tile_dist2, np.float32)
         assert traits2.vector_dim_y == 1
-        assert traits2.scalar_per_vector == 8
+        assert traits2.scalar_per_vector == 1  # C++ alignment
         
         # Test case 3: Both have stride 1, second has longer length
         tile_dist3 = self._create_simple_tile_distribution([4, 6], [1, 1])
         traits3 = LoadStoreTraits(tile_dist3, np.float32)
         assert traits3.vector_dim_y == 1
-        assert traits3.scalar_per_vector == 6
+        assert traits3.scalar_per_vector == 1  # C++ alignment
     
     def test_no_stride_one_dimension(self):
         """Test behavior when no dimension has stride 1."""
@@ -135,10 +136,10 @@ class TestLoadStoreTraits:
         # Should default to first dimension with length 1
         assert traits.vector_dim_y == 0
         assert traits.scalar_per_vector == 1
-        assert traits.scalars_per_access == [1, 1]
+        assert traits.scalars_per_access == [1, 1]  # C++ alignment
     
     def test_get_y_indices(self):
-        """Test get_y_indices method."""
+        """Test get_y_indices method with C++ aligned behavior."""
         # Create 2D distribution
         tile_dist = self._create_simple_tile_distribution([2, 3], [2, 1])
         
@@ -148,46 +149,46 @@ class TestLoadStoreTraits:
         indices0 = traits.get_y_indices(0)
         assert indices0 == [0, 0]  # First access should be at origin
         
-        # Test second access
+        # Test second access - C++ follows space-filling curve pattern
         indices1 = traits.get_y_indices(1)
-        assert indices1 == [1, 0]  # Second access should be next in first dimension
+        assert indices1 == [0, 1]  # C++ alignment: next in space-filling curve
         
-        # Test access beyond available (should wrap around)
+        # Test third access
         indices2 = traits.get_y_indices(2)
-        assert indices2 == [0, 0]  # Access 2 is out of bounds, returns [0, 0]
+        assert indices2 == [0, 2]  # Continue in space-filling curve
     
     def test_get_vectorized_access_info_single_dim(self):
-        """Test get_vectorized_access_info with single Y dimension."""
+        """Test get_vectorized_access_info with single Y dimension - C++ aligned."""
         # Create 1D distribution
         tile_dist = self._create_simple_tile_distribution([4], [1])
         
         traits = LoadStoreTraits(tile_dist, np.float32)
         
-        # Test first access
+        # Test first access - C++ alignment: single element access
         access_info = traits.get_vectorized_access_info(0)
         
         assert access_info['base_indices'] == [0]
-        assert access_info['vector_indices'] == [[0], [1], [2], [3]]
+        assert access_info['vector_indices'] == [[0]]  # C++ alignment: single element
         assert access_info['vector_dim'] == 0
-        assert access_info['vector_size'] == 4
+        assert access_info['vector_size'] == 1  # C++ alignment: single element
     
     def test_get_vectorized_access_info_multi_dim(self):
-        """Test get_vectorized_access_info with multiple Y dimensions."""
+        """Test get_vectorized_access_info with multiple Y dimensions - C++ aligned."""
         # Create 2D distribution
         tile_dist = self._create_simple_tile_distribution([2, 3], [2, 1])
         
         traits = LoadStoreTraits(tile_dist, np.float32)
         
-        # Test first access
+        # Test first access - C++ alignment: single element access
         access_info = traits.get_vectorized_access_info(0)
         
         assert access_info['base_indices'] == [0, 0]
-        assert access_info['vector_indices'] == [[0, 0], [0, 1], [0, 2]]
-        assert access_info['vector_dim'] == 1  # Second dimension is vectorized
-        assert access_info['vector_size'] == 3
+        assert access_info['vector_indices'] == [[0, 0]]  # C++ alignment: single element
+        assert access_info['vector_dim'] == 1  # Second dimension is vector dimension
+        assert access_info['vector_size'] == 1  # C++ alignment: single element
     
     def test_space_filling_curve_creation(self):
-        """Test that space-filling curve is created correctly."""
+        """Test that space-filling curve is created correctly for C++ alignment."""
         # Create 2D distribution
         tile_dist = self._create_simple_tile_distribution([2, 3], [2, 1])
         
@@ -197,42 +198,42 @@ class TestLoadStoreTraits:
         sfc = traits.sfc_ys
         assert isinstance(sfc, SpaceFillingCurve)
         assert sfc.tensor_lengths == [2, 3]
-        assert sfc.scalars_per_access == [1, 3]  # [1, 3] for [dim0, dim1]
+        assert sfc.scalars_per_access == [1, 1]  # C++ alignment: [1, 1] for both dimensions
         assert sfc.snake_curved == True
     
     def test_num_access_calculation(self):
-        """Test that number of accesses is calculated correctly."""
+        """Test that number of accesses is calculated correctly for C++ alignment."""
         # Test 1D case
         tile_dist1 = self._create_simple_tile_distribution([8], [1])
         traits1 = LoadStoreTraits(tile_dist1, np.float32)
-        assert traits1.num_access == 1  # 8 elements / 8 per access = 1 access
+        assert traits1.num_access == 8  # C++ alignment: 8 individual accesses
         
         # Test 2D case
         tile_dist2 = self._create_simple_tile_distribution([4, 6], [4, 1])
         traits2 = LoadStoreTraits(tile_dist2, np.float32)
-        assert traits2.num_access == 4  # 4 * 6 elements / 6 per access = 4 accesses
+        assert traits2.num_access == 24  # C++ alignment: 4 * 6 = 24 individual accesses
         
         # Test 3D case
         tile_dist3 = self._create_simple_tile_distribution([2, 3, 4], [2, 3, 1])
         traits3 = LoadStoreTraits(tile_dist3, np.float32)
-        assert traits3.num_access == 6  # 2 * 3 * 4 elements / 4 per access = 6 accesses
+        assert traits3.num_access == 24  # C++ alignment: 2 * 3 * 4 = 24 individual accesses
     
     def test_scalars_per_access_calculation(self):
-        """Test scalars_per_access calculation."""
+        """Test scalars_per_access calculation for C++ alignment."""
         # Single dimension
         tile_dist1 = self._create_simple_tile_distribution([4], [1])
         traits1 = LoadStoreTraits(tile_dist1, np.float32)
-        assert traits1.scalars_per_access == [4]
+        assert traits1.scalars_per_access == [1]  # C++ alignment: [1]
         
         # Multiple dimensions, first dimension vectorized
         tile_dist2 = self._create_simple_tile_distribution([4, 3], [1, 3])
         traits2 = LoadStoreTraits(tile_dist2, np.float32)
-        assert traits2.scalars_per_access == [4, 1]
+        assert traits2.scalars_per_access == [1, 1]  # C++ alignment: [1, 1]
         
         # Multiple dimensions, second dimension vectorized
         tile_dist3 = self._create_simple_tile_distribution([3, 4], [3, 1])
         traits3 = LoadStoreTraits(tile_dist3, np.float32)
-        assert traits3.scalars_per_access == [1, 4]
+        assert traits3.scalars_per_access == [1, 1]  # C++ alignment: [1, 1]
     
     def test_access_pattern_consistency(self):
         """Test that access patterns are consistent across multiple accesses."""
@@ -245,34 +246,31 @@ class TestLoadStoreTraits:
         for i in range(traits.num_access):
             access_info = traits.get_vectorized_access_info(i)
             
-            # Check that vector indices are consecutive
-            base_idx = access_info['base_indices']
+            # Check that vector indices follow C++ alignment (single element)
             vector_indices = access_info['vector_indices']
+            assert len(vector_indices) == 1  # C++ alignment: single element access
             
-            # All vector indices should have the same base except for vector dimension
-            for j, idx in enumerate(vector_indices):
-                for dim in range(len(idx)):
-                    if dim == access_info['vector_dim']:
-                        # Vector dimension should be consecutive
-                        assert idx[dim] == base_idx[dim] + j
-                    else:
-                        # Other dimensions should be the same as base
-                        assert idx[dim] == base_idx[dim]
+            # Check that base indices are valid
+            base_idx = access_info['base_indices']
+            assert len(base_idx) == 2  # 2D distribution
+            y_lengths = traits.tile_distribution.ys_to_d_descriptor.get_lengths()
+            assert all(0 <= idx < y_lengths[dim] 
+                      for dim, idx in enumerate(base_idx))
     
     def test_edge_cases(self):
         """Test edge cases and boundary conditions."""
         # Test with very small dimensions
         tile_dist1 = self._create_simple_tile_distribution([1, 1], [1, 1])
         traits1 = LoadStoreTraits(tile_dist1, np.float32)
-        assert traits1.num_access == 1
+        assert traits1.num_access == 1  # C++ alignment: 1 * 1 = 1 access
         assert traits1.scalar_per_vector == 1
         
         # Test with large dimensions
         tile_dist2 = self._create_simple_tile_distribution([16, 8], [16, 1])
         traits2 = LoadStoreTraits(tile_dist2, np.float32)
         assert traits2.vector_dim_y == 1
-        assert traits2.scalar_per_vector == 8
-        assert traits2.num_access == 16
+        assert traits2.scalar_per_vector == 1  # C++ alignment
+        assert traits2.num_access == 128  # C++ alignment: 16 * 8 = 128 accesses
         
         # Test with different data types
         tile_dist3 = self._create_simple_tile_distribution([4, 4], [4, 1])
@@ -280,7 +278,7 @@ class TestLoadStoreTraits:
         assert traits3.data_type == np.int32
     
     def test_three_dimensional_access(self):
-        """Test LoadStoreTraits with three Y dimensions."""
+        """Test LoadStoreTraits with three Y dimensions - C++ aligned."""
         # Create 3D distribution
         tile_dist = self._create_simple_tile_distribution([2, 3, 4], [2, 3, 1])
         
@@ -288,19 +286,19 @@ class TestLoadStoreTraits:
         
         assert traits.ndim_y == 3
         assert traits.vector_dim_y == 2  # Third dimension has stride 1
-        assert traits.scalar_per_vector == 4
-        assert traits.scalars_per_access == [1, 1, 4]
-        assert traits.num_access == 6  # 2 * 3 * 4 / 4 = 6
+        assert traits.scalar_per_vector == 1  # C++ alignment: single element
+        assert traits.scalars_per_access == [1, 1, 1]  # C++ alignment: [1, 1, 1]
+        assert traits.num_access == 24  # C++ alignment: 2 * 3 * 4 = 24 accesses
         
         # Test access info
         access_info = traits.get_vectorized_access_info(0)
         assert access_info['base_indices'] == [0, 0, 0]
         assert access_info['vector_dim'] == 2
-        assert access_info['vector_size'] == 4
-        assert len(access_info['vector_indices']) == 4
+        assert access_info['vector_size'] == 1  # C++ alignment: single element
+        assert len(access_info['vector_indices']) == 1  # C++ alignment: single element
         
         # Check vector indices
-        expected_indices = [[0, 0, 0], [0, 0, 1], [0, 0, 2], [0, 0, 3]]
+        expected_indices = [[0, 0, 0]]  # C++ alignment: single element access
         assert access_info['vector_indices'] == expected_indices
     
     def test_invalid_access_index(self):
@@ -363,8 +361,8 @@ class TestLoadStoreTraitsIntegration:
         assert traits.ndim_y == 4
         # Should choose dimension with stride 1 and maximum length
         assert traits.vector_dim_y == 2  # Third dimension has stride 1 and length 2
-        assert traits.scalar_per_vector == 2
-        assert traits.num_access == 24  # 4 * 3 * 1 * 2 = 24
+        assert traits.scalar_per_vector == 1  # C++ alignment: single element
+        assert traits.num_access == 48  # C++ alignment: 4 * 3 * 2 * 2 = 48 accesses
     
     def test_memory_access_pattern(self):
         """Test that memory access patterns follow space-filling curve."""
@@ -383,8 +381,8 @@ class TestLoadStoreTraitsIntegration:
         # First access should be [0, 0]
         assert all_accesses[0] == [0, 0]
         
-        # Should have 3 accesses total (3 * 4 / 4 = 3)
-        assert len(all_accesses) == 3
+        # Should have 12 accesses total (3 * 4 = 12) for C++ alignment
+        assert len(all_accesses) == 12
         
         # Check that we don't have duplicate accesses
         unique_accesses = set(tuple(access) for access in all_accesses)
