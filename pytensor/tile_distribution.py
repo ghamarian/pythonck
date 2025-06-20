@@ -207,10 +207,10 @@ class TileDistribution:
                 remaining //= y_lengths[y_idx]
         else:
             # Handle distributed indices case (from direct calls/tests)
-            # Map from distributed indices to Y indices using encoding
+            # FIXED: Use span mappings from detail structure, not raw RH mappings
             for y_idx in range(self.ndim_y):
-                span_major = self.encoding.ys_to_rhs_major[y_idx] - 1  # -1 to convert from 1-based RH to 0-based X index
-                span_minor = self.encoding.ys_to_rhs_minor[y_idx]
+                span_major = self.encoding.detail.ys_to_span_major[y_idx]  # Use pre-computed span_major
+                span_minor = self.encoding.detail.ys_to_span_minor[y_idx]  # Use pre-computed span_minor
                 
                 # Get the distributed index for this span
                 if 0 <= span_major < len(distributed_indices):
