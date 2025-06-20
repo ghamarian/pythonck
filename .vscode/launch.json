@@ -7,7 +7,7 @@
             "request": "launch",
             "module": "pytest",
             "args": [
-                "${workspaceFolder}/tests/test_tile_window.py",
+                "${workspaceFolder}/complete_sweep_with_tile_window.py",
                 "-v"
             ],
             "console": "integratedTerminal",
@@ -24,6 +24,19 @@
             "args": [
                 "run",
                 "${workspaceFolder}/tensor_transform_app.py"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "Debug complete sweep with tile window",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/complete_sweep_with_tile_window_fixed.py",
+            "args": [
             ],
             "console": "integratedTerminal",
             "justMyCode": false,

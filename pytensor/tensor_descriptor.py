@@ -5,7 +5,7 @@ This module provides tensor descriptor functionality for describing
 multi-dimensional tensor layouts with transformations.
 """
 
-from typing import List, Tuple, Optional, Union, Any, TypeVar, Generic
+from typing import List, Tuple, Optional, Union, Any, TypeVar, Generic, Dict
 import numpy as np
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
@@ -828,7 +828,7 @@ class TensorAdaptor:
     """
     
     def __init__(self,
-                 transforms: List[Transform],
+                 transforms: List[Union[Transform, Dict]],
                  lower_dimension_hidden_idss: List[List[int]],
                  upper_dimension_hidden_idss: List[List[int]],
                  bottom_dimension_hidden_ids: List[int],
@@ -837,33 +837,69 @@ class TensorAdaptor:
         Initialize tensor adaptor.
         
         Args:
-            transforms: List of transformations
+            transforms: List of transformations (objects or dictionaries)
             lower_dimension_hidden_idss: Lower dimension IDs for each transform
             upper_dimension_hidden_idss: Upper dimension IDs for each transform
-            bottom_dimension_hidden_ids: Bottom-most dimension IDs
-            top_dimension_hidden_ids: Top-most dimension IDs
+            bottom_dimension_hidden_ids: Bottom dimension IDs
+            top_dimension_hidden_ids: Top dimension IDs
         """
-        self.transforms = transforms
+        # Convert dictionary transforms to actual transform objects
+        actual_transforms = []
+        for transform in transforms:
+            if isinstance(transform, dict):
+                actual_transforms.append(self._convert_dict_transform_to_object(transform))
+            else:
+                actual_transforms.append(transform)
+        
+        self.transforms = actual_transforms
         self.lower_dimension_hidden_idss = lower_dimension_hidden_idss
         self.upper_dimension_hidden_idss = upper_dimension_hidden_idss
         self.bottom_dimension_hidden_ids = bottom_dimension_hidden_ids
         self.top_dimension_hidden_ids = top_dimension_hidden_ids
         
-        # Validate dimensions
-        if len(transforms) != len(lower_dimension_hidden_idss):
-            raise ValueError("Number of transforms must match lower dimension IDs")
-        if len(transforms) != len(upper_dimension_hidden_idss):
-            raise ValueError("Number of transforms must match upper dimension IDs")
+        # Calculate derived properties
+        self.ndim_hidden = self._calculate_ndim_hidden()
         
-        # Calculate number of hidden dimensions
+        # Validate dimensions
+        if not (len(self.transforms) == len(self.lower_dimension_hidden_idss) == len(self.upper_dimension_hidden_idss)):
+            raise ValueError("Number of transforms must match lower/upper dimension IDs")
+    
+    def _convert_dict_transform_to_object(self, dict_transform: Dict) -> Transform:
+        """Convert dictionary transform to actual transform object."""
+        name = dict_transform['name']
+        meta_data = dict_transform['meta_data']
+        
+        if name == 'merge':
+            return MergeTransform(meta_data)
+        elif name == 'unmerge':
+            return UnmergeTransform(meta_data)
+        elif name == 'replicate':
+            return ReplicateTransform(meta_data)
+        elif name == 'pass_through':
+            # meta_data should be the length for pass_through
+            return PassThroughTransform(meta_data)
+        elif name == 'pad':
+            # meta_data should be [lower_length, left_pad, right_pad]
+            return PadTransform(meta_data[0], meta_data[1], meta_data[2])
+        elif name == 'embed':
+            # meta_data should be [lengths, strides]
+            return EmbedTransform(meta_data[0], meta_data[1])
+        elif name == 'xor':
+            # meta_data should be lengths for XOR
+            return XorTransform(meta_data)
+        else:
+            raise ValueError(f"Unknown transform name: {name}")
+    
+    def _calculate_ndim_hidden(self) -> int:
+        """Calculate number of hidden dimensions."""
         all_hidden_ids = set()
-        all_hidden_ids.update(bottom_dimension_hidden_ids)
-        all_hidden_ids.update(top_dimension_hidden_ids)
-        for ids in lower_dimension_hidden_idss:
+        all_hidden_ids.update(self.bottom_dimension_hidden_ids)
+        all_hidden_ids.update(self.top_dimension_hidden_ids)
+        for ids in self.lower_dimension_hidden_idss:
             all_hidden_ids.update(ids)
-        for ids in upper_dimension_hidden_idss:
+        for ids in self.upper_dimension_hidden_idss:
             all_hidden_ids.update(ids)
-        self.ndim_hidden = len(all_hidden_ids)
+        return len(all_hidden_ids)
     
     def get_num_of_transform(self) -> int:
         """Get number of transformations."""
@@ -945,7 +981,7 @@ class TensorDescriptor(TensorAdaptor):
     """
     
     def __init__(self,
-                 transforms: List[Transform],
+                 transforms: List[Union[Transform, Dict]],
                  lower_dimension_hidden_idss: List[List[int]],
                  upper_dimension_hidden_idss: List[List[int]],
                  top_dimension_hidden_ids: List[int],
@@ -956,7 +992,7 @@ class TensorDescriptor(TensorAdaptor):
         Initialize tensor descriptor.
         
         Args:
-            transforms: List of transformations
+            transforms: List of transformations (objects or dictionaries)
             lower_dimension_hidden_idss: Lower dimension IDs for each transform
             upper_dimension_hidden_idss: Upper dimension IDs for each transform
             top_dimension_hidden_ids: Top dimension IDs

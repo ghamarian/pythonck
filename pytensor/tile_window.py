@@ -130,13 +130,13 @@ class TileWindowWithStaticDistribution:
                 idx_diff_ps_ys = [0] * ndim_p + start_idx_ys
                 
                 # Move coordinates by the calculated step
-                idx_diff_adaptor_bottom = [0] * self.bottom_tensor_view.get_num_of_dimension()
+                # Convert to MultiIndex and call the function correctly
+                idx_diff_ps_ys_multi = MultiIndex(len(idx_diff_ps_ys), idx_diff_ps_ys)
                 
-                move_tensor_adaptor_coordinate(
+                idx_diff_adaptor_bottom = move_tensor_adaptor_coordinate(
                     adaptor,
                     window_adaptor_coord,
-                    idx_diff_ps_ys,
-                    idx_diff_adaptor_bottom
+                    idx_diff_ps_ys_multi
                 )
                 
                 move_tensor_coordinate(
@@ -201,24 +201,48 @@ class TileWindowWithStaticDistribution:
         ys_to_d_desc = self.tile_distribution.ys_to_d_descriptor
         num_access_per_coord = self.traits.num_access // self.num_coord
         
+        # Get adaptor and base coordinate info
+        adaptor = self.tile_distribution.ps_ys_to_xs_adaptor
+        partition_idx = self.tile_distribution.get_partition_index()
+        ndim_p = len(partition_idx)
+        ndim_top = adaptor.get_num_of_top_dimension()
+        
         for i_coord in range(self.num_coord):
-            # Get fresh copies of the pre-computed coordinates
-            window_adaptor_coord = self.pre_computed_coords[i_coord][0].copy()
-            bottom_tensor_coord = self.pre_computed_coords[i_coord][1].copy()
-            
             for i_coord_access in range(num_access_per_coord):
                 i_access = i_coord * num_access_per_coord + i_coord_access
                 access_info = self.traits.get_vectorized_access_info(i_access)
                 
+                # CORRECT: Calculate fresh coordinates for each access based on Y indices
+                # This matches the C++ pattern where coordinates are computed from Y indices
+                
+                # Get Y indices for this access
+                idx_ys = access_info['base_indices']
+                
+                # Create top-level coordinate: P dimensions + Y dimensions
+                idx_top = [0] * ndim_top
+                # Set partition dimensions (P dimensions)
+                for i, p_idx in enumerate(partition_idx):
+                    idx_top[i] = p_idx
+                # Set Y dimensions
+                for i, y_idx in enumerate(idx_ys):
+                    idx_top[ndim_p + i] = y_idx
+                
+                # Create adaptor coordinate
+                window_adaptor_coord = make_tensor_adaptor_coordinate(adaptor, idx_top)
+                
+                # Get bottom coordinates and add window origin
+                bottom_idx = [
+                    self.window_origin[i] + window_adaptor_coord.get_bottom_index()[i]
+                    for i in range(len(self.window_origin))
+                ]
+                bottom_tensor_coord = make_tensor_coordinate(
+                    self.bottom_tensor_view.tensor_desc,
+                    bottom_idx
+                )
+                
                 # Process access only if the coordinate is valid
                 if not oob_conditional_check or self._is_coordinate_valid(bottom_tensor_coord):
                     process_access(access_info, bottom_tensor_coord, ys_to_d_desc)
-
-                # Move to the next access coordinates for the next iteration
-                if i_coord_access < num_access_per_coord - 1:
-                    self._move_coordinates_for_next_access(
-                        window_adaptor_coord, bottom_tensor_coord, i_access
-                    )
 
     def _analyze_y_dimensions(self):
         """
@@ -254,19 +278,29 @@ class TileWindowWithStaticDistribution:
             oob_conditional_check: Whether to check out-of-bounds access
         """
         def process_load(access_info, bottom_tensor_coord, ys_to_d_desc):
-            # For each vector element in this access
+            # CORRECT: Match C++ pattern exactly
+            # 1. ONE vectorized read per access (like C++)
+            vector_size = access_info['vector_size']
+            vector_values = self.bottom_tensor_view.get_vectorized_elements(
+                bottom_tensor_coord, 
+                linear_offset=0,  # C++ uses 0 offset
+                vector_size=vector_size,
+                oob_conditional_check=oob_conditional_check
+            )
+            
+            # Ensure we have a list/array for indexing
+            if not isinstance(vector_values, (list, np.ndarray)):
+                vector_values = [vector_values]
+            
+            # 2. Distribute each scalar from vector to distributed tensor (like C++)
             for j, idx_ys in enumerate(access_info['vector_indices']):
-                # Calculate tensor coordinate for this Y index
-                # Ensure we don't go out of bounds when mapping Y dimensions to tensor dimensions
-                tensor_indices = []
-                for i in range(len(self.window_origin)):
-                    y_idx = idx_ys[i] if i < len(idx_ys) else 0
-                    tensor_indices.append(self.window_origin[i] + y_idx)
+                # Get the j-th scalar from the vector
+                if j < len(vector_values):
+                    value = vector_values[j]
+                else:
+                    value = 0  # Padding if needed
                 
-                # Get element from tensor view
-                value = self.bottom_tensor_view.get_element(tensor_indices)
-                
-                # Store in distributed tensor
+                # Store in distributed tensor at Y position
                 d_offset = ys_to_d_desc.calculate_offset(idx_ys)
                 dst_tensor.set_thread_data(d_offset, value)
 
@@ -344,21 +378,41 @@ class TileWindowWithStaticDistribution:
             oob_conditional_check: Whether to check out-of-bounds access
         """
         def process_store(access_info, bottom_tensor_coord, ys_to_d_desc):
-            # For each vector element in this access
+            # CORRECT: Match C++ pattern exactly
+            # 1. Gather vector elements from distributed tensor (like C++)
+            vector_size = access_info['vector_size']
+            vector_values = []
+            
+            # Debug: Show what coordinates we're using
+            tensor_coords = bottom_tensor_coord.get_index().to_list()
+            print(f"DEBUG Store: bottom_tensor_coord = {tensor_coords}, vector_indices = {access_info['vector_indices']}")
+            
             for j, idx_ys in enumerate(access_info['vector_indices']):
                 # Get value from distributed tensor
                 d_offset = ys_to_d_desc.calculate_offset(idx_ys)
                 value = src_tensor.get_thread_data(d_offset)
-                
-                # Calculate tensor coordinate for this Y index
-                # Ensure we don't go out of bounds when mapping Y dimensions to tensor dimensions
-                tensor_indices = []
-                for i in range(len(self.window_origin)):
-                    y_idx = idx_ys[i] if i < len(idx_ys) else 0
-                    tensor_indices.append(self.window_origin[i] + y_idx)
-                
-                # Store in tensor view
-                self.bottom_tensor_view.set_element(tensor_indices, value)
+                vector_values.append(value)
+                print(f"  Y{idx_ys} -> D{d_offset} -> value {value}")
+            
+            # Pad to vector_size if needed
+            while len(vector_values) < vector_size:
+                vector_values.append(0)
+            
+            # 2. ONE vectorized write per access (like C++)
+            # Convert to appropriate format for vectorized write
+            if vector_size == 1:
+                write_value = vector_values[0]
+            else:
+                write_value = np.array(vector_values[:vector_size])
+            
+            print(f"  Writing {write_value} to tensor coords {tensor_coords}")
+            self.bottom_tensor_view.set_vectorized_elements(
+                bottom_tensor_coord,
+                write_value,
+                linear_offset=0,
+                vector_size=vector_size,
+                oob_conditional_check=oob_conditional_check
+            )
 
         self._traverse_window(process_store, oob_conditional_check)
     

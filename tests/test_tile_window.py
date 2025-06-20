@@ -208,6 +208,7 @@ class TestTileWindowWithStaticDistribution:
                         [5, 6, 7, 8],
                         [9, 10, 11, 12],
                         [13, 14, 15, 16]], dtype=np.float32)
+        print(f"Original data:\n{data}")
         tensor_view = make_naive_tensor_view(data, [4, 4], [4, 1])
     
         # The tile is 2x2, so we need 2 Y-dimensions.
@@ -245,21 +246,27 @@ class TestTileWindowWithStaticDistribution:
             window_origin=[1, 1],
             tile_distribution=dist
         )
+        print(f"Window origin: {window.window_origin}")
+        print(f"Window lengths: {window.window_lengths}")
     
         # Load data
         distributed_tensor = window.load()
+        print(f"Loaded distributed tensor data: {distributed_tensor.thread_buffer}")
         assert distributed_tensor is not None
         assert distributed_tensor.get_num_of_elements() == 4
     
         # Modify and store back
         distributed_tensor.fill(99.0)
+        print(f"Modified distributed tensor data: {distributed_tensor.thread_buffer}")
         window.store(distributed_tensor)
+        print(f"Data after store:\n{data}")
     
         # Check that data was stored correctly
         expected_stored_data = np.array([[1, 2, 3, 4],
                                         [5, 99.0, 99.0, 8],
                                         [9, 99.0, 99.0, 12],
                                         [13, 14, 15, 16]], dtype=np.float32)
+        print(f"Expected data:\n{expected_stored_data}")
         assert np.array_equal(data, expected_stored_data)
 
     def test_load_store_rmsnorm(self):
