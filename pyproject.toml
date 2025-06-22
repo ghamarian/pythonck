@@ -1,0 +1,91 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pythonck"
+version = "0.1.0"
+description = "Python implementation of Composable Kernels tensor operations"
+readme = "README.md"
+license = "MIT"
+authors = [
+    {name = "Amir", email = "amir@example.com"}
+]
+keywords = ["tensor", "gpu", "composable-kernels", "cuda", "hip"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "sympy>=1.9",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.0",
+    "pytest-cov",
+    "black",
+    "isort",
+    "flake8",
+]
+streamlit = [
+    "streamlit>=1.20.0",
+    "matplotlib",
+    "numpy",
+    "pandas",
+]
+
+[project.urls]
+Homepage = "https://github.com/ghamarian/pythonck"
+Repository = "https://github.com/ghamarian/pythonck"
+Documentation = "https://github.com/ghamarian/pythonck/blob/main/README.md"
+
+[tool.setuptools]
+packages = ["pytensor", "tensor_transforms", "tile_distribution"]
+
+[tool.setuptools.package-data]
+pytensor = ["*.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+]
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88 

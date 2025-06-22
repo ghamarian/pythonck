@@ -1,11 +1,11 @@
-from setuptools import setup, find_packages
+"""
+Setup script for pytensor package.
 
-setup(
-    name="pythonck",
-    version="0.1",
-    packages=find_packages(),
-    install_requires=[
-        "sympy",
-        "pytest",
-    ],
-) 
+This is a minimal setup.py for backward compatibility.
+The primary configuration is in pyproject.toml.
+"""
+
+from setuptools import setup
+
+# Minimal setup - all configuration is in pyproject.toml
+setup() 

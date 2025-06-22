@@ -1,0 +1,39 @@
+include README.md
+include LICENSE
+include pyproject.toml
+include requirements.txt
+include conftest.py
+
+# Include all Python files in the main packages
+recursive-include pytensor *.py
+recursive-include tensor_transforms *.py
+recursive-include tile_distribution *.py
+
+# Include documentation files
+recursive-include pytensor *.md
+recursive-include pytensor *.rst
+recursive-include tensor_transforms *.md
+recursive-include tile_distribution *.md
+
+# Include examples
+recursive-include examples *.py
+recursive-include examples *.md
+
+# Exclude test files from the distribution
+recursive-exclude tests *
+recursive-exclude todelete *
+
+# Exclude development files
+exclude *.py
+exclude app.py
+exclude tensor_transform_app.py
+exclude tensor_visualization_app.py
+exclude thread_visualization_app.py
+exclude tile_distr_thread_mapping.py
+
+# Exclude cache and build files
+global-exclude __pycache__
+global-exclude *.py[co]
+global-exclude *.so
+global-exclude .DS_Store
+global-exclude *.egg-info 
