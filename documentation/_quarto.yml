@@ -1,0 +1,76 @@
+project:
+  type: website
+  title: "Composable-Kernels Docs"
+  output-dir: _site
+  resources:
+    - pythonck-0.1.0-py3-none-any.whl
+
+extensions: [r-wasm/live]
+
+website:
+  sidebar:
+    style: "docked"
+    collapse-level: 2
+    contents:
+      - section: "Getting Started"
+        contents:
+          - index.qmd
+          - tutorials/index.qmd
+      - section: "Core Concepts"
+        contents:
+          - concepts/tensor-adaptor.qmd
+          - concepts/tensor-descriptor.qmd
+          - concepts/buffer-view.qmd
+          - concepts/tensor-coordinate.qmd
+          - concepts/tensor-view.qmd
+      - section: "Tile Operations"
+        contents:
+          - concepts/tile-distribution.qmd
+          - concepts/tile-distribution-encoding.qmd
+          - concepts/tile-window.qmd
+          - concepts/tile-window-linear.qmd
+          - concepts/shuffle-tile.qmd
+          - concepts/sweep-tile.qmd
+      - section: "Advanced Topics"
+        contents:
+          - concepts/static-distributed-tensor.qmd
+          - concepts/space-filling-curve.qmd
+          - concepts/static-encoding-pattern.qmd
+      - section: "API Reference"
+        contents:
+          - api/index.qmd
+  navbar:
+    background: primary
+    search: true
+    right:
+      - icon: github
+        href: https://github.com/rocm/composable-kernels
+      - text: Docs Home
+        file: index.qmd
+      - text: Tutorials
+        file: tutorials/index.qmd
+
+format:
+  live-html:
+    theme:
+      light: litera
+      dark: slate
+    toc: true
+    code-tools: true
+    execute:
+      eval: false
+    link-external-newwindow: true
+    code-copy: true
+    anchor-sections: true
+    grid:
+      margin-width: 250px
+
+pyodide:
+  packages:
+    - numpy
+    - pandas
+    - sympy
+    - micropip
+  cell-options:
+    autorun: true
+  base-url: "/" 

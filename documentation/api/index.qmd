@@ -1,0 +1,103 @@
+---
+title: "API Reference"
+---
+
+# API Reference
+
+Complete reference documentation for all PythonCK modules and classes.
+
+## Core Tensor Operations
+
+### PyTensor Module
+The main tensor operations module containing all core functionality.
+
+- **[tensor_coordinate](tensor_coordinate.qmd)** - Multi-dimensional coordinate handling
+- **[tensor_descriptor](tensor_descriptor.qmd)** - Tensor layout and metadata
+- **[tensor_adaptor](tensor_adaptor.qmd)** - Tensor transformations and adaptations
+- **[tensor_view](tensor_view.qmd)** - Views and slicing operations
+- **[buffer_view](buffer_view.qmd)** - Low-level memory access patterns
+
+## Tile Operations
+
+- **[tile_distribution](tile_distribution.qmd)** - Data distribution across tiles
+- **[tile_distribution_encoding](tile_distribution_encoding.qmd)** - Encoding schemes for tile distribution
+- **[tile_window](tile_window.qmd)** - Windowed access to tile data
+- **[tile_window_linear](tile_window_linear.qmd)** - Linear tile window operations
+- **[tile_window_utils](tile_window_utils.qmd)** - Utility functions for tile windows
+
+## Specialized Tile Operations
+
+- **[shuffle_tile](shuffle_tile.qmd)** - Data shuffling and rearrangement
+- **[sweep_tile](sweep_tile.qmd)** - Iterative tile processing
+- **[store_tile](store_tile.qmd)** - Tile storage operations
+- **[update_tile](update_tile.qmd)** - In-place tile updates
+- **[tile_scatter_gather](tile_scatter_gather.qmd)** - Scatter/gather operations
+
+## Advanced Features
+
+- **[static_distributed_tensor](static_distributed_tensor.qmd)** - Compile-time optimized tensors
+- **[space_filling_curve](space_filling_curve.qmd)** - Advanced memory access patterns
+- **[static_encoding_pattern](static_encoding_pattern.qmd)** - Static encoding strategies
+
+## Utilities
+
+### Tensor Transforms Module
+Higher-level transformation utilities and examples.
+
+- **[analyzer](analyzer.qmd)** - Tensor operation analysis
+- **[parser](parser.qmd)** - Parsing tensor expressions
+- **[examples](examples.qmd)** - Common transformation patterns
+
+### Tile Distribution Module
+Advanced tile distribution strategies and visualization.
+
+- **[parser](tile_parser.qmd)** - Tile distribution parsing
+- **[visualizer](tile_visualizer.qmd)** - Tile distribution visualization
+- **[examples](tile_examples.qmd)** - Tile distribution examples
+
+## Quick Reference
+
+### Common Imports
+
+```{pyodide}
+# Core tensor operations
+from pytensor.tensor_coordinate import TensorCoordinate
+from pytensor.tensor_descriptor import TensorDescriptor
+from pytensor.tensor_adaptor import TensorAdaptor
+from pytensor.buffer_view import BufferView
+
+# Tile operations
+from pytensor.tile_distribution import TileDistribution
+from pytensor.tile_window import TileWindow
+from pytensor.shuffle_tile import ShuffleTile
+from pytensor.sweep_tile import SweepTile
+
+# Advanced features
+from pytensor.static_distributed_tensor import StaticDistributedTensor
+from pytensor.space_filling_curve import SpaceFillingCurve
+
+# Utilities
+from tensor_transforms.analyzer import analyze_transformation
+from tensor_transforms.parser import parse_expression
+from tile_distribution.visualizer import visualize_distribution
+```
+
+### Key Classes Overview
+
+| Class | Purpose | Key Methods |
+|-------|---------|-------------|
+| `TensorCoordinate` | Multi-dimensional indexing | `__init__()`, `get_element_count()` |
+| `TensorDescriptor` | Tensor metadata | `calculate_offset()`, `get_strides()` |
+| `TensorAdaptor` | Tensor transformations | `transform_coordinate()`, `get_output_shape()` |
+| `BufferView` | Memory access patterns | `generate_access_sequence()` |
+| `TileDistribution` | Tile-based processing | `get_tile_coordinates()`, `get_num_tiles()` |
+| `TileWindow` | Windowed tile access | `get_window_data()`, `slide_window()` |
+
+---
+
+For detailed documentation of each module, click on the links above. Each page includes:
+
+- **Class definitions** with full method signatures
+- **Usage examples** with runnable code
+- **Parameter descriptions** and return values
+- **Related concepts** and cross-references 

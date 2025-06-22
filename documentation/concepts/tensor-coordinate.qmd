@@ -1,0 +1,204 @@
+---
+title: "Tensor Coordinates"
+---
+
+# Tensor Coordinates
+
+Tensor coordinates are the foundation for navigating multi-dimensional tensor spaces in PythonCK. They provide a systematic way to address elements in tensors and handle coordinate transformations.
+
+```{pyodide}
+#| echo: false
+#| output: false
+# Hidden setup - automatically install the package
+import micropip
+try:
+    base_url = str(js.window.location.origin)
+    wheel_url = f"{base_url}/pythonck-0.1.0-py3-none-any.whl"
+    await micropip.install(wheel_url)
+except:
+    try:
+        await micropip.install("./pythonck-0.1.0-py3-none-any.whl")
+    except:
+        pass  # Package may already be installed
+```
+
+## Setup
+
+```{pyodide}
+from pytensor.tensor_coordinate import MultiIndex, TensorCoordinate, TensorAdaptorCoordinate
+import numpy as np
+print("✅ Tensor coordinate modules imported successfully!")
+```
+
+## MultiIndex: Basic Multi-dimensional Indexing
+
+The `MultiIndex` class represents a coordinate in multi-dimensional space:
+
+```{pyodide}
+# Create a 3D coordinate (z=1, y=2, x=3)
+coord = MultiIndex(3, [1, 2, 3])
+print(f"3D coordinate: {coord}")
+print(f"Number of dimensions: {len(coord)}")
+print(f"Access dimension 0: {coord[0]}")
+print(f"Access dimension 1: {coord[1]}")
+print(f"Access dimension 2: {coord[2]}")
+
+# Convert to different formats
+print(f"As list: {coord.to_list()}")
+print(f"As numpy array: {coord.to_array()}")
+```
+
+You can modify coordinates and perform operations:
+
+```{pyodide}
+# Create and modify a coordinate
+coord = MultiIndex(4, [0, 0, 0, 0])
+print(f"Initial: {coord}")
+
+# Set individual dimensions
+coord[0] = 2
+coord[1] = 4
+coord[2] = 6
+coord[3] = 8
+print(f"Modified: {coord}")
+
+# Copy coordinates
+coord_copy = coord.copy()
+coord_copy[0] = 99
+print(f"Original: {coord}")
+print(f"Copy: {coord_copy}")
+```
+
+## TensorAdaptorCoordinate: Transformation-aware Coordinates
+
+`TensorAdaptorCoordinate` tracks coordinates through transformations using hidden dimensions:
+
+```{pyodide}
+# Create a tensor adaptor coordinate
+# This represents a 2D → 1D transformation (e.g., matrix to vector)
+ndim_hidden = 3  # Total hidden dimensions
+bottom_dimension_hidden_ids = [0]  # Maps to output (1D)
+top_dimension_hidden_ids = [1, 2]  # Maps to input (2D)
+hidden_index = MultiIndex(3, [42, 4, 8])  # Values in hidden space
+
+adaptor_coord = TensorAdaptorCoordinate(
+    ndim_hidden=ndim_hidden,
+    bottom_dimension_hidden_ids=bottom_dimension_hidden_ids,
+    top_dimension_hidden_ids=top_dimension_hidden_ids,
+    idx_hidden=hidden_index
+)
+
+print(f"Adaptor coordinate: {adaptor_coord}")
+print(f"Top index (input): {adaptor_coord.get_top_index()}")
+print(f"Bottom index (output): {adaptor_coord.get_bottom_index()}")
+print(f"Hidden index: {adaptor_coord.get_hidden_index()}")
+```
+
+## TensorCoordinate: Simplified Tensor Addressing
+
+`TensorCoordinate` extends `TensorAdaptorCoordinate` for common tensor operations:
+
+```{pyodide}
+# Create a tensor coordinate for a 2D tensor
+ndim_hidden = 3
+top_dimension_hidden_ids = [1, 2]  # Maps to 2D tensor dimensions
+hidden_index = MultiIndex(3, [100, 4, 6])  # [offset, row, col]
+
+tensor_coord = TensorCoordinate(
+    ndim_hidden=ndim_hidden,
+    top_dimension_hidden_ids=top_dimension_hidden_ids,
+    idx_hidden=hidden_index
+)
+
+print(f"Tensor coordinate: {tensor_coord}")
+print(f"Tensor index (row, col): {tensor_coord.get_index()}")
+print(f"Linear offset: {tensor_coord.get_offset()}")
+```
+
+## Practical Example: Matrix Access Patterns
+
+Let's simulate accessing elements in a 4x6 matrix using tensor coordinates:
+
+```{pyodide}
+# Create a matrix in memory (row-major order)
+matrix_data = np.arange(24).reshape(4, 6)
+print("Matrix data:")
+print(matrix_data)
+
+# Create tensor coordinates for accessing elements
+def create_matrix_coordinate(row, col):
+    """Create a tensor coordinate for matrix element access."""
+    # Hidden dimensions: [offset, row, col]
+    # For row-major: offset = row * num_cols + col
+    offset = row * 6 + col
+    hidden_index = MultiIndex(3, [offset, row, col])
+    
+    return TensorCoordinate(
+        ndim_hidden=3,
+        top_dimension_hidden_ids=[1, 2],  # row=dim1, col=dim2
+        idx_hidden=hidden_index
+    )
+
+# Access some elements
+positions = [(0, 0), (1, 3), (2, 5), (3, 2)]
+
+for row, col in positions:
+    coord = create_matrix_coordinate(row, col)
+    tensor_idx = coord.get_index()
+    linear_offset = coord.get_offset()
+    value = matrix_data.flat[linear_offset]
+    
+    print(f"Position ({row}, {col}): tensor_idx={tensor_idx.to_list()}, "
+          f"offset={linear_offset}, value={value}")
+```
+
+## Coordinate Transformations
+
+Coordinates can be transformed as you move through different tensor operations:
+
+```{pyodide}
+# Example: Transpose operation
+def transpose_coordinate(coord):
+    """Transform coordinate for matrix transpose."""
+    idx = coord.get_index()
+    row, col = idx[0], idx[1]
+    
+    # Create new coordinate with swapped dimensions
+    new_offset = col * 4 + row  # Assuming original is 4x6, transposed is 6x4
+    new_hidden = MultiIndex(3, [new_offset, col, row])  # Swap row and col
+    
+    return TensorCoordinate(
+        ndim_hidden=3,
+        top_dimension_hidden_ids=[1, 2],
+        idx_hidden=new_hidden
+    )
+
+# Transform coordinates
+original_coord = create_matrix_coordinate(1, 3)
+transposed_coord = transpose_coordinate(original_coord)
+
+print(f"Original: {original_coord.get_index().to_list()} → offset {original_coord.get_offset()}")
+print(f"Transposed: {transposed_coord.get_index().to_list()} → offset {transposed_coord.get_offset()}")
+
+# Verify with actual transpose
+original_value = matrix_data[1, 3]
+transposed_matrix = matrix_data.T
+transposed_value = transposed_matrix.flat[transposed_coord.get_offset()]
+print(f"Original value: {original_value}")
+print(f"Transposed value: {transposed_value}")
+```
+
+## Key Concepts
+
+1. **MultiIndex**: Basic multi-dimensional coordinate representation
+2. **Hidden Dimensions**: Internal coordinate space that enables transformations
+3. **Top/Bottom Mapping**: How visible tensor dimensions map to internal coordinates
+4. **Linear Offset**: Final memory address for element access
+
+Tensor coordinates provide the foundation for all other PythonCK operations by giving you precise control over how multi-dimensional data is addressed and transformed.
+
+## Next Steps
+
+- **[Tensor Descriptor](tensor-descriptor.qmd)** - Learn how tensor layouts are described
+- **[Tensor Adaptor](tensor-adaptor.qmd)** - Explore coordinate transformations
+- **[Buffer View](buffer-view.qmd)** - See how coordinates map to memory access 

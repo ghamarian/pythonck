@@ -1,0 +1,88 @@
+---
+title: "Composable-Kernels Python Documentation"
+---
+
+# Welcome to PythonCK
+
+PythonCK is a Python implementation of Composable Kernels tensor operations, providing a high-level interface for understanding and experimenting with GPU tensor computations.
+
+## What is Composable Kernels?
+
+Composable Kernels (CK) is a performance portable programming model for writing high performance GPU kernels for machine learning workloads across multiple architectures including GCDCore, CDNA, RDNA architectures, and various other GPU architectures.
+
+This Python implementation allows you to:
+
+- **Understand** the core concepts behind tensor operations
+- **Experiment** with tensor transformations interactively
+- **Visualize** how data flows through different tensor operations
+- **Learn** GPU kernel design patterns
+
+## Quick Example
+
+```{pyodide}
+#| echo: false
+#| output: false
+# Hidden setup - automatically install the package
+import micropip
+import js
+
+try:
+    # Use current domain + root path (works with any web server)
+    base_url = str(js.window.location.origin)
+    wheel_url = f"{base_url}/pythonck-0.1.0-py3-none-any.whl"
+    await micropip.install(wheel_url)
+except:
+    pass  # Package may already be installed or available
+```
+
+Let's start with a simple tensor coordinate example:
+
+```{pyodide}
+from pytensor.tensor_coordinate import TensorCoordinate, MultiIndex
+
+# Create a 2D tensor coordinate
+coord = TensorCoordinate(
+    ndim_hidden=3,
+    top_dimension_hidden_ids=[1, 2],
+    idx_hidden=MultiIndex(3, [0, 2, 3])
+)
+print(f"Tensor coordinate: {coord}")
+print(f"Tensor index: {coord.get_index().to_list()}")
+```
+
+## Key Concepts
+
+### Core Tensor Abstractions
+- **[Tensor Adaptor](concepts/tensor-adaptor.qmd)** - The foundation for tensor transformations
+- **[Tensor Descriptor](concepts/tensor-descriptor.qmd)** - Describes tensor layout and properties
+- **[Buffer View](concepts/buffer-view.qmd)** - Low-level memory access patterns
+- **[Tensor Coordinate](concepts/tensor-coordinate.qmd)** - Multi-dimensional indexing
+
+### Tile Operations
+- **[Tile Distribution](concepts/tile-distribution.qmd)** - How data is distributed across tiles
+- **[Tile Window](concepts/tile-window.qmd)** - Windowed access to tile data
+- **[Shuffle Tile](concepts/shuffle-tile.qmd)** - Data rearrangement operations
+- **[Sweep Tile](concepts/sweep-tile.qmd)** - Iterative tile processing
+
+### Advanced Features
+- **[Static Distributed Tensor](concepts/static-distributed-tensor.qmd)** - Compile-time optimized tensors
+- **[Space Filling Curves](concepts/space-filling-curve.qmd)** - Advanced memory access patterns
+
+## Getting Started
+
+1. **[Tutorials](tutorials/index.qmd)** - Step-by-step guides
+2. **[API Reference](api/index.qmd)** - Complete API documentation
+3. **Interactive Examples** - All code examples are runnable in your browser!
+
+## Features of This Documentation
+
+- 🏃 **Live Code Execution** - Run Python code directly in your browser
+- 📱 **Responsive Design** - Works on desktop and mobile
+- 🌓 **Dark/Light Mode** - Toggle between themes
+- 🔍 **Full-Text Search** - Find what you need quickly
+- 📋 **Copy Code** - One-click code copying
+- 🔗 **Deep Linking** - Share links to specific sections
+
+---
+
+Ready to dive in? Start with our [Getting Started Tutorial](tutorials/index.qmd) or explore specific [concepts](concepts/tensor-adaptor.qmd). 

@@ -1,0 +1,166 @@
+---
+title: "Getting Started with PythonCK"
+---
+
+# Tutorials
+
+Welcome to the PythonCK tutorials! These step-by-step guides will help you understand the core concepts and learn how to use the library effectively.
+
+```{pyodide}
+#| echo: false
+#| output: false
+# Hidden setup - automatically install the package
+import micropip
+try:
+    base_url = str(js.window.location.origin)
+    wheel_url = f"{base_url}/pythonck-0.1.0-py3-none-any.whl"
+    await micropip.install(wheel_url)
+except:
+    try:
+        await micropip.install("./pythonck-0.1.0-py3-none-any.whl")
+    except:
+        pass  # Package may already be installed
+```
+
+## Setup
+
+Let's import the necessary modules:
+
+```{pyodide}
+# Import key modules
+from pytensor import tensor_coordinate, tensor_descriptor, tensor_adaptor
+from pytensor import buffer_view, tile_distribution, tile_window
+import sympy as sp
+print("✅ All modules imported successfully!")
+```
+
+## Tutorial 1: Understanding Tensor Coordinates
+
+Tensor coordinates are the foundation of how we address multi-dimensional data:
+
+```{pyodide}
+from pytensor.tensor_coordinate import TensorCoordinate, MultiIndex
+
+# Create a 3D tensor coordinate (depth=2, height=4, width=6)
+coord = TensorCoordinate(
+    ndim_hidden=4,
+    top_dimension_hidden_ids=[1, 2, 3],
+    idx_hidden=MultiIndex(4, [0, 1, 2, 3])
+)
+print(f"3D Coordinate: {coord}")
+tensor_idx = coord.get_index()
+print(f"Number of dimensions: {len(tensor_idx)}")
+print(f"Tensor index: {tensor_idx.to_list()}")
+
+# Access individual dimensions
+for i in range(len(tensor_idx)):
+    print(f"Dimension {i}: value = {tensor_idx[i]}")
+```
+
+## Tutorial 2: Working with Tensor Descriptors
+
+Tensor descriptors provide metadata about tensor layout and properties:
+
+```{pyodide}
+from pytensor.tensor_descriptor import make_naive_tensor_descriptor
+
+# Create a descriptor for a 2D tensor (4 rows, 8 columns, row-major layout)
+desc = make_naive_tensor_descriptor(
+    lengths=[4, 8],   # 4 rows, 8 columns
+    strides=[8, 1]    # row-major layout
+)
+
+print(f"Tensor shape: {desc.get_lengths()}")
+print(f"Element space size: {desc.get_element_space_size()}")
+print(f"Element at (2, 3): offset = {desc.calculate_offset([2, 3])}")
+```
+
+## Tutorial 3: Buffer Views and Memory Access
+
+Buffer views provide low-level control over memory access patterns:
+
+```{pyodide}
+from pytensor.buffer_view import BufferView, AddressSpaceEnum
+import numpy as np
+
+# Create a buffer view for a 1D array
+data = np.arange(16, dtype=np.float32)
+buffer = BufferView(
+    address_space=AddressSpaceEnum.GLOBAL,
+    data=data,
+    buffer_size=len(data)
+)
+print(f"Buffer size: {buffer.buffer_size} elements")
+print(f"Element type: {buffer.dtype}")
+
+# Test memory access
+element = buffer.get(0, 5, True, 1)
+print(f"Element at index 5: {element}")
+```
+
+## Tutorial 4: Tile-Based Operations
+
+Learn how data is organized and processed in tiles:
+
+```{pyodide}
+from pytensor.tile_distribution import TileDistribution
+
+# Create a 2D tile distribution
+tile_dist = TileDistribution(
+    tensor_shape=[16, 32],  # Original tensor shape
+    tile_shape=[4, 8],      # Each tile is 4x8
+)
+
+print(f"Tensor shape: {tile_dist.tensor_shape}")
+print(f"Tile shape: {tile_dist.tile_shape}")
+print(f"Number of tiles: {tile_dist.get_num_tiles()}")
+print(f"Tiles per dimension: {tile_dist.get_tiles_per_dim()}")
+
+# Get tile coordinates
+tile_coords = tile_dist.get_all_tile_coordinates()
+print(f"First few tile coordinates: {tile_coords[:3]}")
+```
+
+## Tutorial 5: Advanced Tensor Transformations
+
+Explore how tensor adaptors enable complex transformations:
+
+```{pyodide}
+from pytensor.tensor_adaptor import make_single_stage_tensor_adaptor
+from pytensor.tensor_descriptor import PassThroughTransform
+
+# Create a simple tensor adaptor with pass-through transforms
+transforms = [PassThroughTransform(4), PassThroughTransform(6)]
+adaptor = make_single_stage_tensor_adaptor(
+    transforms=transforms,
+    lower_dimension_old_top_idss=[[0], [1]], 
+    upper_dimension_new_top_idss=[[0], [1]]
+)
+
+print(f"Number of transforms: {adaptor.get_num_of_transform()}")
+print(f"Top dimensions: {adaptor.get_num_of_top_dimension()}")
+print(f"Bottom dimensions: {adaptor.get_num_of_bottom_dimension()}")
+```
+
+## Next Steps
+
+Now that you've learned the basics, explore specific concepts in detail:
+
+- **[Tensor Adaptor](../concepts/tensor-adaptor.qmd)** - Deep dive into tensor transformations
+- **[Tile Operations](../concepts/tile-distribution.qmd)** - Advanced tiling strategies
+- **[Buffer Management](../concepts/buffer-view.qmd)** - Memory access optimization
+
+## Interactive Experimentation
+
+Try modifying the examples above! Change the tensor dimensions, tile sizes, or transformation types to see how the system behaves. All code runs directly in your browser, so feel free to experiment.
+
+## Common Patterns
+
+Here are some common usage patterns you'll encounter:
+
+1. **Creating multi-dimensional coordinates** for indexing
+2. **Setting up tile distributions** for parallel processing
+3. **Applying tensor adaptors** for data transformations
+4. **Managing buffer views** for memory optimization
+
+Each concept builds on the previous ones, creating a powerful framework for GPU kernel development. 
