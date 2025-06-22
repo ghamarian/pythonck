@@ -3,377 +3,236 @@ title: "Buffer View"
 format: live-html
 ---
 
+# Buffer View
+
+Buffer views provide a unified abstraction for accessing memory across different address spaces and with various access patterns. They form the lowest level of the PythonCK memory hierarchy.
+
+## Core Concepts
+
+### Memory Address Spaces
+
 ```{pyodide}
-#| echo: false
-#| output: false
+#| echo: true
+#| output: true
 
-import micropip
-import sys
+from pytensor.buffer_view import AddressSpace
 
-# Install package if needed
-try:
-    import pytensor
-    print("✓ pytensor is already available!")
-except ImportError:
-    print("Installing pythonck package...")
-    
-    # Try wheel file first
-    try:
-        await micropip.install("sympy")
-        await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl")
-        import pytensor
-        print("✓ Successfully imported pytensor from wheel!")
-    except Exception as e:
-        print(f"Wheel installation failed: {e}")
-        print("Using fallback implementation...")
-        
-        # Fallback: create minimal pytensor module with buffer_view
-        exec("""
-import sys
-import types
+# Different memory spaces available
+print("Available address spaces:")
+for space in AddressSpace:
+    print(f"  {space.name}: {space.value}")
+```
+
+### Memory Operations
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+from pytensor.buffer_view import MemoryOperation
+
+# Different memory operations supported
+print("Available memory operations:")
+for op in MemoryOperation:
+    print(f"  {op.name}: {op.value}")
+```
+
+## Creating Buffer Views
+
+### Basic Buffer View
+
+```{pyodide}
+#| echo: true
+#| output: true
+
 import numpy as np
+from pytensor.buffer_view import make_buffer_view, AddressSpace
 
-pytensor = types.ModuleType('pytensor')
-pytensor.__file__ = '<inline>'
+# Create sample data
+data = np.array([[1, 2, 3, 4],
+                 [5, 6, 7, 8],
+                 [9, 10, 11, 12]], dtype=np.float32)
 
-class BufferView:
-    def __init__(self, data):
-        self.data = np.array(data) if not isinstance(data, np.ndarray) else data
-    
-    def __repr__(self):
-        return f"BufferView(shape={self.data.shape}, dtype={self.data.dtype})"
+print(f"Original data shape: {data.shape}")
+print(f"Original data:\n{data}")
 
-pytensor.BufferView = BufferView
-sys.modules['pytensor'] = pytensor
-sys.modules['pytensor.buffer_view'] = pytensor
-""")
-        import pytensor
-        print("✓ Fallback pytensor module loaded!")
-```
-
-# Buffer Views
-
-Buffer views provide low-level memory access abstractions in PythonCK, supporting different address spaces and memory access patterns common in GPU computing.
-
-## Setup
-
-```{pyodide}
-from pytensor.buffer_view import BufferView, AddressSpaceEnum, MemoryOperationEnum, make_buffer_view
-import numpy as np
-print("✅ Buffer view modules imported successfully!")
-```
-
-## Basic Buffer Creation
-
-Create different types of buffer views for various memory spaces:
-
-```{pyodide}
-# Create a simple global memory buffer
-data = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype=np.float32)
-print(f"Original data: {data}")
-
-# Create buffer view
-buffer = BufferView(
-    address_space=AddressSpaceEnum.GLOBAL,
+# Create a buffer view
+buffer = make_buffer_view(
     data=data,
-    buffer_size=len(data),
-    invalid_element_use_numerical_zero=True
+    address_space=AddressSpace.GLOBAL
 )
 
-print(f"Buffer: {buffer}")
-print(f"Buffer size: {buffer.buffer_size}")
-print(f"Data type: {buffer.dtype}")
+print(f"\nBuffer view created:")
+print(f"  Address space: {buffer.address_space}")
+print(f"  Data type: {buffer.data.dtype}")
+print(f"  Shape: {buffer.data.shape}")
 ```
 
-## Memory Access Patterns
-
-Buffer views support various access patterns with bounds checking:
+### Accessing Buffer Elements
 
 ```{pyodide}
-# Create a buffer for testing access patterns
-data = np.arange(16, dtype=np.int32)
-buffer = BufferView(
-    address_space=AddressSpaceEnum.GLOBAL,
-    data=data,
-    buffer_size=len(data)
-)
+#| echo: true
+#| output: true
 
-print(f"Buffer data: {data}")
+# Access individual elements
+print("Element access:")
+print(f"  buffer[0, 0] = {buffer.data[0, 0]}")
+print(f"  buffer[1, 2] = {buffer.data[1, 2]}")
+print(f"  buffer[2, 3] = {buffer.data[2, 3]}")
 
-# Basic element access
-print(f"Element at index 5: {buffer[5]}")
-print(f"Element at index 10: {buffer[10]}")
-
-# Access with validity checking
-valid_element = buffer.get(
-    index=0,           # Base index
-    linear_offset=7,   # Offset from base
-    is_valid_element=True,
-    vector_size=1
-)
-print(f"Valid access at offset 7: {valid_element}")
-
-# Invalid element access
-invalid_element = buffer.get(
-    index=0,
-    linear_offset=20,  # Out of bounds
-    is_valid_element=True,
-    vector_size=1
-)
-print(f"Out-of-bounds access: {invalid_element}")
-```
-
-## Vectorized Access
-
-Buffer views support vectorized read and write operations:
-
-```{pyodide}
-# Create buffer for vectorized operations
-data = np.arange(20, dtype=np.float32)
-buffer = BufferView(
-    address_space=AddressSpaceEnum.GLOBAL,
-    data=data
-)
-
-print(f"Original data: {data}")
-
-# Vectorized read (4 elements starting at index 5)
-vector_data = buffer.get(
-    index=0,
-    linear_offset=5,
-    is_valid_element=True,
-    vector_size=4
-)
-print(f"Vector read (4 elements from index 5): {vector_data}")
-
-# Vectorized write
-new_values = np.array([100, 101, 102, 103], dtype=np.float32)
-buffer.set(
-    index=0,
-    linear_offset=8,
-    is_valid_element=True,
-    value=new_values,
-    vector_size=4
-)
-
-print(f"After vectorized write: {buffer.data}")
+# Access entire rows
+print(f"\nRow access:")
+print(f"  Row 0: {buffer.data[0, :]}")
+print(f"  Row 1: {buffer.data[1, :]}")
 ```
 
 ## Memory Operations
 
-Different types of memory operations are supported:
+### SET Operation
 
 ```{pyodide}
-# Create buffer for memory operations
-data = np.array([10, 20, 30, 40, 50], dtype=np.float32)
-buffer = BufferView(
-    address_space=AddressSpaceEnum.GLOBAL,
-    data=data
+#| echo: true
+#| output: true
+
+from pytensor.buffer_view import MemoryOperation
+
+# Create a buffer for writing
+write_data = np.zeros((2, 3), dtype=np.float32)
+write_buffer = make_buffer_view(
+    data=write_data,
+    address_space=AddressSpace.GLOBAL,
+    memory_operation=MemoryOperation.SET
 )
 
-print(f"Initial data: {buffer.data}")
+print(f"Before SET operations:\n{write_buffer.data}")
 
-# SET operation (overwrite)
-buffer.update(
-    operation=MemoryOperationEnum.SET,
-    index=0,
-    linear_offset=2,
-    is_valid_element=True,
-    value=99.0
-)
-print(f"After SET at index 2: {buffer.data}")
+# Simulate SET operations (direct assignment)
+write_buffer.data[0, 0] = 100.0
+write_buffer.data[1, 2] = 200.0
 
-# ADD operation (accumulate)
-buffer.update(
-    operation=MemoryOperationEnum.ADD,
-    index=0,
-    linear_offset=2,
-    is_valid_element=True,
-    value=1.0
-)
-print(f"After ADD at index 2: {buffer.data}")
-
-# ATOMIC_MAX operation
-buffer.update(
-    operation=MemoryOperationEnum.ATOMIC_MAX,
-    index=0,
-    linear_offset=1,
-    is_valid_element=True,
-    value=25.0
-)
-print(f"After ATOMIC_MAX at index 1: {buffer.data}")
+print(f"\nAfter SET operations:\n{write_buffer.data}")
 ```
 
-## Address Space Types
-
-Different address spaces can be used for different memory hierarchies:
+### ADD Operation
 
 ```{pyodide}
-# Create buffers for different address spaces
-data = np.array([1, 2, 3, 4], dtype=np.int32)
+#| echo: true
+#| output: true
 
-# Global memory (GPU global memory)
-global_buffer = BufferView(
-    address_space=AddressSpaceEnum.GLOBAL,
-    data=data.copy()
+# Create a buffer for accumulation
+accum_data = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
+accum_buffer = make_buffer_view(
+    data=accum_data,
+    address_space=AddressSpace.LDS,  # Local Data Share
+    memory_operation=MemoryOperation.ADD
 )
 
-# Local Data Share (GPU shared memory)
-lds_buffer = BufferView(
-    address_space=AddressSpaceEnum.LDS,
-    data=data.copy()
-)
+print(f"Before ADD operations:\n{accum_buffer.data}")
 
-# Vector registers
-vgpr_buffer = BufferView(
-    address_space=AddressSpaceEnum.VGPR,
-    data=data.copy()
-)
+# Simulate ADD operations (accumulation)
+accum_buffer.data[0, 0] += 10.0
+accum_buffer.data[1, 1] += 20.0
 
-print(f"Global buffer: {global_buffer.get_address_space().name}")
-print(f"LDS buffer: {lds_buffer.get_address_space().name}")
-print(f"VGPR buffer: {vgpr_buffer.get_address_space().name}")
+print(f"\nAfter ADD operations:\n{accum_buffer.data}")
 ```
 
-## Invalid Element Handling
+## Advanced Buffer Operations
 
-Buffer views provide flexible handling of invalid or out-of-bounds accesses:
+### Buffer Views with Strides
 
 ```{pyodide}
-# Create buffer with custom invalid element handling
-data = np.array([10, 20, 30], dtype=np.float32)
+#| echo: true
+#| output: true
 
-# Buffer that returns zero for invalid elements
-zero_buffer = BufferView(
-    address_space=AddressSpaceEnum.GLOBAL,
-    data=data,
-    invalid_element_use_numerical_zero=True
+# Create a larger array and view it with different strides
+large_data = np.arange(24, dtype=np.float32).reshape(4, 6)
+print(f"Large data (4x6):\n{large_data}")
+
+# Create a strided view (every other element)
+strided_view = large_data[::2, ::2]  # Every 2nd row and column
+strided_buffer = make_buffer_view(
+    data=strided_view,
+    address_space=AddressSpace.GLOBAL
 )
 
-# Buffer that returns custom value for invalid elements
-custom_buffer = BufferView(
-    address_space=AddressSpaceEnum.GLOBAL,
-    data=data,
-    invalid_element_use_numerical_zero=False,
-    invalid_element_value=-999.0
-)
-
-print(f"Data: {data}")
-
-# Test out-of-bounds access
-oob_zero = zero_buffer.get(0, 10, True, 1)  # Out of bounds
-oob_custom = custom_buffer.get(0, 10, True, 1)  # Out of bounds
-
-print(f"Out-of-bounds with zero handling: {oob_zero}")
-print(f"Out-of-bounds with custom value: {oob_custom}")
-
-# Test invalid element access
-invalid_zero = zero_buffer.get(0, 1, False, 1)  # Element marked as invalid
-invalid_custom = custom_buffer.get(0, 1, False, 1)  # Element marked as invalid
-
-print(f"Invalid element with zero handling: {invalid_zero}")
-print(f"Invalid element with custom value: {invalid_custom}")
+print(f"\nStrided view (2x3):\n{strided_buffer.data}")
+print(f"Strides: {strided_buffer.data.strides}")
 ```
 
-## Practical Example: Matrix Tile Operations
-
-Let's use buffer views to implement a simple matrix tile operation:
+### Buffer Reshaping
 
 ```{pyodide}
-def process_matrix_tile(matrix_buffer, tile_row, tile_col, tile_size):
-    """Process a tile of a matrix using buffer view operations."""
-    result = []
-    
-    for i in range(tile_size):
-        for j in range(tile_size):
-            # Calculate global position
-            global_row = tile_row * tile_size + i
-            global_col = tile_col * tile_size + j
-            linear_offset = global_row * 8 + global_col  # Assuming 8 columns total
-            
-            # Read element
-            element = matrix_buffer.get(
-                index=0,
-                linear_offset=linear_offset,
-                is_valid_element=True,
-                vector_size=1
-            )
-            
-            # Simple processing: square the element
-            processed = element * element
-            
-            # Write back
-            matrix_buffer.set(
-                index=0,
-                linear_offset=linear_offset,
-                is_valid_element=True,
-                value=processed
-            )
-            
-            result.append(processed)
-    
-    return result
+#| echo: true
+#| output: true
 
-# Create a 4x8 matrix
-matrix_data = np.arange(32, dtype=np.float32).reshape(4, 8)
-print("Original matrix:")
-print(matrix_data)
+# Reshape buffer data
+original = np.arange(12, dtype=np.float32).reshape(3, 4)
+print(f"Original shape {original.shape}:\n{original}")
 
-# Create buffer view
-matrix_buffer = BufferView(
-    address_space=AddressSpaceEnum.GLOBAL,
-    data=matrix_data.flatten()
-)
+# Create buffer and reshape
+buffer = make_buffer_view(data=original)
+reshaped = buffer.data.reshape(2, 6)
 
-# Process a 2x2 tile at position (1, 2)
-tile_result = process_matrix_tile(matrix_buffer, 1, 2, 2)
-print(f"Processed tile values: {tile_result}")
+print(f"\nReshaped to {reshaped.shape}:\n{reshaped}")
 
-# Show the modified matrix
-modified_matrix = matrix_buffer.data.reshape(4, 8)
-print("Matrix after tile processing:")
-print(modified_matrix)
+# Note: Both views share the same underlying memory
+original[0, 0] = 999
+print(f"\nAfter modifying original[0,0]:\n{reshaped}")
 ```
 
-## Buffer View Factory
+## Buffer View Patterns
 
-Use the factory function for convenient buffer creation:
+### Read-Only Buffers
 
 ```{pyodide}
-# Create buffers using the factory function
-data = np.array([1, 2, 3, 4, 5], dtype=np.int32)
+#| echo: true
+#| output: true
 
-# Simple buffer
-buffer1 = make_buffer_view(
-    data=data,
-    buffer_size=len(data)
+# Create read-only buffer for input data
+input_data = np.array([1, 4, 9, 16, 25], dtype=np.float32)
+readonly_buffer = make_buffer_view(
+    data=input_data,
+    address_space=AddressSpace.GLOBAL
 )
 
-# Buffer with custom settings
-buffer2 = make_buffer_view(
-    data=data,
-    buffer_size=len(data),
-    address_space=AddressSpaceEnum.LDS,
-    invalid_element_value=-1,
-    invalid_element_use_numerical_zero=False
-)
-
-print(f"Buffer 1: {buffer1}")
-print(f"Buffer 2: {buffer2}")
+print(f"Read-only buffer: {readonly_buffer.data}")
+print(f"Can be used for input to computations")
 ```
 
-## Key Concepts
+### Write-Only Buffers
 
-1. **Address Spaces**: Different memory hierarchies (Global, LDS, VGPR)
-2. **Vectorized Access**: Efficient multi-element operations
-3. **Bounds Checking**: Safe memory access with invalid element handling
-4. **Memory Operations**: SET, ADD, ATOMIC operations
-5. **GPU Memory Model**: Abstractions for GPU memory hierarchies
+```{pyodide}
+#| echo: true
+#| output: true
 
-Buffer views provide the low-level foundation for efficient tensor operations by abstracting memory access patterns and supporting GPU-specific memory hierarchies.
+# Create write-only buffer for output data
+output_data = np.zeros(5, dtype=np.float32)
+writeonly_buffer = make_buffer_view(
+    data=output_data,
+    address_space=AddressSpace.GLOBAL,
+    memory_operation=MemoryOperation.SET
+)
+
+# Simulate computation writing to buffer
+for i in range(len(writeonly_buffer.data)):
+    writeonly_buffer.data[i] = (i + 1) ** 2
+
+print(f"Write-only buffer after computation: {writeonly_buffer.data}")
+```
+
+## Relationship to Other Concepts
+
+Buffer views are the foundation for:
+
+- **Tensor Views** - Combine buffers with tensor descriptors for structured access
+- **Tile Windows** - Provide windowed access to buffer regions
+- **Static Distributed Tensors** - Thread-local buffer management
+- **Memory Operations** - All tensor operations ultimately access memory through buffer views
 
 ## Next Steps
 
-- **[Tensor Descriptor](tensor-descriptor.qmd)** - Learn how tensors use buffer views
-- **[Tile Operations](tile-distribution.qmd)** - See buffer views in tile-based processing
-- **[Tensor Coordinate](tensor-coordinate.qmd)** - Understand coordinate to memory mapping 
+- Learn about [Tensor Coordinates](tensor-coordinate.qmd) for multi-dimensional indexing
+- Explore [Tensor Views](tensor-view.qmd) to see how buffers combine with descriptors
+- Understand [Static Distributed Tensors](static-distributed-tensor.qmd) for parallel buffer management
+
+Buffer views provide the essential memory abstraction that enables all higher-level tensor operations in PythonCK. 

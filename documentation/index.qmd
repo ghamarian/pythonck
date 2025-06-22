@@ -3,137 +3,106 @@ title: "Composable-Kernels Python Documentation"
 format: live-html
 ---
 
+# PythonCK: Python Implementation of Composable Kernels
+
+Welcome to PythonCK, a Python implementation of tensor operations and concepts from the AMD Composable Kernels library. This package provides educational implementations that focus on clarity and understanding rather than performance.
+
+## 🎓 **Recommended Learning Path**
+
+**New to PythonCK?** Follow our structured learning path to understand all concepts:
+
+### **[📚 Complete Learning Path](concepts/learning-path.qmd)**
+A step-by-step guide that builds from basic concepts to advanced GPU thread coordination, culminating in understanding the complete `tile_distr_thread_mapping.py` example.
+
+## 📖 **Learning by Topic**
+
+### 1. **Foundation Concepts**
+- [Buffer Views](concepts/buffer-view.qmd) - Memory buffer abstraction
+- [Tensor Coordinates](concepts/tensor-coordinate.qmd) - Multi-dimensional indexing
+- [Tensor Descriptors](concepts/tensor-descriptor.qmd) - Layout transformations
+- [Tensor Views](concepts/tensor-view.qmd) - Unified tensor access
+
+### 2. **Distribution Concepts**
+- [Tile Distribution Encoding](concepts/tile-distribution-encoding.qmd) - How data is distributed
+- [Tile Distribution](concepts/tile-distribution.qmd) - Parallel processing coordination
+- [Static Distributed Tensors](concepts/static-distributed-tensor.qmd) - Thread-local data
+
+### 3. **Advanced Operations**
+- [Tile Windows](concepts/tile-window.qmd) - Windowed tensor access
+- [Sweep Operations](concepts/sweep-tile.qmd) - Iterating over distributed data
+- [Thread Mapping](concepts/thread-mapping.qmd) - Understanding the complete pipeline
+
+## 📦 **Package Structure**
+
+```
+pytensor/                    # Core tensor operations
+├── buffer_view.py          # Memory abstraction
+├── tensor_coordinate.py    # Multi-dimensional indexing
+├── tensor_descriptor.py    # Layout transformations  
+├── tensor_view.py          # Unified access interface
+├── tile_distribution.py    # Data distribution
+├── tile_window.py          # Windowed access
+├── sweep_tile.py           # Coordinated iteration
+└── ...
+
+tensor_transforms/          # Analysis tools
+├── parser.py              # Descriptor parsing
+├── analyzer.py            # Transformation analysis
+└── ...
+
+tile_distribution/          # Visualization tools
+├── parser.py              # C++ encoding parsing
+├── visualizer.py          # Interactive visualization
+└── ...
+```
+
+## 🔑 **Key Concepts**
+
+**PythonCK** implements several interconnected concepts:
+
+1. **Tensors** are multi-dimensional arrays with flexible layouts
+2. **Coordinates** provide multi-dimensional indexing with transformations
+3. **Distributions** define how data is spread across parallel processing elements
+4. **Tiles** represent chunks of data processed by individual threads/warps
+5. **Sweeps** iterate over distributed data in a coordinated manner
+
+The ultimate goal is understanding how GPU threads coordinate to process large tensors efficiently, as demonstrated in the complete example at `tile_distr_thread_mapping.py`.
+
+## 🚀 **Quick Start**
+
+Jump right in with interactive examples:
+
 ```{pyodide}
 #| echo: true
 #| output: true
 
-import micropip
-import sys
+# PythonCK is already available - let's explore!
+import pytensor
+from pytensor.tensor_coordinate import MultiIndex, TensorCoordinate
 
-print("=== Setting up PythonCK ===")
+# Create a simple multi-dimensional index
+multi_idx = MultiIndex(3, [2, 1, 0])
+print(f"3D index: {multi_idx}")
 
-# Install dependencies first
-print("Installing dependencies...")
-await micropip.install("sympy")
-
-# Try multiple installation methods
-methods = [
-    ("Raw GitHub (master branch)", "https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl"),
-    ("GitHub Release", "https://github.com/ghamarian/pythonck/releases/download/v0.1.0/pythonck-0.1.0-py3-none-any.whl"),
-    ("Local package simulation", None)
-]
-
-success = False
-for method_name, url in methods:
-    if success:
-        break
-        
-    try:
-        if url:
-            print(f"Trying {method_name}...")
-            await micropip.install(url)
-        else:
-            # As a fallback, let's just install the dependencies and show what we can do
-            print("Fallback: Setting up basic environment...")
-            # We'll create a minimal pytensor module inline
-            exec("""
-import sys
-import types
-
-# Create a minimal pytensor module
-pytensor = types.ModuleType('pytensor')
-pytensor.__file__ = '<inline>'
-
-# Add some basic classes for demonstration
-class MultiIndex:
-    def __init__(self, *indices):
-        self.indices = list(indices)
-    
-    def __repr__(self):
-        return f"MultiIndex({self.indices})"
-
-class TensorCoordinate:
-    def __init__(self, multi_index):
-        self.multi_index = multi_index
-    
-    def __repr__(self):
-        return f"TensorCoordinate({self.multi_index})"
-
-pytensor.MultiIndex = MultiIndex
-pytensor.TensorCoordinate = TensorCoordinate
-
-# Add to sys.modules
-sys.modules['pytensor'] = pytensor
-sys.modules['pytensor.tensor_coordinate'] = pytensor
-""")
-        
-        # Test import
-        import pytensor
-        print(f"✓ {method_name} - pytensor imported successfully!")
-        
-        # Test basic functionality
-        from pytensor.tensor_coordinate import TensorCoordinate, MultiIndex
-        print("✓ Core classes imported successfully!")
-        
-        # Show available modules
-        print(f"✓ Available pytensor modules: {[attr for attr in dir(pytensor) if not attr.startswith('_')]}")
-        
-        success = True
-        
-    except Exception as e:
-        print(f"✗ {method_name} failed: {e}")
-        continue
-
-if not success:
-    print("⚠ All installation methods failed, but basic dependencies are available")
-else:
-    print("✓ PythonCK environment ready!")
-
-print("=== Setup Complete ===")
-```
-
-# Welcome to PythonCK
-
-PythonCK is a Python implementation of Composable Kernels tensor operations, providing a high-level interface for understanding and experimenting with GPU tensor computations.
-
-## What is Composable Kernels?
-
-Composable Kernels (CK) is a performance portable programming model for writing high performance GPU kernels for machine learning workloads across multiple architectures including GCDCore, CDNA, RDNA architectures, and various other GPU architectures.
-
-This Python implementation allows you to:
-
-- **Understand** the core concepts behind tensor operations
-- **Experiment** with tensor transformations interactively
-- **Visualize** how data flows through different tensor operations
-- **Learn** GPU kernel design patterns
-
-## Quick Example
-
-```{pyodide}
-from pytensor.tensor_coordinate import TensorCoordinate, MultiIndex
-
-# Create a 2D tensor coordinate
-coord = TensorCoordinate(
-    ndim_hidden=3,
-    top_dimension_hidden_ids=[1, 2],
-    idx_hidden=MultiIndex(3, [0, 2, 3])
-)
+# Create a tensor coordinate
+coord = TensorCoordinate(multi_idx)
 print(f"Tensor coordinate: {coord}")
-print(f"Tensor index: {coord.get_index().to_list()}")
+
+print("✅ PythonCK is ready for exploration!")
 ```
 
-## Key Concepts
+## 🎯 **Learning Paths**
 
-### Core Tensor Abstractions
-- **[Buffer View](concepts/buffer-view.qmd)** - Low-level memory access patterns
-- **[Tensor Coordinate](concepts/tensor-coordinate.qmd)** - Multi-dimensional indexing
+Choose your learning approach:
 
-### Getting Started
+- **🎓 [Structured Path](concepts/learning-path.qmd)** - Follow the complete 10-step progression
+- **🔍 [Concept-Driven](concepts/buffer-view.qmd)** - Explore individual concepts as needed
+- **💻 [Code-First](api/index.qmd)** - Jump into the API documentation
+- **🎮 [Interactive](tutorials/index.qmd)** - Try hands-on tutorials
 
-1. **Interactive Examples** - All code examples are runnable in your browser!
-2. **[API Reference](api/index.qmd)** - Complete API documentation
+## ✨ **Interactive Features**
 
-## Features of This Documentation
+This documentation includes:
 
 - 🏃 **Live Code Execution** - Run Python code directly in your browser
 - 📱 **Responsive Design** - Works on desktop and mobile
@@ -144,4 +113,4 @@ print(f"Tensor index: {coord.get_index().to_list()}")
 
 ---
 
-Ready to explore? Try the interactive examples above or check out the [Buffer View](concepts/buffer-view.qmd) and [Tensor Coordinate](concepts/tensor-coordinate.qmd) concepts.
+*Ready to dive deeper? Start with our [Complete Learning Path](concepts/learning-path.qmd) or jump to any concept that interests you.*
