@@ -11,7 +11,7 @@ The fixed API eliminates the conversion code and provides a clean interface.
 """
 
 import numpy as np
-from examples import get_default_variables
+from tile_distribution.examples import get_default_variables
 from pytensor.tile_distribution_encoding import TileDistributionEncoding
 from pytensor.tile_distribution import make_static_tile_distribution
 from pytensor.static_distributed_tensor import StaticDistributedTensor

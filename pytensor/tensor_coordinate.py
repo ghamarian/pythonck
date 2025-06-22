@@ -277,81 +277,37 @@ def move_tensor_adaptor_coordinate(adaptor: 'TensorAdaptor', coord: TensorAdapto
     ndim_bottom = adaptor.get_num_of_bottom_dimension()
     ntransform = adaptor.get_num_of_transform()
     
-    # Determine which transforms need to be executed
-    do_transforms = [True] * ntransform  # Default: do all transforms
-    
-    if judge_do_transforms:
-        # Check which dimensions have non-zero differences
-        is_non_zero_diff = [False] * ndim_hidden
-        
-        # Set non-zero flags for top dimensions
-        top_dim_ids = adaptor.get_top_dimension_hidden_ids()
-        for i, hid in enumerate(top_dim_ids):
-            if i < len(idx_diff_top) and idx_diff_top[i] != 0:
-                is_non_zero_diff[hid] = True
-        
-        # Propagate non-zero flags through transforms
-        for itran in range(ntransform - 1, -1, -1):
-            dims_low = adaptor.get_lower_dimension_hidden_idss()[itran]
-            dims_up = adaptor.get_upper_dimension_hidden_idss()[itran]
-            
-            # Check if any upper dimension has non-zero diff
-            has_non_zero = any(is_non_zero_diff[hid] for hid in dims_up)
-            do_transforms[itran] = has_non_zero
-            
-            # If transform is needed, mark all lower dimensions as potentially non-zero
-            if has_non_zero:
-                for hid in dims_low:
-                    is_non_zero_diff[hid] = True
-    
-    # Initialize difference for hidden dimensions
-    idx_diff_hidden = MultiIndex(ndim_hidden)
-    
-    # Set top dimension differences
-    top_dim_ids = adaptor.get_top_dimension_hidden_ids()
-    for i, hid in enumerate(top_dim_ids):
-        if i < len(idx_diff_top):
-            idx_diff_hidden[hid] = idx_diff_top[i]
-    
-    # Update top indices in coordinate
+    # Get current state
     idx_hidden = coord.get_hidden_index()
+    top_dim_ids = adaptor.get_top_dimension_hidden_ids()
+    bottom_dim_ids = adaptor.get_bottom_dimension_hidden_ids()
+    
+    # Calculate new top indices
+    new_top_indices = []
     for i, hid in enumerate(top_dim_ids):
         if i < len(idx_diff_top):
-            idx_hidden[hid] += idx_diff_top[i]
+            new_val = idx_hidden[hid] + idx_diff_top[i]
+            new_top_indices.append(new_val)
+        else:
+            new_top_indices.append(idx_hidden[hid])
     
-    # Update lower indices through transforms
-    for itran in range(ntransform - 1, -1, -1):
-        if do_transforms[itran]:
-            transform = adaptor.get_transforms()[itran]
-            dims_low = adaptor.get_lower_dimension_hidden_idss()[itran]
-            dims_up = adaptor.get_upper_dimension_hidden_idss()[itran]
-            
-            # Get current upper index
-            idx_up_new = MultiIndex(len(dims_up), [idx_hidden[hid] for hid in dims_up])
-            
-            # Get upper index difference
-            idx_diff_up = MultiIndex(len(dims_up), [idx_diff_hidden[hid] for hid in dims_up])
-            
-            # Get old lower index before update
-            idx_low_old = MultiIndex(len(dims_low), [idx_hidden[hid] for hid in dims_low])
-            
-            # Calculate new lower index from new upper index
-            idx_low_new = transform.calculate_lower_index(idx_up_new)
-            
-            # Calculate lower index difference
-            idx_diff_low = MultiIndex(len(dims_low))
-            for i in range(len(dims_low)):
-                idx_diff_low[i] = idx_low_new[i] - idx_low_old[i]
-            
-            # Store results
-            for i, hid in enumerate(dims_low):
-                idx_diff_hidden[hid] = idx_diff_low[i]
-                idx_hidden[hid] = idx_low_new[i]
+    # Get old bottom indices for difference calculation
+    old_bottom_indices = [idx_hidden[hid] for hid in bottom_dim_ids]
     
-    # Extract bottom index difference
-    bottom_dim_ids = adaptor.get_bottom_dimension_hidden_ids()
-    idx_diff_bottom = MultiIndex(len(bottom_dim_ids), 
-                                [idx_diff_hidden[hid] for hid in bottom_dim_ids])
+    # Create a completely new coordinate with the new top indices
+    # This ensures all transforms are applied correctly and consistently
+    new_coord = make_tensor_adaptor_coordinate(adaptor, MultiIndex(len(new_top_indices), new_top_indices))
+    
+    # Get the new bottom indices from the correctly calculated coordinate
+    new_bottom_indices = new_coord.get_bottom_index().to_list()
+    
+    # Calculate the bottom index difference
+    idx_diff_bottom = MultiIndex(len(bottom_dim_ids))
+    for i in range(len(bottom_dim_ids)):
+        idx_diff_bottom[i] = new_bottom_indices[i] - old_bottom_indices[i]
+    
+    # Update the original coordinate to the new state
+    coord.set_hidden_index(new_coord.get_hidden_index())
     
     return idx_diff_bottom
 

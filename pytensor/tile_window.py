@@ -373,16 +373,11 @@ class TileWindowWithStaticDistribution:
             vector_size = access_info['vector_size']
             vector_values = []
             
-            # Debug: Show what coordinates we're using
-            tensor_coords = bottom_tensor_coord.get_index().to_list()
-            print(f"DEBUG Store: bottom_tensor_coord = {tensor_coords}, vector_indices = {access_info['vector_indices']}")
-            
             for j, idx_ys in enumerate(access_info['vector_indices']):
                 # Get value from distributed tensor
                 d_offset = ys_to_d_desc.calculate_offset(idx_ys)
                 value = src_tensor.get_thread_data(d_offset)
                 vector_values.append(value)
-                print(f"  Y{idx_ys} -> D{d_offset} -> value {value}")
             
             # Pad to vector_size if needed
             while len(vector_values) < vector_size:
@@ -395,7 +390,6 @@ class TileWindowWithStaticDistribution:
             else:
                 write_value = np.array(vector_values[:vector_size])
             
-            print(f"  Writing {write_value} to tensor coords {tensor_coords}")
             self.bottom_tensor_view.set_vectorized_elements(
                 bottom_tensor_coord,
                 write_value,
@@ -404,7 +398,33 @@ class TileWindowWithStaticDistribution:
                 oob_conditional_check=oob_conditional_check
             )
 
-        self._traverse_window(process_store, oob_conditional_check)
+        # Use a direct coordinate calculation approach instead of incremental movement
+        # This is more reliable and matches the expected behavior
+        ys_to_d_desc = self.tile_distribution.ys_to_d_descriptor
+        
+        for i_access in range(self.traits.num_access):
+            # Get Y indices for this access
+            access_info = self.traits.get_vectorized_access_info(i_access)
+            idx_ys = access_info['vector_indices'][0]  # Get the Y coordinate
+            
+            # Calculate tensor coordinate directly from Y coordinate and window origin
+            # This works for any number of dimensions
+            tensor_coord = []
+            for dim in range(len(self.window_origin)):
+                if dim < len(idx_ys):
+                    tensor_coord.append(self.window_origin[dim] + idx_ys[dim])
+                else:
+                    tensor_coord.append(self.window_origin[dim])
+            
+            # Create tensor coordinate object
+            bottom_tensor_coord = make_tensor_coordinate(
+                self.bottom_tensor_view.tensor_desc,
+                tensor_coord
+            )
+            
+            # Process this access
+            if not oob_conditional_check or self._is_coordinate_valid(bottom_tensor_coord):
+                process_store(access_info, bottom_tensor_coord, ys_to_d_desc)
     
     def store_raw(self, src_tensor: StaticDistributedTensor, oob_conditional_check: bool = True):
         """
