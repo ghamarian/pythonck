@@ -1,26 +1,59 @@
 ---
-title: "Buffer Views"
+title: "Buffer View"
+format: live-html
 ---
-
-# Buffer Views
-
-Buffer views provide low-level memory access abstractions in PythonCK, supporting different address spaces and memory access patterns common in GPU computing.
 
 ```{pyodide}
 #| echo: false
 #| output: false
-# Hidden setup - automatically install the package
+
 import micropip
+import sys
+
+# Install package if needed
 try:
-    base_url = str(js.window.location.origin)
-    wheel_url = f"{base_url}/pythonck-0.1.0-py3-none-any.whl"
-    await micropip.install(wheel_url)
-except:
+    import pytensor
+    print("✓ pytensor is already available!")
+except ImportError:
+    print("Installing pythonck package...")
+    
+    # Try wheel file first
     try:
-        await micropip.install("./pythonck-0.1.0-py3-none-any.whl")
-    except:
-        pass  # Package may already be installed
+        await micropip.install("sympy")
+        await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl")
+        import pytensor
+        print("✓ Successfully imported pytensor from wheel!")
+    except Exception as e:
+        print(f"Wheel installation failed: {e}")
+        print("Using fallback implementation...")
+        
+        # Fallback: create minimal pytensor module with buffer_view
+        exec("""
+import sys
+import types
+import numpy as np
+
+pytensor = types.ModuleType('pytensor')
+pytensor.__file__ = '<inline>'
+
+class BufferView:
+    def __init__(self, data):
+        self.data = np.array(data) if not isinstance(data, np.ndarray) else data
+    
+    def __repr__(self):
+        return f"BufferView(shape={self.data.shape}, dtype={self.data.dtype})"
+
+pytensor.BufferView = BufferView
+sys.modules['pytensor'] = pytensor
+sys.modules['pytensor.buffer_view'] = pytensor
+""")
+        import pytensor
+        print("✓ Fallback pytensor module loaded!")
 ```
+
+# Buffer Views
+
+Buffer views provide low-level memory access abstractions in PythonCK, supporting different address spaces and memory access patterns common in GPU computing.
 
 ## Setup
 

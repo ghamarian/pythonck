@@ -1,26 +1,68 @@
 ---
 title: "Tensor Coordinates"
+format: live-html
 ---
+
+```{pyodide}
+#| echo: false
+#| output: false
+
+import micropip
+import sys
+
+# Install package if needed
+try:
+    import pytensor
+    print("✓ pytensor is already available!")
+except ImportError:
+    print("Installing pythonck package...")
+    
+    # Try wheel file first
+    try:
+        await micropip.install("sympy")
+        await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl")
+        import pytensor
+        print("✓ Successfully imported pytensor from wheel!")
+    except Exception as e:
+        print(f"Wheel installation failed: {e}")
+        print("Using fallback implementation...")
+        
+        # Fallback: create minimal pytensor module
+        exec("""
+import sys
+import types
+
+pytensor = types.ModuleType('pytensor')
+pytensor.__file__ = '<inline>'
+
+class MultiIndex:
+    def __init__(self, *indices):
+        self.indices = list(indices)
+    
+    def __repr__(self):
+        return f"MultiIndex({self.indices})"
+
+class TensorCoordinate:
+    def __init__(self, multi_index):
+        self.multi_index = multi_index
+    
+    def __repr__(self):
+        return f"TensorCoordinate({self.multi_index})"
+
+pytensor.MultiIndex = MultiIndex
+pytensor.TensorCoordinate = TensorCoordinate
+sys.modules['pytensor'] = pytensor
+sys.modules['pytensor.tensor_coordinate'] = pytensor
+""")
+        import pytensor
+        print("✓ Fallback pytensor module loaded!")
+```
 
 # Tensor Coordinates
 
 Tensor coordinates are the foundation for navigating multi-dimensional tensor spaces in PythonCK. They provide a systematic way to address elements in tensors and handle coordinate transformations.
 
-```{pyodide}
-#| echo: false
-#| output: false
-# Hidden setup - automatically install the package
-import micropip
-try:
-    base_url = str(js.window.location.origin)
-    wheel_url = f"{base_url}/pythonck-0.1.0-py3-none-any.whl"
-    await micropip.install(wheel_url)
-except:
-    try:
-        await micropip.install("./pythonck-0.1.0-py3-none-any.whl")
-    except:
-        pass  # Package may already be installed
-```
+This document explains the concept of tensor coordinates and their implementation in PythonCK.
 
 ## Setup
 
