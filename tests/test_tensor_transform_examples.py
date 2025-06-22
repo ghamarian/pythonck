@@ -12,8 +12,7 @@ import os
 # Add parent directory to path to import modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from tensor_transform_examples import get_transform_examples, get_default_variables
-from tensor_transform_parser import TensorTransformParser
+from tensor_transforms import get_transform_examples, get_default_variables, TensorTransformParser
 
 
 class TestTensorTransformExamples:

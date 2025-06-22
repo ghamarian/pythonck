@@ -5,7 +5,7 @@ import os
 # Add the parent directory to sys.path to import the modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from tensor_transform_parser import TensorTransformParser
+from tensor_transforms import TensorTransformParser
 from tensor_transform_app import build_transformation_graph_from_pytensor
 
 

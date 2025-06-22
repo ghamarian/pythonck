@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import pytest
-from tensor_transform_parser import TensorTransformParser
+from tensor_transforms import TensorTransformParser
 
 class TestXorIntegration:
     """Test XOR transform integration with the parser."""

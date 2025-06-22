@@ -7,7 +7,7 @@ and build a graph of transformations.
 
 from typing import List, Dict, Any, Set
 import sympy as sp
-from tensor_transform_parser import TensorTransformParser
+from .parser import TensorTransformParser
 
 class TensorTransformAnalyzer:
     """Analyzer for tensor descriptor transformations."""
@@ -123,7 +123,7 @@ class TensorTransformAnalyzer:
 
 # Simple CLI/test function
 def demo():
-    from tensor_transform_parser import TensorTransformParser
+    from .parser import TensorTransformParser
     # Example: chain of two descriptors (can be replaced with any list)
     descriptor1 = """
     transform_tensor_descriptor(

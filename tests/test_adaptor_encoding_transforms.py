@@ -18,7 +18,7 @@ from pytensor.tile_distribution import (
     _construct_static_tensor_adaptor_from_encoding,
     make_static_tile_distribution
 )
-from examples import EXAMPLES, DEFAULT_VARIABLES
+from tile_distribution.examples import EXAMPLES, DEFAULT_VARIABLES
 import re
 import numpy as np
 

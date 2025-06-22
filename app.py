@@ -16,13 +16,14 @@ from typing import Dict, List, Tuple, Any, Optional
 import plotly.express as px
 
 # Import local modules
-from parser import TileDistributionParser, debug_indexing_relationships
-from tiler_pedantic import TileDistributionPedantic as TileDistribution
-import visualizer
-from test_visualization import create_indexing_visualization
-from visualizer import visualize_hierarchical_tiles
-from visualizer import visualize_y_space_structure
-from examples import get_examples, get_default_variables
+from tile_distribution import (
+    TileDistributionParser, debug_indexing_relationships,
+    TileDistributionPedantic as TileDistribution,
+    create_indexing_visualization,
+    visualize_hierarchical_tiles, visualize_y_space_structure,
+    get_examples, get_default_variables
+)
+import tile_distribution.visualizer as visualizer
 
 # Add new imports for transformation graph visualization
 import graphviz

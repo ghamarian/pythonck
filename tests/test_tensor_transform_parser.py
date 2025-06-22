@@ -1,9 +1,7 @@
 import pytest
 import sympy as sp
-from tensor_transform_parser import TensorTransformParser
-from tensor_transform_examples import get_transform_examples, get_default_variables
+from tensor_transforms import TensorTransformParser, get_transform_examples, get_default_variables, extract_descriptors_from_text
 from tensor_transform_app import build_transformation_graph_from_pytensor
-from extract_descriptors import extract_descriptors_from_text
 
 def test_parse_tensor_descriptor():
     """Test parsing a full tensor descriptor."""

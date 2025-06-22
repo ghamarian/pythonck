@@ -17,8 +17,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tensor_transform_app import build_transformation_graph_from_pytensor, build_backward_transformation_graph_from_pytensor
-from extract_descriptors import extract_descriptors_from_text
-from tensor_transform_parser import TensorTransformParser
+from tensor_transforms import extract_descriptors_from_text, TensorTransformParser
 
 
 class TestFourDescriptorPipeline(unittest.TestCase):

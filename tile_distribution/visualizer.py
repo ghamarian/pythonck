@@ -12,7 +12,7 @@ import networkx as nx
 import numpy as np
 import textwrap  # Add textwrap for text wrapping
 from typing import Dict, List, Any, Tuple, Optional
-from parser import TileDistributionParser
+from .parser import TileDistributionParser
 
 def display_raw_encoding(encoding: Dict[str, Any]) -> str:
     """

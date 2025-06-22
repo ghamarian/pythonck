@@ -7,13 +7,14 @@ import sympy as sp
 import re
 import time
 import math
-from tensor_transform_parser import TensorTransformParser, get_cpp_keywords, extract_descriptor_references
+from tensor_transforms import (
+    TensorTransformParser, get_cpp_keywords, extract_descriptor_references,
+    get_transform_examples, get_default_variables, extract_descriptors_from_text
+)
 from pytensor.tensor_descriptor import (
     Transform, PassThroughTransform, MergeTransform, UnmergeTransform,
     EmbedTransform, OffsetTransform, PadTransform, ReplicateTransform
 )
-from tensor_transform_examples import get_transform_examples, get_default_variables
-from extract_descriptors import extract_descriptors_from_text
 from typing import Dict, Any, List, Tuple
 import graphviz
 import pytensor.tensor_descriptor
@@ -291,7 +292,7 @@ def create_hierarchical_merge_nodes(transform, input_symbols, lower_indices, upp
     """
     import sympy as sp
     from pytensor.tensor_descriptor import MergeTransform, PassThroughTransform
-    from tensor_transform_parser import TensorTransformParser
+    from tensor_transforms import TensorTransformParser
     
     print(f"DEBUG: Creating hierarchical merge nodes for structure: {structure}")
     

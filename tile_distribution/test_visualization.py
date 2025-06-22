@@ -10,9 +10,9 @@ import matplotlib.patches as patches
 import json
 import numpy as np
 import textwrap
-from parser import TileDistributionParser, debug_indexing_relationships
-import visualizer
-from tiler import TileDistribution
+from .parser import TileDistributionParser, debug_indexing_relationships
+from . import visualizer
+from .tiler_pedantic import TileDistributionPedantic as TileDistribution
 from typing import Dict, Any
 
 def create_indexing_visualization(indexing_debug, variables, figsize=(18, 10)):

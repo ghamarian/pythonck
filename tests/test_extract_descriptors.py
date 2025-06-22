@@ -1,5 +1,5 @@
 import pytest
-from extract_descriptors import extract_descriptors_from_text
+from tensor_transforms import extract_descriptors_from_text
 
 def test_extract_descriptors_from_realistic_code():
     code = '''

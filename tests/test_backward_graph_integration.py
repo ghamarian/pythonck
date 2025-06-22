@@ -13,8 +13,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tensor_transform_app import build_backward_transformation_graph_from_pytensor
-from tensor_transform_examples import get_transform_examples, get_default_variables
-from extract_descriptors import extract_descriptors_from_text
+from tensor_transforms import get_transform_examples, get_default_variables, extract_descriptors_from_text
 
 
 class TestBackwardGraphIntegration:

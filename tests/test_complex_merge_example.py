@@ -6,7 +6,7 @@ specified in the tensor descriptor transformation.
 """
 
 import pytest
-from tensor_transform_parser import TensorTransformParser
+from tensor_transforms import TensorTransformParser
 from tensor_transform_app import build_combined_formula, build_combined_backward_formula
 import sympy as sp
 

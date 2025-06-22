@@ -1,4 +1,52 @@
-# Tile Distribution Visualizer
+# Python Tensor and Tile Distribution Tools
+
+This repository contains visualization and analysis tools for understanding Composable Kernels concepts, including tensor transformations and tile distributions.
+
+## Main Applications
+
+The repository includes four main Streamlit applications:
+
+1. **`app.py`** - Tile Distribution Visualizer: Interactive exploration of `tile_distribution_encoding` structures
+2. **`tensor_transform_app.py`** - Tensor Transform Visualizer: Analysis and visualization of tensor descriptor transformations 
+3. **`thread_visualization_app.py`** - Thread Coordinate Visualization: Thread mapping and coordinate analysis
+4. **`tensor_visualization_app.py`** - Tensor Coordinate Mappings: Interactive tensor coordinate exploration
+
+## Repository Structure
+
+```
+├── app.py                          # Main tile distribution visualizer
+├── tensor_transform_app.py         # Tensor transformation visualizer
+├── thread_visualization_app.py     # Thread visualization app
+├── tensor_visualization_app.py     # Tensor coordinate mappings
+├── tile_distr_thread_mapping.py    # Thread mapping utilities
+├── pytensor/                       # Core library (tensor primitives)
+├── tile_distribution/              # Tile distribution module
+│   ├── parser.py                   # Parse C++ tile encodings
+│   ├── examples.py                 # Example encodings
+│   ├── tiler_pedantic.py          # Pedantic implementation
+│   ├── visualizer.py               # Visualization functions
+│   └── test_visualization.py       # Visualization tests
+├── tensor_transforms/              # Tensor transformation module
+│   ├── parser.py                   # Parse tensor descriptors
+│   ├── examples.py                 # Transform examples
+│   ├── analyzer.py                 # Transformation analysis
+│   └── extract_descriptors.py     # Descriptor extraction
+├── cpp/                           # C++ header files
+├── tests/                         # Test suite
+└── todelete/                      # Files marked for deletion
+```
+
+## Quick Start
+
+Run any of the main applications:
+```bash
+streamlit run app.py                      # Tile Distribution Visualizer
+streamlit run tensor_transform_app.py     # Tensor Transform Visualizer
+streamlit run thread_visualization_app.py # Thread Visualization
+streamlit run tensor_visualization_app.py # Tensor Coordinate Mappings
+```
+
+## Tile Distribution Visualizer
 
 This tool provides an interactive visualization of the `tile_distribution_encoding` concepts from the Composable Kernels library. It allows you to explore the hierarchical structure of tile distributions and understand how threads are mapped to data elements.
 
@@ -34,7 +82,7 @@ streamlit run app.py
 ### Using the Parser Directly
 
 ```python
-from parser import TileDistributionParser
+from tile_distribution import TileDistributionParser
 
 # Example C++ code
 cpp_code = """
@@ -58,8 +106,7 @@ print(result)
 ### Creating Visualizations
 
 ```python
-from parser import TileDistributionParser
-from visualizer import visualize_encoding_structure
+from tile_distribution import TileDistributionParser, visualize_encoding_structure
 import matplotlib.pyplot as plt
 
 # Parse encoding
