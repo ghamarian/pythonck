@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Deploy Streamlit Apps Script
-# This script starts all three Streamlit apps on different ports
+# Deploy Streamlit Apps Script - Fixed Version
+# This script starts all three Streamlit apps on different ports without baseUrlPath
 
 set -e  # Exit on any error
 
-echo "🚀 Starting Streamlit Apps Deployment..."
+echo "🚀 Starting Streamlit Apps Deployment (Fixed)..."
 
 # Kill any existing streamlit processes
 echo "🔄 Cleaning up existing processes..."
@@ -18,20 +18,20 @@ sleep 2
 start_app() {
     local app_file=$1
     local port=$2
-    local base_url=$3
-    local app_name=$4
+    local app_name=$3
     
     echo "🎯 Starting $app_name on port $port..."
     
-    # Start the app in the background
+    # Start the app in the background WITHOUT baseUrlPath
+    # Let nginx handle the path routing
     nohup streamlit run "$app_file" \
         --server.port=$port \
-        --server.address=127.0.0.1 \
-        --server.baseUrlPath="/$base_url" \
+        --server.address=0.0.0.0 \
         --server.enableCORS=false \
         --server.enableXsrfProtection=false \
         --server.enableWebsocketCompression=false \
         --server.allowRunOnSave=true \
+        --server.headless=true \
         > "logs/${app_name}.log" 2>&1 &
     
     # Get the PID
@@ -43,15 +43,15 @@ start_app() {
 # Create logs directory if it doesn't exist
 mkdir -p logs
 
-# Start each Streamlit app with the correct base URL paths
+# Start each Streamlit app without base URL paths
 echo "📊 Starting Tensor Transform App..."
-start_app "tensor_transform_app.py" 8501 "tensor-transform" "tensor-transform"
+start_app "tensor_transform_app.py" 8501 "tensor-transform"
 
-echo "📊 Starting Tensor Visualization App..."  
-start_app "tensor_visualization_app.py" 8502 "tensor-visualization" "tensor-visualization"
+echo "📊 Starting Tile Distribution App..."  
+start_app "app.py" 8502 "tile-distribution"
 
 echo "🧵 Starting Thread Visualization App..."
-start_app "thread_visualization_app.py" 8503 "thread-visualization" "thread-visualization"
+start_app "thread_visualization_app.py" 8503 "thread-visualization"
 
 # Wait for apps to start
 echo "⏳ Waiting for apps to start..."
@@ -69,9 +69,15 @@ done
 
 echo "🎉 All apps deployed! Access them via:"
 echo "📚 Documentation: https://ck.silobrain.com/"
-echo "🔄 Tensor Transform: https://ck.silobrain.com/tensor-transform/"
-echo "📊 Tensor Visualization: https://ck.silobrain.com/tensor-visualization/"
-echo "🧵 Thread Visualization: https://ck.silobrain.com/thread-visualization/"
+echo "🔄 Tensor Transform: https://ck.silobrain.com/tensor-transform"
+echo "📊 Tile Distribution: https://ck.silobrain.com/tile-distribution"
+echo "🧵 Thread Visualization: https://ck.silobrain.com/thread-visualization"
+
+echo ""
+echo "🔧 Direct access for testing:"
+echo "   http://localhost:8501 (Tensor Transform)"
+echo "   http://localhost:8502 (Tile Distribution)"
+echo "   http://localhost:8503 (Thread Visualization)"
 
 echo ""
 echo "📝 Logs are available in the logs/ directory"

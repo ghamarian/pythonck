@@ -1,0 +1,423 @@
+---
+title: "Tensor Views: Unified Memory Access"
+format: live-html
+---
+
+## 🎯 **What is a TensorView?**
+
+A **TensorView** combines a **BufferView** (memory access) with a **TensorDescriptor** (layout) to provide unified, coordinate-based access to tensor data. It's the bridge between mathematical tensor operations and actual memory manipulation.
+
+```{pyodide}
+#| echo: false
+#| output: false
+#| autorun: true
+
+# Auto-install pythonck package
+import micropip
+await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl")
+```
+
+## 🏗️ **Core Architecture**
+
+TensorView = BufferView + TensorDescriptor + Memory Operations
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+import numpy as np
+from pytensor.tensor_view import make_tensor_view, make_naive_tensor_view, MemoryOperationEnum, make_naive_tensor_view_packed, AddressSpaceEnum
+from pytensor.tensor_descriptor import make_naive_tensor_descriptor
+from pytensor.tensor_coordinate import make_tensor_coordinate, move_tensor_coordinate
+
+# Create a simple 3x4 tensor with row-major layout
+data = np.arange(12, dtype=np.float32).reshape(3, 4)
+print(f"Original data shape: {data.shape}")
+print(f"Original data:\n{data}")
+
+# Flatten for TensorView (it works with 1D arrays)
+flat_data = data.flatten()
+print(f"Flattened data: {flat_data}")
+
+# Create tensor view with explicit descriptor
+descriptor = make_naive_tensor_descriptor([3, 4], [4, 1])  # 3x4, row-major strides
+tensor_view = make_tensor_view(flat_data, descriptor)
+
+print(f"🎯 TensorView created: {tensor_view}")
+print(f"   Dimensions: {tensor_view.get_num_of_dimension()}")
+print(f"   Buffer size: {tensor_view.get_buffer_view().buffer_size}")
+print(f"   Element space: {tensor_view.get_tensor_descriptor().get_element_space_size()}")
+```
+
+## 📍 **Element Access Methods**
+
+TensorView provides multiple ways to access elements:
+
+### **1. Coordinate-Based Access**
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+# Create tensor view
+data = np.arange(12, dtype=np.float32)
+view = make_naive_tensor_view(data, [3, 4], [4, 1])
+
+# Access using get_element/set_element
+print("🔍 Coordinate-based access:")
+print(f"  [0,0] = {view.get_element([0, 0])}")
+print(f"  [1,2] = {view.get_element([1, 2])}")
+print(f"  [2,3] = {view.get_element([2, 3])}")
+
+# Modify elements
+view.set_element([0, 1], 100.0)
+view.set_element([2, 0], 200.0)
+
+print(f"After modifications:")
+print(f"  [0,1] = {view.get_element([0, 1])} (was 1.0)")
+print(f"  [2,0] = {view.get_element([2, 0])} (was 8.0)")
+```
+
+### **2. Array-Style Indexing**
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+# Array-style access using [] operator
+print("🎮 Array-style indexing:")
+print(f"  view[0,0] = {view[0,0]}")
+print(f"  view[1,3] = {view[1,3]}")
+
+# Array-style modification
+view[1,1] = 99.0
+view[0,3] = 88.0
+
+print(f"After array-style modifications:")
+print(f"  view[1,1] = {view[1,1]} (was 5.0)")
+print(f"  view[0,3] = {view[0,3]} (was 3.0)")
+
+print(f"✅ Current tensor state: {data}")
+```
+
+### **3. Vectorized Operations**
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+# Create fresh tensor for vectorized operations
+data = np.arange(16, dtype=np.float32)
+view = make_naive_tensor_view(data, [4, 4], [4, 1])
+
+# Create coordinate for row 1
+coord = make_tensor_coordinate(view.get_tensor_descriptor(), [1, 0])
+print(f"Coordinate [1,0] offset: {coord.get_offset()}")
+
+# Get single element
+single = view.get_vectorized_elements(coord, linear_offset=0, vector_size=1)
+print(f"🔢 Single element at [1,0]: {single}")
+
+# Get vector of 4 elements (entire row)
+vector = view.get_vectorized_elements(coord, linear_offset=0, vector_size=4)
+print(f"📊 Vector of 4 elements from [1,0]: {vector}")
+
+# Set vector
+new_values = np.array([10.0, 11.0, 12.0, 13.0])
+view.set_vectorized_elements(coord, new_values, linear_offset=0, vector_size=4)
+print(f"✏️ After setting vector: {data[4:8]}")
+```
+
+## 🔧 **Memory Operations**
+
+TensorView supports different memory operations for updates:
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+# Create tensor with ADD operation mode
+data = np.ones(12, dtype=np.float32) * 5.0  # Initialize with 5.0
+view = make_naive_tensor_view(data, [3, 4], [4, 1], 
+                             dst_in_mem_op=MemoryOperationEnum.ADD)
+
+print(f"🔄 Memory Operations Demo")
+print(f"Initial data (all 5.0): {data[:8]}...")
+
+# Update with ADD operation
+coord = make_tensor_coordinate(view.get_tensor_descriptor(), [0, 0])
+add_values = np.array([1.0, 2.0, 3.0, 4.0])
+view.update_vectorized_elements(coord, add_values, linear_offset=0, vector_size=4)
+
+print(f"After ADD operation: {data[:8]}...")
+print(f"Result: original + new values = [6.0, 7.0, 8.0, 9.0]")
+
+# Compare with SET operation
+data_set = np.ones(12, dtype=np.float32) * 5.0
+view_set = make_naive_tensor_view(data_set, [3, 4], [4, 1], 
+                                 dst_in_mem_op=MemoryOperationEnum.SET)
+
+view_set.update_vectorized_elements(coord, add_values, linear_offset=0, vector_size=4)
+print(f"With SET operation: {data_set[:4]} (replaces values)")
+```
+
+## 🏭 **Factory Functions**
+
+Multiple factory functions for different use cases:
+
+### **Naive Tensor View (Strided)**
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+# Create row-major 2x3 tensor
+data = np.arange(6, dtype=np.float32)
+view_row = make_naive_tensor_view(data, [2, 3], [3, 1])  # Row-major strides
+
+print("🏭 Row-major tensor (strides [3,1]):")
+for i in range(2):
+    row = [view_row[i, j] for j in range(3)]
+    print(f"  Row {i}: {row}")
+
+# Create column-major 2x3 tensor
+data_col = np.arange(6, dtype=np.float32)
+view_col = make_naive_tensor_view(data_col, [2, 3], [1, 2])  # Column-major strides
+
+print("\n🏛️ Column-major tensor (strides [1,2]):")
+for i in range(2):
+    row = [view_col[i, j] for j in range(3)]
+    print(f"  Row {i}: {row}")
+```
+
+### **Packed Tensor View**
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+# Create packed 2x3x2 tensor (automatically calculates strides)
+data = np.arange(12, dtype=np.float32)
+view_packed = make_naive_tensor_view_packed(data, [2, 3, 2])
+
+print("📦 Packed 3D tensor [2,3,2]:")
+for i in range(2):
+    print(f"  Slice {i}:")
+    for j in range(3):
+        row = [view_packed[i, j, k] for k in range(2)]
+        print(f"    {row}")
+
+# Show how packed layout works
+print(f"\n🔍 Packed layout analysis:")
+print(f"  [0,0,0] → data[0] = {view_packed[0,0,0]}")
+print(f"  [0,0,1] → data[1] = {view_packed[0,0,1]}")
+print(f"  [0,1,0] → data[2] = {view_packed[0,1,0]}")
+print(f"  [1,0,0] → data[6] = {view_packed[1,0,0]}")
+```
+
+## 🔄 **Integration with Coordinates**
+
+TensorView works seamlessly with TensorCoordinate:
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+# Create 4x4 tensor view
+data = np.arange(16, dtype=np.float32)
+view = make_naive_tensor_view(data, [4, 4], [4, 1])
+
+# Create coordinate and navigate
+coord = make_tensor_coordinate(view.get_tensor_descriptor(), [1, 1])
+print(f"🧭 Starting coordinate [1,1]:")
+print(f"   Value: {view.get_element(coord.get_index())}")
+print(f"   Offset: {coord.get_offset()}")
+
+# Move coordinate and access
+move_tensor_coordinate(view.get_tensor_descriptor(), coord, [1, 1])  # Move to [2,2]
+print(f"\n🚀 After move [+1,+1]:")
+print(f"   New position: {coord.get_index().to_list()}")
+print(f"   Value: {view.get_element(coord.get_index())}")
+print(f"   Offset: {coord.get_offset()}")
+
+# Direct vectorized access using coordinate
+vector = view.get_vectorized_elements(coord, linear_offset=0, vector_size=2)
+print(f"   Next 2 elements: {vector}")
+```
+
+## 📏 **Linear Offset Parameter**
+
+TensorView supports linear offsets for efficient memory access:
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+# Create tensor view
+data = np.arange(20, dtype=np.float32)
+view = make_naive_tensor_view(data, [4, 5], [5, 1])
+
+# Create coordinate at [1,0] (offset 5)
+coord = make_tensor_coordinate(view.get_tensor_descriptor(), [1, 0])
+base_offset = coord.get_offset()
+
+print(f"📏 Linear offset demonstration:")
+print(f"   Base coordinate [1,0] → offset {base_offset}")
+
+# Access with different linear offsets
+for linear_offset in range(5):
+    value = view.get_vectorized_elements(coord, linear_offset=linear_offset, vector_size=1)
+    actual_index = base_offset + linear_offset
+    print(f"   linear_offset={linear_offset} → data[{actual_index}] = {value}")
+
+# This is equivalent to accessing [1,0], [1,1], [1,2], [1,3], [1,4]
+print(f"\n✅ Verification - direct access:")
+for j in range(5):
+    value = view[1, j]
+    print(f"   [1,{j}] = {value}")
+```
+
+## 🎨 **Different Address Spaces**
+
+TensorView supports different memory address spaces:
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+# Create tensor views in different address spaces
+data = np.arange(8, dtype=np.float32)
+
+# Generic address space (default)
+view_generic = make_naive_tensor_view(
+    data, [2, 4], [4, 1],
+    address_space=AddressSpaceEnum.GENERIC
+)
+
+# LDS (Local Data Share) address space
+view_lds = make_naive_tensor_view(
+    data, [2, 4], [4, 1],
+    address_space=AddressSpaceEnum.LDS
+)
+
+print(f"🎨 Address space comparison:")
+print(f"   Generic: {view_generic.get_buffer_view().address_space}")
+print(f"   LDS: {view_lds.get_buffer_view().address_space}")
+
+# Both views access the same data but with different memory models
+print(f"   Both access same data: {view_generic[0,0]} == {view_lds[0,0]}")
+```
+
+## 🔍 **Real-World Example: Matrix Operations**
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+def matrix_multiply_demo():
+    """Demonstrate tensor view usage in matrix operations."""
+    
+    # Create two 3x3 matrices
+    A_data = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9], dtype=np.float32)
+    B_data = np.array([9, 8, 7, 6, 5, 4, 3, 2, 1], dtype=np.float32)
+    C_data = np.zeros(9, dtype=np.float32)
+    
+    # Create tensor views
+    A = make_naive_tensor_view(A_data, [3, 3], [3, 1])
+    B = make_naive_tensor_view(B_data, [3, 3], [3, 1])
+    C = make_naive_tensor_view(C_data, [3, 3], [3, 1])
+    
+    print("🔢 Matrix Multiplication Demo:")
+    print("Matrix A:")
+    for i in range(3):
+        row = [A[i, j] for j in range(3)]
+        print(f"  {row}")
+    
+    print("Matrix B:")
+    for i in range(3):
+        row = [B[i, j] for j in range(3)]
+        print(f"  {row}")
+    
+    # Perform matrix multiplication C = A * B
+    for i in range(3):
+        for j in range(3):
+            result = 0.0
+            for k in range(3):
+                result += A[i, k] * B[k, j]
+            C[i, j] = result
+    
+    print("Result C = A * B:")
+    for i in range(3):
+        row = [C[i, j] for j in range(3)]
+        print(f"  {row}")
+    
+    return C
+
+result_view = matrix_multiply_demo()
+print(f"\n✅ Matrix computation completed using TensorView!")
+```
+
+## 🔧 **Advanced Features**
+
+### **Out-of-Bounds Checking**
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+# Create small tensor
+data = np.arange(12, dtype=np.float32)  # Larger array to avoid OOB issues
+view = make_naive_tensor_view(data, [3, 4], [4, 1])  # 3x4 tensor
+
+print(f"🛡️ Bounds checking demonstration:")
+print(f"   Data size: {len(data)}")
+print(f"   Tensor shape: [3, 4]")
+
+# Safe access within bounds
+coord = make_tensor_coordinate(view.get_tensor_descriptor(), [1, 2])  # Valid [1,2]
+value = view.get_vectorized_elements(coord, linear_offset=0, vector_size=1, 
+                                   oob_conditional_check=True)
+print(f"   Safe access [1,2]: {value} (offset {coord.get_offset()})")
+
+# Access within same row (safe)
+value_next = view.get_vectorized_elements(coord, linear_offset=1, vector_size=1,
+                                        oob_conditional_check=True)
+print(f"   Next element [1,2]+1: {value_next} (offset {coord.get_offset() + 1})")
+
+# Demonstrate bounds checking behavior
+coord_last = make_tensor_coordinate(view.get_tensor_descriptor(), [2, 3])  # Last element [2,3]
+value_last = view.get_vectorized_elements(coord_last, linear_offset=0, vector_size=1,
+                                        oob_conditional_check=True)
+print(f"   Last element [2,3]: {value_last} (offset {coord_last.get_offset()})")
+
+print(f"   ✅ All accesses within bounds!")
+```
+
+## 🎯 **Why TensorView Matters**
+
+TensorView is essential because it:
+
+1. **🔗 Unifies Access**: Single interface for coordinate and linear access
+2. **🎛️ Abstracts Memory**: Works with different address spaces transparently  
+3. **⚡ Optimizes Performance**: Vectorized operations and efficient indexing
+4. **🛡️ Provides Safety**: Bounds checking and type safety
+5. **🧩 Enables Composition**: Integrates seamlessly with descriptors and coordinates
+
+## 🔗 **Integration with Other Components**
+
+- **BufferView**: Provides the underlying memory access interface
+- **TensorDescriptor**: Defines the tensor layout and transformations
+- **TensorCoordinate**: Enables coordinate-based navigation and indexing
+- **Transform System**: Works with complex tensor layouts and access patterns
+
+## ✅ **Next Steps**
+
+Now you understand tensor views! You can explore:
+
+- **[Buffer Views](buffer-view.qmd)** - The memory access foundation
+- **[Tensor Descriptors](tensor-descriptor.qmd)** - Layout and transformation system
+- **[Tensor Coordinates](tensor-coordinate.qmd)** - Navigation and indexing
+
+---
+
+*TensorView bridges the gap between mathematical tensor concepts and efficient memory access!* 🌉 

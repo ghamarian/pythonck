@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>Tile Distribution Deep Dive – Composable-Kernels Docs</title>
+<title>Tile Distribution: Parallel Processing Coordination – Composable-Kernels Docs</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -318,7 +318,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
       <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
         <i class="bi bi-layout-text-sidebar-reverse"></i>
       </button>
-        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">Distribution</li><li class="breadcrumb-item"><a href="../concepts/tile-distribution.html">Tile Distribution Deep Dive</a></li></ol></nav>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../concepts/tile-distribution-encoding.html">Distribution</a></li><li class="breadcrumb-item"><a href="../concepts/tile-distribution.html">Tile Distribution: Parallel Processing Coordination</a></li></ol></nav>
         <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
         </a>
     </div>
@@ -388,14 +388,14 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../concepts/tensor-coordinate.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Tensor Coordinates</span></a>
+  <a href="../concepts/tensor-adaptor-coordinate.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Tensor Adaptor Coordinate: The Result Container</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../concepts/tensor-adaptor-coordinate.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Tensor Adaptor Coordinate: The Result Container</span></a>
+  <a href="../concepts/tensor-coordinate.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Tensor Coordinates</span></a>
   </div>
 </li>
       </ul>
@@ -416,8 +416,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   </div>
 </li>
           <li class="sidebar-item">
- <span class="menu-text">concepts/tensor-view.qmd</span>
-  </li>
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/tensor-view.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Tensor Views: Unified Memory Access</span></a>
+  </div>
+</li>
       </ul>
   </li>
         <li class="sidebar-item sidebar-item-section">
@@ -430,12 +433,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
       </div>
       <ul id="quarto-sidebar-section-4" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
- <span class="menu-text">concepts/tile-distribution-encoding.qmd</span>
-  </li>
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/tile-distribution-encoding.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Tile Distribution Encoding: Mathematical Graph Structure</span></a>
+  </div>
+</li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="../concepts/tile-distribution.html" class="sidebar-item-text sidebar-link active">
- <span class="menu-text">Tile Distribution Deep Dive</span></a>
+ <span class="menu-text">Tile Distribution: Parallel Processing Coordination</span></a>
   </div>
 </li>
           <li class="sidebar-item">
@@ -507,20 +513,17 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#tile-distribution-deep-dive" id="toc-tile-distribution-deep-dive" class="nav-link active" data-scroll-target="#tile-distribution-deep-dive">Tile Distribution Deep Dive</a>
-  <ul class="collapse">
-  <li><a href="#core-concept-thread-to-data-mapping" id="toc-core-concept-thread-to-data-mapping" class="nav-link" data-scroll-target="#core-concept-thread-to-data-mapping">🎯 <strong>Core Concept: Thread-to-Data Mapping</strong></a></li>
-  <li><a href="#make_static_tile_distribution-the-foundation" id="toc-make_static_tile_distribution-the-foundation" class="nav-link" data-scroll-target="#make_static_tile_distribution-the-foundation">🔧 <strong>make_static_tile_distribution: The Foundation</strong></a></li>
-  <li><a href="#ps_ys_to_xs_adaptor-the-critical-adapter" id="toc-ps_ys_to_xs_adaptor-the-critical-adapter" class="nav-link" data-scroll-target="#ps_ys_to_xs_adaptor-the-critical-adapter">🗺️ <strong>ps_ys_to_xs_adaptor: The Critical Adapter</strong></a></li>
-  <li><a href="#d_to_ys_descriptor-local-distribution-mapping" id="toc-d_to_ys_descriptor-local-distribution-mapping" class="nav-link" data-scroll-target="#d_to_ys_descriptor-local-distribution-mapping">📋 <strong>d_to_ys_descriptor: Local Distribution Mapping</strong></a></li>
-  <li><a href="#complete-thread-mapping-pipeline" id="toc-complete-thread-mapping-pipeline" class="nav-link" data-scroll-target="#complete-thread-mapping-pipeline">🔄 <strong>Complete Thread Mapping Pipeline</strong></a></li>
-  <li><a href="#understanding-the-coordinate-spaces" id="toc-understanding-the-coordinate-spaces" class="nav-link" data-scroll-target="#understanding-the-coordinate-spaces">🧩 <strong>Understanding the Coordinate Spaces</strong></a></li>
-  <li><a href="#integration-with-real-applications" id="toc-integration-with-real-applications" class="nav-link" data-scroll-target="#integration-with-real-applications">🎯 <strong>Integration with Real Applications</strong></a></li>
-  <li><a href="#interactive-applications" id="toc-interactive-applications" class="nav-link" data-scroll-target="#interactive-applications">🔗 <strong>Interactive Applications</strong></a></li>
-  <li><a href="#mathematical-foundations" id="toc-mathematical-foundations" class="nav-link" data-scroll-target="#mathematical-foundations">🧮 <strong>Mathematical Foundations</strong></a></li>
-  <li><a href="#why-this-matters" id="toc-why-this-matters" class="nav-link" data-scroll-target="#why-this-matters">🔍 <strong>Why This Matters</strong></a></li>
-  <li><a href="#next-steps" id="toc-next-steps" class="nav-link" data-scroll-target="#next-steps">✅ <strong>Next Steps</strong></a></li>
-  </ul></li>
+  <li><a href="#what-is-tile-distribution" id="toc-what-is-tile-distribution" class="nav-link active" data-scroll-target="#what-is-tile-distribution">🎯 <strong>What is Tile Distribution?</strong></a></li>
+  <li><a href="#creating-tile-distribution-from-encoding" id="toc-creating-tile-distribution-from-encoding" class="nav-link" data-scroll-target="#creating-tile-distribution-from-encoding">🔧 <strong>Creating Tile Distribution from Encoding</strong></a></li>
+  <li><a href="#internal-components-adaptors-and-descriptors" id="toc-internal-components-adaptors-and-descriptors" class="nav-link" data-scroll-target="#internal-components-adaptors-and-descriptors">🔗 <strong>Internal Components: Adaptors and Descriptors</strong></a></li>
+  <li><a href="#partition-index-thread-identification" id="toc-partition-index-thread-identification" class="nav-link" data-scroll-target="#partition-index-thread-identification">🧵 <strong>Partition Index: Thread Identification</strong></a></li>
+  <li><a href="#distributed-spans-spatial-distribution" id="toc-distributed-spans-spatial-distribution" class="nav-link" data-scroll-target="#distributed-spans-spatial-distribution">📏 <strong>Distributed Spans: Spatial Distribution</strong></a></li>
+  <li><a href="#y-dimension-processing" id="toc-y-dimension-processing" class="nav-link" data-scroll-target="#y-dimension-processing">🎯 <strong>Y Dimension Processing</strong></a></li>
+  <li><a href="#creating-tensor-descriptor-from-adaptor" id="toc-creating-tensor-descriptor-from-adaptor" class="nav-link" data-scroll-target="#creating-tensor-descriptor-from-adaptor">🏗️ <strong>Creating Tensor Descriptor from Adaptor</strong></a></li>
+  <li><a href="#advanced-distribution-operations" id="toc-advanced-distribution-operations" class="nav-link" data-scroll-target="#advanced-distribution-operations">🧪 <strong>Advanced Distribution Operations</strong></a></li>
+  <li><a href="#real-world-usage-patterns" id="toc-real-world-usage-patterns" class="nav-link" data-scroll-target="#real-world-usage-patterns">🚀 <strong>Real-World Usage Patterns</strong></a></li>
+  <li><a href="#factory-functions-summary" id="toc-factory-functions-summary" class="nav-link" data-scroll-target="#factory-functions-summary">🏭 <strong>Factory Functions Summary</strong></a></li>
+  <li><a href="#key-takeaways" id="toc-key-takeaways" class="nav-link" data-scroll-target="#key-takeaways">🎓 <strong>Key Takeaways</strong></a></li>
   </ul>
 </nav>
     </div>
@@ -528,9 +531,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <main class="content" id="quarto-document-content">
 
 
-<header id="title-block-header" class="quarto-title-block default"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">Distribution</li><li class="breadcrumb-item"><a href="../concepts/tile-distribution.html">Tile Distribution Deep Dive</a></li></ol></nav>
+<header id="title-block-header" class="quarto-title-block default"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../concepts/tile-distribution-encoding.html">Distribution</a></li><li class="breadcrumb-item"><a href="../concepts/tile-distribution.html">Tile Distribution: Parallel Processing Coordination</a></li></ol></nav>
 <div class="quarto-title">
-<div class="quarto-title-block"><div><h1 class="title">Tile Distribution Deep Dive</h1><button type="button" class="btn code-tools-button" id="quarto-code-tools-source"><i class="bi"></i> Code</button></div></div>
+<div class="quarto-title-block"><div><h1 class="title">Tile Distribution: Parallel Processing Coordination</h1><button type="button" class="btn code-tools-button" id="quarto-code-tools-source"><i class="bi"></i> Code</button></div></div>
 </div>
 
 
@@ -547,6 +550,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </header>
 
 
+<section id="what-is-tile-distribution" class="level2">
+<h2 class="anchored" data-anchor-id="what-is-tile-distribution">🎯 <strong>What is Tile Distribution?</strong></h2>
+<p><strong>Tile Distribution</strong> is the runtime coordinator that transforms the mathematical <strong>tile distribution encoding</strong> into actual parallel processing components. It creates the <strong>adaptors</strong> and <strong>descriptors</strong> needed to map (P,Y) coordinates to final tensor coordinates (X).</p>
 <div>
 <div id="pyodide-1" class="exercise-cell">
 
@@ -555,123 +561,151 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 eyJhdHRyIjp7ImF1dG9ydW4iOnRydWUsImVjaG8iOmZhbHNlLCJlZGl0IjpmYWxzZSwiZXZhbCI6dHJ1ZSwib3V0cHV0IjpmYWxzZX0sImNvZGUiOiJcbiMgQXV0by1pbnN0YWxsIHB5dGhvbmNrIHBhY2thZ2VcbmltcG9ydCBtaWNyb3BpcFxuYXdhaXQgbWljcm9waXAuaW5zdGFsbChcImh0dHBzOi8vcmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbS9naGFtYXJpYW4vcHl0aG9uY2svbWFzdGVyL2RvY3VtZW50YXRpb24vcHl0aG9uY2stMC4xLjAtcHkzLW5vbmUtYW55LndobFwiKSJ9
 </script>
 </div>
-<section id="tile-distribution-deep-dive" class="level1">
-<h1>Tile Distribution Deep Dive</h1>
-<p><strong>Prerequisites</strong>: <a href="../concepts/tensor-descriptor.html">Tensor Descriptors</a>, <a href="tile-distribution-encoding.qmd">Tile Distribution Encoding</a></p>
-<p>This page provides deep explanations of how tile distributions coordinate parallel processing, focusing on the critical functions that enable GPU thread coordination.</p>
-<section id="core-concept-thread-to-data-mapping" class="level2">
-<h2 class="anchored" data-anchor-id="core-concept-thread-to-data-mapping">🎯 <strong>Core Concept: Thread-to-Data Mapping</strong></h2>
-<p>A <strong>Tile Distribution</strong> maps thread identifiers to tensor data locations:</p>
-<pre><code>Thread ID → P coordinates → Y coordinates → X coordinates → Tensor Data</code></pre>
-</section>
-<section id="make_static_tile_distribution-the-foundation" class="level2">
-<h2 class="anchored" data-anchor-id="make_static_tile_distribution-the-foundation">🔧 <strong>make_static_tile_distribution: The Foundation</strong></h2>
-<p>This is the most important function - it creates the coordination system:</p>
 <div>
 <div id="pyodide-2" class="exercise-cell">
 
 </div>
 <script type="pyodide-2-contents">
-eyJhdHRyIjp7ImF1dG9ydW4iOmZhbHNlLCJlY2hvIjp0cnVlLCJlZGl0Ijp0cnVlLCJldmFsIjp0cnVlLCJvdXRwdXQiOnRydWV9LCJjb2RlIjoiXG5mcm9tIHB5dGVuc29yLnRpbGVfZGlzdHJpYnV0aW9uX2VuY29kaW5nIGltcG9ydCBUaWxlRGlzdHJpYnV0aW9uRW5jb2RpbmdcbmZyb20gcHl0ZW5zb3IudGlsZV9kaXN0cmlidXRpb24gaW1wb3J0IG1ha2Vfc3RhdGljX3RpbGVfZGlzdHJpYnV0aW9uXG5cbiMgQ3JlYXRlIGVuY29kaW5nIHRoYXQgZGVmaW5lcyB0aGUgbWF0aGVtYXRpY2FsIGRpc3RyaWJ1dGlvblxuZW5jb2RpbmcgPSBUaWxlRGlzdHJpYnV0aW9uRW5jb2RpbmcoXG4gICAgcnNfbGVuZ3Rocz1bXSwgICAgICAgICAgICAgICAgICAgICMgTm8gcmVkdWN0aW9uIGRpbWVuc2lvbnNcbiAgICBoc19sZW5ndGhzcz1bWzIsIDRdLCBbMiwgM11dLCAgICAjIEhpZXJhcmNoaWNhbDogMng0IGFuZCAyeDMgXG4gICAgcHNfdG9fcmhzc19tYWpvcj1bWzFdLCBbMV1dLCAgICAgIyBQ4oaSSCBtYXBwaW5nIChtYWpvcilcbiAgICBwc190b19yaHNzX21pbm9yPVtbMF0sIFswXV0sICAgICAjIFDihpJIIG1hcHBpbmcgKG1pbm9yKVxuICAgIHlzX3RvX3Joc19tYWpvcj1bMSwgMV0sICAgICAgICAgICMgWeKGkkggbWFwcGluZyAobWFqb3IpXG4gICAgeXNfdG9fcmhzX21pbm9yPVswLCAxXSAgICAgICAgICAgIyBZ4oaSSCBtYXBwaW5nIChtaW5vcilcbilcblxuIyBUSElTIElTIFRIRSBLRVkgRlVOQ1RJT04gLSBjcmVhdGVzIHRoZSBkaXN0cmlidXRpb24gc3lzdGVtXG5kaXN0cmlidXRpb24gPSBtYWtlX3N0YXRpY190aWxlX2Rpc3RyaWJ1dGlvbihlbmNvZGluZylcblxucHJpbnQoZlwiRGlzdHJpYnV0aW9uIGNyZWF0ZWQgd2l0aDpcIilcbnByaW50KGZcIiAgWCBkaW1lbnNpb25zOiB7ZGlzdHJpYnV0aW9uLm5kaW1feH1cIilcbnByaW50KGZcIiAgWSBkaW1lbnNpb25zOiB7ZGlzdHJpYnV0aW9uLm5kaW1feX1cIikgIFxucHJpbnQoZlwiICBQIGRpbWVuc2lvbnM6IHtkaXN0cmlidXRpb24ubmRpbV9wfVwiKVxucHJpbnQoXCLinIUgU3RhdGljIHRpbGUgZGlzdHJpYnV0aW9uIGNyZWF0ZWRcIikifQ==
+eyJhdHRyIjp7ImF1dG9ydW4iOmZhbHNlLCJlY2hvIjp0cnVlLCJlZGl0Ijp0cnVlLCJldmFsIjp0cnVlLCJvdXRwdXQiOnRydWV9LCJjb2RlIjoiXG5pbXBvcnQgbnVtcHkgYXMgbnBcbmZyb20gcHl0ZW5zb3IudGlsZV9kaXN0cmlidXRpb25fZW5jb2RpbmcgaW1wb3J0IFRpbGVEaXN0cmlidXRpb25FbmNvZGluZ1xuZnJvbSBweXRlbnNvci50aWxlX2Rpc3RyaWJ1dGlvbiBpbXBvcnQgKFxuICAgIG1ha2VfdGlsZV9kaXN0cmlidXRpb25fZW5jb2RpbmcsXG4gICAgbWFrZV9zdGF0aWNfdGlsZV9kaXN0cmlidXRpb24sXG4gICAgbWFrZV90aWxlX2Rpc3RyaWJ1dGVkX3NwYW4sXG4gICAgbWFrZV90aWxlX2Rpc3RyaWJ1dGVkX2luZGV4LFxuICAgIG1ha2VfdGlsZV9kaXN0cmlidXRpb24sXG4gICAgbWFrZV90ZW5zb3JfZGVzY3JpcHRvcl9mcm9tX2FkYXB0b3JcbilcbmZyb20gcHl0ZW5zb3IudGVuc29yX2Nvb3JkaW5hdGUgaW1wb3J0IE11bHRpSW5kZXgsIG1ha2VfdGVuc29yX2FkYXB0b3JfY29vcmRpbmF0ZVxuXG5wcmludChcIvCfjq8gVGlsZSBEaXN0cmlidXRpb246IEZyb20gRW5jb2RpbmcgdG8gUnVudGltZSBDb29yZGluYXRpb25cIilcbnByaW50KFwiPVwiICogNjApIn0=
 </script>
 </div>
 </section>
-<section id="ps_ys_to_xs_adaptor-the-critical-adapter" class="level2">
-<h2 class="anchored" data-anchor-id="ps_ys_to_xs_adaptor-the-critical-adapter">🗺️ <strong>ps_ys_to_xs_adaptor: The Critical Adapter</strong></h2>
-<p>This adaptor converts parallel coordinates (P,Y) to tensor coordinates (X):</p>
+<section id="creating-tile-distribution-from-encoding" class="level2">
+<h2 class="anchored" data-anchor-id="creating-tile-distribution-from-encoding">🔧 <strong>Creating Tile Distribution from Encoding</strong></h2>
+<p>Let’s build the complete RMSNorm tile distribution step by step:</p>
 <div>
 <div id="pyodide-3" class="exercise-cell">
 
 </div>
 <script type="pyodide-3-contents">
-eyJhdHRyIjp7ImF1dG9ydW4iOmZhbHNlLCJlY2hvIjp0cnVlLCJlZGl0Ijp0cnVlLCJldmFsIjp0cnVlLCJvdXRwdXQiOnRydWV9LCJjb2RlIjoiXG5mcm9tIHB5dGVuc29yLnRlbnNvcl9jb29yZGluYXRlIGltcG9ydCBNdWx0aUluZGV4XG5cbiMgR2V0IHRoZSBjcml0aWNhbCBhZGFwdG9yIHRoYXQgbWFwcyAoUCxZKSDihpIgWFxucHNfeXNfdG9feHNfYWRhcHRvciA9IGRpc3RyaWJ1dGlvbi5wc195c190b194c19hZGFwdG9yXG5cbnByaW50KGZcIkFkYXB0b3IgZGV0YWlsczpcIilcbnByaW50KGZcIiAgSW5wdXQgZGltZW5zaW9ucyAoUCtZKToge3BzX3lzX3RvX3hzX2FkYXB0b3IuZ2V0X251bV9vZl91cHBlcl9kaW1lbnNpb24oKX1cIilcbnByaW50KGZcIiAgT3V0cHV0IGRpbWVuc2lvbnMgKFgpOiB7cHNfeXNfdG9feHNfYWRhcHRvci5nZXRfbnVtX29mX2xvd2VyX2RpbWVuc2lvbigpfVwiKVxucHJpbnQoZlwiICBOdW1iZXIgb2YgdHJhbnNmb3Jtczoge3BzX3lzX3RvX3hzX2FkYXB0b3IuZ2V0X251bV9vZl90cmFuc2Zvcm0oKX1cIilcblxuIyBFeGFtcGxlOiBDb252ZXJ0IHRocmVhZCBjb29yZGluYXRlcyB0byB0ZW5zb3IgY29vcmRpbmF0ZXNcbnBfY29vcmRzID0gTXVsdGlJbmRleCgyLCBbMCwgMV0pICAjIFRocmVhZCBwYXJ0aXRpb24gY29vcmRpbmF0ZXNcbnlfY29vcmRzID0gTXVsdGlJbmRleCgyLCBbMSwgMF0pICAjIExvY2FsIHRocmVhZCBjb29yZGluYXRlc1xuXG4jIENvbWJpbmUgUCBhbmQgWSBjb29yZGluYXRlc1xuY29tYmluZWRfY29vcmRzID0gTXVsdGlJbmRleCg0LCBwX2Nvb3Jkcy50b19saXN0KCkgKyB5X2Nvb3Jkcy50b19saXN0KCkpXG5wcmludChmXCJDb21iaW5lZCBQLFkgY29vcmRpbmF0ZXM6IHtjb21iaW5lZF9jb29yZHMudG9fbGlzdCgpfVwiKVxuXG4jIFRyYW5zZm9ybSB0byBYICh0ZW5zb3IpIGNvb3JkaW5hdGVzXG54X2Nvb3JkcyA9IHBzX3lzX3RvX3hzX2FkYXB0b3IuY2FsY3VsYXRlX2xvd2VyX2luZGV4KGNvbWJpbmVkX2Nvb3JkcylcbnByaW50KGZcIlJlc3VsdGluZyBYIGNvb3JkaW5hdGVzOiB7eF9jb29yZHMudG9fbGlzdCgpfVwiKVxucHJpbnQoXCLinIUgUCxZIOKGkiBYIGNvb3JkaW5hdGUgdHJhbnNmb3JtYXRpb24gZGVtb25zdHJhdGVkXCIpIn0=
+eyJhdHRyIjp7ImF1dG9ydW4iOmZhbHNlLCJlY2hvIjp0cnVlLCJlZGl0Ijp0cnVlLCJldmFsIjp0cnVlLCJvdXRwdXQiOnRydWV9LCJjb2RlIjoiXG4jIFN0ZXAgMTogQ3JlYXRlIHRoZSBlbmNvZGluZyAobWF0aGVtYXRpY2FsIHNwZWNpZmljYXRpb24pXG52YXJpYWJsZXMgPSB7XG4gICAgXCJSZXBlYXRfTVwiOiA0LCBcIldhcnBQZXJCbG9ja19NXCI6IDIsIFwiVGhyZWFkUGVyV2FycF9NXCI6IDgsIFwiVmVjdG9yX01cIjogNCxcbiAgICBcIlJlcGVhdF9OXCI6IDQsIFwiV2FycFBlckJsb2NrX05cIjogMiwgXCJUaHJlYWRQZXJXYXJwX05cIjogOCwgXCJWZWN0b3JfTlwiOiA0XG59XG5cbmVuY29kaW5nID0gbWFrZV90aWxlX2Rpc3RyaWJ1dGlvbl9lbmNvZGluZyhcbiAgICByc19sZW5ndGhzPVtdLFxuICAgIGhzX2xlbmd0aHNzPVtcbiAgICAgICAgW3ZhcmlhYmxlc1tcIlJlcGVhdF9NXCJdLCB2YXJpYWJsZXNbXCJXYXJwUGVyQmxvY2tfTVwiXSwgdmFyaWFibGVzW1wiVGhyZWFkUGVyV2FycF9NXCJdLCB2YXJpYWJsZXNbXCJWZWN0b3JfTVwiXV0sXG4gICAgICAgIFt2YXJpYWJsZXNbXCJSZXBlYXRfTlwiXSwgdmFyaWFibGVzW1wiV2FycFBlckJsb2NrX05cIl0sIHZhcmlhYmxlc1tcIlRocmVhZFBlcldhcnBfTlwiXSwgdmFyaWFibGVzW1wiVmVjdG9yX05cIl1dXG4gICAgXSxcbiAgICBwc190b19yaHNzX21ham9yPVtbMSwgMl0sIFsxLCAyXV0sXG4gICAgcHNfdG9fcmhzc19taW5vcj1bWzEsIDFdLCBbMiwgMl1dLFxuICAgIHlzX3RvX3Joc19tYWpvcj1bMSwgMSwgMiwgMl0sXG4gICAgeXNfdG9fcmhzX21pbm9yPVswLCAzLCAwLCAzXVxuKVxuXG5wcmludChcIvCfk4sgRW5jb2RpbmcgQ3JlYXRlZDpcIilcbnByaW50KGZcIiAg4oCiIFggZGltZW5zaW9uczoge2VuY29kaW5nLm5kaW1feH1cIilcbnByaW50KGZcIiAg4oCiIFAgZGltZW5zaW9uczoge2VuY29kaW5nLm5kaW1fcH1cIikgIFxucHJpbnQoZlwiICDigKIgWSBkaW1lbnNpb25zOiB7ZW5jb2RpbmcubmRpbV95fVwiKVxucHJpbnQoZlwiICDigKIgUiBkaW1lbnNpb25zOiB7ZW5jb2RpbmcubmRpbV9yfVwiKSJ9
 </script>
 </div>
-</section>
-<section id="d_to_ys_descriptor-local-distribution-mapping" class="level2">
-<h2 class="anchored" data-anchor-id="d_to_ys_descriptor-local-distribution-mapping">📋 <strong>d_to_ys_descriptor: Local Distribution Mapping</strong></h2>
-<p>This descriptor maps distribution indices to local Y coordinates:</p>
 <div>
 <div id="pyodide-4" class="exercise-cell">
 
 </div>
 <script type="pyodide-4-contents">
-eyJhdHRyIjp7ImF1dG9ydW4iOmZhbHNlLCJlY2hvIjp0cnVlLCJlZGl0Ijp0cnVlLCJldmFsIjp0cnVlLCJvdXRwdXQiOnRydWV9LCJjb2RlIjoiXG4jIEdldCB0aGUgZGVzY3JpcHRvciB0aGF0IG1hcHMgRCDihpIgWSBjb29yZGluYXRlc1xuZF90b195c19kZXNjcmlwdG9yID0gZGlzdHJpYnV0aW9uLmRfdG9feXNfZGVzY3JpcHRvclxuXG5wcmludChmXCJE4oaSWSBEZXNjcmlwdG9yOlwiKVxucHJpbnQoZlwiICBJbnB1dCBkaW1lbnNpb25zIChEKToge2xlbihkX3RvX3lzX2Rlc2NyaXB0b3IuZ2V0X2xlbmd0aHMoKSl9XCIpXG5wcmludChmXCIgIE91dHB1dCBzcGFjZSBzaXplOiB7ZF90b195c19kZXNjcmlwdG9yLmdldF9lbGVtZW50X3NwYWNlX3NpemUoKX1cIilcbnByaW50KGZcIiAgWSBkaW1lbnNpb24gbGVuZ3Roczoge2RfdG9feXNfZGVzY3JpcHRvci5nZXRfbGVuZ3RocygpfVwiKVxuXG4jIEV4YW1wbGU6IENvbnZlcnQgZGlzdHJpYnV0aW9uIGluZGV4IHRvIFkgY29vcmRpbmF0ZXNcbmZyb20gcHl0ZW5zb3IudGVuc29yX2Nvb3JkaW5hdGUgaW1wb3J0IG1ha2VfdGVuc29yX2Nvb3JkaW5hdGVcblxuIyBDcmVhdGUgYSBkaXN0cmlidXRpb24gY29vcmRpbmF0ZVxuZF9jb29yZCA9IE11bHRpSW5kZXgoMiwgWzEsIDJdKSAgIyBEaXN0cmlidXRpb24gaW5kZXggWzEsIDJdXG5jb29yZCA9IG1ha2VfdGVuc29yX2Nvb3JkaW5hdGUoZF90b195c19kZXNjcmlwdG9yLCBkX2Nvb3JkKVxuXG5wcmludChmXCJEaXN0cmlidXRpb24gY29vcmRpbmF0ZSBbMSwgMl06XCIpXG5wcmludChmXCIgIE1hcHMgdG8gWSBjb29yZGluYXRlczoge2Nvb3JkLmdldF9pbmRleCgpLnRvX2xpc3QoKX1cIilcbnByaW50KGZcIiAgTGluZWFyIG9mZnNldDoge2Nvb3JkLmdldF9vZmZzZXQoKX1cIilcbnByaW50KFwi4pyFIEQg4oaSIFkgY29vcmRpbmF0ZSBtYXBwaW5nIGRlbW9uc3RyYXRlZFwiKSJ9
+eyJhdHRyIjp7ImF1dG9ydW4iOmZhbHNlLCJlY2hvIjp0cnVlLCJlZGl0Ijp0cnVlLCJldmFsIjp0cnVlLCJvdXRwdXQiOnRydWV9LCJjb2RlIjoiXG4jIFN0ZXAgMjogQ3JlYXRlIHN0YXRpYyB0aWxlIGRpc3RyaWJ1dGlvbiAocnVudGltZSBjb29yZGluYXRvcilcbmRpc3RyaWJ1dGlvbiA9IG1ha2Vfc3RhdGljX3RpbGVfZGlzdHJpYnV0aW9uKGVuY29kaW5nKVxuXG5wcmludChcIvCfmoAgVGlsZSBEaXN0cmlidXRpb24gQ3JlYXRlZDpcIilcbnByaW50KGZcIiAg4oCiIFR5cGU6IHt0eXBlKGRpc3RyaWJ1dGlvbikuX19uYW1lX199XCIpXG5wcmludChmXCIgIOKAoiBUZW5zb3IgZGltZW5zaW9ucyAoWCk6IHtkaXN0cmlidXRpb24ubmRpbV94fVwiKVxucHJpbnQoZlwiICDigKIgVGhyZWFkIHBhcnRpdGlvbiBkaW1lbnNpb25zIChQKToge2Rpc3RyaWJ1dGlvbi5uZGltX3B9XCIpXG5wcmludChmXCIgIOKAoiBFbGVtZW50IGluZGV4aW5nIGRpbWVuc2lvbnMgKFkpOiB7ZGlzdHJpYnV0aW9uLm5kaW1feX1cIilcbnByaW50KGZcIiAg4oCiIFJlcGxpY2F0aW9uIGRpbWVuc2lvbnMgKFIpOiB7ZGlzdHJpYnV0aW9uLm5kaW1fcn1cIilcblxucHJpbnQoZlwiXFxu8J+TkCBEaW1lbnNpb24gTGVuZ3RoczpcIilcbnhfbGVuZ3RocyA9IGRpc3RyaWJ1dGlvbi5nZXRfbGVuZ3RocygpXG5wcmludChmXCIgIOKAoiBYIGxlbmd0aHM6IHt4X2xlbmd0aHN9XCIpXG5wcmludChmXCIgIOKAoiBUb3RhbCB0ZW5zb3Igc2l6ZToge25wLnByb2QoeF9sZW5ndGhzKTosfSBlbGVtZW50c1wiKSJ9
 </script>
 </div>
 </section>
-<section id="complete-thread-mapping-pipeline" class="level2">
-<h2 class="anchored" data-anchor-id="complete-thread-mapping-pipeline">🔄 <strong>Complete Thread Mapping Pipeline</strong></h2>
-<p>Here’s how a thread ID becomes tensor access:</p>
+<section id="internal-components-adaptors-and-descriptors" class="level2">
+<h2 class="anchored" data-anchor-id="internal-components-adaptors-and-descriptors">🔗 <strong>Internal Components: Adaptors and Descriptors</strong></h2>
+<p>The tile distribution contains two key components:</p>
 <div>
 <div id="pyodide-5" class="exercise-cell">
 
 </div>
 <script type="pyodide-5-contents">
-eyJhdHRyIjp7ImF1dG9ydW4iOmZhbHNlLCJlY2hvIjp0cnVlLCJlZGl0Ijp0cnVlLCJldmFsIjp0cnVlLCJvdXRwdXQiOnRydWV9LCJjb2RlIjoiXG5kZWYgY29tcGxldGVfdGhyZWFkX21hcHBpbmcoZGlzdHJpYnV0aW9uLCB0aHJlYWRfcCwgdGhyZWFkX2QpOlxuICAgIFwiXCJcIkRlbW9uc3RyYXRlIGNvbXBsZXRlIHRocmVhZCDihpIgdGVuc29yIGNvb3JkaW5hdGUgbWFwcGluZ1wiXCJcIlxuICAgIFxuICAgIHByaW50KGZcIvCfp7UgVGhyZWFkIG1hcHBpbmcgZm9yIFA9e3RocmVhZF9wfSwgRD17dGhyZWFkX2R9XCIpXG4gICAgXG4gICAgIyBTdGVwIDE6IEQgY29vcmRpbmF0ZXMg4oaSIFkgY29vcmRpbmF0ZXNcbiAgICBkX2Nvb3JkID0gTXVsdGlJbmRleChsZW4odGhyZWFkX2QpLCB0aHJlYWRfZClcbiAgICBkX3RlbnNvcl9jb29yZCA9IG1ha2VfdGVuc29yX2Nvb3JkaW5hdGUoZGlzdHJpYnV0aW9uLmRfdG9feXNfZGVzY3JpcHRvciwgZF9jb29yZClcbiAgICB5X2Nvb3JkcyA9IGRfdGVuc29yX2Nvb3JkLmdldF9pbmRleCgpXG4gICAgXG4gICAgcHJpbnQoZlwiICBTdGVwIDE6IER7dGhyZWFkX2R9IOKGkiBZe3lfY29vcmRzLnRvX2xpc3QoKX1cIilcbiAgICBcbiAgICAjIFN0ZXAgMjogQ29tYmluZSBQIGFuZCBZIGNvb3JkaW5hdGVzXG4gICAgcF9jb29yZCA9IE11bHRpSW5kZXgobGVuKHRocmVhZF9wKSwgdGhyZWFkX3ApXG4gICAgY29tYmluZWQgPSBNdWx0aUluZGV4KFxuICAgICAgICBsZW4odGhyZWFkX3ApICsgbGVuKHlfY29vcmRzLnRvX2xpc3QoKSksXG4gICAgICAgIHRocmVhZF9wICsgeV9jb29yZHMudG9fbGlzdCgpXG4gICAgKVxuICAgIFxuICAgIHByaW50KGZcIiAgU3RlcCAyOiBQe3RocmVhZF9wfSArIFl7eV9jb29yZHMudG9fbGlzdCgpfSDihpIgUFl7Y29tYmluZWQudG9fbGlzdCgpfVwiKVxuICAgIFxuICAgICMgU3RlcCAzOiAoUCxZKSBjb29yZGluYXRlcyDihpIgWCBjb29yZGluYXRlc1xuICAgIHhfY29vcmRzID0gZGlzdHJpYnV0aW9uLnBzX3lzX3RvX3hzX2FkYXB0b3IuY2FsY3VsYXRlX2xvd2VyX2luZGV4KGNvbWJpbmVkKVxuICAgIFxuICAgIHByaW50KGZcIiAgU3RlcCAzOiBQWXtjb21iaW5lZC50b19saXN0KCl9IOKGkiBYe3hfY29vcmRzLnRvX2xpc3QoKX1cIilcbiAgICBwcmludChmXCIgIPCfjq8gRmluYWwgdGVuc29yIGNvb3JkaW5hdGVzOiB7eF9jb29yZHMudG9fbGlzdCgpfVwiKVxuICAgIFxuICAgIHJldHVybiB4X2Nvb3Jkc1xuXG4jIFRlc3QgY29tcGxldGUgbWFwcGluZyBmb3IgZGlmZmVyZW50IHRocmVhZHNcbnByaW50KFwiPT09IFRocmVhZCBNYXBwaW5nIEV4YW1wbGVzID09PVwiKVxuY29tcGxldGVfdGhyZWFkX21hcHBpbmcoZGlzdHJpYnV0aW9uLCBbMCwgMF0sIFswLCAwXSlcbnByaW50KClcbmNvbXBsZXRlX3RocmVhZF9tYXBwaW5nKGRpc3RyaWJ1dGlvbiwgWzEsIDBdLCBbMSwgMV0pXG5wcmludCgpXG5jb21wbGV0ZV90aHJlYWRfbWFwcGluZyhkaXN0cmlidXRpb24sIFswLCAxXSwgWzIsIDBdKVxucHJpbnQoXCLinIUgQ29tcGxldGUgdGhyZWFkIG1hcHBpbmcgcGlwZWxpbmUgZGVtb25zdHJhdGVkXCIpIn0=
+eyJhdHRyIjp7ImF1dG9ydW4iOmZhbHNlLCJlY2hvIjp0cnVlLCJlZGl0Ijp0cnVlLCJldmFsIjp0cnVlLCJvdXRwdXQiOnRydWV9LCJjb2RlIjoiXG5wcmludChcIvCflJcgSW50ZXJuYWwgQ29tcG9uZW50cyBBbmFseXNpczpcIilcblxuIyAxLiBQU19ZUyDihpIgWFMgQWRhcHRvciAoY29vcmRpbmF0ZSBtYXBwaW5nKVxucHNfeXNfdG9feHNfYWRhcHRvciA9IGRpc3RyaWJ1dGlvbi5wc195c190b194c19hZGFwdG9yXG5wcmludChmXCJcXG4x77iP4oOjIFBTX1lTIOKGkiBYUyBBZGFwdG9yOlwiKVxucHJpbnQoZlwiICDigKIgVHlwZToge3R5cGUocHNfeXNfdG9feHNfYWRhcHRvcikuX19uYW1lX199XCIpXG5wcmludChmXCIgIOKAoiBUb3AgZGltZW5zaW9uczoge3BzX3lzX3RvX3hzX2FkYXB0b3IuZ2V0X251bV9vZl90b3BfZGltZW5zaW9uKCl9XCIpXG5wcmludChmXCIgIOKAoiBCb3R0b20gZGltZW5zaW9uczoge3BzX3lzX3RvX3hzX2FkYXB0b3IuZ2V0X251bV9vZl9ib3R0b21fZGltZW5zaW9uKCl9XCIpXG5wcmludChmXCIgIOKAoiBIaWRkZW4gZGltZW5zaW9uczoge3BzX3lzX3RvX3hzX2FkYXB0b3IuZ2V0X251bV9vZl9oaWRkZW5fZGltZW5zaW9uKCl9XCIpXG5wcmludChmXCIgIOKAoiBQdXJwb3NlOiBNYXBzIChQ4oKALFDigoEsWeKCgCxZ4oKBLFnigoIsWeKCgykg4oaSIChY4oKALFjigoEpXCIpXG5cbiMgMi4gWVMg4oaSIEQgRGVzY3JpcHRvciAobGluZWFyaXphdGlvbilcbnlzX3RvX2RfZGVzY3JpcHRvciA9IGRpc3RyaWJ1dGlvbi55c190b19kX2Rlc2NyaXB0b3JcbnByaW50KGZcIlxcbjLvuI/ig6MgWVMg4oaSIEQgRGVzY3JpcHRvcjpcIilcbnByaW50KGZcIiAg4oCiIFR5cGU6IHt0eXBlKHlzX3RvX2RfZGVzY3JpcHRvcikuX19uYW1lX199XCIpXG5wcmludChmXCIgIOKAoiBEaW1lbnNpb25zOiB7eXNfdG9fZF9kZXNjcmlwdG9yLmdldF9udW1fb2ZfZGltZW5zaW9uKCl9XCIpXG5wcmludChmXCIgIOKAoiBFbGVtZW50IHNwYWNlIHNpemU6IHt5c190b19kX2Rlc2NyaXB0b3IuZ2V0X2VsZW1lbnRfc3BhY2Vfc2l6ZSgpfVwiKVxucHJpbnQoZlwiICDigKIgTGVuZ3Roczoge3lzX3RvX2RfZGVzY3JpcHRvci5nZXRfbGVuZ3RocygpfVwiKVxucHJpbnQoZlwiICDigKIgUHVycG9zZTogTWFwcyAoWeKCgCxZ4oKBLFnigoIsWeKCgykg4oaSIGxpbmVhciBpbmRleFwiKSJ9
 </script>
 </div>
 </section>
-<section id="understanding-the-coordinate-spaces" class="level2">
-<h2 class="anchored" data-anchor-id="understanding-the-coordinate-spaces">🧩 <strong>Understanding the Coordinate Spaces</strong></h2>
+<section id="partition-index-thread-identification" class="level2">
+<h2 class="anchored" data-anchor-id="partition-index-thread-identification">🧵 <strong>Partition Index: Thread Identification</strong></h2>
+<p>The distribution determines which thread you are via partition indices:</p>
 <div>
 <div id="pyodide-6" class="exercise-cell">
 
 </div>
 <script type="pyodide-6-contents">
-eyJhdHRyIjp7ImF1dG9ydW4iOmZhbHNlLCJlY2hvIjp0cnVlLCJlZGl0Ijp0cnVlLCJldmFsIjp0cnVlLCJvdXRwdXQiOnRydWV9LCJjb2RlIjoiXG5kZWYgYW5hbHl6ZV9jb29yZGluYXRlX3NwYWNlcyhkaXN0cmlidXRpb24pOlxuICAgIFwiXCJcIkFuYWx5emUgYWxsIGNvb3JkaW5hdGUgc3BhY2VzIGluIHRoZSBkaXN0cmlidXRpb25cIlwiXCJcbiAgICBcbiAgICBwcmludChcIvCfk4ogQ29vcmRpbmF0ZSBTcGFjZSBBbmFseXNpczpcIilcbiAgICBwcmludChmXCIgIFAgKFBhcnRpdGlvbikgc3BhY2U6IHtkaXN0cmlidXRpb24ubmRpbV9wfSBkaW1lbnNpb25zXCIpXG4gICAgcHJpbnQoZlwiICBZIChMb2NhbCB0aHJlYWQpIHNwYWNlOiB7ZGlzdHJpYnV0aW9uLm5kaW1feX0gZGltZW5zaW9uc1wiKSAgXG4gICAgcHJpbnQoZlwiICBYIChUZW5zb3IpIHNwYWNlOiB7ZGlzdHJpYnV0aW9uLm5kaW1feH0gZGltZW5zaW9uc1wiKVxuICAgIFxuICAgICMgR2V0IGRpc3RyaWJ1dGVkIHNwYW5zIChob3cgZGF0YSBpcyBwYXJ0aXRpb25lZClcbiAgICBzcGFucyA9IGRpc3RyaWJ1dGlvbi5nZXRfZGlzdHJpYnV0ZWRfc3BhbnMoKVxuICAgIHByaW50KGZcIiAgTnVtYmVyIG9mIGRpc3RyaWJ1dGVkIHNwYW5zOiB7bGVuKHNwYW5zKX1cIilcbiAgICBcbiAgICBmb3IgaSwgc3BhbiBpbiBlbnVtZXJhdGUoc3BhbnMpOlxuICAgICAgICBwcmludChmXCIgICAgU3BhbiB7aX06IHtzcGFufVwiKVxuICAgIFxuICAgIHByaW50KFwi4pyFIENvb3JkaW5hdGUgc3BhY2UgYW5hbHlzaXMgY29tcGxldGVcIilcblxuYW5hbHl6ZV9jb29yZGluYXRlX3NwYWNlcyhkaXN0cmlidXRpb24pIn0=
+eyJhdHRyIjp7ImF1dG9ydW4iOmZhbHNlLCJlY2hvIjp0cnVlLCJlZGl0Ijp0cnVlLCJldmFsIjp0cnVlLCJvdXRwdXQiOnRydWV9LCJjb2RlIjoiXG5wcmludChcIvCfp7UgVGhyZWFkIFBhcnRpdGlvbiBTeXN0ZW06XCIpXG5cbiMgR2V0IGN1cnJlbnQgcGFydGl0aW9uIGluZGV4IChzaW11bGF0ZWQpXG5wYXJ0aXRpb25faWR4ID0gZGlzdHJpYnV0aW9uLmdldF9wYXJ0aXRpb25faW5kZXgoKVxucHJpbnQoZlwiICDigKIgQ3VycmVudCBwYXJ0aXRpb24gaW5kZXg6IHtwYXJ0aXRpb25faWR4fVwiKVxucHJpbnQoZlwiICDigKIgUOKCgCAodGhyZWFkIHdhcnAgSUQpOiB7cGFydGl0aW9uX2lkeFswXX1cIilcbnByaW50KGZcIiAg4oCiIFDigoEgKHRocmVhZCBsYW5lIElEKToge3BhcnRpdGlvbl9pZHhbMV19XCIpXG5cbiMgQ2FsY3VsYXRlIHRlbnNvciBjb29yZGluYXRlcyBmb3IgdGhpcyB0aHJlYWRcbnhfaW5kZXggPSBkaXN0cmlidXRpb24uY2FsY3VsYXRlX2luZGV4KHBhcnRpdGlvbl9pZHgpXG5wcmludChmXCIgIOKAoiBUZW5zb3IgY29vcmRpbmF0ZXM6IHt4X2luZGV4LnRvX2xpc3QoKX1cIilcblxucHJpbnQoZlwiXFxu8J+UjSBVbmRlcnN0YW5kaW5nIFBhcnRpdGlvbiBJbmRpY2VzOlwiKVxucHJpbnQoZlwiICDigKIgUCBjb29yZGluYXRlcyBpZGVudGlmeSB3aGljaCB0aHJlYWQgeW91IGFyZVwiKVxucHJpbnQoZlwiICDigKIgRGlmZmVyZW50IHRocmVhZHMgZ2V0IGRpZmZlcmVudCBQIHZhbHVlc1wiKVxucHJpbnQoZlwiICDigKIgUCB2YWx1ZXMgbWFwIHRvIGRpZmZlcmVudCBzdGFydGluZyBwb3NpdGlvbnMgaW4gdGVuc29yXCIpXG5cbiMgU2hvdyBzb21lIGV4YW1wbGUgbWFwcGluZ3NcbmV4YW1wbGVfcGFydGl0aW9ucyA9IFtbMCwgMF0sIFswLCAxXSwgWzEsIDBdLCBbMSwgMV1dXG5wcmludChmXCJcXG7wn5OKIEV4YW1wbGUgVGhyZWFkIE1hcHBpbmdzOlwiKVxuZm9yIHBfaWR4IGluIGV4YW1wbGVfcGFydGl0aW9uczpcbiAgICB4X2Nvb3JkID0gZGlzdHJpYnV0aW9uLmNhbGN1bGF0ZV9pbmRleChwX2lkeClcbiAgICBwcmludChmXCIgIFRocmVhZCBQe3BfaWR4fSDihpIgVGVuc29yIFh7eF9jb29yZC50b19saXN0KCl9XCIpIn0=
 </script>
 </div>
 </section>
-<section id="integration-with-real-applications" class="level2">
-<h2 class="anchored" data-anchor-id="integration-with-real-applications">🎯 <strong>Integration with Real Applications</strong></h2>
-<p>See how these concepts work in practice:</p>
+<section id="distributed-spans-spatial-distribution" class="level2">
+<h2 class="anchored" data-anchor-id="distributed-spans-spatial-distribution">📏 <strong>Distributed Spans: Spatial Distribution</strong></h2>
+<p>Spans define how computation is distributed across space:</p>
 <div>
 <div id="pyodide-7" class="exercise-cell">
 
 </div>
 <script type="pyodide-7-contents">
-eyJhdHRyIjp7ImF1dG9ydW4iOmZhbHNlLCJlY2hvIjp0cnVlLCJlZGl0Ijp0cnVlLCJldmFsIjp0cnVlLCJvdXRwdXQiOnRydWV9LCJjb2RlIjoiXG4jIFNpbXVsYXRlIGhvdyB0aWxlIGRpc3RyaWJ1dGlvbnMgYXJlIHVzZWQgaW4gcmVhbCBrZXJuZWxzXG5kZWYgc2ltdWxhdGVfa2VybmVsX2V4ZWN1dGlvbihkaXN0cmlidXRpb24sIGRhdGFfc2hhcGUpOlxuICAgIFwiXCJcIlNpbXVsYXRlIGhvdyBHUFUgdGhyZWFkcyB1c2UgdGlsZSBkaXN0cmlidXRpb25cIlwiXCJcbiAgICBcbiAgICBwcmludChmXCLwn5qAIFNpbXVsYXRpbmcga2VybmVsIGV4ZWN1dGlvbiBvbiB7ZGF0YV9zaGFwZX0gdGVuc29yOlwiKVxuICAgIFxuICAgICMgRWFjaCB0aHJlYWQgYmxvY2sgZ2V0cyBQIGNvb3JkaW5hdGVzXG4gICAgIyBFYWNoIHRocmVhZCBpbiBibG9jayBnZXRzIEQgY29vcmRpbmF0ZXNcbiAgICBcbiAgICB0aHJlYWRzX3Blcl9ibG9jayA9IFsyLCAyXSAgIyAyeDIgdGhyZWFkcyBwZXIgYmxvY2tcbiAgICBibG9ja3MgPSBbMiwgMl0gICAgICAgICAgICAjIDJ4MiBibG9ja3NcbiAgICBcbiAgICBwcmludChmXCIgIEdyaWQ6IHtibG9ja3N9IGJsb2Nrcywge3RocmVhZHNfcGVyX2Jsb2NrfSB0aHJlYWRzL2Jsb2NrXCIpXG4gICAgXG4gICAgYWN0aXZlX3RocmVhZHMgPSAwXG4gICAgZm9yIGJsb2NrX3AwIGluIHJhbmdlKGJsb2Nrc1swXSk6XG4gICAgICAgIGZvciBibG9ja19wMSBpbiByYW5nZShibG9ja3NbMV0pOlxuICAgICAgICAgICAgZm9yIHRocmVhZF9kMCBpbiByYW5nZSh0aHJlYWRzX3Blcl9ibG9ja1swXSk6XG4gICAgICAgICAgICAgICAgZm9yIHRocmVhZF9kMSBpbiByYW5nZSh0aHJlYWRzX3Blcl9ibG9ja1sxXSk6XG4gICAgICAgICAgICAgICAgICAgIFxuICAgICAgICAgICAgICAgICAgICAjIEdldCB0ZW5zb3IgY29vcmRpbmF0ZXMgZm9yIHRoaXMgdGhyZWFkXG4gICAgICAgICAgICAgICAgICAgIHhfY29vcmRzID0gY29tcGxldGVfdGhyZWFkX21hcHBpbmcoXG4gICAgICAgICAgICAgICAgICAgICAgICBkaXN0cmlidXRpb24sIFxuICAgICAgICAgICAgICAgICAgICAgICAgW2Jsb2NrX3AwLCBibG9ja19wMV0sIFxuICAgICAgICAgICAgICAgICAgICAgICAgW3RocmVhZF9kMCwgdGhyZWFkX2QxXVxuICAgICAgICAgICAgICAgICAgICApXG4gICAgICAgICAgICAgICAgICAgIFxuICAgICAgICAgICAgICAgICAgICAjIENoZWNrIGlmIGNvb3JkaW5hdGVzIGFyZSB3aXRoaW4gdGVuc29yIGJvdW5kc1xuICAgICAgICAgICAgICAgICAgICBpZiBhbGwoeCA8IGRhdGFfc2hhcGVbaV0gZm9yIGksIHggaW4gZW51bWVyYXRlKHhfY29vcmRzLnRvX2xpc3QoKSkpOlxuICAgICAgICAgICAgICAgICAgICAgICAgYWN0aXZlX3RocmVhZHMgKz0gMVxuICAgICAgICAgICAgICAgICAgICAgICAgXG4gICAgICAgICAgICAgICAgICAgICAgICAjIFRoaXMgdGhyZWFkIHdvdWxkIHByb2Nlc3MgZGF0YSBhdCB4X2Nvb3Jkc1xuICAgICAgICAgICAgICAgICAgICAgICAgcHJpbnQoZlwiICAgIFRocmVhZCBCKHtibG9ja19wMH0se2Jsb2NrX3AxfSlUKHt0aHJlYWRfZDB9LHt0aHJlYWRfZDF9KSDihpIgVGVuc29ye3hfY29vcmRzLnRvX2xpc3QoKX1cIilcbiAgICBcbiAgICBwcmludChmXCIgIFRvdGFsIGFjdGl2ZSB0aHJlYWRzOiB7YWN0aXZlX3RocmVhZHN9XCIpXG4gICAgcHJpbnQoXCLinIUgS2VybmVsIGV4ZWN1dGlvbiBzaW11bGF0aW9uIGNvbXBsZXRlXCIpXG5cbiMgVGVzdCB3aXRoIHJlYWxpc3RpYyB0ZW5zb3Igc2l6ZVxuc2ltdWxhdGVfa2VybmVsX2V4ZWN1dGlvbihkaXN0cmlidXRpb24sIFs4LCAxMl0pIn0=
+eyJhdHRyIjp7ImF1dG9ydW4iOmZhbHNlLCJlY2hvIjp0cnVlLCJlZGl0Ijp0cnVlLCJldmFsIjp0cnVlLCJvdXRwdXQiOnRydWV9LCJjb2RlIjoiXG5wcmludChcIvCfk48gRGlzdHJpYnV0ZWQgU3BhbnMgQW5hbHlzaXM6XCIpXG5cbiMgR2V0IGRpc3RyaWJ1dGVkIHNwYW5zXG5zcGFucyA9IGRpc3RyaWJ1dGlvbi5nZXRfZGlzdHJpYnV0ZWRfc3BhbnMoKVxucHJpbnQoZlwiICDigKIgTnVtYmVyIG9mIHNwYW5zOiB7bGVuKHNwYW5zKX1cIilcblxuZm9yIHhfaWR4LCBzcGFuIGluIGVudW1lcmF0ZShzcGFucyk6XG4gICAgcHJpbnQoZlwiXFxu8J+OqCBYe3hfaWR4fSBTcGFuOlwiKVxuICAgIHByaW50KGZcIiAg4oCiIFBhcnRpYWwgbGVuZ3Roczoge3NwYW4ucGFydGlhbF9sZW5ndGhzfVwiKVxuICAgIHByaW50KGZcIiAg4oCiIFRvdGFsIGVsZW1lbnRzOiB7bnAucHJvZChzcGFuLnBhcnRpYWxfbGVuZ3Rocyl9XCIpXG4gICAgcHJpbnQoZlwiICDigKIgSXMgc3RhdGljOiB7c3Bhbi5pc19zdGF0aWMoKX1cIilcblxucHJpbnQoZlwiXFxu8J+UjSBTcGFuIEludGVycHJldGF0aW9uOlwiKVxucHJpbnQoZlwiICDigKIgRWFjaCBwcm9jZXNzaW5nIGVsZW1lbnQgaGFuZGxlcyBhICdzcGFuJyBvZiBkYXRhXCIpXG5wcmludChmXCIgIOKAoiBTcGFucyBkZWZpbmUgdGhlIHNwYXRpYWwgbG9jYWxpdHkgcGF0dGVyblwiKVxucHJpbnQoZlwiICDigKIgWSBjb29yZGluYXRlcyBpbmRleCB3aXRoaW4gZWFjaCBzcGFuXCIpXG5wcmludChmXCIgIOKAoiBNdWx0aXBsZSB0aHJlYWRzIGNhbiB3b3JrIG9uIGRpZmZlcmVudCBzcGFuc1wiKSJ9
+</script>
+</div>
+<div>
+<div id="pyodide-8" class="exercise-cell">
+
+</div>
+<script type="pyodide-8-contents">
+eyJhdHRyIjp7ImF1dG9ydW4iOmZhbHNlLCJlY2hvIjp0cnVlLCJlZGl0Ijp0cnVlLCJldmFsIjp0cnVlLCJvdXRwdXQiOnRydWV9LCJjb2RlIjoiXG4jIENyZWF0ZSBleGFtcGxlIGRpc3RyaWJ1dGVkIHNwYW5zIGFuZCBpbmRpY2VzXG5wcmludChcIvCfm6DvuI8gV29ya2luZyB3aXRoIFNwYW5zIGFuZCBJbmRpY2VzOlwiKVxuXG4jIENyZWF0ZSBjdXN0b20gc3BhbnNcbmN1c3RvbV9zcGFuID0gbWFrZV90aWxlX2Rpc3RyaWJ1dGVkX3NwYW4oWzQsIDRdKSAgIyA0eDQgc3BhdGlhbCByZWdpb25cbnByaW50KGZcIiAg4oCiIEN1c3RvbSBzcGFuOiB7Y3VzdG9tX3NwYW59XCIpXG5cbiMgQ3JlYXRlIGRpc3RyaWJ1dGVkIGluZGljZXNcbmN1c3RvbV9pbmRleCA9IG1ha2VfdGlsZV9kaXN0cmlidXRlZF9pbmRleChbMiwgM10pICAjIFNwZWNpZmljIHBvc2l0aW9uIGluIHNwYW5cbnByaW50KGZcIiAg4oCiIEN1c3RvbSBpbmRleDoge2N1c3RvbV9pbmRleH1cIilcblxucHJpbnQoZlwiXFxu8J+SoSBQcmFjdGljYWwgVXNhZ2U6XCIpXG5wcmludChmXCIgIOKAoiBTcGFucyBkZWZpbmUgd29yayBkaXN0cmlidXRpb24gcGF0dGVybnNcIilcbnByaW50KGZcIiAg4oCiIEluZGljZXMgc3BlY2lmeSBwb3NpdGlvbnMgd2l0aGluIHNwYW5zXCIpXG5wcmludChmXCIgIOKAoiBUb2dldGhlciB0aGV5IGVuYWJsZSBlZmZpY2llbnQgcGFyYWxsZWwgYWNjZXNzXCIpIn0=
 </script>
 </div>
 </section>
-<section id="interactive-applications" class="level2">
-<h2 class="anchored" data-anchor-id="interactive-applications">🔗 <strong>Interactive Applications</strong></h2>
-<p>Explore these concepts with our full applications:</p>
-<ul>
-<li><strong><a href="../../tensor_transform_app.py">Tensor Transform App</a></strong> - Visualize how descriptors and adaptors work together</li>
-<li><strong><a href="../../app.py">Main App</a></strong> - Interactive tile distribution exploration</li>
-<li><strong><a href="../../tile_distr_thread_mapping.py">Thread Mapping Example</a></strong> - Complete real-world example</li>
-</ul>
+<section id="y-dimension-processing" class="level2">
+<h2 class="anchored" data-anchor-id="y-dimension-processing">🎯 <strong>Y Dimension Processing</strong></h2>
+<p>Y coordinates determine which data elements each thread processes:</p>
+<div>
+<div id="pyodide-9" class="exercise-cell">
+
+</div>
+<script type="pyodide-9-contents">
+eyJhdHRyIjp7ImF1dG9ydW4iOmZhbHNlLCJlY2hvIjp0cnVlLCJlZGl0Ijp0cnVlLCJldmFsIjp0cnVlLCJvdXRwdXQiOnRydWV9LCJjb2RlIjoiXG5wcmludChcIvCfjq8gWSBEaW1lbnNpb24gUHJvY2Vzc2luZzpcIilcblxuIyBHZXQgWSBkaW1lbnNpb24gcHJvcGVydGllc1xueV9sZW5ndGhzID0gZGlzdHJpYnV0aW9uLmdldF95X3ZlY3Rvcl9sZW5ndGhzKClcbnlfc3RyaWRlcyA9IGRpc3RyaWJ1dGlvbi5nZXRfeV92ZWN0b3Jfc3RyaWRlcygpXG5cbnByaW50KGZcIiAg4oCiIFkgZGltZW5zaW9uIGNvdW50OiB7ZGlzdHJpYnV0aW9uLm5kaW1feX1cIilcbnByaW50KGZcIiAg4oCiIFkgbGVuZ3Roczoge3lfbGVuZ3Roc31cIilcbnByaW50KGZcIiAg4oCiIFkgc3RyaWRlczoge3lfc3RyaWRlc31cIilcblxucHJpbnQoZlwiXFxu8J+UhCBZIENvb3JkaW5hdGUgTWFwcGluZzpcIilcbnByaW50KGZcIiAg4oCiIFnigoA6IFJlcGVhdCBkaW1lbnNpb24gKG91dGVyIGxvb3ApXCIpXG5wcmludChmXCIgIOKAoiBZ4oKBOiBWZWN0b3IgZGltZW5zaW9uIChTSU1EKVwiKVxucHJpbnQoZlwiICDigKIgWeKCgjogUmVwZWF0IGRpbWVuc2lvbiAob3V0ZXIgbG9vcClcIilcbnByaW50KGZcIiAg4oCiIFnigoM6IFZlY3RvciBkaW1lbnNpb24gKFNJTUQpXCIpXG5cbiMgRXhhbXBsZTogY29udmVydCBhY2Nlc3MgaW5kZXggdG8gWSBjb29yZGluYXRlc1xuYWNjZXNzX2luZGljZXMgPSBbMCwgMSwgNSwgMTAsIDE1XVxucHJpbnQoZlwiXFxu8J+TiiBBY2Nlc3MgSW5kZXgg4oaSIFkgQ29vcmRpbmF0ZXM6XCIpXG5mb3IgYWNjZXNzX2lkeCBpbiBhY2Nlc3NfaW5kaWNlczpcbiAgICB5X2luZGljZXMgPSBkaXN0cmlidXRpb24uZ2V0X3lfaW5kaWNlc19mcm9tX2Rpc3RyaWJ1dGVkX2luZGljZXMoYWNjZXNzX2lkeClcbiAgICBwcmludChmXCIgIEFjY2Vzc1t7YWNjZXNzX2lkeH1dIOKGkiBZe3lfaW5kaWNlc31cIikifQ==
+</script>
+</div>
 </section>
-<section id="mathematical-foundations" class="level2">
-<h2 class="anchored" data-anchor-id="mathematical-foundations">🧮 <strong>Mathematical Foundations</strong></h2>
-<p>The key insight is the <strong>coordinate space hierarchy</strong>:</p>
-<pre><code>GPU Thread Grid → P coordinates (blocks)
-    ↓
-GPU Thread Block → D coordinates (threads)  
-    ↓
-d_to_ys_descriptor → Y coordinates (local)
-    ↓
-ps_ys_to_xs_adaptor → X coordinates (tensor)
-    ↓
-Tensor Descriptor → Memory addresses</code></pre>
+<section id="creating-tensor-descriptor-from-adaptor" class="level2">
+<h2 class="anchored" data-anchor-id="creating-tensor-descriptor-from-adaptor">🏗️ <strong>Creating Tensor Descriptor from Adaptor</strong></h2>
+<p>Transform adaptors into descriptors for tensor operations:</p>
+<div>
+<div id="pyodide-10" class="exercise-cell">
+
+</div>
+<script type="pyodide-10-contents">
+eyJhdHRyIjp7ImF1dG9ydW4iOmZhbHNlLCJlY2hvIjp0cnVlLCJlZGl0Ijp0cnVlLCJldmFsIjp0cnVlLCJvdXRwdXQiOnRydWV9LCJjb2RlIjoiXG5wcmludChcIvCfj5fvuI8gVGVuc29yIERlc2NyaXB0b3IgZnJvbSBBZGFwdG9yOlwiKVxuXG4jIENyZWF0ZSBkZXNjcmlwdG9yIGZyb20gdGhlIFBTX1lT4oaSWFMgYWRhcHRvclxuYWRhcHRvciA9IGRpc3RyaWJ1dGlvbi5wc195c190b194c19hZGFwdG9yXG5lbGVtZW50X3NwYWNlX3NpemUgPSAxMDI0ICAjIEV4YW1wbGUgYnVmZmVyIHNpemVcblxuZGVzY3JpcHRvciA9IG1ha2VfdGVuc29yX2Rlc2NyaXB0b3JfZnJvbV9hZGFwdG9yKGFkYXB0b3IsIGVsZW1lbnRfc3BhY2Vfc2l6ZSlcbnByaW50KGZcIiAg4oCiIENyZWF0ZWQgZGVzY3JpcHRvcjoge2Rlc2NyaXB0b3J9XCIpXG5wcmludChmXCIgIOKAoiBEZXNjcmlwdG9yIGRpbWVuc2lvbnM6IHtkZXNjcmlwdG9yLmdldF9udW1fb2ZfZGltZW5zaW9uKCl9XCIpXG5wcmludChmXCIgIOKAoiBEZXNjcmlwdG9yIGxlbmd0aHM6IHtkZXNjcmlwdG9yLmdldF9sZW5ndGhzKCl9XCIpXG5wcmludChmXCIgIOKAoiBFbGVtZW50IHNwYWNlOiB7ZGVzY3JpcHRvci5nZXRfZWxlbWVudF9zcGFjZV9zaXplKCl9XCIpXG5cbnByaW50KGZcIlxcbvCflIQgQWRhcHRvciB2cyBEZXNjcmlwdG9yOlwiKVxucHJpbnQoZlwiICDigKIgQWRhcHRvcjogSGFuZGxlcyBjb29yZGluYXRlIHRyYW5zZm9ybWF0aW9uc1wiKVxucHJpbnQoZlwiICDigKIgRGVzY3JpcHRvcjogQWRkcyBsaW5lYXJpemF0aW9uIGFuZCBtZW1vcnkgbGF5b3V0XCIpXG5wcmludChmXCIgIOKAoiBCb3RoIGFyZSBuZWVkZWQgZm9yIGNvbXBsZXRlIHRlbnNvciBvcGVyYXRpb25zXCIpIn0=
+</script>
+</div>
 </section>
-<section id="why-this-matters" class="level2">
-<h2 class="anchored" data-anchor-id="why-this-matters">🔍 <strong>Why This Matters</strong></h2>
-<p>Understanding these components is essential for:</p>
+<section id="advanced-distribution-operations" class="level2">
+<h2 class="anchored" data-anchor-id="advanced-distribution-operations">🧪 <strong>Advanced Distribution Operations</strong></h2>
+<p>Explore advanced coordinate mapping functionality:</p>
+<div>
+<div id="pyodide-11" class="exercise-cell">
+
+</div>
+<script type="pyodide-11-contents">
+eyJhdHRyIjp7ImF1dG9ydW4iOmZhbHNlLCJlY2hvIjp0cnVlLCJlZGl0Ijp0cnVlLCJldmFsIjp0cnVlLCJvdXRwdXQiOnRydWV9LCJjb2RlIjoiXG5wcmludChcIvCfp6ogQWR2YW5jZWQgQ29vcmRpbmF0ZSBPcGVyYXRpb25zOlwiKVxuXG4jIFRlc3QgY29vcmRpbmF0ZSBtYXBwaW5nIHRocm91Z2ggYWRhcHRvclxucHNfeXNfY29vcmRzID0gWzAsIDEsIDIsIDEsIDAsIDNdICAjIFDigoAsUOKCgSxZ4oKALFnigoEsWeKCgixZ4oKDXG5tdWx0aV9pZHggPSBNdWx0aUluZGV4KGxlbihwc195c19jb29yZHMpLCBwc195c19jb29yZHMpXG5cbiMgQ3JlYXRlIGFkYXB0b3IgY29vcmRpbmF0ZVxuYWRhcHRvcl9jb29yZCA9IG1ha2VfdGVuc29yX2FkYXB0b3JfY29vcmRpbmF0ZShcbiAgICBkaXN0cmlidXRpb24ucHNfeXNfdG9feHNfYWRhcHRvciwgXG4gICAgbXVsdGlfaWR4XG4pXG5cbnByaW50KGZcIiAg4oCiIElucHV0IFBTX1lTOiB7cHNfeXNfY29vcmRzfVwiKVxucHJpbnQoZlwiICDigKIgVG9wIGluZGV4OiB7YWRhcHRvcl9jb29yZC5nZXRfdG9wX2luZGV4KCkudG9fbGlzdCgpfVwiKVxucHJpbnQoZlwiICDigKIgQm90dG9tIGluZGV4OiB7YWRhcHRvcl9jb29yZC5nZXRfYm90dG9tX2luZGV4KCkudG9fbGlzdCgpfVwiKVxucHJpbnQoZlwiICDigKIgSGlkZGVuIGRpbWVuc2lvbnM6IHthZGFwdG9yX2Nvb3JkLmdldF9oaWRkZW5faW5kZXgoKS50b19saXN0KCl9XCIpXG5cbnByaW50KGZcIlxcbvCflI0gQ29vcmRpbmF0ZSBGbG93OlwiKVxucHJpbnQoZlwiICDigKIgUFNfWVMgaW5wdXQg4oaSIEhpZGRlbiB0cmFuc2Zvcm1hdGlvbnMg4oaSIFggb3V0cHV0XCIpXG5wcmludChmXCIgIOKAoiBIaWRkZW4gZGltcyBjYXB0dXJlIGludGVybWVkaWF0ZSB0aWxlIHN0cnVjdHVyZVwiKVxucHJpbnQoZlwiICDigKIgRmluYWwgWCBjb29yZHMgYXJlIGFjdHVhbCB0ZW5zb3IgcG9zaXRpb25zXCIpIn0=
+</script>
+</div>
+</section>
+<section id="real-world-usage-patterns" class="level2">
+<h2 class="anchored" data-anchor-id="real-world-usage-patterns">🚀 <strong>Real-World Usage Patterns</strong></h2>
+<p>Understanding how tile distribution works in practice:</p>
+<div>
+<div id="pyodide-12" class="exercise-cell">
+
+</div>
+<script type="pyodide-12-contents">
+eyJhdHRyIjp7ImF1dG9ydW4iOmZhbHNlLCJlY2hvIjp0cnVlLCJlZGl0Ijp0cnVlLCJldmFsIjp0cnVlLCJvdXRwdXQiOnRydWV9LCJjb2RlIjoiXG5wcmludChcIvCfmoAgUmVhbC1Xb3JsZCBVc2FnZSBQYXR0ZXJuczpcIilcblxucHJpbnQoZlwiXFxuMe+4j+KDoyBUaHJlYWQgSW5pdGlhbGl6YXRpb246XCIpXG5wcmludChmXCIgIOKAoiBFYWNoIEdQVSB0aHJlYWQgY2FsbHMgZ2V0X3BhcnRpdGlvbl9pbmRleCgpXCIpXG5wcmludChmXCIgIOKAoiBHZXRzIHVuaXF1ZSBQIGNvb3JkaW5hdGVzIGlkZW50aWZ5aW5nIHRoZSB0aHJlYWRcIilcbnByaW50KGZcIiAg4oCiIFVzZXMgUCB0byBjYWxjdWxhdGUgc3RhcnRpbmcgdGVuc29yIHBvc2l0aW9uXCIpXG5cbnByaW50KGZcIlxcbjLvuI/ig6MgRGF0YSBFbGVtZW50IFByb2Nlc3Npbmc6XCIpXG5wcmludChmXCIgIOKAoiBUaHJlYWQgaXRlcmF0ZXMgdGhyb3VnaCBZIGNvb3JkaW5hdGUgc3BhY2VcIilcbnByaW50KGZcIiAg4oCiIEVhY2ggWSBjb21iaW5hdGlvbiBpZGVudGlmaWVzIGEgZGF0YSBlbGVtZW50XCIpXG5wcmludChmXCIgIOKAoiBQU19ZU+KGklhTIGFkYXB0b3IgbWFwcyB0byBmaW5hbCB0ZW5zb3IgY29vcmRpbmF0ZXNcIilcblxucHJpbnQoZlwiXFxuM++4j+KDoyBNZW1vcnkgQWNjZXNzOlwiKVxucHJpbnQoZlwiICDigKIgWVPihpJEIGRlc2NyaXB0b3IgbGluZWFyaXplcyBZIGNvb3JkaW5hdGVzXCIpXG5wcmludChmXCIgIOKAoiBFbmFibGVzIGVmZmljaWVudCBzZXF1ZW50aWFsIG1lbW9yeSBhY2Nlc3NcIilcbnByaW50KGZcIiAg4oCiIFNwYW5zIGVuc3VyZSBzcGF0aWFsIGxvY2FsaXR5XCIpXG5cbnByaW50KGZcIlxcbjTvuI/ig6MgUGFyYWxsZWwgRWZmaWNpZW5jeTpcIilcbnRvdGFsX3dvcmsgPSBucC5wcm9kKGRpc3RyaWJ1dGlvbi5nZXRfbGVuZ3RocygpKVxudGhyZWFkc19wZXJfYmxvY2sgPSB2YXJpYWJsZXNbJ1dhcnBQZXJCbG9ja19NJ10gKiB2YXJpYWJsZXNbJ1dhcnBQZXJCbG9ja19OJ10gKiB2YXJpYWJsZXNbJ1RocmVhZFBlcldhcnBfTSddICogdmFyaWFibGVzWydUaHJlYWRQZXJXYXJwX04nXVxud29ya19wZXJfdGhyZWFkID0gbnAucHJvZCh5X2xlbmd0aHMpXG5cbnByaW50KGZcIiAg4oCiIFRvdGFsIHRlbnNvciBlbGVtZW50czoge3RvdGFsX3dvcms6LH1cIilcbnByaW50KGZcIiAg4oCiIFRocmVhZHMgcGVyIGJsb2NrOiB7dGhyZWFkc19wZXJfYmxvY2t9XCIpXG5wcmludChmXCIgIOKAoiBXb3JrIHBlciB0aHJlYWQ6IHt3b3JrX3Blcl90aHJlYWR9XCIpXG5wcmludChmXCIgIOKAoiBQYXJhbGxlbCBlZmZpY2llbmN5OiB7MTAwICogdGhyZWFkc19wZXJfYmxvY2sgKiB3b3JrX3Blcl90aHJlYWQgLyB0b3RhbF93b3JrOi4xZn0lXCIpIn0=
+</script>
+</div>
+</section>
+<section id="factory-functions-summary" class="level2">
+<h2 class="anchored" data-anchor-id="factory-functions-summary">🏭 <strong>Factory Functions Summary</strong></h2>
+<p>Complete reference for tile distribution creation:</p>
+<div>
+<div id="pyodide-13" class="exercise-cell">
+
+</div>
+<script type="pyodide-13-contents">
+eyJhdHRyIjp7ImF1dG9ydW4iOmZhbHNlLCJlY2hvIjp0cnVlLCJlZGl0Ijp0cnVlLCJldmFsIjp0cnVlLCJvdXRwdXQiOnRydWV9LCJjb2RlIjoiXG5wcmludChcIvCfj60gVGlsZSBEaXN0cmlidXRpb24gRmFjdG9yeSBGdW5jdGlvbnM6XCIpXG5cbnByaW50KGZcIlxcbjHvuI/ig6MgbWFrZV90aWxlX2Rpc3RyaWJ1dGlvbl9lbmNvZGluZygpXCIpXG5wcmludChmXCIgICDigKIgQ3JlYXRlcyBtYXRoZW1hdGljYWwgZW5jb2RpbmcgZnJvbSBncmFwaCBzdHJ1Y3R1cmVcIilcbnByaW50KGZcIiAgIOKAoiBJbnB1dDogUi9IIHNlcXVlbmNlcyBhbmQgUC9ZIG1hcHBpbmdzXCIpXG5wcmludChmXCIgICDigKIgT3V0cHV0OiBUaWxlRGlzdHJpYnV0aW9uRW5jb2RpbmdcIilcblxucHJpbnQoZlwiXFxuMu+4j+KDoyBtYWtlX3N0YXRpY190aWxlX2Rpc3RyaWJ1dGlvbigpXCIpXG5wcmludChmXCIgICDigKIgQ3JlYXRlcyBydW50aW1lIGRpc3RyaWJ1dGlvbiBmcm9tIGVuY29kaW5nXCIpXG5wcmludChmXCIgICDigKIgSW5wdXQ6IFRpbGVEaXN0cmlidXRpb25FbmNvZGluZ1wiKVxucHJpbnQoZlwiICAg4oCiIE91dHB1dDogVGlsZURpc3RyaWJ1dGlvbiB3aXRoIGFkYXB0b3JzL2Rlc2NyaXB0b3JzXCIpXG5cbnByaW50KGZcIlxcbjPvuI/ig6MgbWFrZV90aWxlX2Rpc3RyaWJ1dGlvbigpXCIpXG5wcmludChmXCIgICDigKIgQ3JlYXRlcyBkaXN0cmlidXRpb24gZnJvbSBjdXN0b20gY29tcG9uZW50c1wiKVxucHJpbnQoZlwiICAg4oCiIElucHV0OiBhZGFwdG9yLCBkZXNjcmlwdG9yLCBlbmNvZGluZ1wiKVxucHJpbnQoZlwiICAg4oCiIE91dHB1dDogVGlsZURpc3RyaWJ1dGlvblwiKVxuXG5wcmludChmXCJcXG4077iP4oOjIG1ha2VfdGlsZV9kaXN0cmlidXRlZF9zcGFuKClcIilcbnByaW50KGZcIiAgIOKAoiBDcmVhdGVzIHNwYW4gZnJvbSBwYXJ0aWFsIGxlbmd0aHNcIilcbnByaW50KGZcIiAgIOKAoiBJbnB1dDogTGlzdCBvZiBsZW5ndGhzXCIpXG5wcmludChmXCIgICDigKIgT3V0cHV0OiBUaWxlRGlzdHJpYnV0ZWRTcGFuXCIpXG5cbnByaW50KGZcIlxcbjXvuI/ig6MgbWFrZV90aWxlX2Rpc3RyaWJ1dGVkX2luZGV4KClcIilcbnByaW50KGZcIiAgIOKAoiBDcmVhdGVzIGluZGV4IGZyb20gcGFydGlhbCBpbmRpY2VzXCIpXG5wcmludChmXCIgICDigKIgSW5wdXQ6IExpc3Qgb2YgaW5kaWNlc1wiKVxucHJpbnQoZlwiICAg4oCiIE91dHB1dDogVGlsZURpc3RyaWJ1dGVkSW5kZXhcIilcblxucHJpbnQoZlwiXFxuNu+4j+KDoyBtYWtlX3RlbnNvcl9kZXNjcmlwdG9yX2Zyb21fYWRhcHRvcigpXCIpXG5wcmludChmXCIgICDigKIgQ3JlYXRlcyBkZXNjcmlwdG9yIGZyb20gYWRhcHRvclwiKVxucHJpbnQoZlwiICAg4oCiIElucHV0OiBUZW5zb3JBZGFwdG9yICsgZWxlbWVudF9zcGFjZV9zaXplXCIpXG5wcmludChmXCIgICDigKIgT3V0cHV0OiBUZW5zb3JEZXNjcmlwdG9yXCIpIn0=
+</script>
+</div>
+</section>
+<section id="key-takeaways" class="level2">
+<h2 class="anchored" data-anchor-id="key-takeaways">🎓 <strong>Key Takeaways</strong></h2>
 <ol type="1">
-<li><strong>Tile Windows</strong> - Use these coordinates to determine what data to load</li>
-<li><strong>Sweep Operations</strong> - Navigate through distributed data systematically</li>
-<li><strong>GPU Kernels</strong> - Map thread IDs to tensor data efficiently</li>
-<li><strong>Memory Coalescing</strong> - Ensure efficient memory access patterns</li>
+<li><strong>Runtime Bridge</strong>: Tile distribution transforms mathematical encoding into runtime components</li>
+<li><strong>Dual Components</strong>: Contains both PS_YS→XS adaptor and YS→D descriptor for complete functionality</li>
+<li><strong>Thread Coordination</strong>: Partition indices identify threads and map them to tensor regions</li>
+<li><strong>Spatial Locality</strong>: Distributed spans ensure efficient memory access patterns</li>
+<li><strong>Y Processing</strong>: Y coordinates define per-thread work and enable vectorized operations</li>
+<li><strong>Integration Ready</strong>: Provides the foundation for tile windows, sweep operations, and tensor views</li>
 </ol>
-</section>
-<section id="next-steps" class="level2">
-<h2 class="anchored" data-anchor-id="next-steps">✅ <strong>Next Steps</strong></h2>
-<p>Now you’re ready for: - <a href="tile-window.qmd"><strong>Tile Windows Deep Dive</strong></a> - See how distributions integrate with data loading - <a href="thread-mapping.qmd"><strong>Complete Thread Mapping</strong></a> - The full GPU coordination pipeline</p>
-<hr>
-<p><em>These coordinate mappings are the mathematical foundation that makes efficient GPU tensor processing possible!</em></p>
+<p>The tile distribution serves as the <strong>runtime coordinator</strong> that makes parallel tensor computation possible with optimal efficiency!</p>
+<p><strong>Next</strong>: Static Distributed Tensors show how to use tile distributions for actual tensor operations.</p>
 
 
 <!-- -->
@@ -680,7 +714,7 @@ Tensor Descriptor → Memory addresses</code></pre>
 eyJvcHRpb25zIjp7ImVudiI6eyJQTE9UTFlfUkVOREVSRVIiOiJwbG90bHlfbWltZXR5cGUifSwiaW5kZXhVUkwiOiJodHRwczovL2Nkbi5qc2RlbGl2ci5uZXQvcHlvZGlkZS92MC4yNy4wL2Z1bGwvIn0sInBhY2thZ2VzIjp7InBrZ3MiOlsicHlvZGlkZV9odHRwIiwibWljcm9waXAiLCJpcHl0aG9uIiwibnVtcHkiLCJwYW5kYXMiLCJzeW1weSIsIm1pY3JvcGlwIl19fQ==
 </script>
 <script type="ojs-module-contents">
-eyJjb250ZW50cyI6W3siY2VsbE5hbWUiOiJweW9kaWRlLTciLCJpbmxpbmUiOmZhbHNlLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0Iiwic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl83ID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS03LWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtNy1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzcgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzcsIHt9KTtcbiJ9LHsiY2VsbE5hbWUiOiJweW9kaWRlLTYiLCJpbmxpbmUiOmZhbHNlLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0Iiwic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl82ID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS02LWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtNi1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzYgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzYsIHt9KTtcbiJ9LHsiY2VsbE5hbWUiOiJweW9kaWRlLTUiLCJpbmxpbmUiOmZhbHNlLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0Iiwic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl81ID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS01LWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtNS1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzUgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzUsIHt9KTtcbiJ9LHsiY2VsbE5hbWUiOiJweW9kaWRlLTQiLCJpbmxpbmUiOmZhbHNlLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0Iiwic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl80ID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS00LWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtNC1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzQgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzQsIHt9KTtcbiJ9LHsiY2VsbE5hbWUiOiJweW9kaWRlLTMiLCJpbmxpbmUiOmZhbHNlLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0Iiwic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl8zID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS0zLWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtMy1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzMgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzMsIHt9KTtcbiJ9LHsiY2VsbE5hbWUiOiJweW9kaWRlLTIiLCJpbmxpbmUiOmZhbHNlLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0Iiwic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl8yID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS0yLWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtMi1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzIgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzIsIHt9KTtcbiJ9LHsiY2VsbE5hbWUiOiJweW9kaWRlLTEiLCJpbmxpbmUiOmZhbHNlLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0Iiwic291cmNlIjoiX3B5b2RpZGVfdmFsdWVfMSA9IHtcbiAgY29uc3QgeyBoaWdobGlnaHRQeXRob24sIGI2NERlY29kZX0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS0xLWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgLy8gRGVmYXVsdCBldmFsdWF0aW9uIGNvbmZpZ3VyYXRpb25cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oe1xuICAgIGlkOiBcInB5b2RpZGUtMS1jb250ZW50c1wiLFxuICAgIGVjaG86IHRydWUsXG4gICAgb3V0cHV0OiB0cnVlXG4gIH0sIGJsb2NrLmF0dHIpO1xuXG4gIC8vIEV2YWx1YXRlIHRoZSBwcm92aWRlZCBQeXRob24gY29kZVxuICBjb25zdCByZXN1bHQgPSBweW9kaWRlT2pzLnByb2Nlc3Moe2NvZGU6IGJsb2NrLmNvZGUsIG9wdGlvbnN9LCB7fSk7XG5cbiAgLy8gRWFybHkgeWllbGQgd2hpbGUgd2Ugd2FpdCBmb3IgdGhlIGZpcnN0IGV2YWx1YXRpb24gYW5kIHJlbmRlclxuICBpZiAob3B0aW9ucy5vdXRwdXQgJiYgIShcIjFcIiBpbiBweW9kaWRlT2pzLnJlbmRlcmVkT2pzKSkge1xuICAgIGNvbnN0IGNvbnRhaW5lciA9IGRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoXCJkaXZcIik7XG4gICAgY29uc3Qgc3Bpbm5lciA9IGRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoXCJkaXZcIik7XG5cbiAgICBpZiAob3B0aW9ucy5lY2hvKSB7XG4gICAgICAvLyBTaG93IG91dHB1dCBhcyBoaWdobGlnaHRlZCBzb3VyY2VcbiAgICAgIGNvbnN0IHByZUVsZW0gPSBkb2N1bWVudC5jcmVhdGVFbGVtZW50KFwicHJlXCIpO1xuICAgICAgY29udGFpbmVyLmNsYXNzTmFtZSA9IFwic291cmNlQ29kZVwiO1xuICAgICAgcHJlRWxlbS5jbGFzc05hbWUgPSBcInNvdXJjZUNvZGUgcHl0aG9uXCI7XG4gICAgICBwcmVFbGVtLmFwcGVuZENoaWxkKGhpZ2hsaWdodFB5dGhvbihibG9jay5jb2RlKSk7XG4gICAgICBzcGlubmVyLmNsYXNzTmFtZSA9IFwic3Bpbm5lci1ncm93IHNwaW5uZXItZ3Jvdy1zbSBtLTIgcG9zaXRpb24tYWJzb2x1dGUgdG9wLTAgZW5kLTBcIjtcbiAgICAgIHByZUVsZW0uYXBwZW5kQ2hpbGQoc3Bpbm5lcik7XG4gICAgICBjb250YWluZXIuYXBwZW5kQ2hpbGQocHJlRWxlbSk7XG4gICAgfSBlbHNlIHtcbiAgICAgIHNwaW5uZXIuY2xhc3NOYW1lID0gXCJzcGlubmVyLWJvcmRlciBzcGlubmVyLWJvcmRlci1zbVwiO1xuICAgICAgY29udGFpbmVyLmFwcGVuZENoaWxkKHNwaW5uZXIpO1xuICAgIH1cblxuICAgIHlpZWxkIGNvbnRhaW5lcjtcbiAgfVxuXG4gIHB5b2RpZGVPanMucmVuZGVyZWRPanNbXCIxXCJdID0gdHJ1ZTtcbiAgeWllbGQgYXdhaXQgcmVzdWx0O1xufVxuIn0seyJjZWxsTmFtZSI6InB5b2RpZGUtcHJlbHVkZSIsImlubGluZSI6ZmFsc2UsIm1ldGhvZE5hbWUiOiJpbnRlcnByZXRRdWlldCIsInNvdXJjZSI6InB5b2RpZGVPanMgPSB7XG4gIGNvbnN0IHtcbiAgICBQeW9kaWRlRXZhbHVhdG9yLFxuICAgIFB5b2RpZGVFbnZpcm9ubWVudE1hbmFnZXIsXG4gICAgc2V0dXBQeXRob24sXG4gICAgc3RhcnRQeW9kaWRlV29ya2VyLFxuICAgIGI2NERlY29kZSxcbiAgICBjb2xsYXBzZVBhdGgsXG4gIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHN0YXR1c0NvbnRhaW5lciA9IGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKFwiZXhlcmNpc2UtbG9hZGluZy1zdGF0dXNcIik7XG4gIGNvbnN0IGluZGljYXRvckNvbnRhaW5lciA9IGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKFwiZXhlcmNpc2UtbG9hZGluZy1pbmRpY2F0b3JcIik7XG4gIGluZGljYXRvckNvbnRhaW5lci5jbGFzc0xpc3QucmVtb3ZlKFwiZC1ub25lXCIpO1xuXG4gIGxldCBzdGF0dXNUZXh0ID0gZG9jdW1lbnQuY3JlYXRlRWxlbWVudChcImRpdlwiKVxuICBzdGF0dXNUZXh0LmNsYXNzTGlzdCA9IFwiZXhlcmNpc2UtbG9hZGluZy1kZXRhaWxzXCI7XG4gIHN0YXR1c1RleHQgPSBzdGF0dXNDb250YWluZXIuYXBwZW5kQ2hpbGQoc3RhdHVzVGV4dCk7XG4gIHN0YXR1c1RleHQudGV4dENvbnRlbnQgPSBgSW5pdGlhbGlzZWA7XG5cbiAgLy8gSG9pc3QgaW5kaWNhdG9yIG91dCBmcm9tIGZpbmFsIHNsaWRlIHdoZW4gcnVubmluZyB1bmRlciByZXZlYWxcbiAgY29uc3QgcmV2ZWFsU3RhdHVzID0gZG9jdW1lbnQucXVlcnlTZWxlY3RvcihcIi5yZXZlYWwgLmV4ZXJjaXNlLWxvYWRpbmctaW5kaWNhdG9yXCIpO1xuICBpZiAocmV2ZWFsU3RhdHVzKSB7XG4gICAgcmV2ZWFsU3RhdHVzLnJlbW92ZSgpO1xuICAgIGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoXCIucmV2ZWFsID4gLnNsaWRlc1wiKS5hcHBlbmRDaGlsZChyZXZlYWxTdGF0dXMpO1xuICB9XG5cbiAgLy8gTWFrZSBhbnkgcmV2ZWFsIHNsaWRlcyB3aXRoIGxpdmUgY2VsbHMgc2Nyb2xsYWJsZVxuICBkb2N1bWVudC5xdWVyeVNlbGVjdG9yQWxsKFwiLnJldmVhbCAuZXhlcmNpc2UtY2VsbFwiKS5mb3JFYWNoKChlbCkgPT4ge1xuICAgIGVsLmNsb3Nlc3QoJ3NlY3Rpb24uc2xpZGUnKS5jbGFzc0xpc3QuYWRkKFwic2Nyb2xsYWJsZVwiKTtcbiAgfSlcblxuICAvLyBQeW9kaWRlIHN1cHBsZW1lbnRhbCBkYXRhIGFuZCBvcHRpb25zXG4gIGNvbnN0IGRhdGFDb250ZW50ID0gZG9jdW1lbnQucXVlcnlTZWxlY3Rvcihgc2NyaXB0W3R5cGU9XFxcInB5b2RpZGUtZGF0YVxcXCJdYCkudGV4dENvbnRlbnQ7XG4gIGNvbnN0IGRhdGEgPSBKU09OLnBhcnNlKGI2NERlY29kZShkYXRhQ29udGVudCkpO1xuXG4gIC8vIEdyYWIgbGlzdCBvZiByZXNvdXJjZXMgdG8gYmUgZG93bmxvYWRlZFxuICBjb25zdCBmaWxlc0NvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwidmZzLWZpbGVcXFwiXWApLnRleHRDb250ZW50O1xuICBjb25zdCBmaWxlcyA9IEpTT04ucGFyc2UoYjY0RGVjb2RlKGZpbGVzQ29udGVudCkpO1xuXG4gIGxldCBweW9kaWRlUHJvbWlzZSA9IChhc3luYyAoKSA9PiB7XG4gICAgc3RhdHVzVGV4dC50ZXh0Q29udGVudCA9IGBEb3dubG9hZGluZyBQeW9kaWRlYDtcbiAgICBjb25zdCBweW9kaWRlID0gYXdhaXQgc3RhcnRQeW9kaWRlV29ya2VyKGRhdGEub3B0aW9ucyk7XG5cbiAgICBzdGF0dXNUZXh0LnRleHRDb250ZW50ID0gYERvd25sb2FkaW5nIHBhY2thZ2U6IG1pY3JvcGlwYDtcbiAgICBhd2FpdCBweW9kaWRlLmxvYWRQYWNrYWdlKFwibWljcm9waXBcIik7XG4gICAgY29uc3QgbWljcm9waXAgPSBhd2FpdCBweW9kaWRlLnB5aW1wb3J0KFwibWljcm9waXBcIik7XG4gICAgYXdhaXQgZGF0YS5wYWNrYWdlcy5wa2dzLm1hcCgocGtnKSA9PiAoKSA9PiB7XG4gICAgICBzdGF0dXNUZXh0LnRleHRDb250ZW50ID0gYERvd25sb2FkaW5nIHBhY2thZ2U6ICR7cGtnfWA7XG4gICAgICByZXR1cm4gbWljcm9waXAuaW5zdGFsbChwa2cpO1xuICAgIH0pLnJlZHVjZSgoY3VyLCBuZXh0KSA9PiBjdXIudGhlbihuZXh0KSwgUHJvbWlzZS5yZXNvbHZlKCkpO1xuICAgIGF3YWl0IG1pY3JvcGlwLmRlc3Ryb3koKTtcblxuICAgIC8vIERvd25sb2FkIGFuZCBpbnN0YWxsIHJlc291cmNlc1xuICAgIGF3YWl0IGZpbGVzLm1hcCgoZmlsZSkgPT4gYXN5bmMgKCkgPT4ge1xuICAgICAgY29uc3QgbmFtZSA9IGZpbGUuc3Vic3RyaW5nKGZpbGUubGFzdEluZGV4T2YoJy8nKSArIDEpO1xuICAgICAgc3RhdHVzVGV4dC50ZXh0Q29udGVudCA9IGBEb3dubG9hZGluZyByZXNvdXJjZTogJHtuYW1lfWA7XG4gICAgICBjb25zdCByZXNwb25zZSA9IGF3YWl0IGZldGNoKGZpbGUpO1xuICAgICAgaWYgKCFyZXNwb25zZS5vaykge1xuICAgICAgICB0aHJvdyBuZXcgRXJyb3IoYENhbid0IGRvd25sb2FkIFxcYCR7ZmlsZX1cXGAuIEVycm9yICR7cmVzcG9uc2Uuc3RhdHVzfTogXCIke3Jlc3BvbnNlLnN0YXR1c1RleHR9XCIuYCk7XG4gICAgICB9XG4gICAgICBjb25zdCBkYXRhID0gYXdhaXQgcmVzcG9uc2UuYXJyYXlCdWZmZXIoKTtcblxuICAgICAgLy8gU3RvcmUgVVJMcyBpbiB0aGUgY3dkIHdpdGhvdXQgYW55IHN1YmRpcmVjdG9yeSBzdHJ1Y3R1cmVcbiAgICAgIGlmIChmaWxlLmluY2x1ZGVzKFwiOi8vXCIpKSB7XG4gICAgICAgIGZpbGUgPSBuYW1lO1xuICAgICAgfVxuXG4gICAgICAvLyBDb2xsYXBzZSBoaWdoZXIgZGlyZWN0b3J5IHN0cnVjdHVyZVxuICAgICAgZmlsZSA9IGNvbGxhcHNlUGF0aChmaWxlKTtcblxuICAgICAgLy8gQ3JlYXRlIGRpcmVjdG9yeSB0cmVlLCBpZ25vcmluZyBcImRpcmVjdG9yeSBleGlzdHNcIiBWRlMgZXJyb3JzXG4gICAgICBjb25zdCBwYXJ0cyA9IGZpbGUuc3BsaXQoJy8nKS5zbGljZSgwLCAtMSk7XG4gICAgICBsZXQgcGF0aCA9ICcnO1xuICAgICAgd2hpbGUgKHBhcnRzLmxlbmd0aCA+IDApIHtcbiAgICAgICAgcGF0aCArPSBwYXJ0cy5zaGlmdCgpICsgJy8nO1xuICAgICAgICB0cnkge1xuICAgICAgICAgIGF3YWl0IHB5b2RpZGUuRlMubWtkaXIocGF0aCk7XG4gICAgICAgIH0gY2F0Y2ggKGUpIHtcbiAgICAgICAgICBpZiAoZS5uYW1lICE9PSBcIkVycm5vRXJyb3JcIikgdGhyb3cgZTtcbiAgICAgICAgICBpZiAoZS5lcnJubyAhPT0gMjApIHtcbiAgICAgICAgICAgIGNvbnN0IGVycm9yVGV4dFB0ciA9IGF3YWl0IHB5b2RpZGUuX21vZHVsZS5fc3RyZXJyb3IoZS5lcnJubyk7XG4gICAgICAgICAgICBjb25zdCBlcnJvclRleHQgPSBhd2FpdCBweW9kaWRlLl9tb2R1bGUuVVRGOFRvU3RyaW5nKGVycm9yVGV4dFB0cik7XG4gICAgICAgICAgICB0aHJvdyBuZXcgRXJyb3IoYEZpbGVzeXN0ZW0gRXJyb3IgJHtlLmVycm5vfSBcIiR7ZXJyb3JUZXh0fVwiLmApO1xuICAgICAgICAgIH1cbiAgICAgICAgfVxuICAgICAgfVxuXG4gICAgICAvLyBXcml0ZSB0aGlzIGZpbGUgdG8gdGhlIFZGU1xuICAgICAgdHJ5IHtcbiAgICAgICAgcmV0dXJuIGF3YWl0IHB5b2RpZGUuRlMud3JpdGVGaWxlKGZpbGUsIG5ldyBVaW50OEFycmF5KGRhdGEpKTtcbiAgICAgIH0gY2F0Y2ggKGUpIHtcbiAgICAgICAgaWYgKGUubmFtZSAhPT0gXCJFcnJub0Vycm9yXCIpIHRocm93IGU7XG4gICAgICAgIGNvbnN0IGVycm9yVGV4dFB0ciA9IGF3YWl0IHB5b2RpZGUuX21vZHVsZS5fc3RyZXJyb3IoZS5lcnJubyk7XG4gICAgICAgIGNvbnN0IGVycm9yVGV4dCA9IGF3YWl0IHB5b2RpZGUuX21vZHVsZS5VVEY4VG9TdHJpbmcoZXJyb3JUZXh0UHRyKTtcbiAgICAgICAgdGhyb3cgbmV3IEVycm9yKGBGaWxlc3lzdGVtIEVycm9yICR7ZS5lcnJub30gXCIke2Vycm9yVGV4dH1cIi5gKTtcbiAgICAgIH1cbiAgICB9KS5yZWR1Y2UoKGN1ciwgbmV4dCkgPT4gY3VyLnRoZW4obmV4dCksIFByb21pc2UucmVzb2x2ZSgpKTtcblxuICAgIHN0YXR1c1RleHQudGV4dENvbnRlbnQgPSBgUHlvZGlkZSBlbnZpcm9ubWVudCBzZXR1cGA7XG4gICAgYXdhaXQgc2V0dXBQeXRob24ocHlvZGlkZSk7XG5cbiAgICBzdGF0dXNUZXh0LnJlbW92ZSgpO1xuICAgIGlmIChzdGF0dXNDb250YWluZXIuY2hpbGRyZW4ubGVuZ3RoID09IDApIHtcbiAgICAgIHN0YXR1c0NvbnRhaW5lci5wYXJlbnROb2RlLnJlbW92ZSgpO1xuICAgIH1cbiAgICByZXR1cm4gcHlvZGlkZTtcbiAgfSkoKS5jYXRjaCgoZXJyKSA9PiB7XG4gICAgc3RhdHVzVGV4dC5zdHlsZS5jb2xvciA9IFwidmFyKC0tZXhlcmNpc2UtZWRpdG9yLWhsLWVyLCAjQUQwMDAwKVwiO1xuICAgIHN0YXR1c1RleHQudGV4dENvbnRlbnQgPSBlcnIubWVzc2FnZTtcbiAgICAvL2luZGljYXRvckNvbnRhaW5lci5xdWVyeVNlbGVjdG9yKFwiLnNwaW5uZXItZ3Jvd1wiKS5jbGFzc0xpc3QuYWRkKFwiZC1ub25lXCIpO1xuICAgIHRocm93IGVycjtcbiAgfSk7XG5cbiAgLy8gS2VlcCB0cmFjayBvZiBpbml0aWFsIE9KUyBibG9jayByZW5kZXJcbiAgY29uc3QgcmVuZGVyZWRPanMgPSB7fTtcblxuICBjb25zdCBwcm9jZXNzID0gYXN5bmMgKGNvbnRleHQsIGlucHV0cykgPT4ge1xuICAgIGNvbnN0IHB5b2RpZGUgPSBhd2FpdCBweW9kaWRlUHJvbWlzZTtcbiAgICBjb25zdCBldmFsdWF0b3IgPSBuZXcgUHlvZGlkZUV2YWx1YXRvcihweW9kaWRlLCBjb250ZXh0KTtcbiAgICBhd2FpdCBldmFsdWF0b3IucHJvY2VzcyhpbnB1dHMpO1xuICAgIHJldHVybiBldmFsdWF0b3IuY29udGFpbmVyO1xuICB9XG5cbiAgcmV0dXJuIHtcbiAgICBweW9kaWRlUHJvbWlzZSxcbiAgICByZW5kZXJlZE9qcyxcbiAgICBwcm9jZXNzLFxuICB9O1xufVxuIn1dfQ==
+eyJjb250ZW50cyI6W3siY2VsbE5hbWUiOiJweW9kaWRlLTEzIiwiaW5saW5lIjpmYWxzZSwibWV0aG9kTmFtZSI6ImludGVycHJldCIsInNvdXJjZSI6InZpZXdvZiBfcHlvZGlkZV9lZGl0b3JfMTMgPSB7XG4gIGNvbnN0IHsgUHlvZGlkZUV4ZXJjaXNlRWRpdG9yLCBiNjREZWNvZGUgfSA9IHdpbmRvdy5fZXhlcmNpc2Vfb2pzX3J1bnRpbWU7XG5cbiAgY29uc3Qgc2NyaXB0Q29udGVudCA9IGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoYHNjcmlwdFt0eXBlPVxcXCJweW9kaWRlLTEzLWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtMTMtY29udGVudHNgIH0sIGJsb2NrLmF0dHIpO1xuICBjb25zdCBlZGl0b3IgPSBuZXcgUHlvZGlkZUV4ZXJjaXNlRWRpdG9yKFxuICAgIHB5b2RpZGVPanMucHlvZGlkZVByb21pc2UsXG4gICAgYmxvY2suY29kZSxcbiAgICBvcHRpb25zXG4gICk7XG5cbiAgcmV0dXJuIGVkaXRvci5jb250YWluZXI7XG59XG5fcHlvZGlkZV92YWx1ZV8xMyA9IHB5b2RpZGVPanMucHJvY2VzcyhfcHlvZGlkZV9lZGl0b3JfMTMsIHt9KTtcbiJ9LHsiY2VsbE5hbWUiOiJweW9kaWRlLTEyIiwiaW5saW5lIjpmYWxzZSwibWV0aG9kTmFtZSI6ImludGVycHJldCIsInNvdXJjZSI6InZpZXdvZiBfcHlvZGlkZV9lZGl0b3JfMTIgPSB7XG4gIGNvbnN0IHsgUHlvZGlkZUV4ZXJjaXNlRWRpdG9yLCBiNjREZWNvZGUgfSA9IHdpbmRvdy5fZXhlcmNpc2Vfb2pzX3J1bnRpbWU7XG5cbiAgY29uc3Qgc2NyaXB0Q29udGVudCA9IGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoYHNjcmlwdFt0eXBlPVxcXCJweW9kaWRlLTEyLWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtMTItY29udGVudHNgIH0sIGJsb2NrLmF0dHIpO1xuICBjb25zdCBlZGl0b3IgPSBuZXcgUHlvZGlkZUV4ZXJjaXNlRWRpdG9yKFxuICAgIHB5b2RpZGVPanMucHlvZGlkZVByb21pc2UsXG4gICAgYmxvY2suY29kZSxcbiAgICBvcHRpb25zXG4gICk7XG5cbiAgcmV0dXJuIGVkaXRvci5jb250YWluZXI7XG59XG5fcHlvZGlkZV92YWx1ZV8xMiA9IHB5b2RpZGVPanMucHJvY2VzcyhfcHlvZGlkZV9lZGl0b3JfMTIsIHt9KTtcbiJ9LHsiY2VsbE5hbWUiOiJweW9kaWRlLTExIiwiaW5saW5lIjpmYWxzZSwibWV0aG9kTmFtZSI6ImludGVycHJldCIsInNvdXJjZSI6InZpZXdvZiBfcHlvZGlkZV9lZGl0b3JfMTEgPSB7XG4gIGNvbnN0IHsgUHlvZGlkZUV4ZXJjaXNlRWRpdG9yLCBiNjREZWNvZGUgfSA9IHdpbmRvdy5fZXhlcmNpc2Vfb2pzX3J1bnRpbWU7XG5cbiAgY29uc3Qgc2NyaXB0Q29udGVudCA9IGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoYHNjcmlwdFt0eXBlPVxcXCJweW9kaWRlLTExLWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtMTEtY29udGVudHNgIH0sIGJsb2NrLmF0dHIpO1xuICBjb25zdCBlZGl0b3IgPSBuZXcgUHlvZGlkZUV4ZXJjaXNlRWRpdG9yKFxuICAgIHB5b2RpZGVPanMucHlvZGlkZVByb21pc2UsXG4gICAgYmxvY2suY29kZSxcbiAgICBvcHRpb25zXG4gICk7XG5cbiAgcmV0dXJuIGVkaXRvci5jb250YWluZXI7XG59XG5fcHlvZGlkZV92YWx1ZV8xMSA9IHB5b2RpZGVPanMucHJvY2VzcyhfcHlvZGlkZV9lZGl0b3JfMTEsIHt9KTtcbiJ9LHsiY2VsbE5hbWUiOiJweW9kaWRlLTEwIiwiaW5saW5lIjpmYWxzZSwibWV0aG9kTmFtZSI6ImludGVycHJldCIsInNvdXJjZSI6InZpZXdvZiBfcHlvZGlkZV9lZGl0b3JfMTAgPSB7XG4gIGNvbnN0IHsgUHlvZGlkZUV4ZXJjaXNlRWRpdG9yLCBiNjREZWNvZGUgfSA9IHdpbmRvdy5fZXhlcmNpc2Vfb2pzX3J1bnRpbWU7XG5cbiAgY29uc3Qgc2NyaXB0Q29udGVudCA9IGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoYHNjcmlwdFt0eXBlPVxcXCJweW9kaWRlLTEwLWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtMTAtY29udGVudHNgIH0sIGJsb2NrLmF0dHIpO1xuICBjb25zdCBlZGl0b3IgPSBuZXcgUHlvZGlkZUV4ZXJjaXNlRWRpdG9yKFxuICAgIHB5b2RpZGVPanMucHlvZGlkZVByb21pc2UsXG4gICAgYmxvY2suY29kZSxcbiAgICBvcHRpb25zXG4gICk7XG5cbiAgcmV0dXJuIGVkaXRvci5jb250YWluZXI7XG59XG5fcHlvZGlkZV92YWx1ZV8xMCA9IHB5b2RpZGVPanMucHJvY2VzcyhfcHlvZGlkZV9lZGl0b3JfMTAsIHt9KTtcbiJ9LHsiY2VsbE5hbWUiOiJweW9kaWRlLTkiLCJpbmxpbmUiOmZhbHNlLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0Iiwic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl85ID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS05LWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtOS1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzkgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzksIHt9KTtcbiJ9LHsiY2VsbE5hbWUiOiJweW9kaWRlLTgiLCJpbmxpbmUiOmZhbHNlLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0Iiwic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl84ID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS04LWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtOC1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzggPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzgsIHt9KTtcbiJ9LHsiY2VsbE5hbWUiOiJweW9kaWRlLTciLCJpbmxpbmUiOmZhbHNlLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0Iiwic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl83ID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS03LWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtNy1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzcgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzcsIHt9KTtcbiJ9LHsiY2VsbE5hbWUiOiJweW9kaWRlLTYiLCJpbmxpbmUiOmZhbHNlLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0Iiwic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl82ID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS02LWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtNi1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzYgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzYsIHt9KTtcbiJ9LHsiY2VsbE5hbWUiOiJweW9kaWRlLTUiLCJpbmxpbmUiOmZhbHNlLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0Iiwic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl81ID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS01LWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtNS1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzUgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzUsIHt9KTtcbiJ9LHsiY2VsbE5hbWUiOiJweW9kaWRlLTQiLCJpbmxpbmUiOmZhbHNlLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0Iiwic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl80ID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS00LWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtNC1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzQgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzQsIHt9KTtcbiJ9LHsiY2VsbE5hbWUiOiJweW9kaWRlLTMiLCJpbmxpbmUiOmZhbHNlLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0Iiwic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl8zID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS0zLWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtMy1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzMgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzMsIHt9KTtcbiJ9LHsiY2VsbE5hbWUiOiJweW9kaWRlLTIiLCJpbmxpbmUiOmZhbHNlLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0Iiwic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl8yID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS0yLWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtMi1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzIgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzIsIHt9KTtcbiJ9LHsiY2VsbE5hbWUiOiJweW9kaWRlLTEiLCJpbmxpbmUiOmZhbHNlLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0Iiwic291cmNlIjoiX3B5b2RpZGVfdmFsdWVfMSA9IHtcbiAgY29uc3QgeyBoaWdobGlnaHRQeXRob24sIGI2NERlY29kZX0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS0xLWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgLy8gRGVmYXVsdCBldmFsdWF0aW9uIGNvbmZpZ3VyYXRpb25cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oe1xuICAgIGlkOiBcInB5b2RpZGUtMS1jb250ZW50c1wiLFxuICAgIGVjaG86IHRydWUsXG4gICAgb3V0cHV0OiB0cnVlXG4gIH0sIGJsb2NrLmF0dHIpO1xuXG4gIC8vIEV2YWx1YXRlIHRoZSBwcm92aWRlZCBQeXRob24gY29kZVxuICBjb25zdCByZXN1bHQgPSBweW9kaWRlT2pzLnByb2Nlc3Moe2NvZGU6IGJsb2NrLmNvZGUsIG9wdGlvbnN9LCB7fSk7XG5cbiAgLy8gRWFybHkgeWllbGQgd2hpbGUgd2Ugd2FpdCBmb3IgdGhlIGZpcnN0IGV2YWx1YXRpb24gYW5kIHJlbmRlclxuICBpZiAob3B0aW9ucy5vdXRwdXQgJiYgIShcIjFcIiBpbiBweW9kaWRlT2pzLnJlbmRlcmVkT2pzKSkge1xuICAgIGNvbnN0IGNvbnRhaW5lciA9IGRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoXCJkaXZcIik7XG4gICAgY29uc3Qgc3Bpbm5lciA9IGRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoXCJkaXZcIik7XG5cbiAgICBpZiAob3B0aW9ucy5lY2hvKSB7XG4gICAgICAvLyBTaG93IG91dHB1dCBhcyBoaWdobGlnaHRlZCBzb3VyY2VcbiAgICAgIGNvbnN0IHByZUVsZW0gPSBkb2N1bWVudC5jcmVhdGVFbGVtZW50KFwicHJlXCIpO1xuICAgICAgY29udGFpbmVyLmNsYXNzTmFtZSA9IFwic291cmNlQ29kZVwiO1xuICAgICAgcHJlRWxlbS5jbGFzc05hbWUgPSBcInNvdXJjZUNvZGUgcHl0aG9uXCI7XG4gICAgICBwcmVFbGVtLmFwcGVuZENoaWxkKGhpZ2hsaWdodFB5dGhvbihibG9jay5jb2RlKSk7XG4gICAgICBzcGlubmVyLmNsYXNzTmFtZSA9IFwic3Bpbm5lci1ncm93IHNwaW5uZXItZ3Jvdy1zbSBtLTIgcG9zaXRpb24tYWJzb2x1dGUgdG9wLTAgZW5kLTBcIjtcbiAgICAgIHByZUVsZW0uYXBwZW5kQ2hpbGQoc3Bpbm5lcik7XG4gICAgICBjb250YWluZXIuYXBwZW5kQ2hpbGQocHJlRWxlbSk7XG4gICAgfSBlbHNlIHtcbiAgICAgIHNwaW5uZXIuY2xhc3NOYW1lID0gXCJzcGlubmVyLWJvcmRlciBzcGlubmVyLWJvcmRlci1zbVwiO1xuICAgICAgY29udGFpbmVyLmFwcGVuZENoaWxkKHNwaW5uZXIpO1xuICAgIH1cblxuICAgIHlpZWxkIGNvbnRhaW5lcjtcbiAgfVxuXG4gIHB5b2RpZGVPanMucmVuZGVyZWRPanNbXCIxXCJdID0gdHJ1ZTtcbiAgeWllbGQgYXdhaXQgcmVzdWx0O1xufVxuIn0seyJjZWxsTmFtZSI6InB5b2RpZGUtcHJlbHVkZSIsImlubGluZSI6ZmFsc2UsIm1ldGhvZE5hbWUiOiJpbnRlcnByZXRRdWlldCIsInNvdXJjZSI6InB5b2RpZGVPanMgPSB7XG4gIGNvbnN0IHtcbiAgICBQeW9kaWRlRXZhbHVhdG9yLFxuICAgIFB5b2RpZGVFbnZpcm9ubWVudE1hbmFnZXIsXG4gICAgc2V0dXBQeXRob24sXG4gICAgc3RhcnRQeW9kaWRlV29ya2VyLFxuICAgIGI2NERlY29kZSxcbiAgICBjb2xsYXBzZVBhdGgsXG4gIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHN0YXR1c0NvbnRhaW5lciA9IGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKFwiZXhlcmNpc2UtbG9hZGluZy1zdGF0dXNcIik7XG4gIGNvbnN0IGluZGljYXRvckNvbnRhaW5lciA9IGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKFwiZXhlcmNpc2UtbG9hZGluZy1pbmRpY2F0b3JcIik7XG4gIGluZGljYXRvckNvbnRhaW5lci5jbGFzc0xpc3QucmVtb3ZlKFwiZC1ub25lXCIpO1xuXG4gIGxldCBzdGF0dXNUZXh0ID0gZG9jdW1lbnQuY3JlYXRlRWxlbWVudChcImRpdlwiKVxuICBzdGF0dXNUZXh0LmNsYXNzTGlzdCA9IFwiZXhlcmNpc2UtbG9hZGluZy1kZXRhaWxzXCI7XG4gIHN0YXR1c1RleHQgPSBzdGF0dXNDb250YWluZXIuYXBwZW5kQ2hpbGQoc3RhdHVzVGV4dCk7XG4gIHN0YXR1c1RleHQudGV4dENvbnRlbnQgPSBgSW5pdGlhbGlzZWA7XG5cbiAgLy8gSG9pc3QgaW5kaWNhdG9yIG91dCBmcm9tIGZpbmFsIHNsaWRlIHdoZW4gcnVubmluZyB1bmRlciByZXZlYWxcbiAgY29uc3QgcmV2ZWFsU3RhdHVzID0gZG9jdW1lbnQucXVlcnlTZWxlY3RvcihcIi5yZXZlYWwgLmV4ZXJjaXNlLWxvYWRpbmctaW5kaWNhdG9yXCIpO1xuICBpZiAocmV2ZWFsU3RhdHVzKSB7XG4gICAgcmV2ZWFsU3RhdHVzLnJlbW92ZSgpO1xuICAgIGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoXCIucmV2ZWFsID4gLnNsaWRlc1wiKS5hcHBlbmRDaGlsZChyZXZlYWxTdGF0dXMpO1xuICB9XG5cbiAgLy8gTWFrZSBhbnkgcmV2ZWFsIHNsaWRlcyB3aXRoIGxpdmUgY2VsbHMgc2Nyb2xsYWJsZVxuICBkb2N1bWVudC5xdWVyeVNlbGVjdG9yQWxsKFwiLnJldmVhbCAuZXhlcmNpc2UtY2VsbFwiKS5mb3JFYWNoKChlbCkgPT4ge1xuICAgIGVsLmNsb3Nlc3QoJ3NlY3Rpb24uc2xpZGUnKS5jbGFzc0xpc3QuYWRkKFwic2Nyb2xsYWJsZVwiKTtcbiAgfSlcblxuICAvLyBQeW9kaWRlIHN1cHBsZW1lbnRhbCBkYXRhIGFuZCBvcHRpb25zXG4gIGNvbnN0IGRhdGFDb250ZW50ID0gZG9jdW1lbnQucXVlcnlTZWxlY3Rvcihgc2NyaXB0W3R5cGU9XFxcInB5b2RpZGUtZGF0YVxcXCJdYCkudGV4dENvbnRlbnQ7XG4gIGNvbnN0IGRhdGEgPSBKU09OLnBhcnNlKGI2NERlY29kZShkYXRhQ29udGVudCkpO1xuXG4gIC8vIEdyYWIgbGlzdCBvZiByZXNvdXJjZXMgdG8gYmUgZG93bmxvYWRlZFxuICBjb25zdCBmaWxlc0NvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwidmZzLWZpbGVcXFwiXWApLnRleHRDb250ZW50O1xuICBjb25zdCBmaWxlcyA9IEpTT04ucGFyc2UoYjY0RGVjb2RlKGZpbGVzQ29udGVudCkpO1xuXG4gIGxldCBweW9kaWRlUHJvbWlzZSA9IChhc3luYyAoKSA9PiB7XG4gICAgc3RhdHVzVGV4dC50ZXh0Q29udGVudCA9IGBEb3dubG9hZGluZyBQeW9kaWRlYDtcbiAgICBjb25zdCBweW9kaWRlID0gYXdhaXQgc3RhcnRQeW9kaWRlV29ya2VyKGRhdGEub3B0aW9ucyk7XG5cbiAgICBzdGF0dXNUZXh0LnRleHRDb250ZW50ID0gYERvd25sb2FkaW5nIHBhY2thZ2U6IG1pY3JvcGlwYDtcbiAgICBhd2FpdCBweW9kaWRlLmxvYWRQYWNrYWdlKFwibWljcm9waXBcIik7XG4gICAgY29uc3QgbWljcm9waXAgPSBhd2FpdCBweW9kaWRlLnB5aW1wb3J0KFwibWljcm9waXBcIik7XG4gICAgYXdhaXQgZGF0YS5wYWNrYWdlcy5wa2dzLm1hcCgocGtnKSA9PiAoKSA9PiB7XG4gICAgICBzdGF0dXNUZXh0LnRleHRDb250ZW50ID0gYERvd25sb2FkaW5nIHBhY2thZ2U6ICR7cGtnfWA7XG4gICAgICByZXR1cm4gbWljcm9waXAuaW5zdGFsbChwa2cpO1xuICAgIH0pLnJlZHVjZSgoY3VyLCBuZXh0KSA9PiBjdXIudGhlbihuZXh0KSwgUHJvbWlzZS5yZXNvbHZlKCkpO1xuICAgIGF3YWl0IG1pY3JvcGlwLmRlc3Ryb3koKTtcblxuICAgIC8vIERvd25sb2FkIGFuZCBpbnN0YWxsIHJlc291cmNlc1xuICAgIGF3YWl0IGZpbGVzLm1hcCgoZmlsZSkgPT4gYXN5bmMgKCkgPT4ge1xuICAgICAgY29uc3QgbmFtZSA9IGZpbGUuc3Vic3RyaW5nKGZpbGUubGFzdEluZGV4T2YoJy8nKSArIDEpO1xuICAgICAgc3RhdHVzVGV4dC50ZXh0Q29udGVudCA9IGBEb3dubG9hZGluZyByZXNvdXJjZTogJHtuYW1lfWA7XG4gICAgICBjb25zdCByZXNwb25zZSA9IGF3YWl0IGZldGNoKGZpbGUpO1xuICAgICAgaWYgKCFyZXNwb25zZS5vaykge1xuICAgICAgICB0aHJvdyBuZXcgRXJyb3IoYENhbid0IGRvd25sb2FkIFxcYCR7ZmlsZX1cXGAuIEVycm9yICR7cmVzcG9uc2Uuc3RhdHVzfTogXCIke3Jlc3BvbnNlLnN0YXR1c1RleHR9XCIuYCk7XG4gICAgICB9XG4gICAgICBjb25zdCBkYXRhID0gYXdhaXQgcmVzcG9uc2UuYXJyYXlCdWZmZXIoKTtcblxuICAgICAgLy8gU3RvcmUgVVJMcyBpbiB0aGUgY3dkIHdpdGhvdXQgYW55IHN1YmRpcmVjdG9yeSBzdHJ1Y3R1cmVcbiAgICAgIGlmIChmaWxlLmluY2x1ZGVzKFwiOi8vXCIpKSB7XG4gICAgICAgIGZpbGUgPSBuYW1lO1xuICAgICAgfVxuXG4gICAgICAvLyBDb2xsYXBzZSBoaWdoZXIgZGlyZWN0b3J5IHN0cnVjdHVyZVxuICAgICAgZmlsZSA9IGNvbGxhcHNlUGF0aChmaWxlKTtcblxuICAgICAgLy8gQ3JlYXRlIGRpcmVjdG9yeSB0cmVlLCBpZ25vcmluZyBcImRpcmVjdG9yeSBleGlzdHNcIiBWRlMgZXJyb3JzXG4gICAgICBjb25zdCBwYXJ0cyA9IGZpbGUuc3BsaXQoJy8nKS5zbGljZSgwLCAtMSk7XG4gICAgICBsZXQgcGF0aCA9ICcnO1xuICAgICAgd2hpbGUgKHBhcnRzLmxlbmd0aCA+IDApIHtcbiAgICAgICAgcGF0aCArPSBwYXJ0cy5zaGlmdCgpICsgJy8nO1xuICAgICAgICB0cnkge1xuICAgICAgICAgIGF3YWl0IHB5b2RpZGUuRlMubWtkaXIocGF0aCk7XG4gICAgICAgIH0gY2F0Y2ggKGUpIHtcbiAgICAgICAgICBpZiAoZS5uYW1lICE9PSBcIkVycm5vRXJyb3JcIikgdGhyb3cgZTtcbiAgICAgICAgICBpZiAoZS5lcnJubyAhPT0gMjApIHtcbiAgICAgICAgICAgIGNvbnN0IGVycm9yVGV4dFB0ciA9IGF3YWl0IHB5b2RpZGUuX21vZHVsZS5fc3RyZXJyb3IoZS5lcnJubyk7XG4gICAgICAgICAgICBjb25zdCBlcnJvclRleHQgPSBhd2FpdCBweW9kaWRlLl9tb2R1bGUuVVRGOFRvU3RyaW5nKGVycm9yVGV4dFB0cik7XG4gICAgICAgICAgICB0aHJvdyBuZXcgRXJyb3IoYEZpbGVzeXN0ZW0gRXJyb3IgJHtlLmVycm5vfSBcIiR7ZXJyb3JUZXh0fVwiLmApO1xuICAgICAgICAgIH1cbiAgICAgICAgfVxuICAgICAgfVxuXG4gICAgICAvLyBXcml0ZSB0aGlzIGZpbGUgdG8gdGhlIFZGU1xuICAgICAgdHJ5IHtcbiAgICAgICAgcmV0dXJuIGF3YWl0IHB5b2RpZGUuRlMud3JpdGVGaWxlKGZpbGUsIG5ldyBVaW50OEFycmF5KGRhdGEpKTtcbiAgICAgIH0gY2F0Y2ggKGUpIHtcbiAgICAgICAgaWYgKGUubmFtZSAhPT0gXCJFcnJub0Vycm9yXCIpIHRocm93IGU7XG4gICAgICAgIGNvbnN0IGVycm9yVGV4dFB0ciA9IGF3YWl0IHB5b2RpZGUuX21vZHVsZS5fc3RyZXJyb3IoZS5lcnJubyk7XG4gICAgICAgIGNvbnN0IGVycm9yVGV4dCA9IGF3YWl0IHB5b2RpZGUuX21vZHVsZS5VVEY4VG9TdHJpbmcoZXJyb3JUZXh0UHRyKTtcbiAgICAgICAgdGhyb3cgbmV3IEVycm9yKGBGaWxlc3lzdGVtIEVycm9yICR7ZS5lcnJub30gXCIke2Vycm9yVGV4dH1cIi5gKTtcbiAgICAgIH1cbiAgICB9KS5yZWR1Y2UoKGN1ciwgbmV4dCkgPT4gY3VyLnRoZW4obmV4dCksIFByb21pc2UucmVzb2x2ZSgpKTtcblxuICAgIHN0YXR1c1RleHQudGV4dENvbnRlbnQgPSBgUHlvZGlkZSBlbnZpcm9ubWVudCBzZXR1cGA7XG4gICAgYXdhaXQgc2V0dXBQeXRob24ocHlvZGlkZSk7XG5cbiAgICBzdGF0dXNUZXh0LnJlbW92ZSgpO1xuICAgIGlmIChzdGF0dXNDb250YWluZXIuY2hpbGRyZW4ubGVuZ3RoID09IDApIHtcbiAgICAgIHN0YXR1c0NvbnRhaW5lci5wYXJlbnROb2RlLnJlbW92ZSgpO1xuICAgIH1cbiAgICByZXR1cm4gcHlvZGlkZTtcbiAgfSkoKS5jYXRjaCgoZXJyKSA9PiB7XG4gICAgc3RhdHVzVGV4dC5zdHlsZS5jb2xvciA9IFwidmFyKC0tZXhlcmNpc2UtZWRpdG9yLWhsLWVyLCAjQUQwMDAwKVwiO1xuICAgIHN0YXR1c1RleHQudGV4dENvbnRlbnQgPSBlcnIubWVzc2FnZTtcbiAgICAvL2luZGljYXRvckNvbnRhaW5lci5xdWVyeVNlbGVjdG9yKFwiLnNwaW5uZXItZ3Jvd1wiKS5jbGFzc0xpc3QuYWRkKFwiZC1ub25lXCIpO1xuICAgIHRocm93IGVycjtcbiAgfSk7XG5cbiAgLy8gS2VlcCB0cmFjayBvZiBpbml0aWFsIE9KUyBibG9jayByZW5kZXJcbiAgY29uc3QgcmVuZGVyZWRPanMgPSB7fTtcblxuICBjb25zdCBwcm9jZXNzID0gYXN5bmMgKGNvbnRleHQsIGlucHV0cykgPT4ge1xuICAgIGNvbnN0IHB5b2RpZGUgPSBhd2FpdCBweW9kaWRlUHJvbWlzZTtcbiAgICBjb25zdCBldmFsdWF0b3IgPSBuZXcgUHlvZGlkZUV2YWx1YXRvcihweW9kaWRlLCBjb250ZXh0KTtcbiAgICBhd2FpdCBldmFsdWF0b3IucHJvY2VzcyhpbnB1dHMpO1xuICAgIHJldHVybiBldmFsdWF0b3IuY29udGFpbmVyO1xuICB9XG5cbiAgcmV0dXJuIHtcbiAgICBweW9kaWRlUHJvbWlzZSxcbiAgICByZW5kZXJlZE9qcyxcbiAgICBwcm9jZXNzLFxuICB9O1xufVxuIn1dfQ==
 </script>
 <div id="exercise-loading-indicator" class="exercise-loading-indicator d-none d-flex align-items-center gap-2">
 <div id="exercise-loading-status" class="d-flex gap-2">
@@ -693,7 +727,6 @@ eyJjb250ZW50cyI6W3siY2VsbE5hbWUiOiJweW9kaWRlLTciLCJpbmxpbmUiOmZhbHNlLCJtZXRob2RO
 <script type="vfs-file">
 W10=
 </script>
-</section>
 </section>
 
 </main> <!-- /main -->
@@ -1176,291 +1209,386 @@ window._ojs.runtime.interpretFromScriptTags();
     }
   });
   </script><div class="modal fade" id="quarto-embedded-source-code-modal" tabindex="-1" aria-labelledby="quarto-embedded-source-code-modal-label" aria-hidden="true"><div class="modal-dialog modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="quarto-embedded-source-code-modal-label">Source Code</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="">
-<div class="sourceCode" id="cb3" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> "Tile Distribution Deep Dive"</span></span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="an">format:</span><span class="co"> live-html</span></span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: false</span></span>
-<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: false</span></span>
-<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a><span class="co">#| autorun: true</span></span>
-<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Auto-install pythonck package</span></span>
-<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> micropip</span>
-<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a><span class="cf">await</span> micropip.install(<span class="st">"https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl"</span>)</span>
-<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a><span class="fu"># Tile Distribution Deep Dive</span></span>
-<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>**Prerequisites**: <span class="co">[</span><span class="ot">Tensor Descriptors</span><span class="co">](tensor-descriptor.qmd)</span>, <span class="co">[</span><span class="ot">Tile Distribution Encoding</span><span class="co">](tile-distribution-encoding.qmd)</span></span>
-<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>This page provides deep explanations of how tile distributions coordinate parallel processing, focusing on the critical functions that enable GPU thread coordination.</span>
-<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a><span class="fu">## 🎯 **Core Concept: Thread-to-Data Mapping**</span></span>
-<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a>A **Tile Distribution** maps thread identifiers to tensor data locations:</span>
-<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a><span class="in">Thread ID → P coordinates → Y coordinates → X coordinates → Tensor Data</span></span>
-<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-32"><a href="#cb3-32" aria-hidden="true" tabindex="-1"></a><span class="fu">## 🔧 **make_static_tile_distribution: The Foundation**</span></span>
-<span id="cb3-33"><a href="#cb3-33" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-34"><a href="#cb3-34" aria-hidden="true" tabindex="-1"></a>This is the most important function - it creates the coordination system:</span>
-<span id="cb3-35"><a href="#cb3-35" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-38"><a href="#cb3-38" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
-<span id="cb3-39"><a href="#cb3-39" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
-<span id="cb3-40"><a href="#cb3-40" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
-<span id="cb3-41"><a href="#cb3-41" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-42"><a href="#cb3-42" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tile_distribution_encoding <span class="im">import</span> TileDistributionEncoding</span>
-<span id="cb3-43"><a href="#cb3-43" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tile_distribution <span class="im">import</span> make_static_tile_distribution</span>
-<span id="cb3-44"><a href="#cb3-44" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-45"><a href="#cb3-45" aria-hidden="true" tabindex="-1"></a><span class="co"># Create encoding that defines the mathematical distribution</span></span>
-<span id="cb3-46"><a href="#cb3-46" aria-hidden="true" tabindex="-1"></a>encoding <span class="op">=</span> TileDistributionEncoding(</span>
-<span id="cb3-47"><a href="#cb3-47" aria-hidden="true" tabindex="-1"></a>    rs_lengths<span class="op">=</span>[],                    <span class="co"># No reduction dimensions</span></span>
-<span id="cb3-48"><a href="#cb3-48" aria-hidden="true" tabindex="-1"></a>    hs_lengthss<span class="op">=</span>[[<span class="dv">2</span>, <span class="dv">4</span>], [<span class="dv">2</span>, <span class="dv">3</span>]],    <span class="co"># Hierarchical: 2x4 and 2x3 </span></span>
-<span id="cb3-49"><a href="#cb3-49" aria-hidden="true" tabindex="-1"></a>    ps_to_rhss_major<span class="op">=</span>[[<span class="dv">1</span>], [<span class="dv">1</span>]],     <span class="co"># P→H mapping (major)</span></span>
-<span id="cb3-50"><a href="#cb3-50" aria-hidden="true" tabindex="-1"></a>    ps_to_rhss_minor<span class="op">=</span>[[<span class="dv">0</span>], [<span class="dv">0</span>]],     <span class="co"># P→H mapping (minor)</span></span>
-<span id="cb3-51"><a href="#cb3-51" aria-hidden="true" tabindex="-1"></a>    ys_to_rhs_major<span class="op">=</span>[<span class="dv">1</span>, <span class="dv">1</span>],          <span class="co"># Y→H mapping (major)</span></span>
-<span id="cb3-52"><a href="#cb3-52" aria-hidden="true" tabindex="-1"></a>    ys_to_rhs_minor<span class="op">=</span>[<span class="dv">0</span>, <span class="dv">1</span>]           <span class="co"># Y→H mapping (minor)</span></span>
-<span id="cb3-53"><a href="#cb3-53" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb3-54"><a href="#cb3-54" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-55"><a href="#cb3-55" aria-hidden="true" tabindex="-1"></a><span class="co"># THIS IS THE KEY FUNCTION - creates the distribution system</span></span>
-<span id="cb3-56"><a href="#cb3-56" aria-hidden="true" tabindex="-1"></a>distribution <span class="op">=</span> make_static_tile_distribution(encoding)</span>
-<span id="cb3-57"><a href="#cb3-57" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-58"><a href="#cb3-58" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Distribution created with:"</span>)</span>
-<span id="cb3-59"><a href="#cb3-59" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  X dimensions: </span><span class="sc">{</span>distribution<span class="sc">.</span>ndim_x<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb3-60"><a href="#cb3-60" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  Y dimensions: </span><span class="sc">{</span>distribution<span class="sc">.</span>ndim_y<span class="sc">}</span><span class="ss">"</span>)  </span>
-<span id="cb3-61"><a href="#cb3-61" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  P dimensions: </span><span class="sc">{</span>distribution<span class="sc">.</span>ndim_p<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb3-62"><a href="#cb3-62" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"✅ Static tile distribution created"</span>)</span>
-<span id="cb3-63"><a href="#cb3-63" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb3-64"><a href="#cb3-64" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-65"><a href="#cb3-65" aria-hidden="true" tabindex="-1"></a><span class="fu">## 🗺️ **ps_ys_to_xs_adaptor: The Critical Adapter**</span></span>
-<span id="cb3-66"><a href="#cb3-66" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-67"><a href="#cb3-67" aria-hidden="true" tabindex="-1"></a>This adaptor converts parallel coordinates (P,Y) to tensor coordinates (X):</span>
-<span id="cb3-68"><a href="#cb3-68" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-71"><a href="#cb3-71" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
-<span id="cb3-72"><a href="#cb3-72" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
-<span id="cb3-73"><a href="#cb3-73" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
-<span id="cb3-74"><a href="#cb3-74" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-75"><a href="#cb3-75" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tensor_coordinate <span class="im">import</span> MultiIndex</span>
-<span id="cb3-76"><a href="#cb3-76" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-77"><a href="#cb3-77" aria-hidden="true" tabindex="-1"></a><span class="co"># Get the critical adaptor that maps (P,Y) → X</span></span>
-<span id="cb3-78"><a href="#cb3-78" aria-hidden="true" tabindex="-1"></a>ps_ys_to_xs_adaptor <span class="op">=</span> distribution.ps_ys_to_xs_adaptor</span>
-<span id="cb3-79"><a href="#cb3-79" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-80"><a href="#cb3-80" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Adaptor details:"</span>)</span>
-<span id="cb3-81"><a href="#cb3-81" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  Input dimensions (P+Y): </span><span class="sc">{</span>ps_ys_to_xs_adaptor<span class="sc">.</span>get_num_of_upper_dimension()<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb3-82"><a href="#cb3-82" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  Output dimensions (X): </span><span class="sc">{</span>ps_ys_to_xs_adaptor<span class="sc">.</span>get_num_of_lower_dimension()<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb3-83"><a href="#cb3-83" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  Number of transforms: </span><span class="sc">{</span>ps_ys_to_xs_adaptor<span class="sc">.</span>get_num_of_transform()<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb3-84"><a href="#cb3-84" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-85"><a href="#cb3-85" aria-hidden="true" tabindex="-1"></a><span class="co"># Example: Convert thread coordinates to tensor coordinates</span></span>
-<span id="cb3-86"><a href="#cb3-86" aria-hidden="true" tabindex="-1"></a>p_coords <span class="op">=</span> MultiIndex(<span class="dv">2</span>, [<span class="dv">0</span>, <span class="dv">1</span>])  <span class="co"># Thread partition coordinates</span></span>
-<span id="cb3-87"><a href="#cb3-87" aria-hidden="true" tabindex="-1"></a>y_coords <span class="op">=</span> MultiIndex(<span class="dv">2</span>, [<span class="dv">1</span>, <span class="dv">0</span>])  <span class="co"># Local thread coordinates</span></span>
-<span id="cb3-88"><a href="#cb3-88" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-89"><a href="#cb3-89" aria-hidden="true" tabindex="-1"></a><span class="co"># Combine P and Y coordinates</span></span>
-<span id="cb3-90"><a href="#cb3-90" aria-hidden="true" tabindex="-1"></a>combined_coords <span class="op">=</span> MultiIndex(<span class="dv">4</span>, p_coords.to_list() <span class="op">+</span> y_coords.to_list())</span>
-<span id="cb3-91"><a href="#cb3-91" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Combined P,Y coordinates: </span><span class="sc">{</span>combined_coords<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb3-92"><a href="#cb3-92" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-93"><a href="#cb3-93" aria-hidden="true" tabindex="-1"></a><span class="co"># Transform to X (tensor) coordinates</span></span>
-<span id="cb3-94"><a href="#cb3-94" aria-hidden="true" tabindex="-1"></a>x_coords <span class="op">=</span> ps_ys_to_xs_adaptor.calculate_lower_index(combined_coords)</span>
-<span id="cb3-95"><a href="#cb3-95" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Resulting X coordinates: </span><span class="sc">{</span>x_coords<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb3-96"><a href="#cb3-96" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"✅ P,Y → X coordinate transformation demonstrated"</span>)</span>
-<span id="cb3-97"><a href="#cb3-97" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb3-98"><a href="#cb3-98" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-99"><a href="#cb3-99" aria-hidden="true" tabindex="-1"></a><span class="fu">## 📋 **d_to_ys_descriptor: Local Distribution Mapping**</span></span>
-<span id="cb3-100"><a href="#cb3-100" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-101"><a href="#cb3-101" aria-hidden="true" tabindex="-1"></a>This descriptor maps distribution indices to local Y coordinates:</span>
-<span id="cb3-102"><a href="#cb3-102" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-105"><a href="#cb3-105" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
-<span id="cb3-106"><a href="#cb3-106" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
-<span id="cb3-107"><a href="#cb3-107" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
-<span id="cb3-108"><a href="#cb3-108" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-109"><a href="#cb3-109" aria-hidden="true" tabindex="-1"></a><span class="co"># Get the descriptor that maps D → Y coordinates</span></span>
-<span id="cb3-110"><a href="#cb3-110" aria-hidden="true" tabindex="-1"></a>d_to_ys_descriptor <span class="op">=</span> distribution.d_to_ys_descriptor</span>
-<span id="cb3-111"><a href="#cb3-111" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-112"><a href="#cb3-112" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"D→Y Descriptor:"</span>)</span>
-<span id="cb3-113"><a href="#cb3-113" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  Input dimensions (D): </span><span class="sc">{</span><span class="bu">len</span>(d_to_ys_descriptor.get_lengths())<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb3-114"><a href="#cb3-114" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  Output space size: </span><span class="sc">{</span>d_to_ys_descriptor<span class="sc">.</span>get_element_space_size()<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb3-115"><a href="#cb3-115" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  Y dimension lengths: </span><span class="sc">{</span>d_to_ys_descriptor<span class="sc">.</span>get_lengths()<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb3-116"><a href="#cb3-116" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-117"><a href="#cb3-117" aria-hidden="true" tabindex="-1"></a><span class="co"># Example: Convert distribution index to Y coordinates</span></span>
-<span id="cb3-118"><a href="#cb3-118" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tensor_coordinate <span class="im">import</span> make_tensor_coordinate</span>
-<span id="cb3-119"><a href="#cb3-119" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-120"><a href="#cb3-120" aria-hidden="true" tabindex="-1"></a><span class="co"># Create a distribution coordinate</span></span>
-<span id="cb3-121"><a href="#cb3-121" aria-hidden="true" tabindex="-1"></a>d_coord <span class="op">=</span> MultiIndex(<span class="dv">2</span>, [<span class="dv">1</span>, <span class="dv">2</span>])  <span class="co"># Distribution index [1, 2]</span></span>
-<span id="cb3-122"><a href="#cb3-122" aria-hidden="true" tabindex="-1"></a>coord <span class="op">=</span> make_tensor_coordinate(d_to_ys_descriptor, d_coord)</span>
-<span id="cb3-123"><a href="#cb3-123" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-124"><a href="#cb3-124" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Distribution coordinate [1, 2]:"</span>)</span>
-<span id="cb3-125"><a href="#cb3-125" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  Maps to Y coordinates: </span><span class="sc">{</span>coord<span class="sc">.</span>get_index()<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb3-126"><a href="#cb3-126" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  Linear offset: </span><span class="sc">{</span>coord<span class="sc">.</span>get_offset()<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb3-127"><a href="#cb3-127" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"✅ D → Y coordinate mapping demonstrated"</span>)</span>
-<span id="cb3-128"><a href="#cb3-128" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb3-129"><a href="#cb3-129" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-130"><a href="#cb3-130" aria-hidden="true" tabindex="-1"></a><span class="fu">## 🔄 **Complete Thread Mapping Pipeline**</span></span>
-<span id="cb3-131"><a href="#cb3-131" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-132"><a href="#cb3-132" aria-hidden="true" tabindex="-1"></a>Here's how a thread ID becomes tensor access:</span>
-<span id="cb3-133"><a href="#cb3-133" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-136"><a href="#cb3-136" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
-<span id="cb3-137"><a href="#cb3-137" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
-<span id="cb3-138"><a href="#cb3-138" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
-<span id="cb3-139"><a href="#cb3-139" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-140"><a href="#cb3-140" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> complete_thread_mapping(distribution, thread_p, thread_d):</span>
-<span id="cb3-141"><a href="#cb3-141" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Demonstrate complete thread → tensor coordinate mapping"""</span></span>
-<span id="cb3-142"><a href="#cb3-142" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb3-143"><a href="#cb3-143" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"🧵 Thread mapping for P=</span><span class="sc">{</span>thread_p<span class="sc">}</span><span class="ss">, D=</span><span class="sc">{</span>thread_d<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb3-144"><a href="#cb3-144" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb3-145"><a href="#cb3-145" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Step 1: D coordinates → Y coordinates</span></span>
-<span id="cb3-146"><a href="#cb3-146" aria-hidden="true" tabindex="-1"></a>    d_coord <span class="op">=</span> MultiIndex(<span class="bu">len</span>(thread_d), thread_d)</span>
-<span id="cb3-147"><a href="#cb3-147" aria-hidden="true" tabindex="-1"></a>    d_tensor_coord <span class="op">=</span> make_tensor_coordinate(distribution.d_to_ys_descriptor, d_coord)</span>
-<span id="cb3-148"><a href="#cb3-148" aria-hidden="true" tabindex="-1"></a>    y_coords <span class="op">=</span> d_tensor_coord.get_index()</span>
-<span id="cb3-149"><a href="#cb3-149" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb3-150"><a href="#cb3-150" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  Step 1: D</span><span class="sc">{</span>thread_d<span class="sc">}</span><span class="ss"> → Y</span><span class="sc">{</span>y_coords<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb3-151"><a href="#cb3-151" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb3-152"><a href="#cb3-152" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Step 2: Combine P and Y coordinates</span></span>
-<span id="cb3-153"><a href="#cb3-153" aria-hidden="true" tabindex="-1"></a>    p_coord <span class="op">=</span> MultiIndex(<span class="bu">len</span>(thread_p), thread_p)</span>
-<span id="cb3-154"><a href="#cb3-154" aria-hidden="true" tabindex="-1"></a>    combined <span class="op">=</span> MultiIndex(</span>
-<span id="cb3-155"><a href="#cb3-155" aria-hidden="true" tabindex="-1"></a>        <span class="bu">len</span>(thread_p) <span class="op">+</span> <span class="bu">len</span>(y_coords.to_list()),</span>
-<span id="cb3-156"><a href="#cb3-156" aria-hidden="true" tabindex="-1"></a>        thread_p <span class="op">+</span> y_coords.to_list()</span>
-<span id="cb3-157"><a href="#cb3-157" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb3-158"><a href="#cb3-158" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb3-159"><a href="#cb3-159" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  Step 2: P</span><span class="sc">{</span>thread_p<span class="sc">}</span><span class="ss"> + Y</span><span class="sc">{</span>y_coords<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss"> → PY</span><span class="sc">{</span>combined<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb3-160"><a href="#cb3-160" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb3-161"><a href="#cb3-161" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Step 3: (P,Y) coordinates → X coordinates</span></span>
-<span id="cb3-162"><a href="#cb3-162" aria-hidden="true" tabindex="-1"></a>    x_coords <span class="op">=</span> distribution.ps_ys_to_xs_adaptor.calculate_lower_index(combined)</span>
-<span id="cb3-163"><a href="#cb3-163" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb3-164"><a href="#cb3-164" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  Step 3: PY</span><span class="sc">{</span>combined<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss"> → X</span><span class="sc">{</span>x_coords<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb3-165"><a href="#cb3-165" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  🎯 Final tensor coordinates: </span><span class="sc">{</span>x_coords<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb3-166"><a href="#cb3-166" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb3-167"><a href="#cb3-167" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> x_coords</span>
-<span id="cb3-168"><a href="#cb3-168" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-169"><a href="#cb3-169" aria-hidden="true" tabindex="-1"></a><span class="co"># Test complete mapping for different threads</span></span>
-<span id="cb3-170"><a href="#cb3-170" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"=== Thread Mapping Examples ==="</span>)</span>
-<span id="cb3-171"><a href="#cb3-171" aria-hidden="true" tabindex="-1"></a>complete_thread_mapping(distribution, [<span class="dv">0</span>, <span class="dv">0</span>], [<span class="dv">0</span>, <span class="dv">0</span>])</span>
-<span id="cb3-172"><a href="#cb3-172" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>()</span>
-<span id="cb3-173"><a href="#cb3-173" aria-hidden="true" tabindex="-1"></a>complete_thread_mapping(distribution, [<span class="dv">1</span>, <span class="dv">0</span>], [<span class="dv">1</span>, <span class="dv">1</span>])</span>
-<span id="cb3-174"><a href="#cb3-174" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>()</span>
-<span id="cb3-175"><a href="#cb3-175" aria-hidden="true" tabindex="-1"></a>complete_thread_mapping(distribution, [<span class="dv">0</span>, <span class="dv">1</span>], [<span class="dv">2</span>, <span class="dv">0</span>])</span>
-<span id="cb3-176"><a href="#cb3-176" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"✅ Complete thread mapping pipeline demonstrated"</span>)</span>
-<span id="cb3-177"><a href="#cb3-177" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb3-178"><a href="#cb3-178" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-179"><a href="#cb3-179" aria-hidden="true" tabindex="-1"></a><span class="fu">## 🧩 **Understanding the Coordinate Spaces**</span></span>
-<span id="cb3-180"><a href="#cb3-180" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-183"><a href="#cb3-183" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
-<span id="cb3-184"><a href="#cb3-184" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
-<span id="cb3-185"><a href="#cb3-185" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
-<span id="cb3-186"><a href="#cb3-186" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-187"><a href="#cb3-187" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> analyze_coordinate_spaces(distribution):</span>
-<span id="cb3-188"><a href="#cb3-188" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Analyze all coordinate spaces in the distribution"""</span></span>
-<span id="cb3-189"><a href="#cb3-189" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb3-190"><a href="#cb3-190" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"📊 Coordinate Space Analysis:"</span>)</span>
-<span id="cb3-191"><a href="#cb3-191" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  P (Partition) space: </span><span class="sc">{</span>distribution<span class="sc">.</span>ndim_p<span class="sc">}</span><span class="ss"> dimensions"</span>)</span>
-<span id="cb3-192"><a href="#cb3-192" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  Y (Local thread) space: </span><span class="sc">{</span>distribution<span class="sc">.</span>ndim_y<span class="sc">}</span><span class="ss"> dimensions"</span>)  </span>
-<span id="cb3-193"><a href="#cb3-193" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  X (Tensor) space: </span><span class="sc">{</span>distribution<span class="sc">.</span>ndim_x<span class="sc">}</span><span class="ss"> dimensions"</span>)</span>
-<span id="cb3-194"><a href="#cb3-194" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb3-195"><a href="#cb3-195" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Get distributed spans (how data is partitioned)</span></span>
-<span id="cb3-196"><a href="#cb3-196" aria-hidden="true" tabindex="-1"></a>    spans <span class="op">=</span> distribution.get_distributed_spans()</span>
-<span id="cb3-197"><a href="#cb3-197" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  Number of distributed spans: </span><span class="sc">{</span><span class="bu">len</span>(spans)<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb3-198"><a href="#cb3-198" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb3-199"><a href="#cb3-199" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i, span <span class="kw">in</span> <span class="bu">enumerate</span>(spans):</span>
-<span id="cb3-200"><a href="#cb3-200" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"    Span </span><span class="sc">{</span>i<span class="sc">}</span><span class="ss">: </span><span class="sc">{</span>span<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb3-201"><a href="#cb3-201" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb3-202"><a href="#cb3-202" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"✅ Coordinate space analysis complete"</span>)</span>
-<span id="cb3-203"><a href="#cb3-203" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-204"><a href="#cb3-204" aria-hidden="true" tabindex="-1"></a>analyze_coordinate_spaces(distribution)</span>
-<span id="cb3-205"><a href="#cb3-205" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb3-206"><a href="#cb3-206" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-207"><a href="#cb3-207" aria-hidden="true" tabindex="-1"></a><span class="fu">## 🎯 **Integration with Real Applications**</span></span>
-<span id="cb3-208"><a href="#cb3-208" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-209"><a href="#cb3-209" aria-hidden="true" tabindex="-1"></a>See how these concepts work in practice:</span>
-<span id="cb3-210"><a href="#cb3-210" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-213"><a href="#cb3-213" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
-<span id="cb3-214"><a href="#cb3-214" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
-<span id="cb3-215"><a href="#cb3-215" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
-<span id="cb3-216"><a href="#cb3-216" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-217"><a href="#cb3-217" aria-hidden="true" tabindex="-1"></a><span class="co"># Simulate how tile distributions are used in real kernels</span></span>
-<span id="cb3-218"><a href="#cb3-218" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> simulate_kernel_execution(distribution, data_shape):</span>
-<span id="cb3-219"><a href="#cb3-219" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Simulate how GPU threads use tile distribution"""</span></span>
-<span id="cb3-220"><a href="#cb3-220" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb3-221"><a href="#cb3-221" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"🚀 Simulating kernel execution on </span><span class="sc">{</span>data_shape<span class="sc">}</span><span class="ss"> tensor:"</span>)</span>
-<span id="cb3-222"><a href="#cb3-222" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb3-223"><a href="#cb3-223" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Each thread block gets P coordinates</span></span>
-<span id="cb3-224"><a href="#cb3-224" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Each thread in block gets D coordinates</span></span>
-<span id="cb3-225"><a href="#cb3-225" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb3-226"><a href="#cb3-226" aria-hidden="true" tabindex="-1"></a>    threads_per_block <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">2</span>]  <span class="co"># 2x2 threads per block</span></span>
-<span id="cb3-227"><a href="#cb3-227" aria-hidden="true" tabindex="-1"></a>    blocks <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">2</span>]            <span class="co"># 2x2 blocks</span></span>
-<span id="cb3-228"><a href="#cb3-228" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb3-229"><a href="#cb3-229" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  Grid: </span><span class="sc">{</span>blocks<span class="sc">}</span><span class="ss"> blocks, </span><span class="sc">{</span>threads_per_block<span class="sc">}</span><span class="ss"> threads/block"</span>)</span>
-<span id="cb3-230"><a href="#cb3-230" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb3-231"><a href="#cb3-231" aria-hidden="true" tabindex="-1"></a>    active_threads <span class="op">=</span> <span class="dv">0</span></span>
-<span id="cb3-232"><a href="#cb3-232" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> block_p0 <span class="kw">in</span> <span class="bu">range</span>(blocks[<span class="dv">0</span>]):</span>
-<span id="cb3-233"><a href="#cb3-233" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> block_p1 <span class="kw">in</span> <span class="bu">range</span>(blocks[<span class="dv">1</span>]):</span>
-<span id="cb3-234"><a href="#cb3-234" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> thread_d0 <span class="kw">in</span> <span class="bu">range</span>(threads_per_block[<span class="dv">0</span>]):</span>
-<span id="cb3-235"><a href="#cb3-235" aria-hidden="true" tabindex="-1"></a>                <span class="cf">for</span> thread_d1 <span class="kw">in</span> <span class="bu">range</span>(threads_per_block[<span class="dv">1</span>]):</span>
-<span id="cb3-236"><a href="#cb3-236" aria-hidden="true" tabindex="-1"></a>                    </span>
-<span id="cb3-237"><a href="#cb3-237" aria-hidden="true" tabindex="-1"></a>                    <span class="co"># Get tensor coordinates for this thread</span></span>
-<span id="cb3-238"><a href="#cb3-238" aria-hidden="true" tabindex="-1"></a>                    x_coords <span class="op">=</span> complete_thread_mapping(</span>
-<span id="cb3-239"><a href="#cb3-239" aria-hidden="true" tabindex="-1"></a>                        distribution, </span>
-<span id="cb3-240"><a href="#cb3-240" aria-hidden="true" tabindex="-1"></a>                        [block_p0, block_p1], </span>
-<span id="cb3-241"><a href="#cb3-241" aria-hidden="true" tabindex="-1"></a>                        [thread_d0, thread_d1]</span>
-<span id="cb3-242"><a href="#cb3-242" aria-hidden="true" tabindex="-1"></a>                    )</span>
-<span id="cb3-243"><a href="#cb3-243" aria-hidden="true" tabindex="-1"></a>                    </span>
-<span id="cb3-244"><a href="#cb3-244" aria-hidden="true" tabindex="-1"></a>                    <span class="co"># Check if coordinates are within tensor bounds</span></span>
-<span id="cb3-245"><a href="#cb3-245" aria-hidden="true" tabindex="-1"></a>                    <span class="cf">if</span> <span class="bu">all</span>(x <span class="op">&lt;</span> data_shape[i] <span class="cf">for</span> i, x <span class="kw">in</span> <span class="bu">enumerate</span>(x_coords.to_list())):</span>
-<span id="cb3-246"><a href="#cb3-246" aria-hidden="true" tabindex="-1"></a>                        active_threads <span class="op">+=</span> <span class="dv">1</span></span>
-<span id="cb3-247"><a href="#cb3-247" aria-hidden="true" tabindex="-1"></a>                        </span>
-<span id="cb3-248"><a href="#cb3-248" aria-hidden="true" tabindex="-1"></a>                        <span class="co"># This thread would process data at x_coords</span></span>
-<span id="cb3-249"><a href="#cb3-249" aria-hidden="true" tabindex="-1"></a>                        <span class="bu">print</span>(<span class="ss">f"    Thread B(</span><span class="sc">{</span>block_p0<span class="sc">}</span><span class="ss">,</span><span class="sc">{</span>block_p1<span class="sc">}</span><span class="ss">)T(</span><span class="sc">{</span>thread_d0<span class="sc">}</span><span class="ss">,</span><span class="sc">{</span>thread_d1<span class="sc">}</span><span class="ss">) → Tensor</span><span class="sc">{</span>x_coords<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb3-250"><a href="#cb3-250" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb3-251"><a href="#cb3-251" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  Total active threads: </span><span class="sc">{</span>active_threads<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb3-252"><a href="#cb3-252" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"✅ Kernel execution simulation complete"</span>)</span>
-<span id="cb3-253"><a href="#cb3-253" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-254"><a href="#cb3-254" aria-hidden="true" tabindex="-1"></a><span class="co"># Test with realistic tensor size</span></span>
-<span id="cb3-255"><a href="#cb3-255" aria-hidden="true" tabindex="-1"></a>simulate_kernel_execution(distribution, [<span class="dv">8</span>, <span class="dv">12</span>])</span>
-<span id="cb3-256"><a href="#cb3-256" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb3-257"><a href="#cb3-257" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-258"><a href="#cb3-258" aria-hidden="true" tabindex="-1"></a><span class="fu">## 🔗 **Interactive Applications**</span></span>
-<span id="cb3-259"><a href="#cb3-259" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-260"><a href="#cb3-260" aria-hidden="true" tabindex="-1"></a>Explore these concepts with our full applications:</span>
-<span id="cb3-261"><a href="#cb3-261" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-262"><a href="#cb3-262" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Tensor Transform App](../../tensor_transform_app.py)** - Visualize how descriptors and adaptors work together</span>
-<span id="cb3-263"><a href="#cb3-263" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Main App](../../app.py)** - Interactive tile distribution exploration</span>
-<span id="cb3-264"><a href="#cb3-264" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Thread Mapping Example](../../tile_distr_thread_mapping.py)** - Complete real-world example</span>
-<span id="cb3-265"><a href="#cb3-265" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-266"><a href="#cb3-266" aria-hidden="true" tabindex="-1"></a><span class="fu">## 🧮 **Mathematical Foundations**</span></span>
-<span id="cb3-267"><a href="#cb3-267" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-268"><a href="#cb3-268" aria-hidden="true" tabindex="-1"></a>The key insight is the **coordinate space hierarchy**:</span>
-<span id="cb3-269"><a href="#cb3-269" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-270"><a href="#cb3-270" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb3-271"><a href="#cb3-271" aria-hidden="true" tabindex="-1"></a><span class="in">GPU Thread Grid → P coordinates (blocks)</span></span>
-<span id="cb3-272"><a href="#cb3-272" aria-hidden="true" tabindex="-1"></a><span class="in">    ↓</span></span>
-<span id="cb3-273"><a href="#cb3-273" aria-hidden="true" tabindex="-1"></a><span class="in">GPU Thread Block → D coordinates (threads)  </span></span>
-<span id="cb3-274"><a href="#cb3-274" aria-hidden="true" tabindex="-1"></a><span class="in">    ↓</span></span>
-<span id="cb3-275"><a href="#cb3-275" aria-hidden="true" tabindex="-1"></a><span class="in">d_to_ys_descriptor → Y coordinates (local)</span></span>
-<span id="cb3-276"><a href="#cb3-276" aria-hidden="true" tabindex="-1"></a><span class="in">    ↓</span></span>
-<span id="cb3-277"><a href="#cb3-277" aria-hidden="true" tabindex="-1"></a><span class="in">ps_ys_to_xs_adaptor → X coordinates (tensor)</span></span>
-<span id="cb3-278"><a href="#cb3-278" aria-hidden="true" tabindex="-1"></a><span class="in">    ↓</span></span>
-<span id="cb3-279"><a href="#cb3-279" aria-hidden="true" tabindex="-1"></a><span class="in">Tensor Descriptor → Memory addresses</span></span>
-<span id="cb3-280"><a href="#cb3-280" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb3-281"><a href="#cb3-281" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-282"><a href="#cb3-282" aria-hidden="true" tabindex="-1"></a><span class="fu">## 🔍 **Why This Matters**</span></span>
-<span id="cb3-283"><a href="#cb3-283" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-284"><a href="#cb3-284" aria-hidden="true" tabindex="-1"></a>Understanding these components is essential for:</span>
-<span id="cb3-285"><a href="#cb3-285" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-286"><a href="#cb3-286" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>**Tile Windows** - Use these coordinates to determine what data to load</span>
-<span id="cb3-287"><a href="#cb3-287" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>**Sweep Operations** - Navigate through distributed data systematically</span>
-<span id="cb3-288"><a href="#cb3-288" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>**GPU Kernels** - Map thread IDs to tensor data efficiently</span>
-<span id="cb3-289"><a href="#cb3-289" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>**Memory Coalescing** - Ensure efficient memory access patterns</span>
-<span id="cb3-290"><a href="#cb3-290" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-291"><a href="#cb3-291" aria-hidden="true" tabindex="-1"></a><span class="fu">## ✅ **Next Steps**</span></span>
-<span id="cb3-292"><a href="#cb3-292" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-293"><a href="#cb3-293" aria-hidden="true" tabindex="-1"></a>Now you're ready for:</span>
-<span id="cb3-294"><a href="#cb3-294" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">**Tile Windows Deep Dive**</span><span class="co">](tile-window.qmd)</span> - See how distributions integrate with data loading</span>
-<span id="cb3-295"><a href="#cb3-295" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">**Complete Thread Mapping**</span><span class="co">](thread-mapping.qmd)</span> - The full GPU coordination pipeline</span>
-<span id="cb3-296"><a href="#cb3-296" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-297"><a href="#cb3-297" aria-hidden="true" tabindex="-1"></a>---</span>
-<span id="cb3-298"><a href="#cb3-298" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-299"><a href="#cb3-299" aria-hidden="true" tabindex="-1"></a>*These coordinate mappings are the mathematical foundation that makes efficient GPU tensor processing possible!* </span>
+<div class="sourceCode" id="cb1" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> "Tile Distribution: Parallel Processing Coordination"</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="an">format:</span><span class="co"> live-html</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="fu">## 🎯 **What is Tile Distribution?**</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>**Tile Distribution** is the runtime coordinator that transforms the mathematical **tile distribution encoding** into actual parallel processing components. It creates the **adaptors** and **descriptors** needed to map (P,Y) coordinates to final tensor coordinates (X).</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: false</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: false</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="co">#| autorun: true</span></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="co"># Auto-install pythonck package</span></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> micropip</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a><span class="cf">await</span> micropip.install(<span class="st">"https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl"</span>)</span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tile_distribution_encoding <span class="im">import</span> TileDistributionEncoding</span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tile_distribution <span class="im">import</span> (</span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a>    make_tile_distribution_encoding,</span>
+<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a>    make_static_tile_distribution,</span>
+<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a>    make_tile_distributed_span,</span>
+<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a>    make_tile_distributed_index,</span>
+<span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a>    make_tile_distribution,</span>
+<span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a>    make_tensor_descriptor_from_adaptor</span>
+<span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb1-38"><a href="#cb1-38" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tensor_coordinate <span class="im">import</span> MultiIndex, make_tensor_adaptor_coordinate</span>
+<span id="cb1-39"><a href="#cb1-39" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-40"><a href="#cb1-40" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"🎯 Tile Distribution: From Encoding to Runtime Coordination"</span>)</span>
+<span id="cb1-41"><a href="#cb1-41" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"="</span> <span class="op">*</span> <span class="dv">60</span>)</span>
+<span id="cb1-42"><a href="#cb1-42" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb1-43"><a href="#cb1-43" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-44"><a href="#cb1-44" aria-hidden="true" tabindex="-1"></a><span class="fu">## 🔧 **Creating Tile Distribution from Encoding**</span></span>
+<span id="cb1-45"><a href="#cb1-45" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-46"><a href="#cb1-46" aria-hidden="true" tabindex="-1"></a>Let's build the complete RMSNorm tile distribution step by step:</span>
+<span id="cb1-47"><a href="#cb1-47" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-50"><a href="#cb1-50" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb1-51"><a href="#cb1-51" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
+<span id="cb1-52"><a href="#cb1-52" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
+<span id="cb1-53"><a href="#cb1-53" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-54"><a href="#cb1-54" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 1: Create the encoding (mathematical specification)</span></span>
+<span id="cb1-55"><a href="#cb1-55" aria-hidden="true" tabindex="-1"></a>variables <span class="op">=</span> {</span>
+<span id="cb1-56"><a href="#cb1-56" aria-hidden="true" tabindex="-1"></a>    <span class="st">"Repeat_M"</span>: <span class="dv">4</span>, <span class="st">"WarpPerBlock_M"</span>: <span class="dv">2</span>, <span class="st">"ThreadPerWarp_M"</span>: <span class="dv">8</span>, <span class="st">"Vector_M"</span>: <span class="dv">4</span>,</span>
+<span id="cb1-57"><a href="#cb1-57" aria-hidden="true" tabindex="-1"></a>    <span class="st">"Repeat_N"</span>: <span class="dv">4</span>, <span class="st">"WarpPerBlock_N"</span>: <span class="dv">2</span>, <span class="st">"ThreadPerWarp_N"</span>: <span class="dv">8</span>, <span class="st">"Vector_N"</span>: <span class="dv">4</span></span>
+<span id="cb1-58"><a href="#cb1-58" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb1-59"><a href="#cb1-59" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-60"><a href="#cb1-60" aria-hidden="true" tabindex="-1"></a>encoding <span class="op">=</span> make_tile_distribution_encoding(</span>
+<span id="cb1-61"><a href="#cb1-61" aria-hidden="true" tabindex="-1"></a>    rs_lengths<span class="op">=</span>[],</span>
+<span id="cb1-62"><a href="#cb1-62" aria-hidden="true" tabindex="-1"></a>    hs_lengthss<span class="op">=</span>[</span>
+<span id="cb1-63"><a href="#cb1-63" aria-hidden="true" tabindex="-1"></a>        [variables[<span class="st">"Repeat_M"</span>], variables[<span class="st">"WarpPerBlock_M"</span>], variables[<span class="st">"ThreadPerWarp_M"</span>], variables[<span class="st">"Vector_M"</span>]],</span>
+<span id="cb1-64"><a href="#cb1-64" aria-hidden="true" tabindex="-1"></a>        [variables[<span class="st">"Repeat_N"</span>], variables[<span class="st">"WarpPerBlock_N"</span>], variables[<span class="st">"ThreadPerWarp_N"</span>], variables[<span class="st">"Vector_N"</span>]]</span>
+<span id="cb1-65"><a href="#cb1-65" aria-hidden="true" tabindex="-1"></a>    ],</span>
+<span id="cb1-66"><a href="#cb1-66" aria-hidden="true" tabindex="-1"></a>    ps_to_rhss_major<span class="op">=</span>[[<span class="dv">1</span>, <span class="dv">2</span>], [<span class="dv">1</span>, <span class="dv">2</span>]],</span>
+<span id="cb1-67"><a href="#cb1-67" aria-hidden="true" tabindex="-1"></a>    ps_to_rhss_minor<span class="op">=</span>[[<span class="dv">1</span>, <span class="dv">1</span>], [<span class="dv">2</span>, <span class="dv">2</span>]],</span>
+<span id="cb1-68"><a href="#cb1-68" aria-hidden="true" tabindex="-1"></a>    ys_to_rhs_major<span class="op">=</span>[<span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">2</span>],</span>
+<span id="cb1-69"><a href="#cb1-69" aria-hidden="true" tabindex="-1"></a>    ys_to_rhs_minor<span class="op">=</span>[<span class="dv">0</span>, <span class="dv">3</span>, <span class="dv">0</span>, <span class="dv">3</span>]</span>
+<span id="cb1-70"><a href="#cb1-70" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb1-71"><a href="#cb1-71" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-72"><a href="#cb1-72" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"📋 Encoding Created:"</span>)</span>
+<span id="cb1-73"><a href="#cb1-73" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • X dimensions: </span><span class="sc">{</span>encoding<span class="sc">.</span>ndim_x<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-74"><a href="#cb1-74" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • P dimensions: </span><span class="sc">{</span>encoding<span class="sc">.</span>ndim_p<span class="sc">}</span><span class="ss">"</span>)  </span>
+<span id="cb1-75"><a href="#cb1-75" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Y dimensions: </span><span class="sc">{</span>encoding<span class="sc">.</span>ndim_y<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-76"><a href="#cb1-76" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • R dimensions: </span><span class="sc">{</span>encoding<span class="sc">.</span>ndim_r<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-77"><a href="#cb1-77" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb1-78"><a href="#cb1-78" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-81"><a href="#cb1-81" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb1-82"><a href="#cb1-82" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
+<span id="cb1-83"><a href="#cb1-83" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
+<span id="cb1-84"><a href="#cb1-84" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-85"><a href="#cb1-85" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 2: Create static tile distribution (runtime coordinator)</span></span>
+<span id="cb1-86"><a href="#cb1-86" aria-hidden="true" tabindex="-1"></a>distribution <span class="op">=</span> make_static_tile_distribution(encoding)</span>
+<span id="cb1-87"><a href="#cb1-87" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-88"><a href="#cb1-88" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"🚀 Tile Distribution Created:"</span>)</span>
+<span id="cb1-89"><a href="#cb1-89" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Type: </span><span class="sc">{</span><span class="bu">type</span>(distribution)<span class="sc">.</span><span class="va">__name__</span><span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-90"><a href="#cb1-90" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Tensor dimensions (X): </span><span class="sc">{</span>distribution<span class="sc">.</span>ndim_x<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-91"><a href="#cb1-91" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Thread partition dimensions (P): </span><span class="sc">{</span>distribution<span class="sc">.</span>ndim_p<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-92"><a href="#cb1-92" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Element indexing dimensions (Y): </span><span class="sc">{</span>distribution<span class="sc">.</span>ndim_y<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-93"><a href="#cb1-93" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Replication dimensions (R): </span><span class="sc">{</span>distribution<span class="sc">.</span>ndim_r<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-94"><a href="#cb1-94" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-95"><a href="#cb1-95" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">📐 Dimension Lengths:"</span>)</span>
+<span id="cb1-96"><a href="#cb1-96" aria-hidden="true" tabindex="-1"></a>x_lengths <span class="op">=</span> distribution.get_lengths()</span>
+<span id="cb1-97"><a href="#cb1-97" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • X lengths: </span><span class="sc">{</span>x_lengths<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-98"><a href="#cb1-98" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Total tensor size: </span><span class="sc">{</span>np<span class="sc">.</span>prod(x_lengths)<span class="sc">:,}</span><span class="ss"> elements"</span>)</span>
+<span id="cb1-99"><a href="#cb1-99" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb1-100"><a href="#cb1-100" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-101"><a href="#cb1-101" aria-hidden="true" tabindex="-1"></a><span class="fu">## 🔗 **Internal Components: Adaptors and Descriptors**</span></span>
+<span id="cb1-102"><a href="#cb1-102" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-103"><a href="#cb1-103" aria-hidden="true" tabindex="-1"></a>The tile distribution contains two key components:</span>
+<span id="cb1-104"><a href="#cb1-104" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-107"><a href="#cb1-107" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb1-108"><a href="#cb1-108" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
+<span id="cb1-109"><a href="#cb1-109" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
+<span id="cb1-110"><a href="#cb1-110" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-111"><a href="#cb1-111" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"🔗 Internal Components Analysis:"</span>)</span>
+<span id="cb1-112"><a href="#cb1-112" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-113"><a href="#cb1-113" aria-hidden="true" tabindex="-1"></a><span class="co"># 1. PS_YS → XS Adaptor (coordinate mapping)</span></span>
+<span id="cb1-114"><a href="#cb1-114" aria-hidden="true" tabindex="-1"></a>ps_ys_to_xs_adaptor <span class="op">=</span> distribution.ps_ys_to_xs_adaptor</span>
+<span id="cb1-115"><a href="#cb1-115" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">1️⃣ PS_YS → XS Adaptor:"</span>)</span>
+<span id="cb1-116"><a href="#cb1-116" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Type: </span><span class="sc">{</span><span class="bu">type</span>(ps_ys_to_xs_adaptor)<span class="sc">.</span><span class="va">__name__</span><span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-117"><a href="#cb1-117" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Top dimensions: </span><span class="sc">{</span>ps_ys_to_xs_adaptor<span class="sc">.</span>get_num_of_top_dimension()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-118"><a href="#cb1-118" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Bottom dimensions: </span><span class="sc">{</span>ps_ys_to_xs_adaptor<span class="sc">.</span>get_num_of_bottom_dimension()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-119"><a href="#cb1-119" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Hidden dimensions: </span><span class="sc">{</span>ps_ys_to_xs_adaptor<span class="sc">.</span>get_num_of_hidden_dimension()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-120"><a href="#cb1-120" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Purpose: Maps (P₀,P₁,Y₀,Y₁,Y₂,Y₃) → (X₀,X₁)"</span>)</span>
+<span id="cb1-121"><a href="#cb1-121" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-122"><a href="#cb1-122" aria-hidden="true" tabindex="-1"></a><span class="co"># 2. YS → D Descriptor (linearization)</span></span>
+<span id="cb1-123"><a href="#cb1-123" aria-hidden="true" tabindex="-1"></a>ys_to_d_descriptor <span class="op">=</span> distribution.ys_to_d_descriptor</span>
+<span id="cb1-124"><a href="#cb1-124" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">2️⃣ YS → D Descriptor:"</span>)</span>
+<span id="cb1-125"><a href="#cb1-125" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Type: </span><span class="sc">{</span><span class="bu">type</span>(ys_to_d_descriptor)<span class="sc">.</span><span class="va">__name__</span><span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-126"><a href="#cb1-126" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Dimensions: </span><span class="sc">{</span>ys_to_d_descriptor<span class="sc">.</span>get_num_of_dimension()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-127"><a href="#cb1-127" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Element space size: </span><span class="sc">{</span>ys_to_d_descriptor<span class="sc">.</span>get_element_space_size()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-128"><a href="#cb1-128" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Lengths: </span><span class="sc">{</span>ys_to_d_descriptor<span class="sc">.</span>get_lengths()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-129"><a href="#cb1-129" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Purpose: Maps (Y₀,Y₁,Y₂,Y₃) → linear index"</span>)</span>
+<span id="cb1-130"><a href="#cb1-130" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb1-131"><a href="#cb1-131" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-132"><a href="#cb1-132" aria-hidden="true" tabindex="-1"></a><span class="fu">## 🧵 **Partition Index: Thread Identification**</span></span>
+<span id="cb1-133"><a href="#cb1-133" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-134"><a href="#cb1-134" aria-hidden="true" tabindex="-1"></a>The distribution determines which thread you are via partition indices:</span>
+<span id="cb1-135"><a href="#cb1-135" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-138"><a href="#cb1-138" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb1-139"><a href="#cb1-139" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
+<span id="cb1-140"><a href="#cb1-140" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
+<span id="cb1-141"><a href="#cb1-141" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-142"><a href="#cb1-142" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"🧵 Thread Partition System:"</span>)</span>
+<span id="cb1-143"><a href="#cb1-143" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-144"><a href="#cb1-144" aria-hidden="true" tabindex="-1"></a><span class="co"># Get current partition index (simulated)</span></span>
+<span id="cb1-145"><a href="#cb1-145" aria-hidden="true" tabindex="-1"></a>partition_idx <span class="op">=</span> distribution.get_partition_index()</span>
+<span id="cb1-146"><a href="#cb1-146" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Current partition index: </span><span class="sc">{</span>partition_idx<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-147"><a href="#cb1-147" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • P₀ (thread warp ID): </span><span class="sc">{</span>partition_idx[<span class="dv">0</span>]<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-148"><a href="#cb1-148" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • P₁ (thread lane ID): </span><span class="sc">{</span>partition_idx[<span class="dv">1</span>]<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-149"><a href="#cb1-149" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-150"><a href="#cb1-150" aria-hidden="true" tabindex="-1"></a><span class="co"># Calculate tensor coordinates for this thread</span></span>
+<span id="cb1-151"><a href="#cb1-151" aria-hidden="true" tabindex="-1"></a>x_index <span class="op">=</span> distribution.calculate_index(partition_idx)</span>
+<span id="cb1-152"><a href="#cb1-152" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Tensor coordinates: </span><span class="sc">{</span>x_index<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-153"><a href="#cb1-153" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-154"><a href="#cb1-154" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">🔍 Understanding Partition Indices:"</span>)</span>
+<span id="cb1-155"><a href="#cb1-155" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • P coordinates identify which thread you are"</span>)</span>
+<span id="cb1-156"><a href="#cb1-156" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Different threads get different P values"</span>)</span>
+<span id="cb1-157"><a href="#cb1-157" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • P values map to different starting positions in tensor"</span>)</span>
+<span id="cb1-158"><a href="#cb1-158" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-159"><a href="#cb1-159" aria-hidden="true" tabindex="-1"></a><span class="co"># Show some example mappings</span></span>
+<span id="cb1-160"><a href="#cb1-160" aria-hidden="true" tabindex="-1"></a>example_partitions <span class="op">=</span> [[<span class="dv">0</span>, <span class="dv">0</span>], [<span class="dv">0</span>, <span class="dv">1</span>], [<span class="dv">1</span>, <span class="dv">0</span>], [<span class="dv">1</span>, <span class="dv">1</span>]]</span>
+<span id="cb1-161"><a href="#cb1-161" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">📊 Example Thread Mappings:"</span>)</span>
+<span id="cb1-162"><a href="#cb1-162" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> p_idx <span class="kw">in</span> example_partitions:</span>
+<span id="cb1-163"><a href="#cb1-163" aria-hidden="true" tabindex="-1"></a>    x_coord <span class="op">=</span> distribution.calculate_index(p_idx)</span>
+<span id="cb1-164"><a href="#cb1-164" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  Thread P</span><span class="sc">{</span>p_idx<span class="sc">}</span><span class="ss"> → Tensor X</span><span class="sc">{</span>x_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-165"><a href="#cb1-165" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb1-166"><a href="#cb1-166" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-167"><a href="#cb1-167" aria-hidden="true" tabindex="-1"></a><span class="fu">## 📏 **Distributed Spans: Spatial Distribution**</span></span>
+<span id="cb1-168"><a href="#cb1-168" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-169"><a href="#cb1-169" aria-hidden="true" tabindex="-1"></a>Spans define how computation is distributed across space:</span>
+<span id="cb1-170"><a href="#cb1-170" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-173"><a href="#cb1-173" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb1-174"><a href="#cb1-174" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
+<span id="cb1-175"><a href="#cb1-175" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
+<span id="cb1-176"><a href="#cb1-176" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-177"><a href="#cb1-177" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"📏 Distributed Spans Analysis:"</span>)</span>
+<span id="cb1-178"><a href="#cb1-178" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-179"><a href="#cb1-179" aria-hidden="true" tabindex="-1"></a><span class="co"># Get distributed spans</span></span>
+<span id="cb1-180"><a href="#cb1-180" aria-hidden="true" tabindex="-1"></a>spans <span class="op">=</span> distribution.get_distributed_spans()</span>
+<span id="cb1-181"><a href="#cb1-181" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Number of spans: </span><span class="sc">{</span><span class="bu">len</span>(spans)<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-182"><a href="#cb1-182" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-183"><a href="#cb1-183" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> x_idx, span <span class="kw">in</span> <span class="bu">enumerate</span>(spans):</span>
+<span id="cb1-184"><a href="#cb1-184" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">🎨 X</span><span class="sc">{</span>x_idx<span class="sc">}</span><span class="ss"> Span:"</span>)</span>
+<span id="cb1-185"><a href="#cb1-185" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  • Partial lengths: </span><span class="sc">{</span>span<span class="sc">.</span>partial_lengths<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-186"><a href="#cb1-186" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  • Total elements: </span><span class="sc">{</span>np<span class="sc">.</span>prod(span.partial_lengths)<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-187"><a href="#cb1-187" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  • Is static: </span><span class="sc">{</span>span<span class="sc">.</span>is_static()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-188"><a href="#cb1-188" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-189"><a href="#cb1-189" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">🔍 Span Interpretation:"</span>)</span>
+<span id="cb1-190"><a href="#cb1-190" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Each processing element handles a 'span' of data"</span>)</span>
+<span id="cb1-191"><a href="#cb1-191" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Spans define the spatial locality pattern"</span>)</span>
+<span id="cb1-192"><a href="#cb1-192" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Y coordinates index within each span"</span>)</span>
+<span id="cb1-193"><a href="#cb1-193" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Multiple threads can work on different spans"</span>)</span>
+<span id="cb1-194"><a href="#cb1-194" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb1-195"><a href="#cb1-195" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-198"><a href="#cb1-198" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb1-199"><a href="#cb1-199" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
+<span id="cb1-200"><a href="#cb1-200" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
+<span id="cb1-201"><a href="#cb1-201" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-202"><a href="#cb1-202" aria-hidden="true" tabindex="-1"></a><span class="co"># Create example distributed spans and indices</span></span>
+<span id="cb1-203"><a href="#cb1-203" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"🛠️ Working with Spans and Indices:"</span>)</span>
+<span id="cb1-204"><a href="#cb1-204" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-205"><a href="#cb1-205" aria-hidden="true" tabindex="-1"></a><span class="co"># Create custom spans</span></span>
+<span id="cb1-206"><a href="#cb1-206" aria-hidden="true" tabindex="-1"></a>custom_span <span class="op">=</span> make_tile_distributed_span([<span class="dv">4</span>, <span class="dv">4</span>])  <span class="co"># 4x4 spatial region</span></span>
+<span id="cb1-207"><a href="#cb1-207" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Custom span: </span><span class="sc">{</span>custom_span<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-208"><a href="#cb1-208" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-209"><a href="#cb1-209" aria-hidden="true" tabindex="-1"></a><span class="co"># Create distributed indices</span></span>
+<span id="cb1-210"><a href="#cb1-210" aria-hidden="true" tabindex="-1"></a>custom_index <span class="op">=</span> make_tile_distributed_index([<span class="dv">2</span>, <span class="dv">3</span>])  <span class="co"># Specific position in span</span></span>
+<span id="cb1-211"><a href="#cb1-211" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Custom index: </span><span class="sc">{</span>custom_index<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-212"><a href="#cb1-212" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-213"><a href="#cb1-213" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">💡 Practical Usage:"</span>)</span>
+<span id="cb1-214"><a href="#cb1-214" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Spans define work distribution patterns"</span>)</span>
+<span id="cb1-215"><a href="#cb1-215" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Indices specify positions within spans"</span>)</span>
+<span id="cb1-216"><a href="#cb1-216" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Together they enable efficient parallel access"</span>)</span>
+<span id="cb1-217"><a href="#cb1-217" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb1-218"><a href="#cb1-218" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-219"><a href="#cb1-219" aria-hidden="true" tabindex="-1"></a><span class="fu">## 🎯 **Y Dimension Processing**</span></span>
+<span id="cb1-220"><a href="#cb1-220" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-221"><a href="#cb1-221" aria-hidden="true" tabindex="-1"></a>Y coordinates determine which data elements each thread processes:</span>
+<span id="cb1-222"><a href="#cb1-222" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-225"><a href="#cb1-225" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb1-226"><a href="#cb1-226" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
+<span id="cb1-227"><a href="#cb1-227" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
+<span id="cb1-228"><a href="#cb1-228" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-229"><a href="#cb1-229" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"🎯 Y Dimension Processing:"</span>)</span>
+<span id="cb1-230"><a href="#cb1-230" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-231"><a href="#cb1-231" aria-hidden="true" tabindex="-1"></a><span class="co"># Get Y dimension properties</span></span>
+<span id="cb1-232"><a href="#cb1-232" aria-hidden="true" tabindex="-1"></a>y_lengths <span class="op">=</span> distribution.get_y_vector_lengths()</span>
+<span id="cb1-233"><a href="#cb1-233" aria-hidden="true" tabindex="-1"></a>y_strides <span class="op">=</span> distribution.get_y_vector_strides()</span>
+<span id="cb1-234"><a href="#cb1-234" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-235"><a href="#cb1-235" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Y dimension count: </span><span class="sc">{</span>distribution<span class="sc">.</span>ndim_y<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-236"><a href="#cb1-236" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Y lengths: </span><span class="sc">{</span>y_lengths<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-237"><a href="#cb1-237" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Y strides: </span><span class="sc">{</span>y_strides<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-238"><a href="#cb1-238" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-239"><a href="#cb1-239" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">🔄 Y Coordinate Mapping:"</span>)</span>
+<span id="cb1-240"><a href="#cb1-240" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Y₀: Repeat dimension (outer loop)"</span>)</span>
+<span id="cb1-241"><a href="#cb1-241" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Y₁: Vector dimension (SIMD)"</span>)</span>
+<span id="cb1-242"><a href="#cb1-242" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Y₂: Repeat dimension (outer loop)"</span>)</span>
+<span id="cb1-243"><a href="#cb1-243" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Y₃: Vector dimension (SIMD)"</span>)</span>
+<span id="cb1-244"><a href="#cb1-244" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-245"><a href="#cb1-245" aria-hidden="true" tabindex="-1"></a><span class="co"># Example: convert access index to Y coordinates</span></span>
+<span id="cb1-246"><a href="#cb1-246" aria-hidden="true" tabindex="-1"></a>access_indices <span class="op">=</span> [<span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">5</span>, <span class="dv">10</span>, <span class="dv">15</span>]</span>
+<span id="cb1-247"><a href="#cb1-247" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">📊 Access Index → Y Coordinates:"</span>)</span>
+<span id="cb1-248"><a href="#cb1-248" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> access_idx <span class="kw">in</span> access_indices:</span>
+<span id="cb1-249"><a href="#cb1-249" aria-hidden="true" tabindex="-1"></a>    y_indices <span class="op">=</span> distribution.get_y_indices_from_distributed_indices(access_idx)</span>
+<span id="cb1-250"><a href="#cb1-250" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  Access[</span><span class="sc">{</span>access_idx<span class="sc">}</span><span class="ss">] → Y</span><span class="sc">{</span>y_indices<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-251"><a href="#cb1-251" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb1-252"><a href="#cb1-252" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-253"><a href="#cb1-253" aria-hidden="true" tabindex="-1"></a><span class="fu">## 🏗️ **Creating Tensor Descriptor from Adaptor**</span></span>
+<span id="cb1-254"><a href="#cb1-254" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-255"><a href="#cb1-255" aria-hidden="true" tabindex="-1"></a>Transform adaptors into descriptors for tensor operations:</span>
+<span id="cb1-256"><a href="#cb1-256" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-259"><a href="#cb1-259" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb1-260"><a href="#cb1-260" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
+<span id="cb1-261"><a href="#cb1-261" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
+<span id="cb1-262"><a href="#cb1-262" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-263"><a href="#cb1-263" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"🏗️ Tensor Descriptor from Adaptor:"</span>)</span>
+<span id="cb1-264"><a href="#cb1-264" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-265"><a href="#cb1-265" aria-hidden="true" tabindex="-1"></a><span class="co"># Create descriptor from the PS_YS→XS adaptor</span></span>
+<span id="cb1-266"><a href="#cb1-266" aria-hidden="true" tabindex="-1"></a>adaptor <span class="op">=</span> distribution.ps_ys_to_xs_adaptor</span>
+<span id="cb1-267"><a href="#cb1-267" aria-hidden="true" tabindex="-1"></a>element_space_size <span class="op">=</span> <span class="dv">1024</span>  <span class="co"># Example buffer size</span></span>
+<span id="cb1-268"><a href="#cb1-268" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-269"><a href="#cb1-269" aria-hidden="true" tabindex="-1"></a>descriptor <span class="op">=</span> make_tensor_descriptor_from_adaptor(adaptor, element_space_size)</span>
+<span id="cb1-270"><a href="#cb1-270" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Created descriptor: </span><span class="sc">{</span>descriptor<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-271"><a href="#cb1-271" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Descriptor dimensions: </span><span class="sc">{</span>descriptor<span class="sc">.</span>get_num_of_dimension()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-272"><a href="#cb1-272" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Descriptor lengths: </span><span class="sc">{</span>descriptor<span class="sc">.</span>get_lengths()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-273"><a href="#cb1-273" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Element space: </span><span class="sc">{</span>descriptor<span class="sc">.</span>get_element_space_size()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-274"><a href="#cb1-274" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-275"><a href="#cb1-275" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">🔄 Adaptor vs Descriptor:"</span>)</span>
+<span id="cb1-276"><a href="#cb1-276" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Adaptor: Handles coordinate transformations"</span>)</span>
+<span id="cb1-277"><a href="#cb1-277" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Descriptor: Adds linearization and memory layout"</span>)</span>
+<span id="cb1-278"><a href="#cb1-278" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Both are needed for complete tensor operations"</span>)</span>
+<span id="cb1-279"><a href="#cb1-279" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb1-280"><a href="#cb1-280" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-281"><a href="#cb1-281" aria-hidden="true" tabindex="-1"></a><span class="fu">## 🧪 **Advanced Distribution Operations**</span></span>
+<span id="cb1-282"><a href="#cb1-282" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-283"><a href="#cb1-283" aria-hidden="true" tabindex="-1"></a>Explore advanced coordinate mapping functionality:</span>
+<span id="cb1-284"><a href="#cb1-284" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-287"><a href="#cb1-287" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb1-288"><a href="#cb1-288" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
+<span id="cb1-289"><a href="#cb1-289" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
+<span id="cb1-290"><a href="#cb1-290" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-291"><a href="#cb1-291" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"🧪 Advanced Coordinate Operations:"</span>)</span>
+<span id="cb1-292"><a href="#cb1-292" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-293"><a href="#cb1-293" aria-hidden="true" tabindex="-1"></a><span class="co"># Test coordinate mapping through adaptor</span></span>
+<span id="cb1-294"><a href="#cb1-294" aria-hidden="true" tabindex="-1"></a>ps_ys_coords <span class="op">=</span> [<span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">1</span>, <span class="dv">0</span>, <span class="dv">3</span>]  <span class="co"># P₀,P₁,Y₀,Y₁,Y₂,Y₃</span></span>
+<span id="cb1-295"><a href="#cb1-295" aria-hidden="true" tabindex="-1"></a>multi_idx <span class="op">=</span> MultiIndex(<span class="bu">len</span>(ps_ys_coords), ps_ys_coords)</span>
+<span id="cb1-296"><a href="#cb1-296" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-297"><a href="#cb1-297" aria-hidden="true" tabindex="-1"></a><span class="co"># Create adaptor coordinate</span></span>
+<span id="cb1-298"><a href="#cb1-298" aria-hidden="true" tabindex="-1"></a>adaptor_coord <span class="op">=</span> make_tensor_adaptor_coordinate(</span>
+<span id="cb1-299"><a href="#cb1-299" aria-hidden="true" tabindex="-1"></a>    distribution.ps_ys_to_xs_adaptor, </span>
+<span id="cb1-300"><a href="#cb1-300" aria-hidden="true" tabindex="-1"></a>    multi_idx</span>
+<span id="cb1-301"><a href="#cb1-301" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb1-302"><a href="#cb1-302" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-303"><a href="#cb1-303" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Input PS_YS: </span><span class="sc">{</span>ps_ys_coords<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-304"><a href="#cb1-304" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Top index: </span><span class="sc">{</span>adaptor_coord<span class="sc">.</span>get_top_index()<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-305"><a href="#cb1-305" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Bottom index: </span><span class="sc">{</span>adaptor_coord<span class="sc">.</span>get_bottom_index()<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-306"><a href="#cb1-306" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Hidden dimensions: </span><span class="sc">{</span>adaptor_coord<span class="sc">.</span>get_hidden_index()<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-307"><a href="#cb1-307" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-308"><a href="#cb1-308" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">🔍 Coordinate Flow:"</span>)</span>
+<span id="cb1-309"><a href="#cb1-309" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • PS_YS input → Hidden transformations → X output"</span>)</span>
+<span id="cb1-310"><a href="#cb1-310" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Hidden dims capture intermediate tile structure"</span>)</span>
+<span id="cb1-311"><a href="#cb1-311" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Final X coords are actual tensor positions"</span>)</span>
+<span id="cb1-312"><a href="#cb1-312" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb1-313"><a href="#cb1-313" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-314"><a href="#cb1-314" aria-hidden="true" tabindex="-1"></a><span class="fu">## 🚀 **Real-World Usage Patterns**</span></span>
+<span id="cb1-315"><a href="#cb1-315" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-316"><a href="#cb1-316" aria-hidden="true" tabindex="-1"></a>Understanding how tile distribution works in practice:</span>
+<span id="cb1-317"><a href="#cb1-317" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-320"><a href="#cb1-320" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb1-321"><a href="#cb1-321" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
+<span id="cb1-322"><a href="#cb1-322" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
+<span id="cb1-323"><a href="#cb1-323" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-324"><a href="#cb1-324" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"🚀 Real-World Usage Patterns:"</span>)</span>
+<span id="cb1-325"><a href="#cb1-325" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-326"><a href="#cb1-326" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">1️⃣ Thread Initialization:"</span>)</span>
+<span id="cb1-327"><a href="#cb1-327" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Each GPU thread calls get_partition_index()"</span>)</span>
+<span id="cb1-328"><a href="#cb1-328" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Gets unique P coordinates identifying the thread"</span>)</span>
+<span id="cb1-329"><a href="#cb1-329" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Uses P to calculate starting tensor position"</span>)</span>
+<span id="cb1-330"><a href="#cb1-330" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-331"><a href="#cb1-331" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">2️⃣ Data Element Processing:"</span>)</span>
+<span id="cb1-332"><a href="#cb1-332" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Thread iterates through Y coordinate space"</span>)</span>
+<span id="cb1-333"><a href="#cb1-333" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Each Y combination identifies a data element"</span>)</span>
+<span id="cb1-334"><a href="#cb1-334" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • PS_YS→XS adaptor maps to final tensor coordinates"</span>)</span>
+<span id="cb1-335"><a href="#cb1-335" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-336"><a href="#cb1-336" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">3️⃣ Memory Access:"</span>)</span>
+<span id="cb1-337"><a href="#cb1-337" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • YS→D descriptor linearizes Y coordinates"</span>)</span>
+<span id="cb1-338"><a href="#cb1-338" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Enables efficient sequential memory access"</span>)</span>
+<span id="cb1-339"><a href="#cb1-339" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Spans ensure spatial locality"</span>)</span>
+<span id="cb1-340"><a href="#cb1-340" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-341"><a href="#cb1-341" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">4️⃣ Parallel Efficiency:"</span>)</span>
+<span id="cb1-342"><a href="#cb1-342" aria-hidden="true" tabindex="-1"></a>total_work <span class="op">=</span> np.prod(distribution.get_lengths())</span>
+<span id="cb1-343"><a href="#cb1-343" aria-hidden="true" tabindex="-1"></a>threads_per_block <span class="op">=</span> variables[<span class="st">'WarpPerBlock_M'</span>] <span class="op">*</span> variables[<span class="st">'WarpPerBlock_N'</span>] <span class="op">*</span> variables[<span class="st">'ThreadPerWarp_M'</span>] <span class="op">*</span> variables[<span class="st">'ThreadPerWarp_N'</span>]</span>
+<span id="cb1-344"><a href="#cb1-344" aria-hidden="true" tabindex="-1"></a>work_per_thread <span class="op">=</span> np.prod(y_lengths)</span>
+<span id="cb1-345"><a href="#cb1-345" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-346"><a href="#cb1-346" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Total tensor elements: </span><span class="sc">{</span>total_work<span class="sc">:,}</span><span class="ss">"</span>)</span>
+<span id="cb1-347"><a href="#cb1-347" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Threads per block: </span><span class="sc">{</span>threads_per_block<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-348"><a href="#cb1-348" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Work per thread: </span><span class="sc">{</span>work_per_thread<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-349"><a href="#cb1-349" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  • Parallel efficiency: </span><span class="sc">{</span><span class="dv">100</span> <span class="op">*</span> threads_per_block <span class="op">*</span> work_per_thread <span class="op">/</span> total_work<span class="sc">:.1f}</span><span class="ss">%"</span>)</span>
+<span id="cb1-350"><a href="#cb1-350" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb1-351"><a href="#cb1-351" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-352"><a href="#cb1-352" aria-hidden="true" tabindex="-1"></a><span class="fu">## 🏭 **Factory Functions Summary**</span></span>
+<span id="cb1-353"><a href="#cb1-353" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-354"><a href="#cb1-354" aria-hidden="true" tabindex="-1"></a>Complete reference for tile distribution creation:</span>
+<span id="cb1-355"><a href="#cb1-355" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-358"><a href="#cb1-358" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb1-359"><a href="#cb1-359" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
+<span id="cb1-360"><a href="#cb1-360" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
+<span id="cb1-361"><a href="#cb1-361" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-362"><a href="#cb1-362" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"🏭 Tile Distribution Factory Functions:"</span>)</span>
+<span id="cb1-363"><a href="#cb1-363" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-364"><a href="#cb1-364" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">1️⃣ make_tile_distribution_encoding()"</span>)</span>
+<span id="cb1-365"><a href="#cb1-365" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"   • Creates mathematical encoding from graph structure"</span>)</span>
+<span id="cb1-366"><a href="#cb1-366" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"   • Input: R/H sequences and P/Y mappings"</span>)</span>
+<span id="cb1-367"><a href="#cb1-367" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"   • Output: TileDistributionEncoding"</span>)</span>
+<span id="cb1-368"><a href="#cb1-368" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-369"><a href="#cb1-369" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">2️⃣ make_static_tile_distribution()"</span>)</span>
+<span id="cb1-370"><a href="#cb1-370" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"   • Creates runtime distribution from encoding"</span>)</span>
+<span id="cb1-371"><a href="#cb1-371" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"   • Input: TileDistributionEncoding"</span>)</span>
+<span id="cb1-372"><a href="#cb1-372" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"   • Output: TileDistribution with adaptors/descriptors"</span>)</span>
+<span id="cb1-373"><a href="#cb1-373" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-374"><a href="#cb1-374" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">3️⃣ make_tile_distribution()"</span>)</span>
+<span id="cb1-375"><a href="#cb1-375" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"   • Creates distribution from custom components"</span>)</span>
+<span id="cb1-376"><a href="#cb1-376" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"   • Input: adaptor, descriptor, encoding"</span>)</span>
+<span id="cb1-377"><a href="#cb1-377" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"   • Output: TileDistribution"</span>)</span>
+<span id="cb1-378"><a href="#cb1-378" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-379"><a href="#cb1-379" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">4️⃣ make_tile_distributed_span()"</span>)</span>
+<span id="cb1-380"><a href="#cb1-380" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"   • Creates span from partial lengths"</span>)</span>
+<span id="cb1-381"><a href="#cb1-381" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"   • Input: List of lengths"</span>)</span>
+<span id="cb1-382"><a href="#cb1-382" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"   • Output: TileDistributedSpan"</span>)</span>
+<span id="cb1-383"><a href="#cb1-383" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-384"><a href="#cb1-384" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">5️⃣ make_tile_distributed_index()"</span>)</span>
+<span id="cb1-385"><a href="#cb1-385" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"   • Creates index from partial indices"</span>)</span>
+<span id="cb1-386"><a href="#cb1-386" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"   • Input: List of indices"</span>)</span>
+<span id="cb1-387"><a href="#cb1-387" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"   • Output: TileDistributedIndex"</span>)</span>
+<span id="cb1-388"><a href="#cb1-388" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-389"><a href="#cb1-389" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">6️⃣ make_tensor_descriptor_from_adaptor()"</span>)</span>
+<span id="cb1-390"><a href="#cb1-390" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"   • Creates descriptor from adaptor"</span>)</span>
+<span id="cb1-391"><a href="#cb1-391" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"   • Input: TensorAdaptor + element_space_size"</span>)</span>
+<span id="cb1-392"><a href="#cb1-392" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"   • Output: TensorDescriptor"</span>)</span>
+<span id="cb1-393"><a href="#cb1-393" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb1-394"><a href="#cb1-394" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-395"><a href="#cb1-395" aria-hidden="true" tabindex="-1"></a><span class="fu">## 🎓 **Key Takeaways**</span></span>
+<span id="cb1-396"><a href="#cb1-396" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-397"><a href="#cb1-397" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>**Runtime Bridge**: Tile distribution transforms mathematical encoding into runtime components</span>
+<span id="cb1-398"><a href="#cb1-398" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>**Dual Components**: Contains both PS_YS→XS adaptor and YS→D descriptor for complete functionality</span>
+<span id="cb1-399"><a href="#cb1-399" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>**Thread Coordination**: Partition indices identify threads and map them to tensor regions</span>
+<span id="cb1-400"><a href="#cb1-400" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>**Spatial Locality**: Distributed spans ensure efficient memory access patterns</span>
+<span id="cb1-401"><a href="#cb1-401" aria-hidden="true" tabindex="-1"></a><span class="ss">5. </span>**Y Processing**: Y coordinates define per-thread work and enable vectorized operations</span>
+<span id="cb1-402"><a href="#cb1-402" aria-hidden="true" tabindex="-1"></a><span class="ss">6. </span>**Integration Ready**: Provides the foundation for tile windows, sweep operations, and tensor views</span>
+<span id="cb1-403"><a href="#cb1-403" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-404"><a href="#cb1-404" aria-hidden="true" tabindex="-1"></a>The tile distribution serves as the **runtime coordinator** that makes parallel tensor computation possible with optimal efficiency! </span>
+<span id="cb1-405"><a href="#cb1-405" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-406"><a href="#cb1-406" aria-hidden="true" tabindex="-1"></a>**Next**: Static Distributed Tensors show how to use tile distributions for actual tensor operations. </span>
 </code><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></pre></div>
 </div></div></div></div></div>
 </div> <!-- /content -->

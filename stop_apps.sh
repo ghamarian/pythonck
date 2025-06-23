@@ -34,7 +34,7 @@ stop_app() {
 
 # Stop each app
 stop_app "tensor-transform"
-stop_app "tensor-visualization" 
+stop_app "tile-distribution" 
 stop_app "thread-visualization"
 
 # Also kill any remaining streamlit processes

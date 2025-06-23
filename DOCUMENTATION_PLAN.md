@@ -10,27 +10,21 @@ Based on user feedback, the documentation has been **reorganized** to fix depend
 - [x] **Learning Path Restructured** - Fixed dependency ordering (descriptors before advanced coordinates)
 - [x] **Tensor Descriptors** - Complete `to_upper`/`to_lower` examples for all transforms
 - [x] **Advanced Coordinate Operations** - Descriptor-dependent functions separated out
-- [x] **Tile Distribution Deep Dive** - `make_static_tile_distribution`, adaptors, descriptors explained
+- [x] **Tensor Views** - Unified memory access with coordinate integration and out-of-bounds handling
+- [x] **Tensor Coordinate System** - Complete three-level hierarchy explanation with all coordinate functions
+- [x] **Tensor Adaptor Coordinate** - Detailed TensorAdaptorCoordinate vs TensorCoordinate differences
+- [x] **Buffer Views** - Memory abstraction layer with address spaces and operations
 - [x] **Autorun Fixed** - Only installation cells run automatically, user clicks for examples
 
-### **🔄 In Progress - Critical Gap Identified**
-- [ ] **Tensor Coordinate System Deep Dive** - MISSING: Need complete explanation of TensorAdaptorCoordinate vs TensorCoordinate differences, hidden dimension system, coordinate movement, and validation methods
-- [ ] **Tile Window Deep Dive** - `precompute` and `load` integration with descriptors
-- [ ] **Tensor Views Updated** - Integration with new descriptor knowledge
-- [ ] **Complete Thread Mapping** - Full pipeline documentation
+### **🔄 In Progress - Current Focus**
+- [x] **Tile Distribution Encoding** - Mathematical encoding as graph structure with RMSNorm examples
+- [x] **Tile Distribution** - Parallel processing coordination with adaptors and descriptors
 
 ### **📋 Remaining Pages to Create**
-- [x] **Tensor Coordinate System** (NEW) - **CRITICAL**: Comprehensive page explaining:
-  - The three-level coordinate hierarchy (top/hidden/bottom)
-  - Why TensorAdaptorCoordinate vs TensorCoordinate exist and when to use each
-  - How hidden dimensions enable complex transformations
-  - Complete examples of coordinate creation, movement, and validation
-  - All 8+ coordinate functions with real-world usage examples
-- [ ] Tile Distribution Encoding (focused)
-- [ ] Static Distributed Tensors (focused)  
-- [ ] Tile Windows Deep Dive (precompute/load integration)
-- [ ] Sweep Operations (focused)
-- [ ] Complete Thread Mapping (final integration)
+- [ ] **Static Distributed Tensors** - Thread-local tensor operations
+- [ ] **Tile Windows Deep Dive** - `precompute` and `load` integration with descriptors  
+- [ ] **Sweep Operations** - Tile-based computation patterns
+- [ ] **Complete Thread Mapping** - Full pipeline documentation
 
 ---
 

@@ -388,14 +388,14 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../concepts/tensor-coordinate.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Tensor Coordinates</span></a>
+  <a href="../concepts/tensor-adaptor-coordinate.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Tensor Adaptor Coordinate: The Result Container</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../concepts/tensor-adaptor-coordinate.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Tensor Adaptor Coordinate: The Result Container</span></a>
+  <a href="../concepts/tensor-coordinate.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Tensor Coordinates</span></a>
   </div>
 </li>
       </ul>
@@ -416,8 +416,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   </div>
 </li>
           <li class="sidebar-item">
- <span class="menu-text">concepts/tensor-view.qmd</span>
-  </li>
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/tensor-view.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Tensor Views: Unified Memory Access</span></a>
+  </div>
+</li>
       </ul>
   </li>
         <li class="sidebar-item sidebar-item-section">
@@ -430,12 +433,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
       </div>
       <ul id="quarto-sidebar-section-4" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
- <span class="menu-text">concepts/tile-distribution-encoding.qmd</span>
-  </li>
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/tile-distribution-encoding.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Tile Distribution Encoding: Mathematical Graph Structure</span></a>
+  </div>
+</li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="../concepts/tile-distribution.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Tile Distribution Deep Dive</span></a>
+ <span class="menu-text">Tile Distribution: Parallel Processing Coordination</span></a>
   </div>
 </li>
           <li class="sidebar-item">
@@ -588,13 +594,13 @@ eyJhdHRyIjp7ImF1dG9ydW4iOnRydWUsImVjaG8iOmZhbHNlLCJlZGl0IjpmYWxzZSwiZXZhbCI6dHJ1
 <h3 class="anchored" data-anchor-id="phase-2-advanced-indexing-requires-descriptors"><strong>Phase 2: Advanced Indexing (Requires Descriptors)</strong></h3>
 <ol start="4" type="1">
 <li><a href="../concepts/tensor-coordinate-advanced.html"><strong>Advanced Coordinate Operations</strong></a> - <code>move_tensor_coordinate</code> and transform-dependent operations</li>
-<li><a href="tensor-view.qmd"><strong>Tensor Views</strong></a> - Unified access interface</li>
+<li><a href="../concepts/tensor-view.html"><strong>Tensor Views</strong></a> - Unified access interface</li>
 </ol>
 </section>
 <section id="phase-3-distribution-parallel-processing" class="level3">
 <h3 class="anchored" data-anchor-id="phase-3-distribution-parallel-processing"><strong>Phase 3: Distribution (Parallel Processing)</strong></h3>
 <ol start="6" type="1">
-<li><a href="tile-distribution-encoding.qmd"><strong>Tile Distribution Encoding</strong></a> - Mathematical encoding framework</li>
+<li><a href="../concepts/tile-distribution-encoding.html"><strong>Tile Distribution Encoding</strong></a> - Mathematical encoding framework</li>
 <li><a href="../concepts/tile-distribution.html"><strong>Tile Distribution Deep Dive</strong></a> - <code>make_static_tile_distribution</code>, adaptors, descriptors</li>
 <li><a href="static-distributed-tensor.qmd"><strong>Static Distributed Tensors</strong></a> - Thread-local data management</li>
 </ol>
