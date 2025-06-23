@@ -25,11 +25,11 @@ Buffer views provide a unified abstraction for accessing memory across different
 #| echo: true
 #| output: true
 
-from pytensor.buffer_view import AddressSpace
+from pytensor.buffer_view import AddressSpaceEnum
 
 # Different memory spaces available
 print("Available address spaces:")
-for space in AddressSpace:
+for space in AddressSpaceEnum:
     print(f"  {space.name}: {space.value}")
 ```
 
@@ -39,11 +39,11 @@ for space in AddressSpace:
 #| echo: true
 #| output: true
 
-from pytensor.buffer_view import MemoryOperation
+from pytensor.buffer_view import MemoryOperationEnum
 
 # Different memory operations supported
 print("Available memory operations:")
-for op in MemoryOperation:
+for op in MemoryOperationEnum:
     print(f"  {op.name}: {op.value}")
 ```
 
@@ -56,7 +56,7 @@ for op in MemoryOperation:
 #| output: true
 
 import numpy as np
-from pytensor.buffer_view import make_buffer_view, AddressSpace
+from pytensor.buffer_view import make_buffer_view, AddressSpaceEnum
 
 # Create sample data
 data = np.array([[1, 2, 3, 4],
@@ -69,7 +69,8 @@ print(f"Original data:\n{data}")
 # Create a buffer view
 buffer = make_buffer_view(
     data=data,
-    address_space=AddressSpace.GLOBAL
+    buffer_size=data.size,
+    address_space=AddressSpaceEnum.GLOBAL
 )
 
 print(f"\nBuffer view created:")
@@ -104,14 +105,14 @@ print(f"  Row 1: {buffer.data[1, :]}")
 #| echo: true
 #| output: true
 
-from pytensor.buffer_view import MemoryOperation
+from pytensor.buffer_view import MemoryOperationEnum
 
 # Create a buffer for writing
 write_data = np.zeros((2, 3), dtype=np.float32)
 write_buffer = make_buffer_view(
     data=write_data,
-    address_space=AddressSpace.GLOBAL,
-    memory_operation=MemoryOperation.SET
+    buffer_size=write_data.size,
+    address_space=AddressSpaceEnum.GLOBAL
 )
 
 print(f"Before SET operations:\n{write_buffer.data}")
@@ -133,8 +134,8 @@ print(f"\nAfter SET operations:\n{write_buffer.data}")
 accum_data = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
 accum_buffer = make_buffer_view(
     data=accum_data,
-    address_space=AddressSpace.LDS,  # Local Data Share
-    memory_operation=MemoryOperation.ADD
+    buffer_size=accum_data.size,
+    address_space=AddressSpaceEnum.LDS  # Local Data Share
 )
 
 print(f"Before ADD operations:\n{accum_buffer.data}")
@@ -162,7 +163,8 @@ print(f"Large data (4x6):\n{large_data}")
 strided_view = large_data[::2, ::2]  # Every 2nd row and column
 strided_buffer = make_buffer_view(
     data=strided_view,
-    address_space=AddressSpace.GLOBAL
+    buffer_size=strided_view.size,
+    address_space=AddressSpaceEnum.GLOBAL
 )
 
 print(f"\nStrided view (2x3):\n{strided_buffer.data}")
@@ -180,7 +182,7 @@ original = np.arange(12, dtype=np.float32).reshape(3, 4)
 print(f"Original shape {original.shape}:\n{original}")
 
 # Create buffer and reshape
-buffer = make_buffer_view(data=original)
+buffer = make_buffer_view(data=original, buffer_size=original.size)
 reshaped = buffer.data.reshape(2, 6)
 
 print(f"\nReshaped to {reshaped.shape}:\n{reshaped}")
@@ -202,7 +204,8 @@ print(f"\nAfter modifying original[0,0]:\n{reshaped}")
 input_data = np.array([1, 4, 9, 16, 25], dtype=np.float32)
 readonly_buffer = make_buffer_view(
     data=input_data,
-    address_space=AddressSpace.GLOBAL
+    buffer_size=input_data.size,
+    address_space=AddressSpaceEnum.GLOBAL
 )
 
 print(f"Read-only buffer: {readonly_buffer.data}")
@@ -219,8 +222,8 @@ print(f"Can be used for input to computations")
 output_data = np.zeros(5, dtype=np.float32)
 writeonly_buffer = make_buffer_view(
     data=output_data,
-    address_space=AddressSpace.GLOBAL,
-    memory_operation=MemoryOperation.SET
+    buffer_size=output_data.size,
+    address_space=AddressSpaceEnum.GLOBAL
 )
 
 # Simulate computation writing to buffer
