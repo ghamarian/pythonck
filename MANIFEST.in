@@ -27,7 +27,6 @@ recursive-exclude todelete *
 exclude *.py
 exclude app.py
 exclude tensor_transform_app.py
-exclude tensor_visualization_app.py
 exclude thread_visualization_app.py
 exclude tile_distr_thread_mapping.py
 
