@@ -192,45 +192,26 @@ original[0, 0] = 999
 print(f"\nAfter modifying original[0,0]:\n{reshaped}")
 ```
 
-## Buffer View Patterns
+## Buffer View Integration
 
-### Read-Only Buffers
-
-```{pyodide}
-#| echo: true
-#| output: true
-
-# Create read-only buffer for input data
-input_data = np.array([1, 4, 9, 16, 25], dtype=np.float32)
-readonly_buffer = make_buffer_view(
-    data=input_data,
-    buffer_size=input_data.size,
-    address_space=AddressSpaceEnum.GLOBAL
-)
-
-print(f"Read-only buffer: {readonly_buffer.data}")
-print(f"Can be used for input to computations")
-```
-
-### Write-Only Buffers
+Buffer views serve as the foundation for all tensor operations in PythonCK. They provide the memory abstraction that higher-level components like tensor views and tile windows build upon.
 
 ```{pyodide}
 #| echo: true
 #| output: true
 
-# Create write-only buffer for output data
-output_data = np.zeros(5, dtype=np.float32)
-writeonly_buffer = make_buffer_view(
-    data=output_data,
-    buffer_size=output_data.size,
+# Buffer views integrate with tensor operations
+computation_data = np.arange(12, dtype=np.float32).reshape(3, 4)
+computation_buffer = make_buffer_view(
+    data=computation_data,
+    buffer_size=computation_data.size,
     address_space=AddressSpaceEnum.GLOBAL
 )
 
-# Simulate computation writing to buffer
-for i in range(len(writeonly_buffer.data)):
-    writeonly_buffer.data[i] = (i + 1) ** 2
-
-print(f"Write-only buffer after computation: {writeonly_buffer.data}")
+print(f"Buffer for tensor operations:")
+print(f"  Shape: {computation_buffer.data.shape}")
+print(f"  Address space: {computation_buffer.address_space.name}")
+print(f"  Data:\n{computation_buffer.data}")
 ```
 
 ## Relationship to Other Concepts

@@ -36,7 +36,7 @@ print(f"Values: {idx.to_list()}")
 ```
 
 ### TensorCoordinate
-A `TensorCoordinate` extends `MultiIndex` with transformation capabilities:
+A `TensorCoordinate` represents coordinates in a tensor space with transformations:
 
 ```{pyodide}
 #| echo: true
@@ -45,11 +45,20 @@ A `TensorCoordinate` extends `MultiIndex` with transformation capabilities:
 from pytensor.tensor_coordinate import TensorCoordinate, MultiIndex
 
 # Create a tensor coordinate
-multi_idx = MultiIndex(3, [1, 2, 3])
-coord = TensorCoordinate(multi_idx)
+# TensorCoordinate needs: ndim_hidden, top_dimension_hidden_ids, idx_hidden
+ndim_hidden = 4  # Total hidden dimensions
+top_dimension_hidden_ids = [1, 2, 3]  # Which hidden dims map to top
+idx_hidden = MultiIndex(4, [0, 1, 2, 3])  # Initial hidden index
 
-print(f"Tensor coordinate: {coord}")
-print(f"Underlying index: {coord.get_index()}")
+coord = TensorCoordinate(
+    ndim_hidden=ndim_hidden,
+    top_dimension_hidden_ids=top_dimension_hidden_ids,
+    idx_hidden=idx_hidden
+)
+
+print(f"Tensor coordinate created")
+print(f"Top index: {coord.get_index()}")
+print(f"Offset: {coord.get_offset()}")
 ```
 
 ## Key Operations
@@ -78,17 +87,26 @@ print(f"Sum: {result}")
 #| echo: true
 #| output: true
 
-from pytensor.tensor_coordinate import make_tensor_adaptor_coordinate
+from pytensor.tensor_coordinate import TensorAdaptorCoordinate
 
-# Create a coordinate with transformations
-# This demonstrates how coordinates can be transformed through adaptor chains
-coord = make_tensor_adaptor_coordinate(
-    adaptor=None,  # No adaptor for this simple example
-    multi_index=MultiIndex(2, [5, 3])
+# Create an adaptor coordinate manually for demonstration
+# In practice, these are created through tensor descriptors and adaptors
+ndim_hidden = 3
+bottom_dimension_hidden_ids = [0]  # Maps to offset
+top_dimension_hidden_ids = [1, 2]  # Maps to 2D index
+idx_hidden = MultiIndex(3, [5, 2, 3])  # offset=5, index=(2,3)
+
+adaptor_coord = TensorAdaptorCoordinate(
+    ndim_hidden=ndim_hidden,
+    bottom_dimension_hidden_ids=bottom_dimension_hidden_ids,
+    top_dimension_hidden_ids=top_dimension_hidden_ids,
+    idx_hidden=idx_hidden
 )
 
-print(f"Adaptor coordinate: {coord}")
-print(f"Bottom index: {coord.get_bottom_index()}")
+print(f"Adaptor coordinate created")
+print(f"Top index: {adaptor_coord.get_top_index()}")
+print(f"Bottom index: {adaptor_coord.get_bottom_index()}")
+print(f"Hidden index: {adaptor_coord.get_hidden_index()}")
 ```
 
 ## Relationship to Other Concepts
