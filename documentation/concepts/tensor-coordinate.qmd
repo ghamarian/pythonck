@@ -31,7 +31,8 @@ from pytensor.tensor_coordinate import MultiIndex
 # Create a 3D index
 idx = MultiIndex(3, [2, 1, 4])
 print(f"3D index: {idx}")
-print(f"Dimensions: {idx.get_ndim()}")
+print(f"Dimensions: {len(idx)}")  # Use len() like in C++ size()
+print(f"Size: {idx.size}")  # Direct access to size attribute
 print(f"Values: {idx.to_list()}")
 ```
 
