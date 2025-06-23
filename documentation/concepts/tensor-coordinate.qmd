@@ -13,9 +13,43 @@ import micropip
 await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl")
 ```
 
-# Tensor Coordinates
+```{pyodide}
+#| echo: false
+#| output: false
+#| autorun: true
 
-Tensor coordinates provide a powerful abstraction for multi-dimensional indexing with support for complex transformations. They form the foundation for all tensor operations in PythonCK.
+# Import required classes
+from pytensor.tensor_coordinate import MultiIndex, TensorCoordinate, TensorAdaptorCoordinate, make_tensor_coordinate, make_tensor_adaptor_coordinate
+from pytensor.tensor_descriptor import make_naive_tensor_descriptor
+```
+
+# Tensor Coordinates: The Final Result
+
+**Prerequisites**: [Buffer Views](buffer-view.qmd), [Tensor Descriptors](tensor-descriptor.qmd)
+
+Tensor coordinates represent **the final result** after all tensor layout transformations have been applied. They store both the multi-dimensional index and the linear memory offset that results from complex coordinate transformations.
+
+## What is a TensorCoordinate?
+
+A `TensorCoordinate` is the end product of the tensor transformation pipeline:
+
+```
+Input Index → Transforms → TensorCoordinate (Index + Offset)
+```
+
+**Key characteristics:**
+- **Stores the final index**: The transformed multi-dimensional coordinate
+- **Stores the linear offset**: The final memory location after all transformations
+- **Extends TensorAdaptorCoordinate**: Inherits transformation tracking but focuses on the final result
+- **Always has a single bottom dimension**: The linear offset is stored in hidden dimension `[0]`
+
+## Why TensorCoordinate Matters
+
+After complex transformations (embedding, merging, unmerging, etc.), you need:
+1. **The final index**: Where you are in the logical tensor space
+2. **The linear offset**: Where to actually access memory
+
+TensorCoordinate provides both pieces of information in a single, convenient container.
 
 ## Core Components
 
@@ -121,8 +155,68 @@ Tensor coordinates are used throughout PythonCK:
 
 ## Next Steps
 
-- Explore [Buffer Views](buffer-view.qmd) to see how coordinates access memory
-- Learn about [Tensor Descriptors](tensor-descriptor.qmd) for coordinate transformations
-- Understand [Tile Distribution](tile-distribution.qmd) for parallel coordinate mapping
+- Learn about [**Tensor Adaptors**](tensor-adaptor.qmd) - The transformation engines that execute descriptors
+- Explore [**Tensor Adaptor Coordinates**](tensor-adaptor-coordinate.qmd) - Result containers for transformed indices
+- Understand [**Advanced Coordinate Operations**](tensor-coordinate-advanced.qmd) - Functions that require descriptors
 
 The coordinate system provides the mathematical foundation that enables all the advanced tensor operations in PythonCK. 
+
+### TensorCoordinate: Index + Offset Storage
+
+A `TensorCoordinate` stores the final result of tensor transformations - both the logical index and the linear memory offset:
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+from pytensor.tensor_coordinate import make_tensor_coordinate
+from pytensor.tensor_descriptor import make_naive_tensor_descriptor
+
+# Create a 4x6 tensor descriptor (row-major layout)
+descriptor = make_naive_tensor_descriptor([4, 6], [6, 1])
+
+# Create a tensor coordinate for logical index [2, 3]
+logical_index = [2, 3]
+coord = make_tensor_coordinate(descriptor, logical_index)
+
+print(f"🎯 TensorCoordinate stores the final result:")
+print(f"  Input logical index: {logical_index}")
+print(f"  Final index: {coord.get_index().to_list()}")
+print(f"  Linear offset: {coord.get_offset()}")
+print(f"  Manual calculation: 2*6 + 3*1 = {2*6 + 3*1}")
+print(f"  ✅ Both index and offset stored!")
+```
+
+### Key Methods
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+# TensorCoordinate provides clear access to both pieces of information
+print(f"📍 TensorCoordinate key methods:")
+print(f"  coord.get_index(): {coord.get_index().to_list()} (the logical index)")
+print(f"  coord.get_offset(): {coord.get_offset()} (the memory offset)")
+print(f"  coord.get_hidden_index(): {coord.get_hidden_index().to_list()} (internal storage)")
+
+# The beauty: after complex transformations, you always get both!
+print(f"✨ Perfect for memory access: tensor[{coord.get_index().to_list()}] = memory[{coord.get_offset()}]")
+```
+
+### Comparison with TensorAdaptorCoordinate
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+from pytensor.tensor_coordinate import make_tensor_adaptor_coordinate
+
+# Create an adaptor coordinate (intermediate result)
+# Since TensorDescriptor extends TensorAdaptor, we can use it directly
+adaptor_coord = make_tensor_adaptor_coordinate(descriptor, coord.get_index())
+
+print(f"🔄 TensorAdaptorCoordinate vs TensorCoordinate:")
+print(f"  Adaptor - Top: {adaptor_coord.get_top_index().to_list()}, Bottom: {adaptor_coord.get_bottom_index().to_list()}")
+print(f"  Tensor  - Index: {coord.get_index().to_list()}, Offset: {coord.get_offset()}")
+print(f"  🎯 TensorCoordinate simplifies: single offset instead of bottom index")
+``` 

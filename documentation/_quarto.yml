@@ -16,26 +16,31 @@ website:
         contents:
           - index.qmd
           - tutorials/index.qmd
-      - section: "Core Concepts"
+      - section: "Foundation"
         contents:
+          - concepts/buffer-view.qmd
+          - concepts/tensor-transforms.qmd
           - concepts/tensor-adaptor.qmd
           - concepts/tensor-descriptor.qmd
-          - concepts/buffer-view.qmd
+          - concepts/tensor-adaptor-coordinate.qmd
           - concepts/tensor-coordinate.qmd
+      - section: "Advanced Indexing"
+        contents:
+          - concepts/tensor-coordinate-advanced.qmd
           - concepts/tensor-view.qmd
-      - section: "Tile Operations"
+      - section: "Distribution"
         contents:
-          - concepts/tile-distribution.qmd
           - concepts/tile-distribution-encoding.qmd
-          - concepts/tile-window.qmd
-          - concepts/tile-window-linear.qmd
-          - concepts/shuffle-tile.qmd
-          - concepts/sweep-tile.qmd
-      - section: "Advanced Topics"
-        contents:
+          - concepts/tile-distribution.qmd
           - concepts/static-distributed-tensor.qmd
-          - concepts/space-filling-curve.qmd
-          - concepts/static-encoding-pattern.qmd
+      - section: "Advanced Operations"
+        contents:
+          - concepts/tile-window.qmd
+          - concepts/sweep-tile.qmd
+          - concepts/thread-mapping.qmd
+      - section: "Reference"
+        contents:
+          - concepts/learning-path.qmd
       - section: "API Reference"
         contents:
           - api/index.qmd
@@ -72,5 +77,5 @@ pyodide:
     - sympy
     - micropip
   cell-options:
-    autorun: true
+    autorun: false
   base-url: "/" 

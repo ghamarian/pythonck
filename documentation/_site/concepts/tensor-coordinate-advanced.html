@@ -1,0 +1,1591 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.7.32">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>Advanced Coordinate Operations – Composable-Kernels Docs</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-37eea08aefeeee20ff55810ff984fec1.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-2fef5ea3f8957b3e4ecc936fc74692ca.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-37eea08aefeeee20ff55810ff984fec1.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-0fb8165251960a2efcdd406640794b0d.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-f429b06b0a5e29bdf232010360fda716.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../site_libs/bootstrap/bootstrap-0fb8165251960a2efcdd406640794b0d.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<script src="../site_libs/quarto-contrib/live-runtime/live-runtime.js" type="module"></script>
+<link href="../site_libs/quarto-contrib/live-runtime/live-runtime.css" rel="stylesheet">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script type="module" src="../site_libs/quarto-ojs/quarto-ojs-runtime.js"></script>
+<link href="../site_libs/quarto-ojs/quarto-ojs.css" rel="stylesheet">
+
+
+</head>
+
+<body class="nav-sidebar docked nav-fixed quarto-light"><script id="quarto-html-before-body" type="application/javascript">
+    const toggleBodyColorMode = (bsSheetEl) => {
+      const mode = bsSheetEl.getAttribute("data-mode");
+      const bodyEl = window.document.querySelector("body");
+      if (mode === "dark") {
+        bodyEl.classList.add("quarto-dark");
+        bodyEl.classList.remove("quarto-light");
+      } else {
+        bodyEl.classList.add("quarto-light");
+        bodyEl.classList.remove("quarto-dark");
+      }
+    }
+    const toggleBodyColorPrimary = () => {
+      const bsSheetEl = window.document.querySelector("link#quarto-bootstrap:not([rel=disabled-stylesheet])");
+      if (bsSheetEl) {
+        toggleBodyColorMode(bsSheetEl);
+      }
+    }
+    const setColorSchemeToggle = (alternate) => {
+      const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+      for (let i=0; i < toggles.length; i++) {
+        const toggle = toggles[i];
+        if (toggle) {
+          if (alternate) {
+            toggle.classList.add("alternate");
+          } else {
+            toggle.classList.remove("alternate");
+          }
+        }
+      }
+    };
+    const toggleColorMode = (alternate) => {
+      // Switch the stylesheets
+      const primaryStylesheets = window.document.querySelectorAll('link.quarto-color-scheme:not(.quarto-color-alternate)');
+      const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+      manageTransitions('#quarto-margin-sidebar .nav-link', false);
+      if (alternate) {
+        // note: dark is layered on light, we don't disable primary!
+        enableStylesheet(alternateStylesheets);
+        for (const sheetNode of alternateStylesheets) {
+          if (sheetNode.id === "quarto-bootstrap") {
+            toggleBodyColorMode(sheetNode);
+          }
+        }
+      } else {
+        disableStylesheet(alternateStylesheets);
+        enableStylesheet(primaryStylesheets)
+        toggleBodyColorPrimary();
+      }
+      manageTransitions('#quarto-margin-sidebar .nav-link', true);
+      // Switch the toggles
+      setColorSchemeToggle(alternate)
+      // Hack to workaround the fact that safari doesn't
+      // properly recolor the scrollbar when toggling (#1455)
+      if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+        manageTransitions("body", false);
+        window.scrollTo(0, 1);
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          manageTransitions("body", true);
+        }, 40);
+      }
+    }
+    const disableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        stylesheet.rel = 'disabled-stylesheet';
+      }
+    }
+    const enableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        if(stylesheet.rel !== 'stylesheet') { // for Chrome, which will still FOUC without this check
+          stylesheet.rel = 'stylesheet';
+        }
+      }
+    }
+    const manageTransitions = (selector, allowTransitions) => {
+      const els = window.document.querySelectorAll(selector);
+      for (let i=0; i < els.length; i++) {
+        const el = els[i];
+        if (allowTransitions) {
+          el.classList.remove('notransition');
+        } else {
+          el.classList.add('notransition');
+        }
+      }
+    }
+    const isFileUrl = () => {
+      return window.location.protocol === 'file:';
+    }
+    const hasAlternateSentinel = () => {
+      let styleSentinel = getColorSchemeSentinel();
+      if (styleSentinel !== null) {
+        return styleSentinel === "alternate";
+      } else {
+        return false;
+      }
+    }
+    const setStyleSentinel = (alternate) => {
+      const value = alternate ? "alternate" : "default";
+      if (!isFileUrl()) {
+        window.localStorage.setItem("quarto-color-scheme", value);
+      } else {
+        localAlternateSentinel = value;
+      }
+    }
+    const getColorSchemeSentinel = () => {
+      if (!isFileUrl()) {
+        const storageValue = window.localStorage.getItem("quarto-color-scheme");
+        return storageValue != null ? storageValue : localAlternateSentinel;
+      } else {
+        return localAlternateSentinel;
+      }
+    }
+    const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+      const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+      const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+      let newTheme = '';
+      if(authorPrefersDark) {
+        newTheme = isAlternate ? baseTheme : alternateTheme;
+      } else {
+        newTheme = isAlternate ? alternateTheme : baseTheme;
+      }
+      const changeGiscusTheme = () => {
+        // From: https://github.com/giscus/giscus/issues/336
+        const sendMessage = (message) => {
+          const iframe = document.querySelector('iframe.giscus-frame');
+          if (!iframe) return;
+          iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+        }
+        sendMessage({
+          setConfig: {
+            theme: newTheme
+          }
+        });
+      }
+      const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+      if (isGiscussLoaded) {
+        changeGiscusTheme();
+      }
+    };
+    const authorPrefersDark = false;
+    const darkModeDefault = authorPrefersDark;
+      document.querySelector('link#quarto-text-highlighting-styles.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+      document.querySelector('link#quarto-bootstrap.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+    let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+    // Dark / light mode switch
+    window.quartoToggleColorScheme = () => {
+      // Read the current dark / light value
+      let toAlternate = !hasAlternateSentinel();
+      toggleColorMode(toAlternate);
+      setStyleSentinel(toAlternate);
+      toggleGiscusIfUsed(toAlternate, darkModeDefault);
+      window.dispatchEvent(new Event('resize'));
+    };
+    // Switch to dark mode if need be
+    if (hasAlternateSentinel()) {
+      toggleColorMode(true);
+    } else {
+      toggleColorMode(false);
+    }
+  </script>
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">Composable-Kernels Docs</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/rocm/composable-kernels"> <i class="bi bi-github" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link active" href="../index.html" aria-current="page"> 
+<span class="menu-text">Docs Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../tutorials/index.html"> 
+<span class="menu-text">Tutorials</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../concepts/tensor-coordinate-advanced.html">Advanced Indexing</a></li><li class="breadcrumb-item"><a href="../concepts/tensor-coordinate-advanced.html">Advanced Coordinate Operations</a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation docked overflow-auto">
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
+ <span class="menu-text">Getting Started</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Composable-Kernels Python Documentation</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../tutorials/index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Getting Started with PythonCK</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true">
+ <span class="menu-text">Foundation</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/buffer-view.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Buffer View</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/tensor-transforms.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Tensor Transforms: The Building Blocks</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/tensor-adaptor.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">TensorAdaptor: The Transformation Engine</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/tensor-descriptor.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">TensorDescriptor: The Complete Layout Description</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/tensor-adaptor-coordinate.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Tensor Adaptor Coordinate: The Result Container</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/tensor-coordinate.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Tensor Coordinates</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true">
+ <span class="menu-text">Advanced Indexing</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/tensor-coordinate-advanced.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">Advanced Coordinate Operations</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+ <span class="menu-text">concepts/tensor-view.qmd</span>
+  </li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true">
+ <span class="menu-text">Distribution</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-4" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+ <span class="menu-text">concepts/tile-distribution-encoding.qmd</span>
+  </li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/tile-distribution.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Tile Distribution Deep Dive</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+ <span class="menu-text">concepts/static-distributed-tensor.qmd</span>
+  </li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true">
+ <span class="menu-text">Advanced Operations</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-5" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+ <span class="menu-text">concepts/tile-window.qmd</span>
+  </li>
+          <li class="sidebar-item">
+ <span class="menu-text">concepts/sweep-tile.qmd</span>
+  </li>
+          <li class="sidebar-item">
+ <span class="menu-text">concepts/thread-mapping.qmd</span>
+  </li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-6" role="navigation" aria-expanded="true">
+ <span class="menu-text">Reference</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-6" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-6" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/learning-path.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">PythonCK Learning Path</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-7" role="navigation" aria-expanded="true">
+ <span class="menu-text">API Reference</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-7" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-7" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../api/index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">API Reference</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#advanced-coordinate-operations" id="toc-advanced-coordinate-operations" class="nav-link active" data-scroll-target="#advanced-coordinate-operations">Advanced Coordinate Operations</a>
+  <ul class="collapse">
+  <li><a href="#coordinate-creation-from-descriptors-and-adaptors" id="toc-coordinate-creation-from-descriptors-and-adaptors" class="nav-link" data-scroll-target="#coordinate-creation-from-descriptors-and-adaptors">🏗️ <strong>Coordinate Creation from Descriptors and Adaptors</strong></a>
+  <ul class="collapse">
+  <li><a href="#make_tensor_coordinate-descriptor-based-creation" id="toc-make_tensor_coordinate-descriptor-based-creation" class="nav-link" data-scroll-target="#make_tensor_coordinate-descriptor-based-creation">make_tensor_coordinate: Descriptor-Based Creation</a></li>
+  <li><a href="#make_tensor_adaptor_coordinate-adaptor-based-creation" id="toc-make_tensor_adaptor_coordinate-adaptor-based-creation" class="nav-link" data-scroll-target="#make_tensor_adaptor_coordinate-adaptor-based-creation">make_tensor_adaptor_coordinate: Adaptor-Based Creation</a></li>
+  <li><a href="#key-differences-descriptor-vs-adaptor-creation" id="toc-key-differences-descriptor-vs-adaptor-creation" class="nav-link" data-scroll-target="#key-differences-descriptor-vs-adaptor-creation">Key Differences: Descriptor vs Adaptor Creation</a></li>
+  </ul></li>
+  <li><a href="#why-descriptors-are-required" id="toc-why-descriptors-are-required" class="nav-link" data-scroll-target="#why-descriptors-are-required">🚨 <strong>Why Descriptors Are Required</strong></a></li>
+  <li><a href="#move_tensor_coordinate-descriptor-aware-movement" id="toc-move_tensor_coordinate-descriptor-aware-movement" class="nav-link" data-scroll-target="#move_tensor_coordinate-descriptor-aware-movement">🔄 <strong>move_tensor_coordinate: Descriptor-Aware Movement</strong></a></li>
+  <li><a href="#coordinate-validation-with-descriptors" id="toc-coordinate-validation-with-descriptors" class="nav-link" data-scroll-target="#coordinate-validation-with-descriptors">🔍 <strong>Coordinate Validation with Descriptors</strong></a></li>
+  <li><a href="#complex-transform-navigation" id="toc-complex-transform-navigation" class="nav-link" data-scroll-target="#complex-transform-navigation">🎯 <strong>Complex Transform Navigation</strong></a></li>
+  <li><a href="#linear-offset-calculations" id="toc-linear-offset-calculations" class="nav-link" data-scroll-target="#linear-offset-calculations">🧮 <strong>Linear Offset Calculations</strong></a></li>
+  <li><a href="#integration-with-tensor-views" id="toc-integration-with-tensor-views" class="nav-link" data-scroll-target="#integration-with-tensor-views">🔗 <strong>Integration with Tensor Views</strong></a></li>
+  <li><a href="#interactive-coordinate-debugging" id="toc-interactive-coordinate-debugging" class="nav-link" data-scroll-target="#interactive-coordinate-debugging">🎮 <strong>Interactive Coordinate Debugging</strong></a></li>
+  <li><a href="#why-these-operations-matter" id="toc-why-these-operations-matter" class="nav-link" data-scroll-target="#why-these-operations-matter">🔍 <strong>Why These Operations Matter</strong></a></li>
+  <li><a href="#interactive-applications" id="toc-interactive-applications" class="nav-link" data-scroll-target="#interactive-applications">🎯 <strong>Interactive Applications</strong></a></li>
+  <li><a href="#next-steps" id="toc-next-steps" class="nav-link" data-scroll-target="#next-steps">✅ <strong>Next Steps</strong></a></li>
+  <li><a href="#coordinate-movement" id="toc-coordinate-movement" class="nav-link" data-scroll-target="#coordinate-movement">Coordinate Movement</a></li>
+  </ul></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+
+<header id="title-block-header" class="quarto-title-block default"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../concepts/tensor-coordinate-advanced.html">Advanced Indexing</a></li><li class="breadcrumb-item"><a href="../concepts/tensor-coordinate-advanced.html">Advanced Coordinate Operations</a></li></ol></nav>
+<div class="quarto-title">
+<div class="quarto-title-block"><div><h1 class="title">Advanced Coordinate Operations</h1><button type="button" class="btn code-tools-button" id="quarto-code-tools-source"><i class="bi"></i> Code</button></div></div>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<div>
+<div id="pyodide-1" class="exercise-cell">
+
+</div>
+<script type="pyodide-1-contents">
+eyJhdHRyIjp7ImF1dG9ydW4iOnRydWUsImVjaG8iOmZhbHNlLCJlZGl0IjpmYWxzZSwiZXZhbCI6dHJ1ZSwib3V0cHV0IjpmYWxzZX0sImNvZGUiOiJcbiMgQXV0by1pbnN0YWxsIHB5dGhvbmNrIHBhY2thZ2VcbmltcG9ydCBtaWNyb3BpcFxuYXdhaXQgbWljcm9waXAuaW5zdGFsbChcImh0dHBzOi8vcmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbS9naGFtYXJpYW4vcHl0aG9uY2svbWFzdGVyL2RvY3VtZW50YXRpb24vcHl0aG9uY2stMC4xLjAtcHkzLW5vbmUtYW55LndobFwiKSJ9
+</script>
+</div>
+<div>
+<div id="pyodide-2" class="exercise-cell">
+
+</div>
+<script type="pyodide-2-contents">
+eyJhdHRyIjp7ImF1dG9ydW4iOnRydWUsImVjaG8iOmZhbHNlLCJlZGl0IjpmYWxzZSwiZXZhbCI6dHJ1ZSwib3V0cHV0IjpmYWxzZX0sImNvZGUiOiJcbiMgSW1wb3J0IHJlcXVpcmVkIGNsYXNzZXNcbmZyb20gcHl0ZW5zb3IudGVuc29yX2Nvb3JkaW5hdGUgaW1wb3J0IE11bHRpSW5kZXgsIG1ha2VfdGVuc29yX2Nvb3JkaW5hdGUsIG1ha2VfdGVuc29yX2FkYXB0b3JfY29vcmRpbmF0ZSwgbW92ZV90ZW5zb3JfY29vcmRpbmF0ZSwgYWRhcHRvcl9jb29yZGluYXRlX2lzX3ZhbGlkLCBjb29yZGluYXRlX2hhc192YWxpZF9vZmZzZXRcbmZyb20gcHl0ZW5zb3IudGVuc29yX2Rlc2NyaXB0b3IgaW1wb3J0IG1ha2VfbmFpdmVfdGVuc29yX2Rlc2NyaXB0b3IsIFRlbnNvckFkYXB0b3IsIEVtYmVkVHJhbnNmb3JtLCBVbm1lcmdlVHJhbnNmb3JtIn0=
+</script>
+</div>
+<section id="advanced-coordinate-operations" class="level1">
+<h1>Advanced Coordinate Operations</h1>
+<p><strong>Prerequisites</strong>: <a href="../concepts/tensor-descriptor.html">Tensor Descriptors</a>, <a href="../concepts/tensor-coordinate.html">Tensor Coordinates</a>, <a href="../concepts/tensor-adaptor.html">Tensor Adaptors</a>, <a href="../concepts/tensor-adaptor-coordinate.html">Tensor Adaptor Coordinates</a></p>
+<p>Advanced coordinate operations require understanding of <strong>Tensor Descriptors</strong>, <strong>Tensor Coordinates</strong>, <strong>Tensor Adaptors</strong>, and <strong>Tensor Adaptor Coordinates</strong>. These operations enable:</p>
+<ul>
+<li><strong>Create</strong> coordinates from descriptors and adaptors</li>
+<li><strong>Move</strong> coordinates through transform chains</li>
+<li><strong>Convert</strong> between different coordinate spaces</li>
+<li><strong>Check</strong> if operations are valid in the current descriptor context</li>
+</ul>
+<section id="coordinate-creation-from-descriptors-and-adaptors" class="level2">
+<h2 class="anchored" data-anchor-id="coordinate-creation-from-descriptors-and-adaptors">🏗️ <strong>Coordinate Creation from Descriptors and Adaptors</strong></h2>
+<section id="make_tensor_coordinate-descriptor-based-creation" class="level3">
+<h3 class="anchored" data-anchor-id="make_tensor_coordinate-descriptor-based-creation">make_tensor_coordinate: Descriptor-Based Creation</h3>
+<p>Creates coordinates from tensor descriptors:</p>
+<div>
+<div id="pyodide-3" class="exercise-cell">
+
+</div>
+<script type="pyodide-3-contents">
+eyJhdHRyIjp7ImF1dG9ydW4iOmZhbHNlLCJlY2hvIjp0cnVlLCJlZGl0Ijp0cnVlLCJldmFsIjp0cnVlLCJvdXRwdXQiOnRydWV9LCJjb2RlIjoiXG5mcm9tIHB5dGVuc29yLnRlbnNvcl9jb29yZGluYXRlIGltcG9ydCBtYWtlX3RlbnNvcl9jb29yZGluYXRlXG5mcm9tIHB5dGVuc29yLnRlbnNvcl9kZXNjcmlwdG9yIGltcG9ydCBtYWtlX25haXZlX3RlbnNvcl9kZXNjcmlwdG9yXG5mcm9tIHB5dGVuc29yLnRlbnNvcl9jb29yZGluYXRlIGltcG9ydCBNdWx0aUluZGV4XG5cbiMgQ3JlYXRlIGEgdGVuc29yIGRlc2NyaXB0b3IgKGRlZmluZXMgdGhlIHRlbnNvciBsYXlvdXQpXG5sZW5ndGhzID0gWzQsIDZdICAjIDR4NiBtYXRyaXhcbnN0cmlkZXMgPSBbNiwgMV0gICMgUm93LW1ham9yIGxheW91dFxuZGVzY3JpcHRvciA9IG1ha2VfbmFpdmVfdGVuc29yX2Rlc2NyaXB0b3IobGVuZ3Rocywgc3RyaWRlcylcblxuIyBDcmVhdGUgY29vcmRpbmF0ZSBmcm9tIGRlc2NyaXB0b3IgYW5kIHVzZXIgaW5kZXhcbnVzZXJfaW5kZXggPSBNdWx0aUluZGV4KDIsIFsxLCAyXSkgICMgUm93IDEsIENvbHVtbiAyXG5jb29yZCA9IG1ha2VfdGVuc29yX2Nvb3JkaW5hdGUoZGVzY3JpcHRvciwgdXNlcl9pbmRleClcblxucHJpbnQoZlwiVXNlciBpbmRleDoge3VzZXJfaW5kZXgudG9fbGlzdCgpfVwiKVxucHJpbnQoZlwiQ3JlYXRlZCBjb29yZGluYXRlOiB7Y29vcmR9XCIpXG5wcmludChmXCJUb3AgaW5kZXg6IHtjb29yZC5nZXRfaW5kZXgoKS50b19saXN0KCl9XCIpXG5wcmludChmXCJMaW5lYXIgb2Zmc2V0OiB7Y29vcmQuZ2V0X29mZnNldCgpfVwiKVxucHJpbnQoXCLinIUgRGVzY3JpcHRvci1iYXNlZCBjb29yZGluYXRlIGNyZWF0aW9uXCIpIn0=
+</script>
+</div>
+</section>
+<section id="make_tensor_adaptor_coordinate-adaptor-based-creation" class="level3">
+<h3 class="anchored" data-anchor-id="make_tensor_adaptor_coordinate-adaptor-based-creation">make_tensor_adaptor_coordinate: Adaptor-Based Creation</h3>
+<p>Creates coordinates from tensor adaptors (more general than descriptors):</p>
+<div>
+<div id="pyodide-4" class="exercise-cell">
+
+</div>
+<script type="pyodide-4-contents">
+eyJhdHRyIjp7ImF1dG9ydW4iOmZhbHNlLCJlY2hvIjp0cnVlLCJlZGl0Ijp0cnVlLCJldmFsIjp0cnVlLCJvdXRwdXQiOnRydWV9LCJjb2RlIjoiXG5mcm9tIHB5dGVuc29yLnRlbnNvcl9jb29yZGluYXRlIGltcG9ydCBtYWtlX3RlbnNvcl9hZGFwdG9yX2Nvb3JkaW5hdGVcbmZyb20gcHl0ZW5zb3IudGVuc29yX2Rlc2NyaXB0b3IgaW1wb3J0IFRlbnNvckFkYXB0b3IsIEVtYmVkVHJhbnNmb3JtXG5cbiMgQ3JlYXRlIGEgdGVuc29yIGFkYXB0b3Igd2l0aCB0cmFuc2Zvcm1hdGlvbnNcbmVtYmVkX3RyYW5zZm9ybSA9IEVtYmVkVHJhbnNmb3JtKFs0LCA2XSwgWzYsIDFdKSAgIyA0eDYg4oaSIGxpbmVhclxuXG4jIENyZWF0ZSBUZW5zb3JBZGFwdG9yIHdpdGggY29ycmVjdCBjb25zdHJ1Y3RvciBzaWduYXR1cmVcbmFkYXB0b3IgPSBUZW5zb3JBZGFwdG9yKFxuICAgIHRyYW5zZm9ybXM9W2VtYmVkX3RyYW5zZm9ybV0sXG4gICAgbG93ZXJfZGltZW5zaW9uX2hpZGRlbl9pZHNzPVtbMF1dLCAgIyBUcmFuc2Zvcm0gb3V0cHV0cyB0byBoaWRkZW4gZGltIDBcbiAgICB1cHBlcl9kaW1lbnNpb25faGlkZGVuX2lkc3M9W1sxLCAyXV0sICAjIFRyYW5zZm9ybSB0YWtlcyBmcm9tIGhpZGRlbiBkaW1zIDEsMlxuICAgIGJvdHRvbV9kaW1lbnNpb25faGlkZGVuX2lkcz1bMF0sICAjIEJvdHRvbSBkaW1lbnNpb24gaXMgaGlkZGVuIGRpbSAwXG4gICAgdG9wX2RpbWVuc2lvbl9oaWRkZW5faWRzPVsxLCAyXSAgIyBUb3AgZGltZW5zaW9ucyBhcmUgaGlkZGVuIGRpbXMgMSwyXG4pXG5cbiMgQ3JlYXRlIGNvb3JkaW5hdGUgZnJvbSBhZGFwdG9yIGFuZCB0b3AgaW5kZXhcbnRvcF9pbmRleCA9IE11bHRpSW5kZXgoMiwgWzIsIDNdKSAgIyA0eDYgY29vcmRpbmF0ZVxuYWRhcHRvcl9jb29yZCA9IG1ha2VfdGVuc29yX2FkYXB0b3JfY29vcmRpbmF0ZShhZGFwdG9yLCB0b3BfaW5kZXgpXG5cbnByaW50KGZcIlRvcCBpbmRleCAoNHg2KToge2FkYXB0b3JfY29vcmQuZ2V0X3RvcF9pbmRleCgpLnRvX2xpc3QoKX1cIilcbnByaW50KGZcIkJvdHRvbSBpbmRleCAobGluZWFyKToge2FkYXB0b3JfY29vcmQuZ2V0X2JvdHRvbV9pbmRleCgpLnRvX2xpc3QoKX1cIilcbnByaW50KGZcIkhpZGRlbiBpbmRleDoge2FkYXB0b3JfY29vcmQuZ2V0X2hpZGRlbl9pbmRleCgpLnRvX2xpc3QoKX1cIilcbnByaW50KFwi4pyFIEFkYXB0b3ItYmFzZWQgY29vcmRpbmF0ZSBjcmVhdGlvblwiKSJ9
+</script>
+</div>
+</section>
+<section id="key-differences-descriptor-vs-adaptor-creation" class="level3">
+<h3 class="anchored" data-anchor-id="key-differences-descriptor-vs-adaptor-creation">Key Differences: Descriptor vs Adaptor Creation</h3>
+<p><strong>make_tensor_coordinate:</strong> - Takes TensorDescriptor - Always creates TensorCoordinate - Bottom dimension is single offset - Simpler, tensor-specific</p>
+<p><strong>make_tensor_adaptor_coordinate:</strong> - Takes TensorAdaptor - Creates TensorAdaptorCoordinate - Can have multiple bottom dimensions - More general, flexible</p>
+<p><strong>Relationship:</strong> - <code>make_tensor_coordinate()</code> calls <code>make_tensor_adaptor_coordinate()</code> internally - then converts result to TensorCoordinate</p>
+</section>
+</section>
+<section id="why-descriptors-are-required" class="level2">
+<h2 class="anchored" data-anchor-id="why-descriptors-are-required">🚨 <strong>Why Descriptors Are Required</strong></h2>
+<p>Many coordinate operations need to: - <strong>Validate</strong> if a coordinate is within bounds after transformation - <strong>Move</strong> coordinates through transform chains - <strong>Convert</strong> between different coordinate spaces - <strong>Check</strong> if operations are valid in the current descriptor context</p>
+</section>
+<section id="move_tensor_coordinate-descriptor-aware-movement" class="level2">
+<h2 class="anchored" data-anchor-id="move_tensor_coordinate-descriptor-aware-movement">🔄 <strong>move_tensor_coordinate: Descriptor-Aware Movement</strong></h2>
+<p>The most important function that requires descriptors:</p>
+<div>
+<div id="pyodide-5" class="exercise-cell">
+
+</div>
+<script type="pyodide-5-contents">
+eyJhdHRyIjp7ImF1dG9ydW4iOmZhbHNlLCJlY2hvIjp0cnVlLCJlZGl0Ijp0cnVlLCJldmFsIjp0cnVlLCJvdXRwdXQiOnRydWV9LCJjb2RlIjoiXG5mcm9tIHB5dGVuc29yLnRlbnNvcl9jb29yZGluYXRlIGltcG9ydCBtYWtlX3RlbnNvcl9jb29yZGluYXRlLCBtb3ZlX3RlbnNvcl9jb29yZGluYXRlXG5mcm9tIHB5dGVuc29yLnRlbnNvcl9kZXNjcmlwdG9yIGltcG9ydCBtYWtlX25haXZlX3RlbnNvcl9kZXNjcmlwdG9yXG5mcm9tIHB5dGVuc29yLnRlbnNvcl9jb29yZGluYXRlIGltcG9ydCBNdWx0aUluZGV4XG5cbiMgRmlyc3QgY3JlYXRlIGEgdGVuc29yIGRlc2NyaXB0b3IgKHJlcXVpcmVkISlcbmxlbmd0aHMgPSBbNCwgNl0gICMgNHg2IG1hdHJpeFxuc3RyaWRlcyA9IFs2LCAxXSAgIyBSb3ctbWFqb3IgbGF5b3V0XG5kZXNjcmlwdG9yID0gbWFrZV9uYWl2ZV90ZW5zb3JfZGVzY3JpcHRvcihsZW5ndGhzLCBzdHJpZGVzKVxuXG4jIENyZWF0ZSBpbml0aWFsIGNvb3JkaW5hdGVcbmluaXRpYWxfaWR4ID0gTXVsdGlJbmRleCgyLCBbMSwgMl0pICAjIFJvdyAxLCBDb2x1bW4gMlxuY29vcmQgPSBtYWtlX3RlbnNvcl9jb29yZGluYXRlKGRlc2NyaXB0b3IsIGluaXRpYWxfaWR4KVxuXG5wcmludChmXCJJbml0aWFsIGNvb3JkaW5hdGU6IHtjb29yZC5nZXRfaW5kZXgoKX1cIilcbnByaW50KGZcIkluaXRpYWwgcG9zaXRpb246IHtjb29yZC5nZXRfaW5kZXgoKS50b19saXN0KCl9XCIpXG5cbiMgTW92ZSBieSBvZmZzZXQgLSB0aGlzIHVzZXMgZGVzY3JpcHRvciBmb3IgdmFsaWRhdGlvbiFcbm9mZnNldCA9IE11bHRpSW5kZXgoMiwgWzAsIDFdKSAgIyBNb3ZlIDEgY29sdW1uIHJpZ2h0XG5tb3ZlX3RlbnNvcl9jb29yZGluYXRlKGRlc2NyaXB0b3IsIGNvb3JkLCBvZmZzZXQpXG5cbnByaW50KGZcIkFmdGVyIG1vdmU6IHtjb29yZC5nZXRfaW5kZXgoKS50b19saXN0KCl9XCIpXG5wcmludChcIuKchSBEZXNjcmlwdG9yLXZhbGlkYXRlZCBjb29yZGluYXRlIG1vdmVtZW50XCIpIn0=
+</script>
+</div>
+</section>
+<section id="coordinate-validation-with-descriptors" class="level2">
+<h2 class="anchored" data-anchor-id="coordinate-validation-with-descriptors">🔍 <strong>Coordinate Validation with Descriptors</strong></h2>
+<div>
+<div id="pyodide-6" class="exercise-cell">
+
+</div>
+<script type="pyodide-6-contents">
+eyJhdHRyIjp7ImF1dG9ydW4iOmZhbHNlLCJlY2hvIjp0cnVlLCJlZGl0Ijp0cnVlLCJldmFsIjp0cnVlLCJvdXRwdXQiOnRydWV9LCJjb2RlIjoiXG5mcm9tIHB5dGVuc29yLnRlbnNvcl9jb29yZGluYXRlIGltcG9ydCBhZGFwdG9yX2Nvb3JkaW5hdGVfaXNfdmFsaWQsIGNvb3JkaW5hdGVfaGFzX3ZhbGlkX29mZnNldFxuXG4jIFRlc3QgY29vcmRpbmF0ZSB2YWxpZGl0eSB3aXRoaW4gZGVzY3JpcHRvciBib3VuZHNcbnZhbGlkX2lkeCA9IE11bHRpSW5kZXgoMiwgWzMsIDVdKSAgIyBSb3cgMywgQ29sdW1uIDUgKHdpdGhpbiA0eDYpXG5pbnZhbGlkX2lkeCA9IE11bHRpSW5kZXgoMiwgWzQsIDZdKSAgIyBSb3cgNCwgQ29sdW1uIDYgKG91dHNpZGUgNHg2KVxuXG52YWxpZF9jb29yZCA9IG1ha2VfdGVuc29yX2Nvb3JkaW5hdGUoZGVzY3JpcHRvciwgdmFsaWRfaWR4KVxudHJ5OlxuICAgIGludmFsaWRfY29vcmQgPSBtYWtlX3RlbnNvcl9jb29yZGluYXRlKGRlc2NyaXB0b3IsIGludmFsaWRfaWR4KVxuICAgIHByaW50KFwiSW52YWxpZCBjb29yZGluYXRlIGNyZWF0ZWQgLSBkZXNjcmlwdG9yIHZhbGlkYXRpb24gbmVlZGVkXCIpXG5leGNlcHQ6XG4gICAgcHJpbnQoXCJEZXNjcmlwdG9yIHByZXZlbnRlZCBpbnZhbGlkIGNvb3JkaW5hdGUgY3JlYXRpb25cIilcblxuIyBDaGVjayBpZiBhIGNvb3JkaW5hdGUgaXMgdmFsaWRcbnByaW50KGZcIlZhbGlkIGNvb3JkaW5hdGUgY2hlY2s6IHthZGFwdG9yX2Nvb3JkaW5hdGVfaXNfdmFsaWQoZGVzY3JpcHRvciwgdmFsaWRfY29vcmQpfVwiKVxuXG4jIENoZWNrIGlmIGNvb3JkaW5hdGUgaGFzIHZhbGlkIG9mZnNldFxuaGFzX3ZhbGlkX29mZnNldCA9IGNvb3JkaW5hdGVfaGFzX3ZhbGlkX29mZnNldChkZXNjcmlwdG9yLCB2YWxpZF9jb29yZClcbnByaW50KGZcIkNvb3JkaW5hdGUgaGFzIHZhbGlkIG9mZnNldDoge2hhc192YWxpZF9vZmZzZXR9XCIpXG5wcmludChcIuKchSBEZXNjcmlwdG9yLWJhc2VkIHZhbGlkYXRpb24gd29ya2luZ1wiKSJ9
+</script>
+</div>
+</section>
+<section id="complex-transform-navigation" class="level2">
+<h2 class="anchored" data-anchor-id="complex-transform-navigation">🎯 <strong>Complex Transform Navigation</strong></h2>
+<p>Working with multi-transform adaptors:</p>
+<div>
+<div id="pyodide-7" class="exercise-cell">
+
+</div>
+<script type="pyodide-7-contents">
+eyJhdHRyIjp7ImF1dG9ydW4iOmZhbHNlLCJlY2hvIjp0cnVlLCJlZGl0Ijp0cnVlLCJldmFsIjp0cnVlLCJvdXRwdXQiOnRydWV9LCJjb2RlIjoiXG5mcm9tIHB5dGVuc29yLnRlbnNvcl9kZXNjcmlwdG9yIGltcG9ydCBUZW5zb3JBZGFwdG9yLCBFbWJlZFRyYW5zZm9ybSwgUGFzc1Rocm91Z2hUcmFuc2Zvcm1cbmZyb20gcHl0ZW5zb3IudGVuc29yX2Nvb3JkaW5hdGUgaW1wb3J0IG1ha2VfdGVuc29yX2FkYXB0b3JfY29vcmRpbmF0ZVxuXG4jIENyZWF0ZSBzaW1wbGUgbXVsdGktdHJhbnNmb3JtIGFkYXB0b3IgdXNpbmcgY29tcGF0aWJsZSB0cmFuc2Zvcm1zXG4jIFVzZSBQYXNzVGhyb3VnaCB0cmFuc2Zvcm1zIHRoYXQgcHJlc2VydmUgZGltZW5zaW9uc1xucGFzczEgPSBQYXNzVGhyb3VnaFRyYW5zZm9ybSg0KSAgIyBGaXJzdCBkaW1lbnNpb24gKGxlbmd0aCA0KVxucGFzczIgPSBQYXNzVGhyb3VnaFRyYW5zZm9ybSg2KSAgIyBTZWNvbmQgZGltZW5zaW9uIChsZW5ndGggNilcblxuIyBDcmVhdGUgVGVuc29yQWRhcHRvciB3aXRoIG11bHRpcGxlIHRyYW5zZm9ybXNcbmFkYXB0b3IgPSBUZW5zb3JBZGFwdG9yKFxuICAgIHRyYW5zZm9ybXM9W3Bhc3MxLCBwYXNzMl0sXG4gICAgbG93ZXJfZGltZW5zaW9uX2hpZGRlbl9pZHNzPVtbMF0sIFsxXV0sICAgICAjIHBhc3Mx4oaSZGltMCwgcGFzczLihpJkaW0xXG4gICAgdXBwZXJfZGltZW5zaW9uX2hpZGRlbl9pZHNzPVtbMl0sIFszXV0sICAgICAjIHBhc3Mx4oaQZGltMiwgcGFzczLihpBkaW0zXG4gICAgYm90dG9tX2RpbWVuc2lvbl9oaWRkZW5faWRzPVswLCAxXSwgICAgICAgICAjIEZpbmFsIGJvdHRvbSBpcyBkaW1zIDAsMVxuICAgIHRvcF9kaW1lbnNpb25faGlkZGVuX2lkcz1bMiwgM10gICAgICAgICAgICAgIyBUb3AgaXMgZGltcyAyLDNcbilcblxuIyBDcmVhdGUgY29vcmRpbmF0ZSB0aGF0IG5hdmlnYXRlcyB0aHJvdWdoIHRyYW5zZm9ybXNcbmluaXRpYWxfaWR4ID0gTXVsdGlJbmRleCgyLCBbMiwgM10pICAjIFN0YXJ0IHdpdGggNHg2IGNvb3JkaW5hdGVcbmFkYXB0b3JfY29vcmQgPSBtYWtlX3RlbnNvcl9hZGFwdG9yX2Nvb3JkaW5hdGUoYWRhcHRvciwgaW5pdGlhbF9pZHgpXG5cbnByaW50KGZcIlVwcGVyIGluZGV4ICg0eDYpOiB7YWRhcHRvcl9jb29yZC5nZXRfdG9wX2luZGV4KCkudG9fbGlzdCgpfVwiKVxucHJpbnQoZlwiTG93ZXIgaW5kZXggKHByZXNlcnZlZCk6IHthZGFwdG9yX2Nvb3JkLmdldF9ib3R0b21faW5kZXgoKS50b19saXN0KCl9XCIpXG5cbiMgTW92ZSB0aHJvdWdoIHRoZSB0cmFuc2Zvcm0gY2hhaW4gIFxub2Zmc2V0ID0gTXVsdGlJbmRleCgyLCBbMCwgMV0pXG5tb3ZlX3RlbnNvcl9jb29yZGluYXRlKGFkYXB0b3IsIGFkYXB0b3JfY29vcmQsIG9mZnNldClcbnByaW50KGZcIkFmdGVyIG1vdmUgLSBVcHBlcjoge2FkYXB0b3JfY29vcmQuZ2V0X3RvcF9pbmRleCgpLnRvX2xpc3QoKX1cIilcbnByaW50KGZcIkFmdGVyIG1vdmUgLSBMb3dlcjoge2FkYXB0b3JfY29vcmQuZ2V0X2JvdHRvbV9pbmRleCgpLnRvX2xpc3QoKX1cIilcbnByaW50KFwi4pyFIE11bHRpLXRyYW5zZm9ybSBjb29yZGluYXRlIG5hdmlnYXRpb25cIikifQ==
+</script>
+</div>
+</section>
+<section id="linear-offset-calculations" class="level2">
+<h2 class="anchored" data-anchor-id="linear-offset-calculations">🧮 <strong>Linear Offset Calculations</strong></h2>
+<p>Understanding how descriptors convert to linear memory offsets:</p>
+<div>
+<div id="pyodide-8" class="exercise-cell">
+
+</div>
+<script type="pyodide-8-contents">
+eyJhdHRyIjp7ImF1dG9ydW4iOmZhbHNlLCJlY2hvIjp0cnVlLCJlZGl0Ijp0cnVlLCJldmFsIjp0cnVlLCJvdXRwdXQiOnRydWV9LCJjb2RlIjoiXG4jIENyZWF0ZSBjb29yZGluYXRlIHdpdGggbGluZWFyIG9mZnNldCB0cmFja2luZ1xuY29vcmQgPSBtYWtlX3RlbnNvcl9jb29yZGluYXRlKGRlc2NyaXB0b3IsIE11bHRpSW5kZXgoMiwgWzEsIDNdKSlcblxuIyBHZXQgdGhlIGxpbmVhciBtZW1vcnkgb2Zmc2V0XG5saW5lYXJfb2Zmc2V0ID0gY29vcmQuZ2V0X29mZnNldCgpXG5wcmludChmXCIyRCBjb29yZGluYXRlIFsxLCAzXSDihpIgbGluZWFyIG9mZnNldDoge2xpbmVhcl9vZmZzZXR9XCIpXG5cbiMgVmVyaWZ5IHdpdGggbWFudWFsIGNhbGN1bGF0aW9uXG5tYW51YWxfb2Zmc2V0ID0gMSAqIDYgKyAzICogMSAgIyByb3cqc3RyaWRlICsgY29sKnN0cmlkZVxucHJpbnQoZlwiTWFudWFsIGNhbGN1bGF0aW9uOiAxKjYgKyAzKjEgPSB7bWFudWFsX29mZnNldH1cIilcbnByaW50KGZcIk1hdGNoZXM6IHtsaW5lYXJfb2Zmc2V0ID09IG1hbnVhbF9vZmZzZXR9XCIpXG5wcmludChcIuKchSBMaW5lYXIgb2Zmc2V0IGNhbGN1bGF0aW9uIHZlcmlmaWVkXCIpIn0=
+</script>
+</div>
+</section>
+<section id="integration-with-tensor-views" class="level2">
+<h2 class="anchored" data-anchor-id="integration-with-tensor-views">🔗 <strong>Integration with Tensor Views</strong></h2>
+<p>How advanced coordinates work with tensor views:</p>
+<div>
+<div id="pyodide-9" class="exercise-cell">
+
+</div>
+<script type="pyodide-9-contents">
+eyJhdHRyIjp7ImF1dG9ydW4iOmZhbHNlLCJlY2hvIjp0cnVlLCJlZGl0Ijp0cnVlLCJldmFsIjp0cnVlLCJvdXRwdXQiOnRydWV9LCJjb2RlIjoiXG5pbXBvcnQgbnVtcHkgYXMgbnBcbmZyb20gcHl0ZW5zb3IudGVuc29yX3ZpZXcgaW1wb3J0IG1ha2VfbmFpdmVfdGVuc29yX3ZpZXdcblxuIyBDcmVhdGUgdGVuc29yIGRhdGEgYW5kIHZpZXdcbmRhdGEgPSBucC5hcmFuZ2UoMjQsIGR0eXBlPW5wLmZsb2F0MzIpLnJlc2hhcGUoNCwgNilcbnRlbnNvcl92aWV3ID0gbWFrZV9uYWl2ZV90ZW5zb3JfdmlldyhkYXRhLCBbNCwgNl0sIFs2LCAxXSlcblxuIyBVc2UgYWR2YW5jZWQgY29vcmRpbmF0ZSB0byBhY2Nlc3MgdGVuc29yXG5jb29yZCA9IG1ha2VfdGVuc29yX2Nvb3JkaW5hdGUodGVuc29yX3ZpZXcuZ2V0X3RlbnNvcl9kZXNjcmlwdG9yKCksIE11bHRpSW5kZXgoMiwgWzIsIDRdKSlcbmxpbmVhcl9pZHggPSBjb29yZC5nZXRfb2Zmc2V0KClcblxucHJpbnQoZlwiQ29vcmRpbmF0ZSBbMiwgNF0g4oaSIGxpbmVhciBpbmRleCB7bGluZWFyX2lkeH1cIilcbnByaW50KGZcIlRlbnNvciB2YWx1ZSBhdCBbMiwgNF06IHtkYXRhWzIsIDRdfVwiKVxucHJpbnQoZlwiTGluZWFyIGFjY2VzcyB2YWx1ZToge2RhdGEuZmxhdFtsaW5lYXJfaWR4XX1cIilcbnByaW50KFwi4pyFIENvb3JkaW5hdGUtdGVuc29yIGludGVncmF0aW9uIHdvcmtpbmdcIikifQ==
+</script>
+</div>
+</section>
+<section id="interactive-coordinate-debugging" class="level2">
+<h2 class="anchored" data-anchor-id="interactive-coordinate-debugging">🎮 <strong>Interactive Coordinate Debugging</strong></h2>
+<p>Advanced debugging techniques:</p>
+<div>
+<div id="pyodide-10" class="exercise-cell">
+
+</div>
+<script type="pyodide-10-contents">
+eyJhdHRyIjp7ImF1dG9ydW4iOmZhbHNlLCJlY2hvIjp0cnVlLCJlZGl0Ijp0cnVlLCJldmFsIjp0cnVlLCJvdXRwdXQiOnRydWV9LCJjb2RlIjoiXG5kZWYgZGVidWdfY29vcmRpbmF0ZV9tb3ZlbWVudChkZXNjcmlwdG9yLCBzdGFydF9wb3MsIG1vdmVzKTpcbiAgICBcIlwiXCJEZWJ1ZyBjb29yZGluYXRlIG1vdmVtZW50IHRocm91Z2ggbXVsdGlwbGUgc3RlcHNcIlwiXCJcbiAgICBjb29yZCA9IG1ha2VfdGVuc29yX2Nvb3JkaW5hdGUoZGVzY3JpcHRvciwgTXVsdGlJbmRleCgyLCBzdGFydF9wb3MpKVxuICAgIHByaW50KGZcIlN0YXJ0aW5nIGF0OiB7Y29vcmQuZ2V0X2luZGV4KCkudG9fbGlzdCgpfVwiKVxuICAgIFxuICAgIGZvciBpLCBtb3ZlIGluIGVudW1lcmF0ZShtb3Zlcyk6XG4gICAgICAgIHRyeTpcbiAgICAgICAgICAgIG9mZnNldCA9IE11bHRpSW5kZXgoMiwgbW92ZSlcbiAgICAgICAgICAgIG1vdmVfdGVuc29yX2Nvb3JkaW5hdGUoZGVzY3JpcHRvciwgY29vcmQsIG9mZnNldClcbiAgICAgICAgICAgIHByaW50KGZcIk1vdmUge2krMX0gYnkge21vdmV9OiDihpIge2Nvb3JkLmdldF9pbmRleCgpLnRvX2xpc3QoKX1cIilcbiAgICAgICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBlOlxuICAgICAgICAgICAgcHJpbnQoZlwiTW92ZSB7aSsxfSBieSB7bW92ZX06IEZBSUxFRCAoe2V9KVwiKVxuICAgICAgICAgICAgYnJlYWtcbiAgICBcbiAgICByZXR1cm4gY29vcmRcblxuIyBUZXN0IGNvb3JkaW5hdGUgbW92ZW1lbnQgc2VxdWVuY2Vcbm1vdmVzID0gW1swLCAxXSwgWzEsIDBdLCBbMCwgLTFdLCBbLTEsIDBdXSAgIyBSaWdodCwgRG93biwgTGVmdCwgVXBcbmZpbmFsX2Nvb3JkID0gZGVidWdfY29vcmRpbmF0ZV9tb3ZlbWVudChkZXNjcmlwdG9yLCBbMSwgMV0sIG1vdmVzKVxucHJpbnQoXCLinIUgQ29vcmRpbmF0ZSBtb3ZlbWVudCBkZWJ1Z2dpbmcgY29tcGxldGVcIikifQ==
+</script>
+</div>
+</section>
+<section id="why-these-operations-matter" class="level2">
+<h2 class="anchored" data-anchor-id="why-these-operations-matter">🔍 <strong>Why These Operations Matter</strong></h2>
+<p>These advanced coordinate operations are essential for:</p>
+<ol type="1">
+<li><strong>Tile Windows</strong> - Moving through tensor regions requires descriptor-aware navigation</li>
+<li><strong>Sweep Operations</strong> - Iterating over distributed data needs validated coordinate movement<br>
+</li>
+<li><strong>Tensor Views</strong> - Accessing tensor elements through complex layouts</li>
+<li><strong>Distribution Systems</strong> - Converting between thread coordinates and tensor coordinates</li>
+</ol>
+</section>
+<section id="interactive-applications" class="level2">
+<h2 class="anchored" data-anchor-id="interactive-applications">🎯 <strong>Interactive Applications</strong></h2>
+<p>Test these concepts in our apps: - <strong><a href="../../tensor_transform_app.py">Tensor Transform App</a></strong> - Visualize coordinate transformations - <strong><a href="../../app.py">Main App</a></strong> - See coordinates in action with distributions</p>
+</section>
+<section id="next-steps" class="level2">
+<h2 class="anchored" data-anchor-id="next-steps">✅ <strong>Next Steps</strong></h2>
+<p>Now you can understand: - <a href="../concepts/tile-distribution.html"><strong>Tile Distribution</strong></a> - How coordinates map to parallel processing - <a href="tile-window.qmd"><strong>Advanced Operations</strong></a> - Complex coordinate-based operations</p>
+</section>
+<section id="coordinate-movement" class="level2">
+<h2 class="anchored" data-anchor-id="coordinate-movement">Coordinate Movement</h2>
+<p>Coordinate movement is essential for iterating through tensor spaces, especially when transformations are involved. Movement requires knowledge of the descriptor or adaptor, since the transformation chain determines how steps in the top space map to changes in the hidden and bottom spaces.</p>
+<p><strong>Example:</strong></p>
+<div>
+<div id="pyodide-11" class="exercise-cell">
+
+</div>
+<script type="pyodide-11-contents">
+eyJhdHRyIjp7ImF1dG9ydW4iOmZhbHNlLCJlY2hvIjp0cnVlLCJlZGl0Ijp0cnVlLCJldmFsIjp0cnVlLCJvdXRwdXQiOnRydWV9LCJjb2RlIjoiXG5mcm9tIHB5dGVuc29yLnRlbnNvcl9jb29yZGluYXRlIGltcG9ydCBtb3ZlX3RlbnNvcl9jb29yZGluYXRlLCBtYWtlX3RlbnNvcl9jb29yZGluYXRlLCBNdWx0aUluZGV4XG5mcm9tIHB5dGVuc29yLnRlbnNvcl9kZXNjcmlwdG9yIGltcG9ydCBtYWtlX25haXZlX3RlbnNvcl9kZXNjcmlwdG9yXG5cbiMgQ3JlYXRlIGEgdGVuc29yIGRlc2NyaXB0b3IgKHJvdy1tYWpvciA0eDYpXG5kZXNjcmlwdG9yID0gbWFrZV9uYWl2ZV90ZW5zb3JfZGVzY3JpcHRvcihbNCwgNl0sIFs2LCAxXSlcblxuIyBDcmVhdGUgaW5pdGlhbCBjb29yZGluYXRlIGF0IFsxLCAyXVxuY29vcmQgPSBtYWtlX3RlbnNvcl9jb29yZGluYXRlKGRlc2NyaXB0b3IsIE11bHRpSW5kZXgoMiwgWzEsIDJdKSlcbnByaW50KGZcIkluaXRpYWwgY29vcmRpbmF0ZToge2Nvb3JkLmdldF9pbmRleCgpLnRvX2xpc3QoKX1cIilcblxuIyBNb3ZlIGJ5IFswLCAxXSAocmlnaHQgYnkgb25lIGNvbHVtbilcbnN0ZXAgPSBNdWx0aUluZGV4KDIsIFswLCAxXSlcbm1vdmVfdGVuc29yX2Nvb3JkaW5hdGUoZGVzY3JpcHRvciwgY29vcmQsIHN0ZXApXG5wcmludChmXCJBZnRlciBtb3ZlOiB7Y29vcmQuZ2V0X2luZGV4KCkudG9fbGlzdCgpfVwiKSJ9
+</script>
+</div>
+<blockquote class="blockquote">
+<p><strong>Note:</strong> Movement is only meaningful after you understand how descriptors and adaptors define the mapping between top, hidden, and bottom spaces.</p>
+</blockquote>
+<hr>
+<p><em>These operations bridge the gap between mathematical transforms and practical tensor manipulation!</em></p>
+
+
+<!-- -->
+
+<script type="pyodide-data">
+eyJvcHRpb25zIjp7ImVudiI6eyJQTE9UTFlfUkVOREVSRVIiOiJwbG90bHlfbWltZXR5cGUifSwiaW5kZXhVUkwiOiJodHRwczovL2Nkbi5qc2RlbGl2ci5uZXQvcHlvZGlkZS92MC4yNy4wL2Z1bGwvIn0sInBhY2thZ2VzIjp7InBrZ3MiOlsicHlvZGlkZV9odHRwIiwibWljcm9waXAiLCJpcHl0aG9uIiwibnVtcHkiLCJwYW5kYXMiLCJzeW1weSIsIm1pY3JvcGlwIl19fQ==
+</script>
+<script type="ojs-module-contents">
+eyJjb250ZW50cyI6W3siY2VsbE5hbWUiOiJweW9kaWRlLTExIiwiaW5saW5lIjpmYWxzZSwibWV0aG9kTmFtZSI6ImludGVycHJldCIsInNvdXJjZSI6InZpZXdvZiBfcHlvZGlkZV9lZGl0b3JfMTEgPSB7XG4gIGNvbnN0IHsgUHlvZGlkZUV4ZXJjaXNlRWRpdG9yLCBiNjREZWNvZGUgfSA9IHdpbmRvdy5fZXhlcmNpc2Vfb2pzX3J1bnRpbWU7XG5cbiAgY29uc3Qgc2NyaXB0Q29udGVudCA9IGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoYHNjcmlwdFt0eXBlPVxcXCJweW9kaWRlLTExLWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtMTEtY29udGVudHNgIH0sIGJsb2NrLmF0dHIpO1xuICBjb25zdCBlZGl0b3IgPSBuZXcgUHlvZGlkZUV4ZXJjaXNlRWRpdG9yKFxuICAgIHB5b2RpZGVPanMucHlvZGlkZVByb21pc2UsXG4gICAgYmxvY2suY29kZSxcbiAgICBvcHRpb25zXG4gICk7XG5cbiAgcmV0dXJuIGVkaXRvci5jb250YWluZXI7XG59XG5fcHlvZGlkZV92YWx1ZV8xMSA9IHB5b2RpZGVPanMucHJvY2VzcyhfcHlvZGlkZV9lZGl0b3JfMTEsIHt9KTtcbiJ9LHsiY2VsbE5hbWUiOiJweW9kaWRlLTEwIiwiaW5saW5lIjpmYWxzZSwibWV0aG9kTmFtZSI6ImludGVycHJldCIsInNvdXJjZSI6InZpZXdvZiBfcHlvZGlkZV9lZGl0b3JfMTAgPSB7XG4gIGNvbnN0IHsgUHlvZGlkZUV4ZXJjaXNlRWRpdG9yLCBiNjREZWNvZGUgfSA9IHdpbmRvdy5fZXhlcmNpc2Vfb2pzX3J1bnRpbWU7XG5cbiAgY29uc3Qgc2NyaXB0Q29udGVudCA9IGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoYHNjcmlwdFt0eXBlPVxcXCJweW9kaWRlLTEwLWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtMTAtY29udGVudHNgIH0sIGJsb2NrLmF0dHIpO1xuICBjb25zdCBlZGl0b3IgPSBuZXcgUHlvZGlkZUV4ZXJjaXNlRWRpdG9yKFxuICAgIHB5b2RpZGVPanMucHlvZGlkZVByb21pc2UsXG4gICAgYmxvY2suY29kZSxcbiAgICBvcHRpb25zXG4gICk7XG5cbiAgcmV0dXJuIGVkaXRvci5jb250YWluZXI7XG59XG5fcHlvZGlkZV92YWx1ZV8xMCA9IHB5b2RpZGVPanMucHJvY2VzcyhfcHlvZGlkZV9lZGl0b3JfMTAsIHt9KTtcbiJ9LHsiY2VsbE5hbWUiOiJweW9kaWRlLTkiLCJpbmxpbmUiOmZhbHNlLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0Iiwic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl85ID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS05LWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtOS1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzkgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzksIHt9KTtcbiJ9LHsiY2VsbE5hbWUiOiJweW9kaWRlLTgiLCJpbmxpbmUiOmZhbHNlLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0Iiwic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl84ID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS04LWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtOC1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzggPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzgsIHt9KTtcbiJ9LHsiY2VsbE5hbWUiOiJweW9kaWRlLTciLCJpbmxpbmUiOmZhbHNlLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0Iiwic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl83ID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS03LWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtNy1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzcgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzcsIHt9KTtcbiJ9LHsiY2VsbE5hbWUiOiJweW9kaWRlLTYiLCJpbmxpbmUiOmZhbHNlLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0Iiwic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl82ID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS02LWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtNi1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzYgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzYsIHt9KTtcbiJ9LHsiY2VsbE5hbWUiOiJweW9kaWRlLTUiLCJpbmxpbmUiOmZhbHNlLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0Iiwic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl81ID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS01LWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtNS1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzUgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzUsIHt9KTtcbiJ9LHsiY2VsbE5hbWUiOiJweW9kaWRlLTQiLCJpbmxpbmUiOmZhbHNlLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0Iiwic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl80ID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS00LWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtNC1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzQgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzQsIHt9KTtcbiJ9LHsiY2VsbE5hbWUiOiJweW9kaWRlLTMiLCJpbmxpbmUiOmZhbHNlLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0Iiwic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl8zID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS0zLWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtMy1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzMgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzMsIHt9KTtcbiJ9LHsiY2VsbE5hbWUiOiJweW9kaWRlLTIiLCJpbmxpbmUiOmZhbHNlLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0Iiwic291cmNlIjoiX3B5b2RpZGVfdmFsdWVfMiA9IHtcbiAgY29uc3QgeyBoaWdobGlnaHRQeXRob24sIGI2NERlY29kZX0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS0yLWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgLy8gRGVmYXVsdCBldmFsdWF0aW9uIGNvbmZpZ3VyYXRpb25cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oe1xuICAgIGlkOiBcInB5b2RpZGUtMi1jb250ZW50c1wiLFxuICAgIGVjaG86IHRydWUsXG4gICAgb3V0cHV0OiB0cnVlXG4gIH0sIGJsb2NrLmF0dHIpO1xuXG4gIC8vIEV2YWx1YXRlIHRoZSBwcm92aWRlZCBQeXRob24gY29kZVxuICBjb25zdCByZXN1bHQgPSBweW9kaWRlT2pzLnByb2Nlc3Moe2NvZGU6IGJsb2NrLmNvZGUsIG9wdGlvbnN9LCB7fSk7XG5cbiAgLy8gRWFybHkgeWllbGQgd2hpbGUgd2Ugd2FpdCBmb3IgdGhlIGZpcnN0IGV2YWx1YXRpb24gYW5kIHJlbmRlclxuICBpZiAob3B0aW9ucy5vdXRwdXQgJiYgIShcIjJcIiBpbiBweW9kaWRlT2pzLnJlbmRlcmVkT2pzKSkge1xuICAgIGNvbnN0IGNvbnRhaW5lciA9IGRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoXCJkaXZcIik7XG4gICAgY29uc3Qgc3Bpbm5lciA9IGRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoXCJkaXZcIik7XG5cbiAgICBpZiAob3B0aW9ucy5lY2hvKSB7XG4gICAgICAvLyBTaG93IG91dHB1dCBhcyBoaWdobGlnaHRlZCBzb3VyY2VcbiAgICAgIGNvbnN0IHByZUVsZW0gPSBkb2N1bWVudC5jcmVhdGVFbGVtZW50KFwicHJlXCIpO1xuICAgICAgY29udGFpbmVyLmNsYXNzTmFtZSA9IFwic291cmNlQ29kZVwiO1xuICAgICAgcHJlRWxlbS5jbGFzc05hbWUgPSBcInNvdXJjZUNvZGUgcHl0aG9uXCI7XG4gICAgICBwcmVFbGVtLmFwcGVuZENoaWxkKGhpZ2hsaWdodFB5dGhvbihibG9jay5jb2RlKSk7XG4gICAgICBzcGlubmVyLmNsYXNzTmFtZSA9IFwic3Bpbm5lci1ncm93IHNwaW5uZXItZ3Jvdy1zbSBtLTIgcG9zaXRpb24tYWJzb2x1dGUgdG9wLTAgZW5kLTBcIjtcbiAgICAgIHByZUVsZW0uYXBwZW5kQ2hpbGQoc3Bpbm5lcik7XG4gICAgICBjb250YWluZXIuYXBwZW5kQ2hpbGQocHJlRWxlbSk7XG4gICAgfSBlbHNlIHtcbiAgICAgIHNwaW5uZXIuY2xhc3NOYW1lID0gXCJzcGlubmVyLWJvcmRlciBzcGlubmVyLWJvcmRlci1zbVwiO1xuICAgICAgY29udGFpbmVyLmFwcGVuZENoaWxkKHNwaW5uZXIpO1xuICAgIH1cblxuICAgIHlpZWxkIGNvbnRhaW5lcjtcbiAgfVxuXG4gIHB5b2RpZGVPanMucmVuZGVyZWRPanNbXCIyXCJdID0gdHJ1ZTtcbiAgeWllbGQgYXdhaXQgcmVzdWx0O1xufVxuIn0seyJjZWxsTmFtZSI6InB5b2RpZGUtMSIsImlubGluZSI6ZmFsc2UsIm1ldGhvZE5hbWUiOiJpbnRlcnByZXQiLCJzb3VyY2UiOiJfcHlvZGlkZV92YWx1ZV8xID0ge1xuICBjb25zdCB7IGhpZ2hsaWdodFB5dGhvbiwgYjY0RGVjb2RlfSA9IHdpbmRvdy5fZXhlcmNpc2Vfb2pzX3J1bnRpbWU7XG5cbiAgY29uc3Qgc2NyaXB0Q29udGVudCA9IGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoYHNjcmlwdFt0eXBlPVxcXCJweW9kaWRlLTEtY29udGVudHNcXFwiXWApLnRleHRDb250ZW50O1xuICBjb25zdCBibG9jayA9IEpTT04ucGFyc2UoYjY0RGVjb2RlKHNjcmlwdENvbnRlbnQpKTtcblxuICAvLyBEZWZhdWx0IGV2YWx1YXRpb24gY29uZmlndXJhdGlvblxuICBjb25zdCBvcHRpb25zID0gT2JqZWN0LmFzc2lnbih7XG4gICAgaWQ6IFwicHlvZGlkZS0xLWNvbnRlbnRzXCIsXG4gICAgZWNobzogdHJ1ZSxcbiAgICBvdXRwdXQ6IHRydWVcbiAgfSwgYmxvY2suYXR0cik7XG5cbiAgLy8gRXZhbHVhdGUgdGhlIHByb3ZpZGVkIFB5dGhvbiBjb2RlXG4gIGNvbnN0IHJlc3VsdCA9IHB5b2RpZGVPanMucHJvY2Vzcyh7Y29kZTogYmxvY2suY29kZSwgb3B0aW9uc30sIHt9KTtcblxuICAvLyBFYXJseSB5aWVsZCB3aGlsZSB3ZSB3YWl0IGZvciB0aGUgZmlyc3QgZXZhbHVhdGlvbiBhbmQgcmVuZGVyXG4gIGlmIChvcHRpb25zLm91dHB1dCAmJiAhKFwiMVwiIGluIHB5b2RpZGVPanMucmVuZGVyZWRPanMpKSB7XG4gICAgY29uc3QgY29udGFpbmVyID0gZG9jdW1lbnQuY3JlYXRlRWxlbWVudChcImRpdlwiKTtcbiAgICBjb25zdCBzcGlubmVyID0gZG9jdW1lbnQuY3JlYXRlRWxlbWVudChcImRpdlwiKTtcblxuICAgIGlmIChvcHRpb25zLmVjaG8pIHtcbiAgICAgIC8vIFNob3cgb3V0cHV0IGFzIGhpZ2hsaWdodGVkIHNvdXJjZVxuICAgICAgY29uc3QgcHJlRWxlbSA9IGRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoXCJwcmVcIik7XG4gICAgICBjb250YWluZXIuY2xhc3NOYW1lID0gXCJzb3VyY2VDb2RlXCI7XG4gICAgICBwcmVFbGVtLmNsYXNzTmFtZSA9IFwic291cmNlQ29kZSBweXRob25cIjtcbiAgICAgIHByZUVsZW0uYXBwZW5kQ2hpbGQoaGlnaGxpZ2h0UHl0aG9uKGJsb2NrLmNvZGUpKTtcbiAgICAgIHNwaW5uZXIuY2xhc3NOYW1lID0gXCJzcGlubmVyLWdyb3cgc3Bpbm5lci1ncm93LXNtIG0tMiBwb3NpdGlvbi1hYnNvbHV0ZSB0b3AtMCBlbmQtMFwiO1xuICAgICAgcHJlRWxlbS5hcHBlbmRDaGlsZChzcGlubmVyKTtcbiAgICAgIGNvbnRhaW5lci5hcHBlbmRDaGlsZChwcmVFbGVtKTtcbiAgICB9IGVsc2Uge1xuICAgICAgc3Bpbm5lci5jbGFzc05hbWUgPSBcInNwaW5uZXItYm9yZGVyIHNwaW5uZXItYm9yZGVyLXNtXCI7XG4gICAgICBjb250YWluZXIuYXBwZW5kQ2hpbGQoc3Bpbm5lcik7XG4gICAgfVxuXG4gICAgeWllbGQgY29udGFpbmVyO1xuICB9XG5cbiAgcHlvZGlkZU9qcy5yZW5kZXJlZE9qc1tcIjFcIl0gPSB0cnVlO1xuICB5aWVsZCBhd2FpdCByZXN1bHQ7XG59XG4ifSx7ImNlbGxOYW1lIjoicHlvZGlkZS1wcmVsdWRlIiwiaW5saW5lIjpmYWxzZSwibWV0aG9kTmFtZSI6ImludGVycHJldFF1aWV0Iiwic291cmNlIjoicHlvZGlkZU9qcyA9IHtcbiAgY29uc3Qge1xuICAgIFB5b2RpZGVFdmFsdWF0b3IsXG4gICAgUHlvZGlkZUVudmlyb25tZW50TWFuYWdlcixcbiAgICBzZXR1cFB5dGhvbixcbiAgICBzdGFydFB5b2RpZGVXb3JrZXIsXG4gICAgYjY0RGVjb2RlLFxuICAgIGNvbGxhcHNlUGF0aCxcbiAgfSA9IHdpbmRvdy5fZXhlcmNpc2Vfb2pzX3J1bnRpbWU7XG5cbiAgY29uc3Qgc3RhdHVzQ29udGFpbmVyID0gZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoXCJleGVyY2lzZS1sb2FkaW5nLXN0YXR1c1wiKTtcbiAgY29uc3QgaW5kaWNhdG9yQ29udGFpbmVyID0gZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoXCJleGVyY2lzZS1sb2FkaW5nLWluZGljYXRvclwiKTtcbiAgaW5kaWNhdG9yQ29udGFpbmVyLmNsYXNzTGlzdC5yZW1vdmUoXCJkLW5vbmVcIik7XG5cbiAgbGV0IHN0YXR1c1RleHQgPSBkb2N1bWVudC5jcmVhdGVFbGVtZW50KFwiZGl2XCIpXG4gIHN0YXR1c1RleHQuY2xhc3NMaXN0ID0gXCJleGVyY2lzZS1sb2FkaW5nLWRldGFpbHNcIjtcbiAgc3RhdHVzVGV4dCA9IHN0YXR1c0NvbnRhaW5lci5hcHBlbmRDaGlsZChzdGF0dXNUZXh0KTtcbiAgc3RhdHVzVGV4dC50ZXh0Q29udGVudCA9IGBJbml0aWFsaXNlYDtcblxuICAvLyBIb2lzdCBpbmRpY2F0b3Igb3V0IGZyb20gZmluYWwgc2xpZGUgd2hlbiBydW5uaW5nIHVuZGVyIHJldmVhbFxuICBjb25zdCByZXZlYWxTdGF0dXMgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKFwiLnJldmVhbCAuZXhlcmNpc2UtbG9hZGluZy1pbmRpY2F0b3JcIik7XG4gIGlmIChyZXZlYWxTdGF0dXMpIHtcbiAgICByZXZlYWxTdGF0dXMucmVtb3ZlKCk7XG4gICAgZG9jdW1lbnQucXVlcnlTZWxlY3RvcihcIi5yZXZlYWwgPiAuc2xpZGVzXCIpLmFwcGVuZENoaWxkKHJldmVhbFN0YXR1cyk7XG4gIH1cblxuICAvLyBNYWtlIGFueSByZXZlYWwgc2xpZGVzIHdpdGggbGl2ZSBjZWxscyBzY3JvbGxhYmxlXG4gIGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3JBbGwoXCIucmV2ZWFsIC5leGVyY2lzZS1jZWxsXCIpLmZvckVhY2goKGVsKSA9PiB7XG4gICAgZWwuY2xvc2VzdCgnc2VjdGlvbi5zbGlkZScpLmNsYXNzTGlzdC5hZGQoXCJzY3JvbGxhYmxlXCIpO1xuICB9KVxuXG4gIC8vIFB5b2RpZGUgc3VwcGxlbWVudGFsIGRhdGEgYW5kIG9wdGlvbnNcbiAgY29uc3QgZGF0YUNvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS1kYXRhXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgZGF0YSA9IEpTT04ucGFyc2UoYjY0RGVjb2RlKGRhdGFDb250ZW50KSk7XG5cbiAgLy8gR3JhYiBsaXN0IG9mIHJlc291cmNlcyB0byBiZSBkb3dubG9hZGVkXG4gIGNvbnN0IGZpbGVzQ29udGVudCA9IGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoYHNjcmlwdFt0eXBlPVxcXCJ2ZnMtZmlsZVxcXCJdYCkudGV4dENvbnRlbnQ7XG4gIGNvbnN0IGZpbGVzID0gSlNPTi5wYXJzZShiNjREZWNvZGUoZmlsZXNDb250ZW50KSk7XG5cbiAgbGV0IHB5b2RpZGVQcm9taXNlID0gKGFzeW5jICgpID0+IHtcbiAgICBzdGF0dXNUZXh0LnRleHRDb250ZW50ID0gYERvd25sb2FkaW5nIFB5b2RpZGVgO1xuICAgIGNvbnN0IHB5b2RpZGUgPSBhd2FpdCBzdGFydFB5b2RpZGVXb3JrZXIoZGF0YS5vcHRpb25zKTtcblxuICAgIHN0YXR1c1RleHQudGV4dENvbnRlbnQgPSBgRG93bmxvYWRpbmcgcGFja2FnZTogbWljcm9waXBgO1xuICAgIGF3YWl0IHB5b2RpZGUubG9hZFBhY2thZ2UoXCJtaWNyb3BpcFwiKTtcbiAgICBjb25zdCBtaWNyb3BpcCA9IGF3YWl0IHB5b2RpZGUucHlpbXBvcnQoXCJtaWNyb3BpcFwiKTtcbiAgICBhd2FpdCBkYXRhLnBhY2thZ2VzLnBrZ3MubWFwKChwa2cpID0+ICgpID0+IHtcbiAgICAgIHN0YXR1c1RleHQudGV4dENvbnRlbnQgPSBgRG93bmxvYWRpbmcgcGFja2FnZTogJHtwa2d9YDtcbiAgICAgIHJldHVybiBtaWNyb3BpcC5pbnN0YWxsKHBrZyk7XG4gICAgfSkucmVkdWNlKChjdXIsIG5leHQpID0+IGN1ci50aGVuKG5leHQpLCBQcm9taXNlLnJlc29sdmUoKSk7XG4gICAgYXdhaXQgbWljcm9waXAuZGVzdHJveSgpO1xuXG4gICAgLy8gRG93bmxvYWQgYW5kIGluc3RhbGwgcmVzb3VyY2VzXG4gICAgYXdhaXQgZmlsZXMubWFwKChmaWxlKSA9PiBhc3luYyAoKSA9PiB7XG4gICAgICBjb25zdCBuYW1lID0gZmlsZS5zdWJzdHJpbmcoZmlsZS5sYXN0SW5kZXhPZignLycpICsgMSk7XG4gICAgICBzdGF0dXNUZXh0LnRleHRDb250ZW50ID0gYERvd25sb2FkaW5nIHJlc291cmNlOiAke25hbWV9YDtcbiAgICAgIGNvbnN0IHJlc3BvbnNlID0gYXdhaXQgZmV0Y2goZmlsZSk7XG4gICAgICBpZiAoIXJlc3BvbnNlLm9rKSB7XG4gICAgICAgIHRocm93IG5ldyBFcnJvcihgQ2FuJ3QgZG93bmxvYWQgXFxgJHtmaWxlfVxcYC4gRXJyb3IgJHtyZXNwb25zZS5zdGF0dXN9OiBcIiR7cmVzcG9uc2Uuc3RhdHVzVGV4dH1cIi5gKTtcbiAgICAgIH1cbiAgICAgIGNvbnN0IGRhdGEgPSBhd2FpdCByZXNwb25zZS5hcnJheUJ1ZmZlcigpO1xuXG4gICAgICAvLyBTdG9yZSBVUkxzIGluIHRoZSBjd2Qgd2l0aG91dCBhbnkgc3ViZGlyZWN0b3J5IHN0cnVjdHVyZVxuICAgICAgaWYgKGZpbGUuaW5jbHVkZXMoXCI6Ly9cIikpIHtcbiAgICAgICAgZmlsZSA9IG5hbWU7XG4gICAgICB9XG5cbiAgICAgIC8vIENvbGxhcHNlIGhpZ2hlciBkaXJlY3Rvcnkgc3RydWN0dXJlXG4gICAgICBmaWxlID0gY29sbGFwc2VQYXRoKGZpbGUpO1xuXG4gICAgICAvLyBDcmVhdGUgZGlyZWN0b3J5IHRyZWUsIGlnbm9yaW5nIFwiZGlyZWN0b3J5IGV4aXN0c1wiIFZGUyBlcnJvcnNcbiAgICAgIGNvbnN0IHBhcnRzID0gZmlsZS5zcGxpdCgnLycpLnNsaWNlKDAsIC0xKTtcbiAgICAgIGxldCBwYXRoID0gJyc7XG4gICAgICB3aGlsZSAocGFydHMubGVuZ3RoID4gMCkge1xuICAgICAgICBwYXRoICs9IHBhcnRzLnNoaWZ0KCkgKyAnLyc7XG4gICAgICAgIHRyeSB7XG4gICAgICAgICAgYXdhaXQgcHlvZGlkZS5GUy5ta2RpcihwYXRoKTtcbiAgICAgICAgfSBjYXRjaCAoZSkge1xuICAgICAgICAgIGlmIChlLm5hbWUgIT09IFwiRXJybm9FcnJvclwiKSB0aHJvdyBlO1xuICAgICAgICAgIGlmIChlLmVycm5vICE9PSAyMCkge1xuICAgICAgICAgICAgY29uc3QgZXJyb3JUZXh0UHRyID0gYXdhaXQgcHlvZGlkZS5fbW9kdWxlLl9zdHJlcnJvcihlLmVycm5vKTtcbiAgICAgICAgICAgIGNvbnN0IGVycm9yVGV4dCA9IGF3YWl0IHB5b2RpZGUuX21vZHVsZS5VVEY4VG9TdHJpbmcoZXJyb3JUZXh0UHRyKTtcbiAgICAgICAgICAgIHRocm93IG5ldyBFcnJvcihgRmlsZXN5c3RlbSBFcnJvciAke2UuZXJybm99IFwiJHtlcnJvclRleHR9XCIuYCk7XG4gICAgICAgICAgfVxuICAgICAgICB9XG4gICAgICB9XG5cbiAgICAgIC8vIFdyaXRlIHRoaXMgZmlsZSB0byB0aGUgVkZTXG4gICAgICB0cnkge1xuICAgICAgICByZXR1cm4gYXdhaXQgcHlvZGlkZS5GUy53cml0ZUZpbGUoZmlsZSwgbmV3IFVpbnQ4QXJyYXkoZGF0YSkpO1xuICAgICAgfSBjYXRjaCAoZSkge1xuICAgICAgICBpZiAoZS5uYW1lICE9PSBcIkVycm5vRXJyb3JcIikgdGhyb3cgZTtcbiAgICAgICAgY29uc3QgZXJyb3JUZXh0UHRyID0gYXdhaXQgcHlvZGlkZS5fbW9kdWxlLl9zdHJlcnJvcihlLmVycm5vKTtcbiAgICAgICAgY29uc3QgZXJyb3JUZXh0ID0gYXdhaXQgcHlvZGlkZS5fbW9kdWxlLlVURjhUb1N0cmluZyhlcnJvclRleHRQdHIpO1xuICAgICAgICB0aHJvdyBuZXcgRXJyb3IoYEZpbGVzeXN0ZW0gRXJyb3IgJHtlLmVycm5vfSBcIiR7ZXJyb3JUZXh0fVwiLmApO1xuICAgICAgfVxuICAgIH0pLnJlZHVjZSgoY3VyLCBuZXh0KSA9PiBjdXIudGhlbihuZXh0KSwgUHJvbWlzZS5yZXNvbHZlKCkpO1xuXG4gICAgc3RhdHVzVGV4dC50ZXh0Q29udGVudCA9IGBQeW9kaWRlIGVudmlyb25tZW50IHNldHVwYDtcbiAgICBhd2FpdCBzZXR1cFB5dGhvbihweW9kaWRlKTtcblxuICAgIHN0YXR1c1RleHQucmVtb3ZlKCk7XG4gICAgaWYgKHN0YXR1c0NvbnRhaW5lci5jaGlsZHJlbi5sZW5ndGggPT0gMCkge1xuICAgICAgc3RhdHVzQ29udGFpbmVyLnBhcmVudE5vZGUucmVtb3ZlKCk7XG4gICAgfVxuICAgIHJldHVybiBweW9kaWRlO1xuICB9KSgpLmNhdGNoKChlcnIpID0+IHtcbiAgICBzdGF0dXNUZXh0LnN0eWxlLmNvbG9yID0gXCJ2YXIoLS1leGVyY2lzZS1lZGl0b3ItaGwtZXIsICNBRDAwMDApXCI7XG4gICAgc3RhdHVzVGV4dC50ZXh0Q29udGVudCA9IGVyci5tZXNzYWdlO1xuICAgIC8vaW5kaWNhdG9yQ29udGFpbmVyLnF1ZXJ5U2VsZWN0b3IoXCIuc3Bpbm5lci1ncm93XCIpLmNsYXNzTGlzdC5hZGQoXCJkLW5vbmVcIik7XG4gICAgdGhyb3cgZXJyO1xuICB9KTtcblxuICAvLyBLZWVwIHRyYWNrIG9mIGluaXRpYWwgT0pTIGJsb2NrIHJlbmRlclxuICBjb25zdCByZW5kZXJlZE9qcyA9IHt9O1xuXG4gIGNvbnN0IHByb2Nlc3MgPSBhc3luYyAoY29udGV4dCwgaW5wdXRzKSA9PiB7XG4gICAgY29uc3QgcHlvZGlkZSA9IGF3YWl0IHB5b2RpZGVQcm9taXNlO1xuICAgIGNvbnN0IGV2YWx1YXRvciA9IG5ldyBQeW9kaWRlRXZhbHVhdG9yKHB5b2RpZGUsIGNvbnRleHQpO1xuICAgIGF3YWl0IGV2YWx1YXRvci5wcm9jZXNzKGlucHV0cyk7XG4gICAgcmV0dXJuIGV2YWx1YXRvci5jb250YWluZXI7XG4gIH1cblxuICByZXR1cm4ge1xuICAgIHB5b2RpZGVQcm9taXNlLFxuICAgIHJlbmRlcmVkT2pzLFxuICAgIHByb2Nlc3MsXG4gIH07XG59XG4ifV19
+</script>
+<div id="exercise-loading-indicator" class="exercise-loading-indicator d-none d-flex align-items-center gap-2">
+<div id="exercise-loading-status" class="d-flex gap-2">
+
+</div>
+<div class="spinner-grow spinner-grow-sm">
+
+</div>
+</div>
+<script type="vfs-file">
+W10=
+</script>
+</section>
+</section>
+
+</main> <!-- /main -->
+<script type="ojs-module-contents">
+eyJjb250ZW50cyI6W119
+</script>
+<script type="module">
+if (window.location.protocol === "file:") { alert("The OJS runtime does not work with file:// URLs. Please use a web server to view this document."); }
+window._ojs.paths.runtimeToDoc = "../../concepts";
+window._ojs.paths.runtimeToRoot = "../..";
+window._ojs.paths.docToRoot = "..";
+window._ojs.selfContained = false;
+window._ojs.runtime.interpretFromScriptTags();
+</script>
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    // Ensure there is a toggle, if there isn't float one in the top right
+    if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+      const a = window.document.createElement('a');
+      a.classList.add('top-right');
+      a.classList.add('quarto-color-scheme-toggle');
+      a.href = "";
+      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const i = window.document.createElement("i");
+      i.classList.add('bi');
+      a.appendChild(i);
+      window.document.body.appendChild(a);
+    }
+    setColorSchemeToggle(hasAlternateSentinel())
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+        const codeEl = trigger.previousElementSibling.cloneNode(true);
+        for (const childEl of codeEl.children) {
+          if (isCodeAnnotation(childEl)) {
+            childEl.remove();
+          }
+        }
+        return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+    const viewSource = window.document.getElementById('quarto-view-source') ||
+                       window.document.getElementById('quarto-code-tools-source');
+    if (viewSource) {
+      const sourceUrl = viewSource.getAttribute("data-quarto-source-url");
+      viewSource.addEventListener("click", function(e) {
+        if (sourceUrl) {
+          // rstudio viewer pane
+          if (/\bcapabilities=\b/.test(window.location)) {
+            window.open(sourceUrl);
+          } else {
+            window.location.href = sourceUrl;
+          }
+        } else {
+          const modal = new bootstrap.Modal(document.getElementById('quarto-embedded-source-code-modal'));
+          modal.show();
+        }
+        return false;
+      });
+    }
+    function toggleCodeHandler(show) {
+      return function(e) {
+        const detailsSrc = window.document.querySelectorAll(".cell > details > .sourceCode");
+        for (let i=0; i<detailsSrc.length; i++) {
+          const details = detailsSrc[i].parentElement;
+          if (show) {
+            details.open = true;
+          } else {
+            details.removeAttribute("open");
+          }
+        }
+        const cellCodeDivs = window.document.querySelectorAll(".cell > .sourceCode");
+        const fromCls = show ? "hidden" : "unhidden";
+        const toCls = show ? "unhidden" : "hidden";
+        for (let i=0; i<cellCodeDivs.length; i++) {
+          const codeDiv = cellCodeDivs[i];
+          if (codeDiv.classList.contains(fromCls)) {
+            codeDiv.classList.remove(fromCls);
+            codeDiv.classList.add(toCls);
+          } 
+        }
+        return false;
+      }
+    }
+    const hideAllCode = window.document.getElementById("quarto-hide-all-code");
+    if (hideAllCode) {
+      hideAllCode.addEventListener("click", toggleCodeHandler(false));
+    }
+    const showAllCode = window.document.getElementById("quarto-show-all-code");
+    if (showAllCode) {
+      showAllCode.addEventListener("click", toggleCodeHandler(true));
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+            // target, if specified
+            link.setAttribute("target", "_blank");
+            if (link.getAttribute("rel") === null) {
+              link.setAttribute("rel", "noopener");
+            }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script><div class="modal fade" id="quarto-embedded-source-code-modal" tabindex="-1" aria-labelledby="quarto-embedded-source-code-modal-label" aria-hidden="true"><div class="modal-dialog modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="quarto-embedded-source-code-modal-label">Source Code</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="">
+<div class="sourceCode" id="cb1" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> "Advanced Coordinate Operations"</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="an">format:</span><span class="co"> live-html</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: false</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: false</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="co">#| autorun: true</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Auto-install pythonck package</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> micropip</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="cf">await</span> micropip.install(<span class="st">"https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl"</span>)</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: false</span></span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: false</span></span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a><span class="co">#| autorun: true</span></span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a><span class="co"># Import required classes</span></span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tensor_coordinate <span class="im">import</span> MultiIndex, make_tensor_coordinate, make_tensor_adaptor_coordinate, move_tensor_coordinate, adaptor_coordinate_is_valid, coordinate_has_valid_offset</span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tensor_descriptor <span class="im">import</span> make_naive_tensor_descriptor, TensorAdaptor, EmbedTransform, UnmergeTransform</span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a><span class="fu"># Advanced Coordinate Operations</span></span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a>**Prerequisites**: <span class="co">[</span><span class="ot">Tensor Descriptors</span><span class="co">](tensor-descriptor.qmd)</span>, <span class="co">[</span><span class="ot">Tensor Coordinates</span><span class="co">](tensor-coordinate.qmd)</span>, <span class="co">[</span><span class="ot">Tensor Adaptors</span><span class="co">](tensor-adaptor.qmd)</span>, <span class="co">[</span><span class="ot">Tensor Adaptor Coordinates</span><span class="co">](tensor-adaptor-coordinate.qmd)</span></span>
+<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a>Advanced coordinate operations require understanding of **Tensor Descriptors**, **Tensor Coordinates**, **Tensor Adaptors**, and **Tensor Adaptor Coordinates**. These operations enable:</span>
+<span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Create** coordinates from descriptors and adaptors</span>
+<span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Move** coordinates through transform chains</span>
+<span id="cb1-38"><a href="#cb1-38" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Convert** between different coordinate spaces</span>
+<span id="cb1-39"><a href="#cb1-39" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Check** if operations are valid in the current descriptor context</span>
+<span id="cb1-40"><a href="#cb1-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-41"><a href="#cb1-41" aria-hidden="true" tabindex="-1"></a><span class="fu">## 🏗️ **Coordinate Creation from Descriptors and Adaptors**</span></span>
+<span id="cb1-42"><a href="#cb1-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-43"><a href="#cb1-43" aria-hidden="true" tabindex="-1"></a><span class="fu">### make_tensor_coordinate: Descriptor-Based Creation</span></span>
+<span id="cb1-44"><a href="#cb1-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-45"><a href="#cb1-45" aria-hidden="true" tabindex="-1"></a>Creates coordinates from tensor descriptors:</span>
+<span id="cb1-46"><a href="#cb1-46" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-49"><a href="#cb1-49" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb1-50"><a href="#cb1-50" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
+<span id="cb1-51"><a href="#cb1-51" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
+<span id="cb1-52"><a href="#cb1-52" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-53"><a href="#cb1-53" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tensor_coordinate <span class="im">import</span> make_tensor_coordinate</span>
+<span id="cb1-54"><a href="#cb1-54" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tensor_descriptor <span class="im">import</span> make_naive_tensor_descriptor</span>
+<span id="cb1-55"><a href="#cb1-55" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tensor_coordinate <span class="im">import</span> MultiIndex</span>
+<span id="cb1-56"><a href="#cb1-56" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-57"><a href="#cb1-57" aria-hidden="true" tabindex="-1"></a><span class="co"># Create a tensor descriptor (defines the tensor layout)</span></span>
+<span id="cb1-58"><a href="#cb1-58" aria-hidden="true" tabindex="-1"></a>lengths <span class="op">=</span> [<span class="dv">4</span>, <span class="dv">6</span>]  <span class="co"># 4x6 matrix</span></span>
+<span id="cb1-59"><a href="#cb1-59" aria-hidden="true" tabindex="-1"></a>strides <span class="op">=</span> [<span class="dv">6</span>, <span class="dv">1</span>]  <span class="co"># Row-major layout</span></span>
+<span id="cb1-60"><a href="#cb1-60" aria-hidden="true" tabindex="-1"></a>descriptor <span class="op">=</span> make_naive_tensor_descriptor(lengths, strides)</span>
+<span id="cb1-61"><a href="#cb1-61" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-62"><a href="#cb1-62" aria-hidden="true" tabindex="-1"></a><span class="co"># Create coordinate from descriptor and user index</span></span>
+<span id="cb1-63"><a href="#cb1-63" aria-hidden="true" tabindex="-1"></a>user_index <span class="op">=</span> MultiIndex(<span class="dv">2</span>, [<span class="dv">1</span>, <span class="dv">2</span>])  <span class="co"># Row 1, Column 2</span></span>
+<span id="cb1-64"><a href="#cb1-64" aria-hidden="true" tabindex="-1"></a>coord <span class="op">=</span> make_tensor_coordinate(descriptor, user_index)</span>
+<span id="cb1-65"><a href="#cb1-65" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-66"><a href="#cb1-66" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"User index: </span><span class="sc">{</span>user_index<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-67"><a href="#cb1-67" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Created coordinate: </span><span class="sc">{</span>coord<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-68"><a href="#cb1-68" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Top index: </span><span class="sc">{</span>coord<span class="sc">.</span>get_index()<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-69"><a href="#cb1-69" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Linear offset: </span><span class="sc">{</span>coord<span class="sc">.</span>get_offset()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-70"><a href="#cb1-70" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"✅ Descriptor-based coordinate creation"</span>)</span>
+<span id="cb1-71"><a href="#cb1-71" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb1-72"><a href="#cb1-72" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-73"><a href="#cb1-73" aria-hidden="true" tabindex="-1"></a><span class="fu">### make_tensor_adaptor_coordinate: Adaptor-Based Creation</span></span>
+<span id="cb1-74"><a href="#cb1-74" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-75"><a href="#cb1-75" aria-hidden="true" tabindex="-1"></a>Creates coordinates from tensor adaptors (more general than descriptors):</span>
+<span id="cb1-76"><a href="#cb1-76" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-79"><a href="#cb1-79" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb1-80"><a href="#cb1-80" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
+<span id="cb1-81"><a href="#cb1-81" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
+<span id="cb1-82"><a href="#cb1-82" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-83"><a href="#cb1-83" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tensor_coordinate <span class="im">import</span> make_tensor_adaptor_coordinate</span>
+<span id="cb1-84"><a href="#cb1-84" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tensor_descriptor <span class="im">import</span> TensorAdaptor, EmbedTransform</span>
+<span id="cb1-85"><a href="#cb1-85" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-86"><a href="#cb1-86" aria-hidden="true" tabindex="-1"></a><span class="co"># Create a tensor adaptor with transformations</span></span>
+<span id="cb1-87"><a href="#cb1-87" aria-hidden="true" tabindex="-1"></a>embed_transform <span class="op">=</span> EmbedTransform([<span class="dv">4</span>, <span class="dv">6</span>], [<span class="dv">6</span>, <span class="dv">1</span>])  <span class="co"># 4x6 → linear</span></span>
+<span id="cb1-88"><a href="#cb1-88" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-89"><a href="#cb1-89" aria-hidden="true" tabindex="-1"></a><span class="co"># Create TensorAdaptor with correct constructor signature</span></span>
+<span id="cb1-90"><a href="#cb1-90" aria-hidden="true" tabindex="-1"></a>adaptor <span class="op">=</span> TensorAdaptor(</span>
+<span id="cb1-91"><a href="#cb1-91" aria-hidden="true" tabindex="-1"></a>    transforms<span class="op">=</span>[embed_transform],</span>
+<span id="cb1-92"><a href="#cb1-92" aria-hidden="true" tabindex="-1"></a>    lower_dimension_hidden_idss<span class="op">=</span>[[<span class="dv">0</span>]],  <span class="co"># Transform outputs to hidden dim 0</span></span>
+<span id="cb1-93"><a href="#cb1-93" aria-hidden="true" tabindex="-1"></a>    upper_dimension_hidden_idss<span class="op">=</span>[[<span class="dv">1</span>, <span class="dv">2</span>]],  <span class="co"># Transform takes from hidden dims 1,2</span></span>
+<span id="cb1-94"><a href="#cb1-94" aria-hidden="true" tabindex="-1"></a>    bottom_dimension_hidden_ids<span class="op">=</span>[<span class="dv">0</span>],  <span class="co"># Bottom dimension is hidden dim 0</span></span>
+<span id="cb1-95"><a href="#cb1-95" aria-hidden="true" tabindex="-1"></a>    top_dimension_hidden_ids<span class="op">=</span>[<span class="dv">1</span>, <span class="dv">2</span>]  <span class="co"># Top dimensions are hidden dims 1,2</span></span>
+<span id="cb1-96"><a href="#cb1-96" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb1-97"><a href="#cb1-97" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-98"><a href="#cb1-98" aria-hidden="true" tabindex="-1"></a><span class="co"># Create coordinate from adaptor and top index</span></span>
+<span id="cb1-99"><a href="#cb1-99" aria-hidden="true" tabindex="-1"></a>top_index <span class="op">=</span> MultiIndex(<span class="dv">2</span>, [<span class="dv">2</span>, <span class="dv">3</span>])  <span class="co"># 4x6 coordinate</span></span>
+<span id="cb1-100"><a href="#cb1-100" aria-hidden="true" tabindex="-1"></a>adaptor_coord <span class="op">=</span> make_tensor_adaptor_coordinate(adaptor, top_index)</span>
+<span id="cb1-101"><a href="#cb1-101" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-102"><a href="#cb1-102" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Top index (4x6): </span><span class="sc">{</span>adaptor_coord<span class="sc">.</span>get_top_index()<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-103"><a href="#cb1-103" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Bottom index (linear): </span><span class="sc">{</span>adaptor_coord<span class="sc">.</span>get_bottom_index()<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-104"><a href="#cb1-104" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Hidden index: </span><span class="sc">{</span>adaptor_coord<span class="sc">.</span>get_hidden_index()<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-105"><a href="#cb1-105" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"✅ Adaptor-based coordinate creation"</span>)</span>
+<span id="cb1-106"><a href="#cb1-106" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb1-107"><a href="#cb1-107" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-108"><a href="#cb1-108" aria-hidden="true" tabindex="-1"></a><span class="fu">### Key Differences: Descriptor vs Adaptor Creation</span></span>
+<span id="cb1-109"><a href="#cb1-109" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-110"><a href="#cb1-110" aria-hidden="true" tabindex="-1"></a>**make_tensor_coordinate:**</span>
+<span id="cb1-111"><a href="#cb1-111" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Takes TensorDescriptor</span>
+<span id="cb1-112"><a href="#cb1-112" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Always creates TensorCoordinate</span>
+<span id="cb1-113"><a href="#cb1-113" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Bottom dimension is single offset</span>
+<span id="cb1-114"><a href="#cb1-114" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Simpler, tensor-specific</span>
+<span id="cb1-115"><a href="#cb1-115" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-116"><a href="#cb1-116" aria-hidden="true" tabindex="-1"></a>**make_tensor_adaptor_coordinate:**</span>
+<span id="cb1-117"><a href="#cb1-117" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Takes TensorAdaptor</span>
+<span id="cb1-118"><a href="#cb1-118" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Creates TensorAdaptorCoordinate</span>
+<span id="cb1-119"><a href="#cb1-119" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Can have multiple bottom dimensions</span>
+<span id="cb1-120"><a href="#cb1-120" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>More general, flexible</span>
+<span id="cb1-121"><a href="#cb1-121" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-122"><a href="#cb1-122" aria-hidden="true" tabindex="-1"></a>**Relationship:**</span>
+<span id="cb1-123"><a href="#cb1-123" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`make_tensor_coordinate()`</span> calls <span class="in">`make_tensor_adaptor_coordinate()`</span> internally</span>
+<span id="cb1-124"><a href="#cb1-124" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>then converts result to TensorCoordinate</span>
+<span id="cb1-125"><a href="#cb1-125" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-126"><a href="#cb1-126" aria-hidden="true" tabindex="-1"></a><span class="fu">## 🚨 **Why Descriptors Are Required**</span></span>
+<span id="cb1-127"><a href="#cb1-127" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-128"><a href="#cb1-128" aria-hidden="true" tabindex="-1"></a>Many coordinate operations need to:</span>
+<span id="cb1-129"><a href="#cb1-129" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Validate** if a coordinate is within bounds after transformation</span>
+<span id="cb1-130"><a href="#cb1-130" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Move** coordinates through transform chains</span>
+<span id="cb1-131"><a href="#cb1-131" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Convert** between different coordinate spaces</span>
+<span id="cb1-132"><a href="#cb1-132" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Check** if operations are valid in the current descriptor context</span>
+<span id="cb1-133"><a href="#cb1-133" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-134"><a href="#cb1-134" aria-hidden="true" tabindex="-1"></a><span class="fu">## 🔄 **move_tensor_coordinate: Descriptor-Aware Movement**</span></span>
+<span id="cb1-135"><a href="#cb1-135" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-136"><a href="#cb1-136" aria-hidden="true" tabindex="-1"></a>The most important function that requires descriptors:</span>
+<span id="cb1-137"><a href="#cb1-137" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-140"><a href="#cb1-140" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb1-141"><a href="#cb1-141" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
+<span id="cb1-142"><a href="#cb1-142" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
+<span id="cb1-143"><a href="#cb1-143" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-144"><a href="#cb1-144" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tensor_coordinate <span class="im">import</span> make_tensor_coordinate, move_tensor_coordinate</span>
+<span id="cb1-145"><a href="#cb1-145" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tensor_descriptor <span class="im">import</span> make_naive_tensor_descriptor</span>
+<span id="cb1-146"><a href="#cb1-146" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tensor_coordinate <span class="im">import</span> MultiIndex</span>
+<span id="cb1-147"><a href="#cb1-147" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-148"><a href="#cb1-148" aria-hidden="true" tabindex="-1"></a><span class="co"># First create a tensor descriptor (required!)</span></span>
+<span id="cb1-149"><a href="#cb1-149" aria-hidden="true" tabindex="-1"></a>lengths <span class="op">=</span> [<span class="dv">4</span>, <span class="dv">6</span>]  <span class="co"># 4x6 matrix</span></span>
+<span id="cb1-150"><a href="#cb1-150" aria-hidden="true" tabindex="-1"></a>strides <span class="op">=</span> [<span class="dv">6</span>, <span class="dv">1</span>]  <span class="co"># Row-major layout</span></span>
+<span id="cb1-151"><a href="#cb1-151" aria-hidden="true" tabindex="-1"></a>descriptor <span class="op">=</span> make_naive_tensor_descriptor(lengths, strides)</span>
+<span id="cb1-152"><a href="#cb1-152" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-153"><a href="#cb1-153" aria-hidden="true" tabindex="-1"></a><span class="co"># Create initial coordinate</span></span>
+<span id="cb1-154"><a href="#cb1-154" aria-hidden="true" tabindex="-1"></a>initial_idx <span class="op">=</span> MultiIndex(<span class="dv">2</span>, [<span class="dv">1</span>, <span class="dv">2</span>])  <span class="co"># Row 1, Column 2</span></span>
+<span id="cb1-155"><a href="#cb1-155" aria-hidden="true" tabindex="-1"></a>coord <span class="op">=</span> make_tensor_coordinate(descriptor, initial_idx)</span>
+<span id="cb1-156"><a href="#cb1-156" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-157"><a href="#cb1-157" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Initial coordinate: </span><span class="sc">{</span>coord<span class="sc">.</span>get_index()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-158"><a href="#cb1-158" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Initial position: </span><span class="sc">{</span>coord<span class="sc">.</span>get_index()<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-159"><a href="#cb1-159" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-160"><a href="#cb1-160" aria-hidden="true" tabindex="-1"></a><span class="co"># Move by offset - this uses descriptor for validation!</span></span>
+<span id="cb1-161"><a href="#cb1-161" aria-hidden="true" tabindex="-1"></a>offset <span class="op">=</span> MultiIndex(<span class="dv">2</span>, [<span class="dv">0</span>, <span class="dv">1</span>])  <span class="co"># Move 1 column right</span></span>
+<span id="cb1-162"><a href="#cb1-162" aria-hidden="true" tabindex="-1"></a>move_tensor_coordinate(descriptor, coord, offset)</span>
+<span id="cb1-163"><a href="#cb1-163" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-164"><a href="#cb1-164" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"After move: </span><span class="sc">{</span>coord<span class="sc">.</span>get_index()<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-165"><a href="#cb1-165" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"✅ Descriptor-validated coordinate movement"</span>)</span>
+<span id="cb1-166"><a href="#cb1-166" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb1-167"><a href="#cb1-167" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-168"><a href="#cb1-168" aria-hidden="true" tabindex="-1"></a><span class="fu">## 🔍 **Coordinate Validation with Descriptors**</span></span>
+<span id="cb1-169"><a href="#cb1-169" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-172"><a href="#cb1-172" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb1-173"><a href="#cb1-173" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
+<span id="cb1-174"><a href="#cb1-174" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
+<span id="cb1-175"><a href="#cb1-175" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-176"><a href="#cb1-176" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tensor_coordinate <span class="im">import</span> adaptor_coordinate_is_valid, coordinate_has_valid_offset</span>
+<span id="cb1-177"><a href="#cb1-177" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-178"><a href="#cb1-178" aria-hidden="true" tabindex="-1"></a><span class="co"># Test coordinate validity within descriptor bounds</span></span>
+<span id="cb1-179"><a href="#cb1-179" aria-hidden="true" tabindex="-1"></a>valid_idx <span class="op">=</span> MultiIndex(<span class="dv">2</span>, [<span class="dv">3</span>, <span class="dv">5</span>])  <span class="co"># Row 3, Column 5 (within 4x6)</span></span>
+<span id="cb1-180"><a href="#cb1-180" aria-hidden="true" tabindex="-1"></a>invalid_idx <span class="op">=</span> MultiIndex(<span class="dv">2</span>, [<span class="dv">4</span>, <span class="dv">6</span>])  <span class="co"># Row 4, Column 6 (outside 4x6)</span></span>
+<span id="cb1-181"><a href="#cb1-181" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-182"><a href="#cb1-182" aria-hidden="true" tabindex="-1"></a>valid_coord <span class="op">=</span> make_tensor_coordinate(descriptor, valid_idx)</span>
+<span id="cb1-183"><a href="#cb1-183" aria-hidden="true" tabindex="-1"></a><span class="cf">try</span>:</span>
+<span id="cb1-184"><a href="#cb1-184" aria-hidden="true" tabindex="-1"></a>    invalid_coord <span class="op">=</span> make_tensor_coordinate(descriptor, invalid_idx)</span>
+<span id="cb1-185"><a href="#cb1-185" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"Invalid coordinate created - descriptor validation needed"</span>)</span>
+<span id="cb1-186"><a href="#cb1-186" aria-hidden="true" tabindex="-1"></a><span class="cf">except</span>:</span>
+<span id="cb1-187"><a href="#cb1-187" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"Descriptor prevented invalid coordinate creation"</span>)</span>
+<span id="cb1-188"><a href="#cb1-188" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-189"><a href="#cb1-189" aria-hidden="true" tabindex="-1"></a><span class="co"># Check if a coordinate is valid</span></span>
+<span id="cb1-190"><a href="#cb1-190" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Valid coordinate check: </span><span class="sc">{</span>adaptor_coordinate_is_valid(descriptor, valid_coord)<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-191"><a href="#cb1-191" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-192"><a href="#cb1-192" aria-hidden="true" tabindex="-1"></a><span class="co"># Check if coordinate has valid offset</span></span>
+<span id="cb1-193"><a href="#cb1-193" aria-hidden="true" tabindex="-1"></a>has_valid_offset <span class="op">=</span> coordinate_has_valid_offset(descriptor, valid_coord)</span>
+<span id="cb1-194"><a href="#cb1-194" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Coordinate has valid offset: </span><span class="sc">{</span>has_valid_offset<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-195"><a href="#cb1-195" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"✅ Descriptor-based validation working"</span>)</span>
+<span id="cb1-196"><a href="#cb1-196" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb1-197"><a href="#cb1-197" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-198"><a href="#cb1-198" aria-hidden="true" tabindex="-1"></a><span class="fu">## 🎯 **Complex Transform Navigation**</span></span>
+<span id="cb1-199"><a href="#cb1-199" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-200"><a href="#cb1-200" aria-hidden="true" tabindex="-1"></a>Working with multi-transform adaptors:</span>
+<span id="cb1-201"><a href="#cb1-201" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-204"><a href="#cb1-204" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb1-205"><a href="#cb1-205" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
+<span id="cb1-206"><a href="#cb1-206" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
+<span id="cb1-207"><a href="#cb1-207" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-208"><a href="#cb1-208" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tensor_descriptor <span class="im">import</span> TensorAdaptor, EmbedTransform, PassThroughTransform</span>
+<span id="cb1-209"><a href="#cb1-209" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tensor_coordinate <span class="im">import</span> make_tensor_adaptor_coordinate</span>
+<span id="cb1-210"><a href="#cb1-210" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-211"><a href="#cb1-211" aria-hidden="true" tabindex="-1"></a><span class="co"># Create simple multi-transform adaptor using compatible transforms</span></span>
+<span id="cb1-212"><a href="#cb1-212" aria-hidden="true" tabindex="-1"></a><span class="co"># Use PassThrough transforms that preserve dimensions</span></span>
+<span id="cb1-213"><a href="#cb1-213" aria-hidden="true" tabindex="-1"></a>pass1 <span class="op">=</span> PassThroughTransform(<span class="dv">4</span>)  <span class="co"># First dimension (length 4)</span></span>
+<span id="cb1-214"><a href="#cb1-214" aria-hidden="true" tabindex="-1"></a>pass2 <span class="op">=</span> PassThroughTransform(<span class="dv">6</span>)  <span class="co"># Second dimension (length 6)</span></span>
+<span id="cb1-215"><a href="#cb1-215" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-216"><a href="#cb1-216" aria-hidden="true" tabindex="-1"></a><span class="co"># Create TensorAdaptor with multiple transforms</span></span>
+<span id="cb1-217"><a href="#cb1-217" aria-hidden="true" tabindex="-1"></a>adaptor <span class="op">=</span> TensorAdaptor(</span>
+<span id="cb1-218"><a href="#cb1-218" aria-hidden="true" tabindex="-1"></a>    transforms<span class="op">=</span>[pass1, pass2],</span>
+<span id="cb1-219"><a href="#cb1-219" aria-hidden="true" tabindex="-1"></a>    lower_dimension_hidden_idss<span class="op">=</span>[[<span class="dv">0</span>], [<span class="dv">1</span>]],     <span class="co"># pass1→dim0, pass2→dim1</span></span>
+<span id="cb1-220"><a href="#cb1-220" aria-hidden="true" tabindex="-1"></a>    upper_dimension_hidden_idss<span class="op">=</span>[[<span class="dv">2</span>], [<span class="dv">3</span>]],     <span class="co"># pass1←dim2, pass2←dim3</span></span>
+<span id="cb1-221"><a href="#cb1-221" aria-hidden="true" tabindex="-1"></a>    bottom_dimension_hidden_ids<span class="op">=</span>[<span class="dv">0</span>, <span class="dv">1</span>],         <span class="co"># Final bottom is dims 0,1</span></span>
+<span id="cb1-222"><a href="#cb1-222" aria-hidden="true" tabindex="-1"></a>    top_dimension_hidden_ids<span class="op">=</span>[<span class="dv">2</span>, <span class="dv">3</span>]             <span class="co"># Top is dims 2,3</span></span>
+<span id="cb1-223"><a href="#cb1-223" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb1-224"><a href="#cb1-224" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-225"><a href="#cb1-225" aria-hidden="true" tabindex="-1"></a><span class="co"># Create coordinate that navigates through transforms</span></span>
+<span id="cb1-226"><a href="#cb1-226" aria-hidden="true" tabindex="-1"></a>initial_idx <span class="op">=</span> MultiIndex(<span class="dv">2</span>, [<span class="dv">2</span>, <span class="dv">3</span>])  <span class="co"># Start with 4x6 coordinate</span></span>
+<span id="cb1-227"><a href="#cb1-227" aria-hidden="true" tabindex="-1"></a>adaptor_coord <span class="op">=</span> make_tensor_adaptor_coordinate(adaptor, initial_idx)</span>
+<span id="cb1-228"><a href="#cb1-228" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-229"><a href="#cb1-229" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Upper index (4x6): </span><span class="sc">{</span>adaptor_coord<span class="sc">.</span>get_top_index()<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-230"><a href="#cb1-230" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Lower index (preserved): </span><span class="sc">{</span>adaptor_coord<span class="sc">.</span>get_bottom_index()<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-231"><a href="#cb1-231" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-232"><a href="#cb1-232" aria-hidden="true" tabindex="-1"></a><span class="co"># Move through the transform chain  </span></span>
+<span id="cb1-233"><a href="#cb1-233" aria-hidden="true" tabindex="-1"></a>offset <span class="op">=</span> MultiIndex(<span class="dv">2</span>, [<span class="dv">0</span>, <span class="dv">1</span>])</span>
+<span id="cb1-234"><a href="#cb1-234" aria-hidden="true" tabindex="-1"></a>move_tensor_coordinate(adaptor, adaptor_coord, offset)</span>
+<span id="cb1-235"><a href="#cb1-235" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"After move - Upper: </span><span class="sc">{</span>adaptor_coord<span class="sc">.</span>get_top_index()<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-236"><a href="#cb1-236" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"After move - Lower: </span><span class="sc">{</span>adaptor_coord<span class="sc">.</span>get_bottom_index()<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-237"><a href="#cb1-237" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"✅ Multi-transform coordinate navigation"</span>)</span>
+<span id="cb1-238"><a href="#cb1-238" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb1-239"><a href="#cb1-239" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-240"><a href="#cb1-240" aria-hidden="true" tabindex="-1"></a><span class="fu">## 🧮 **Linear Offset Calculations**</span></span>
+<span id="cb1-241"><a href="#cb1-241" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-242"><a href="#cb1-242" aria-hidden="true" tabindex="-1"></a>Understanding how descriptors convert to linear memory offsets:</span>
+<span id="cb1-243"><a href="#cb1-243" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-246"><a href="#cb1-246" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb1-247"><a href="#cb1-247" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
+<span id="cb1-248"><a href="#cb1-248" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
+<span id="cb1-249"><a href="#cb1-249" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-250"><a href="#cb1-250" aria-hidden="true" tabindex="-1"></a><span class="co"># Create coordinate with linear offset tracking</span></span>
+<span id="cb1-251"><a href="#cb1-251" aria-hidden="true" tabindex="-1"></a>coord <span class="op">=</span> make_tensor_coordinate(descriptor, MultiIndex(<span class="dv">2</span>, [<span class="dv">1</span>, <span class="dv">3</span>]))</span>
+<span id="cb1-252"><a href="#cb1-252" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-253"><a href="#cb1-253" aria-hidden="true" tabindex="-1"></a><span class="co"># Get the linear memory offset</span></span>
+<span id="cb1-254"><a href="#cb1-254" aria-hidden="true" tabindex="-1"></a>linear_offset <span class="op">=</span> coord.get_offset()</span>
+<span id="cb1-255"><a href="#cb1-255" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"2D coordinate [1, 3] → linear offset: </span><span class="sc">{</span>linear_offset<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-256"><a href="#cb1-256" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-257"><a href="#cb1-257" aria-hidden="true" tabindex="-1"></a><span class="co"># Verify with manual calculation</span></span>
+<span id="cb1-258"><a href="#cb1-258" aria-hidden="true" tabindex="-1"></a>manual_offset <span class="op">=</span> <span class="dv">1</span> <span class="op">*</span> <span class="dv">6</span> <span class="op">+</span> <span class="dv">3</span> <span class="op">*</span> <span class="dv">1</span>  <span class="co"># row*stride + col*stride</span></span>
+<span id="cb1-259"><a href="#cb1-259" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Manual calculation: 1*6 + 3*1 = </span><span class="sc">{</span>manual_offset<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-260"><a href="#cb1-260" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Matches: </span><span class="sc">{</span>linear_offset <span class="op">==</span> manual_offset<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-261"><a href="#cb1-261" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"✅ Linear offset calculation verified"</span>)</span>
+<span id="cb1-262"><a href="#cb1-262" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb1-263"><a href="#cb1-263" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-264"><a href="#cb1-264" aria-hidden="true" tabindex="-1"></a><span class="fu">## 🔗 **Integration with Tensor Views**</span></span>
+<span id="cb1-265"><a href="#cb1-265" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-266"><a href="#cb1-266" aria-hidden="true" tabindex="-1"></a>How advanced coordinates work with tensor views:</span>
+<span id="cb1-267"><a href="#cb1-267" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-270"><a href="#cb1-270" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb1-271"><a href="#cb1-271" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
+<span id="cb1-272"><a href="#cb1-272" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
+<span id="cb1-273"><a href="#cb1-273" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-274"><a href="#cb1-274" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb1-275"><a href="#cb1-275" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tensor_view <span class="im">import</span> make_naive_tensor_view</span>
+<span id="cb1-276"><a href="#cb1-276" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-277"><a href="#cb1-277" aria-hidden="true" tabindex="-1"></a><span class="co"># Create tensor data and view</span></span>
+<span id="cb1-278"><a href="#cb1-278" aria-hidden="true" tabindex="-1"></a>data <span class="op">=</span> np.arange(<span class="dv">24</span>, dtype<span class="op">=</span>np.float32).reshape(<span class="dv">4</span>, <span class="dv">6</span>)</span>
+<span id="cb1-279"><a href="#cb1-279" aria-hidden="true" tabindex="-1"></a>tensor_view <span class="op">=</span> make_naive_tensor_view(data, [<span class="dv">4</span>, <span class="dv">6</span>], [<span class="dv">6</span>, <span class="dv">1</span>])</span>
+<span id="cb1-280"><a href="#cb1-280" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-281"><a href="#cb1-281" aria-hidden="true" tabindex="-1"></a><span class="co"># Use advanced coordinate to access tensor</span></span>
+<span id="cb1-282"><a href="#cb1-282" aria-hidden="true" tabindex="-1"></a>coord <span class="op">=</span> make_tensor_coordinate(tensor_view.get_tensor_descriptor(), MultiIndex(<span class="dv">2</span>, [<span class="dv">2</span>, <span class="dv">4</span>]))</span>
+<span id="cb1-283"><a href="#cb1-283" aria-hidden="true" tabindex="-1"></a>linear_idx <span class="op">=</span> coord.get_offset()</span>
+<span id="cb1-284"><a href="#cb1-284" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-285"><a href="#cb1-285" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Coordinate [2, 4] → linear index </span><span class="sc">{</span>linear_idx<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-286"><a href="#cb1-286" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Tensor value at [2, 4]: </span><span class="sc">{</span>data[<span class="dv">2</span>, <span class="dv">4</span>]<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-287"><a href="#cb1-287" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Linear access value: </span><span class="sc">{</span>data<span class="sc">.</span>flat[linear_idx]<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-288"><a href="#cb1-288" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"✅ Coordinate-tensor integration working"</span>)</span>
+<span id="cb1-289"><a href="#cb1-289" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb1-290"><a href="#cb1-290" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-291"><a href="#cb1-291" aria-hidden="true" tabindex="-1"></a><span class="fu">## 🎮 **Interactive Coordinate Debugging**</span></span>
+<span id="cb1-292"><a href="#cb1-292" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-293"><a href="#cb1-293" aria-hidden="true" tabindex="-1"></a>Advanced debugging techniques:</span>
+<span id="cb1-294"><a href="#cb1-294" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-297"><a href="#cb1-297" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb1-298"><a href="#cb1-298" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
+<span id="cb1-299"><a href="#cb1-299" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
+<span id="cb1-300"><a href="#cb1-300" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-301"><a href="#cb1-301" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> debug_coordinate_movement(descriptor, start_pos, moves):</span>
+<span id="cb1-302"><a href="#cb1-302" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Debug coordinate movement through multiple steps"""</span></span>
+<span id="cb1-303"><a href="#cb1-303" aria-hidden="true" tabindex="-1"></a>    coord <span class="op">=</span> make_tensor_coordinate(descriptor, MultiIndex(<span class="dv">2</span>, start_pos))</span>
+<span id="cb1-304"><a href="#cb1-304" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"Starting at: </span><span class="sc">{</span>coord<span class="sc">.</span>get_index()<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-305"><a href="#cb1-305" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb1-306"><a href="#cb1-306" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i, move <span class="kw">in</span> <span class="bu">enumerate</span>(moves):</span>
+<span id="cb1-307"><a href="#cb1-307" aria-hidden="true" tabindex="-1"></a>        <span class="cf">try</span>:</span>
+<span id="cb1-308"><a href="#cb1-308" aria-hidden="true" tabindex="-1"></a>            offset <span class="op">=</span> MultiIndex(<span class="dv">2</span>, move)</span>
+<span id="cb1-309"><a href="#cb1-309" aria-hidden="true" tabindex="-1"></a>            move_tensor_coordinate(descriptor, coord, offset)</span>
+<span id="cb1-310"><a href="#cb1-310" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>(<span class="ss">f"Move </span><span class="sc">{</span>i<span class="op">+</span><span class="dv">1</span><span class="sc">}</span><span class="ss"> by </span><span class="sc">{</span>move<span class="sc">}</span><span class="ss">: → </span><span class="sc">{</span>coord<span class="sc">.</span>get_index()<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-311"><a href="#cb1-311" aria-hidden="true" tabindex="-1"></a>        <span class="cf">except</span> <span class="pp">Exception</span> <span class="im">as</span> e:</span>
+<span id="cb1-312"><a href="#cb1-312" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>(<span class="ss">f"Move </span><span class="sc">{</span>i<span class="op">+</span><span class="dv">1</span><span class="sc">}</span><span class="ss"> by </span><span class="sc">{</span>move<span class="sc">}</span><span class="ss">: FAILED (</span><span class="sc">{</span>e<span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="cb1-313"><a href="#cb1-313" aria-hidden="true" tabindex="-1"></a>            <span class="cf">break</span></span>
+<span id="cb1-314"><a href="#cb1-314" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb1-315"><a href="#cb1-315" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> coord</span>
+<span id="cb1-316"><a href="#cb1-316" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-317"><a href="#cb1-317" aria-hidden="true" tabindex="-1"></a><span class="co"># Test coordinate movement sequence</span></span>
+<span id="cb1-318"><a href="#cb1-318" aria-hidden="true" tabindex="-1"></a>moves <span class="op">=</span> [[<span class="dv">0</span>, <span class="dv">1</span>], [<span class="dv">1</span>, <span class="dv">0</span>], [<span class="dv">0</span>, <span class="op">-</span><span class="dv">1</span>], [<span class="op">-</span><span class="dv">1</span>, <span class="dv">0</span>]]  <span class="co"># Right, Down, Left, Up</span></span>
+<span id="cb1-319"><a href="#cb1-319" aria-hidden="true" tabindex="-1"></a>final_coord <span class="op">=</span> debug_coordinate_movement(descriptor, [<span class="dv">1</span>, <span class="dv">1</span>], moves)</span>
+<span id="cb1-320"><a href="#cb1-320" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"✅ Coordinate movement debugging complete"</span>)</span>
+<span id="cb1-321"><a href="#cb1-321" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb1-322"><a href="#cb1-322" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-323"><a href="#cb1-323" aria-hidden="true" tabindex="-1"></a><span class="fu">## 🔍 **Why These Operations Matter**</span></span>
+<span id="cb1-324"><a href="#cb1-324" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-325"><a href="#cb1-325" aria-hidden="true" tabindex="-1"></a>These advanced coordinate operations are essential for:</span>
+<span id="cb1-326"><a href="#cb1-326" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-327"><a href="#cb1-327" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>**Tile Windows** - Moving through tensor regions requires descriptor-aware navigation</span>
+<span id="cb1-328"><a href="#cb1-328" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>**Sweep Operations** - Iterating over distributed data needs validated coordinate movement  </span>
+<span id="cb1-329"><a href="#cb1-329" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>**Tensor Views** - Accessing tensor elements through complex layouts</span>
+<span id="cb1-330"><a href="#cb1-330" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>**Distribution Systems** - Converting between thread coordinates and tensor coordinates</span>
+<span id="cb1-331"><a href="#cb1-331" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-332"><a href="#cb1-332" aria-hidden="true" tabindex="-1"></a><span class="fu">## 🎯 **Interactive Applications**</span></span>
+<span id="cb1-333"><a href="#cb1-333" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-334"><a href="#cb1-334" aria-hidden="true" tabindex="-1"></a>Test these concepts in our apps:</span>
+<span id="cb1-335"><a href="#cb1-335" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Tensor Transform App](../../tensor_transform_app.py)** - Visualize coordinate transformations</span>
+<span id="cb1-336"><a href="#cb1-336" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Main App](../../app.py)** - See coordinates in action with distributions</span>
+<span id="cb1-337"><a href="#cb1-337" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-338"><a href="#cb1-338" aria-hidden="true" tabindex="-1"></a><span class="fu">## ✅ **Next Steps**</span></span>
+<span id="cb1-339"><a href="#cb1-339" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-340"><a href="#cb1-340" aria-hidden="true" tabindex="-1"></a>Now you can understand:</span>
+<span id="cb1-341"><a href="#cb1-341" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">**Tile Distribution**</span><span class="co">](tile-distribution.qmd)</span> - How coordinates map to parallel processing</span>
+<span id="cb1-342"><a href="#cb1-342" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">**Advanced Operations**</span><span class="co">](tile-window.qmd)</span> - Complex coordinate-based operations</span>
+<span id="cb1-343"><a href="#cb1-343" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-344"><a href="#cb1-344" aria-hidden="true" tabindex="-1"></a><span class="fu">## Coordinate Movement</span></span>
+<span id="cb1-345"><a href="#cb1-345" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-346"><a href="#cb1-346" aria-hidden="true" tabindex="-1"></a>Coordinate movement is essential for iterating through tensor spaces, especially when transformations are involved. Movement requires knowledge of the descriptor or adaptor, since the transformation chain determines how steps in the top space map to changes in the hidden and bottom spaces.</span>
+<span id="cb1-347"><a href="#cb1-347" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-348"><a href="#cb1-348" aria-hidden="true" tabindex="-1"></a>**Example:**</span>
+<span id="cb1-349"><a href="#cb1-349" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-352"><a href="#cb1-352" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb1-353"><a href="#cb1-353" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
+<span id="cb1-354"><a href="#cb1-354" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
+<span id="cb1-355"><a href="#cb1-355" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-356"><a href="#cb1-356" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tensor_coordinate <span class="im">import</span> move_tensor_coordinate, make_tensor_coordinate, MultiIndex</span>
+<span id="cb1-357"><a href="#cb1-357" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tensor_descriptor <span class="im">import</span> make_naive_tensor_descriptor</span>
+<span id="cb1-358"><a href="#cb1-358" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-359"><a href="#cb1-359" aria-hidden="true" tabindex="-1"></a><span class="co"># Create a tensor descriptor (row-major 4x6)</span></span>
+<span id="cb1-360"><a href="#cb1-360" aria-hidden="true" tabindex="-1"></a>descriptor <span class="op">=</span> make_naive_tensor_descriptor([<span class="dv">4</span>, <span class="dv">6</span>], [<span class="dv">6</span>, <span class="dv">1</span>])</span>
+<span id="cb1-361"><a href="#cb1-361" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-362"><a href="#cb1-362" aria-hidden="true" tabindex="-1"></a><span class="co"># Create initial coordinate at [1, 2]</span></span>
+<span id="cb1-363"><a href="#cb1-363" aria-hidden="true" tabindex="-1"></a>coord <span class="op">=</span> make_tensor_coordinate(descriptor, MultiIndex(<span class="dv">2</span>, [<span class="dv">1</span>, <span class="dv">2</span>]))</span>
+<span id="cb1-364"><a href="#cb1-364" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Initial coordinate: </span><span class="sc">{</span>coord<span class="sc">.</span>get_index()<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-365"><a href="#cb1-365" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-366"><a href="#cb1-366" aria-hidden="true" tabindex="-1"></a><span class="co"># Move by [0, 1] (right by one column)</span></span>
+<span id="cb1-367"><a href="#cb1-367" aria-hidden="true" tabindex="-1"></a>step <span class="op">=</span> MultiIndex(<span class="dv">2</span>, [<span class="dv">0</span>, <span class="dv">1</span>])</span>
+<span id="cb1-368"><a href="#cb1-368" aria-hidden="true" tabindex="-1"></a>move_tensor_coordinate(descriptor, coord, step)</span>
+<span id="cb1-369"><a href="#cb1-369" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"After move: </span><span class="sc">{</span>coord<span class="sc">.</span>get_index()<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-370"><a href="#cb1-370" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb1-371"><a href="#cb1-371" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-372"><a href="#cb1-372" aria-hidden="true" tabindex="-1"></a><span class="at">&gt; **Note:** Movement is only meaningful after you understand how descriptors and adaptors define the mapping between top, hidden, and bottom spaces.</span></span>
+<span id="cb1-373"><a href="#cb1-373" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-374"><a href="#cb1-374" aria-hidden="true" tabindex="-1"></a>---</span>
+<span id="cb1-375"><a href="#cb1-375" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-376"><a href="#cb1-376" aria-hidden="true" tabindex="-1"></a>*These operations bridge the gap between mathematical transforms and practical tensor manipulation!* </span>
+</code><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></pre></div>
+</div></div></div></div></div>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

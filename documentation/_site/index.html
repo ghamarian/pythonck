@@ -356,22 +356,34 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
         <li class="sidebar-item sidebar-item-section">
       <div class="sidebar-item-container"> 
             <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true">
- <span class="menu-text">Core Concepts</span></a>
+ <span class="menu-text">Foundation</span></a>
           <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true" aria-label="Toggle section">
             <i class="bi bi-chevron-right ms-2"></i>
           </a> 
       </div>
       <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
- <span class="menu-text">concepts/tensor-adaptor.qmd</span>
-  </li>
-          <li class="sidebar-item">
- <span class="menu-text">concepts/tensor-descriptor.qmd</span>
-  </li>
-          <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="./concepts/buffer-view.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Buffer Views</span></a>
+ <span class="menu-text">Buffer View</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./concepts/tensor-transforms.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Tensor Transforms: The Building Blocks</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./concepts/tensor-adaptor.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">TensorAdaptor: The Transformation Engine</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./concepts/tensor-descriptor.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">TensorDescriptor: The Complete Layout Description</span></a>
   </div>
 </li>
           <li class="sidebar-item">
@@ -381,68 +393,102 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   </div>
 </li>
           <li class="sidebar-item">
- <span class="menu-text">concepts/tensor-view.qmd</span>
-  </li>
+  <div class="sidebar-item-container"> 
+  <a href="./concepts/tensor-adaptor-coordinate.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Tensor Adaptor Coordinate: The Result Container</span></a>
+  </div>
+</li>
       </ul>
   </li>
         <li class="sidebar-item sidebar-item-section">
       <div class="sidebar-item-container"> 
             <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true">
- <span class="menu-text">Tile Operations</span></a>
+ <span class="menu-text">Advanced Indexing</span></a>
           <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true" aria-label="Toggle section">
             <i class="bi bi-chevron-right ms-2"></i>
           </a> 
       </div>
       <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
- <span class="menu-text">concepts/tile-distribution.qmd</span>
-  </li>
+  <div class="sidebar-item-container"> 
+  <a href="./concepts/tensor-coordinate-advanced.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Advanced Coordinate Operations</span></a>
+  </div>
+</li>
           <li class="sidebar-item">
- <span class="menu-text">concepts/tile-distribution-encoding.qmd</span>
-  </li>
-          <li class="sidebar-item">
- <span class="menu-text">concepts/tile-window.qmd</span>
-  </li>
-          <li class="sidebar-item">
- <span class="menu-text">concepts/tile-window-linear.qmd</span>
-  </li>
-          <li class="sidebar-item">
- <span class="menu-text">concepts/shuffle-tile.qmd</span>
-  </li>
-          <li class="sidebar-item">
- <span class="menu-text">concepts/sweep-tile.qmd</span>
+ <span class="menu-text">concepts/tensor-view.qmd</span>
   </li>
       </ul>
   </li>
         <li class="sidebar-item sidebar-item-section">
       <div class="sidebar-item-container"> 
             <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true">
- <span class="menu-text">Advanced Topics</span></a>
+ <span class="menu-text">Distribution</span></a>
           <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true" aria-label="Toggle section">
             <i class="bi bi-chevron-right ms-2"></i>
           </a> 
       </div>
       <ul id="quarto-sidebar-section-4" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
+ <span class="menu-text">concepts/tile-distribution-encoding.qmd</span>
+  </li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./concepts/tile-distribution.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Tile Distribution Deep Dive</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
  <span class="menu-text">concepts/static-distributed-tensor.qmd</span>
-  </li>
-          <li class="sidebar-item">
- <span class="menu-text">concepts/space-filling-curve.qmd</span>
-  </li>
-          <li class="sidebar-item">
- <span class="menu-text">concepts/static-encoding-pattern.qmd</span>
   </li>
       </ul>
   </li>
         <li class="sidebar-item sidebar-item-section">
       <div class="sidebar-item-container"> 
             <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true">
- <span class="menu-text">API Reference</span></a>
+ <span class="menu-text">Advanced Operations</span></a>
           <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true" aria-label="Toggle section">
             <i class="bi bi-chevron-right ms-2"></i>
           </a> 
       </div>
       <ul id="quarto-sidebar-section-5" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+ <span class="menu-text">concepts/tile-window.qmd</span>
+  </li>
+          <li class="sidebar-item">
+ <span class="menu-text">concepts/sweep-tile.qmd</span>
+  </li>
+          <li class="sidebar-item">
+ <span class="menu-text">concepts/thread-mapping.qmd</span>
+  </li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-6" role="navigation" aria-expanded="true">
+ <span class="menu-text">Reference</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-6" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-6" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./concepts/learning-path.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">PythonCK Learning Path</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-7" role="navigation" aria-expanded="true">
+ <span class="menu-text">API Reference</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-7" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-7" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="./api/index.html" class="sidebar-item-text sidebar-link">
@@ -461,18 +507,23 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#welcome-to-pythonck" id="toc-welcome-to-pythonck" class="nav-link active" data-scroll-target="#welcome-to-pythonck">Welcome to PythonCK</a>
+  <li><a href="#pythonck-python-implementation-of-composable-kernels" id="toc-pythonck-python-implementation-of-composable-kernels" class="nav-link active" data-scroll-target="#pythonck-python-implementation-of-composable-kernels">PythonCK: Python Implementation of Composable Kernels</a>
   <ul class="collapse">
-  <li><a href="#what-is-composable-kernels" id="toc-what-is-composable-kernels" class="nav-link" data-scroll-target="#what-is-composable-kernels">What is Composable Kernels?</a></li>
-  <li><a href="#quick-example" id="toc-quick-example" class="nav-link" data-scroll-target="#quick-example">Quick Example</a></li>
-  <li><a href="#key-concepts" id="toc-key-concepts" class="nav-link" data-scroll-target="#key-concepts">Key Concepts</a>
+  <li><a href="#recommended-learning-path" id="toc-recommended-learning-path" class="nav-link" data-scroll-target="#recommended-learning-path">🎓 <strong>Recommended Learning Path</strong></a>
   <ul class="collapse">
-  <li><a href="#core-tensor-abstractions" id="toc-core-tensor-abstractions" class="nav-link" data-scroll-target="#core-tensor-abstractions">Core Tensor Abstractions</a></li>
-  <li><a href="#tile-operations" id="toc-tile-operations" class="nav-link" data-scroll-target="#tile-operations">Tile Operations</a></li>
-  <li><a href="#advanced-features" id="toc-advanced-features" class="nav-link" data-scroll-target="#advanced-features">Advanced Features</a></li>
+  <li><a href="#complete-learning-path" id="toc-complete-learning-path" class="nav-link" data-scroll-target="#complete-learning-path"><strong>📚 Complete Learning Path</strong></a></li>
   </ul></li>
-  <li><a href="#getting-started" id="toc-getting-started" class="nav-link" data-scroll-target="#getting-started">Getting Started</a></li>
-  <li><a href="#features-of-this-documentation" id="toc-features-of-this-documentation" class="nav-link" data-scroll-target="#features-of-this-documentation">Features of This Documentation</a></li>
+  <li><a href="#learning-by-topic" id="toc-learning-by-topic" class="nav-link" data-scroll-target="#learning-by-topic">📖 <strong>Learning by Topic</strong></a>
+  <ul class="collapse">
+  <li><a href="#foundation-concepts" id="toc-foundation-concepts" class="nav-link" data-scroll-target="#foundation-concepts">1. <strong>Foundation Concepts</strong></a></li>
+  <li><a href="#distribution-concepts" id="toc-distribution-concepts" class="nav-link" data-scroll-target="#distribution-concepts">2. <strong>Distribution Concepts</strong></a></li>
+  <li><a href="#advanced-operations" id="toc-advanced-operations" class="nav-link" data-scroll-target="#advanced-operations">3. <strong>Advanced Operations</strong></a></li>
+  </ul></li>
+  <li><a href="#package-structure" id="toc-package-structure" class="nav-link" data-scroll-target="#package-structure">📦 <strong>Package Structure</strong></a></li>
+  <li><a href="#key-concepts" id="toc-key-concepts" class="nav-link" data-scroll-target="#key-concepts">🔑 <strong>Key Concepts</strong></a></li>
+  <li><a href="#quick-start" id="toc-quick-start" class="nav-link" data-scroll-target="#quick-start">🚀 <strong>Quick Start</strong></a></li>
+  <li><a href="#learning-paths" id="toc-learning-paths" class="nav-link" data-scroll-target="#learning-paths">🎯 <strong>Learning Paths</strong></a></li>
+  <li><a href="#interactive-features" id="toc-interactive-features" class="nav-link" data-scroll-target="#interactive-features">✨ <strong>Interactive Features</strong></a></li>
   </ul></li>
   </ul>
 </nav>
@@ -500,78 +551,112 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </header>
 
 
-<section id="welcome-to-pythonck" class="level1">
-<h1>Welcome to PythonCK</h1>
-<p>PythonCK is a Python implementation of Composable Kernels tensor operations, providing a high-level interface for understanding and experimenting with GPU tensor computations.</p>
-<section id="what-is-composable-kernels" class="level2">
-<h2 class="anchored" data-anchor-id="what-is-composable-kernels">What is Composable Kernels?</h2>
-<p>Composable Kernels (CK) is a performance portable programming model for writing high performance GPU kernels for machine learning workloads across multiple architectures including GCDCore, CDNA, RDNA architectures, and various other GPU architectures.</p>
-<p>This Python implementation allows you to:</p>
-<ul>
-<li><strong>Understand</strong> the core concepts behind tensor operations</li>
-<li><strong>Experiment</strong> with tensor transformations interactively</li>
-<li><strong>Visualize</strong> how data flows through different tensor operations</li>
-<li><strong>Learn</strong> GPU kernel design patterns</li>
-</ul>
-</section>
-<section id="quick-example" class="level2">
-<h2 class="anchored" data-anchor-id="quick-example">Quick Example</h2>
 <div>
 <div id="pyodide-1" class="exercise-cell">
 
 </div>
 <script type="pyodide-1-contents">
-eyJhdHRyIjp7ImF1dG9ydW4iOnRydWUsImVjaG8iOmZhbHNlLCJlZGl0IjpmYWxzZSwiZXZhbCI6dHJ1ZSwib3V0cHV0IjpmYWxzZX0sImNvZGUiOiIjIEhpZGRlbiBzZXR1cCAtIGF1dG9tYXRpY2FsbHkgaW5zdGFsbCB0aGUgcGFja2FnZVxuaW1wb3J0IG1pY3JvcGlwXG5pbXBvcnQganNcblxudHJ5OlxuICAgICMgVXNlIGN1cnJlbnQgZG9tYWluICsgcm9vdCBwYXRoICh3b3JrcyB3aXRoIGFueSB3ZWIgc2VydmVyKVxuICAgIGJhc2VfdXJsID0gc3RyKGpzLndpbmRvdy5sb2NhdGlvbi5vcmlnaW4pXG4gICAgd2hlZWxfdXJsID0gZlwie2Jhc2VfdXJsfS9weXRob25jay0wLjEuMC1weTMtbm9uZS1hbnkud2hsXCJcbiAgICBhd2FpdCBtaWNyb3BpcC5pbnN0YWxsKHdoZWVsX3VybClcbmV4Y2VwdDpcbiAgICBwYXNzICAjIFBhY2thZ2UgbWF5IGFscmVhZHkgYmUgaW5zdGFsbGVkIG9yIGF2YWlsYWJsZSJ9
+eyJhdHRyIjp7ImF1dG9ydW4iOnRydWUsImVjaG8iOmZhbHNlLCJlZGl0IjpmYWxzZSwiZXZhbCI6dHJ1ZSwib3V0cHV0IjpmYWxzZX0sImNvZGUiOiJcbiMgQXV0by1pbnN0YWxsIHB5dGhvbmNrIHBhY2thZ2VcbmltcG9ydCBtaWNyb3BpcFxuYXdhaXQgbWljcm9waXAuaW5zdGFsbChcImh0dHBzOi8vcmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbS9naGFtYXJpYW4vcHl0aG9uY2svbWFzdGVyL2RvY3VtZW50YXRpb24vcHl0aG9uY2stMC4xLjAtcHkzLW5vbmUtYW55LndobFwiKSJ9
 </script>
 </div>
-<p>Let’s start with a simple tensor coordinate example:</p>
+<section id="pythonck-python-implementation-of-composable-kernels" class="level1">
+<h1>PythonCK: Python Implementation of Composable Kernels</h1>
+<p>Welcome to PythonCK, a Python implementation of tensor operations and concepts from the AMD Composable Kernels library. This package provides educational implementations that focus on clarity and understanding rather than performance.</p>
+<section id="recommended-learning-path" class="level2">
+<h2 class="anchored" data-anchor-id="recommended-learning-path">🎓 <strong>Recommended Learning Path</strong></h2>
+<p><strong>New to PythonCK?</strong> Follow our structured learning path to understand all concepts:</p>
+<section id="complete-learning-path" class="level3">
+<h3 class="anchored" data-anchor-id="complete-learning-path"><strong><a href="./concepts/learning-path.html">📚 Complete Learning Path</a></strong></h3>
+<p>A step-by-step guide that builds from basic concepts to advanced GPU thread coordination, culminating in understanding the complete <code>tile_distr_thread_mapping.py</code> example.</p>
+</section>
+</section>
+<section id="learning-by-topic" class="level2">
+<h2 class="anchored" data-anchor-id="learning-by-topic">📖 <strong>Learning by Topic</strong></h2>
+<section id="foundation-concepts" class="level3">
+<h3 class="anchored" data-anchor-id="foundation-concepts">1. <strong>Foundation Concepts</strong></h3>
+<ul>
+<li><a href="./concepts/buffer-view.html">Buffer Views</a> - Memory buffer abstraction</li>
+<li><a href="./concepts/tensor-coordinate.html">Tensor Coordinates</a> - Multi-dimensional indexing</li>
+<li><a href="./concepts/tensor-descriptor.html">Tensor Descriptors</a> - Layout transformations</li>
+<li><a href="concepts/tensor-view.qmd">Tensor Views</a> - Unified tensor access</li>
+</ul>
+</section>
+<section id="distribution-concepts" class="level3">
+<h3 class="anchored" data-anchor-id="distribution-concepts">2. <strong>Distribution Concepts</strong></h3>
+<ul>
+<li><a href="concepts/tile-distribution-encoding.qmd">Tile Distribution Encoding</a> - How data is distributed</li>
+<li><a href="./concepts/tile-distribution.html">Tile Distribution</a> - Parallel processing coordination</li>
+<li><a href="concepts/static-distributed-tensor.qmd">Static Distributed Tensors</a> - Thread-local data</li>
+</ul>
+</section>
+<section id="advanced-operations" class="level3">
+<h3 class="anchored" data-anchor-id="advanced-operations">3. <strong>Advanced Operations</strong></h3>
+<ul>
+<li><a href="concepts/tile-window.qmd">Tile Windows</a> - Windowed tensor access</li>
+<li><a href="concepts/sweep-tile.qmd">Sweep Operations</a> - Iterating over distributed data</li>
+<li><a href="concepts/thread-mapping.qmd">Thread Mapping</a> - Understanding the complete pipeline</li>
+</ul>
+</section>
+</section>
+<section id="package-structure" class="level2">
+<h2 class="anchored" data-anchor-id="package-structure">📦 <strong>Package Structure</strong></h2>
+<pre><code>pytensor/                    # Core tensor operations
+├── buffer_view.py          # Memory abstraction
+├── tensor_coordinate.py    # Multi-dimensional indexing
+├── tensor_descriptor.py    # Layout transformations  
+├── tensor_view.py          # Unified access interface
+├── tile_distribution.py    # Data distribution
+├── tile_window.py          # Windowed access
+├── sweep_tile.py           # Coordinated iteration
+└── ...
+
+tensor_transforms/          # Analysis tools
+├── parser.py              # Descriptor parsing
+├── analyzer.py            # Transformation analysis
+└── ...
+
+tile_distribution/          # Visualization tools
+├── parser.py              # C++ encoding parsing
+├── visualizer.py          # Interactive visualization
+└── ...</code></pre>
+</section>
+<section id="key-concepts" class="level2">
+<h2 class="anchored" data-anchor-id="key-concepts">🔑 <strong>Key Concepts</strong></h2>
+<p><strong>PythonCK</strong> implements several interconnected concepts:</p>
+<ol type="1">
+<li><strong>Tensors</strong> are multi-dimensional arrays with flexible layouts</li>
+<li><strong>Coordinates</strong> provide multi-dimensional indexing with transformations</li>
+<li><strong>Distributions</strong> define how data is spread across parallel processing elements</li>
+<li><strong>Tiles</strong> represent chunks of data processed by individual threads/warps</li>
+<li><strong>Sweeps</strong> iterate over distributed data in a coordinated manner</li>
+</ol>
+<p>The ultimate goal is understanding how GPU threads coordinate to process large tensors efficiently, as demonstrated in the complete example at <code>tile_distr_thread_mapping.py</code>.</p>
+</section>
+<section id="quick-start" class="level2">
+<h2 class="anchored" data-anchor-id="quick-start">🚀 <strong>Quick Start</strong></h2>
+<p>Jump right in with interactive examples:</p>
 <div>
 <div id="pyodide-2" class="exercise-cell">
 
 </div>
 <script type="pyodide-2-contents">
-eyJhdHRyIjp7ImF1dG9ydW4iOnRydWUsImVkaXQiOnRydWUsImV2YWwiOnRydWV9LCJjb2RlIjoiZnJvbSBweXRlbnNvci50ZW5zb3JfY29vcmRpbmF0ZSBpbXBvcnQgVGVuc29yQ29vcmRpbmF0ZSwgTXVsdGlJbmRleFxuXG4jIENyZWF0ZSBhIDJEIHRlbnNvciBjb29yZGluYXRlXG5jb29yZCA9IFRlbnNvckNvb3JkaW5hdGUoXG4gICAgbmRpbV9oaWRkZW49MyxcbiAgICB0b3BfZGltZW5zaW9uX2hpZGRlbl9pZHM9WzEsIDJdLFxuICAgIGlkeF9oaWRkZW49TXVsdGlJbmRleCgzLCBbMCwgMiwgM10pXG4pXG5wcmludChmXCJUZW5zb3IgY29vcmRpbmF0ZToge2Nvb3JkfVwiKVxucHJpbnQoZlwiVGVuc29yIGluZGV4OiB7Y29vcmQuZ2V0X2luZGV4KCkudG9fbGlzdCgpfVwiKSJ9
+eyJhdHRyIjp7ImF1dG9ydW4iOmZhbHNlLCJlY2hvIjp0cnVlLCJlZGl0Ijp0cnVlLCJldmFsIjp0cnVlLCJvdXRwdXQiOnRydWV9LCJjb2RlIjoiXG4jIFB5dGhvbkNLIGlzIG5vdyBhdmFpbGFibGUgLSBsZXQncyBleHBsb3JlIVxuaW1wb3J0IHB5dGVuc29yXG5mcm9tIHB5dGVuc29yLnRlbnNvcl9jb29yZGluYXRlIGltcG9ydCBNdWx0aUluZGV4LCBUZW5zb3JDb29yZGluYXRlXG5cbiMgQ3JlYXRlIGEgc2ltcGxlIG11bHRpLWRpbWVuc2lvbmFsIGluZGV4XG5tdWx0aV9pZHggPSBNdWx0aUluZGV4KDMsIFsyLCAxLCAwXSlcbnByaW50KGZcIjNEIGluZGV4OiB7bXVsdGlfaWR4fVwiKVxuXG4jIENyZWF0ZSBhIHRlbnNvciBjb29yZGluYXRlXG5jb29yZCA9IFRlbnNvckNvb3JkaW5hdGUobXVsdGlfaWR4KVxucHJpbnQoZlwiVGVuc29yIGNvb3JkaW5hdGU6IHtjb29yZH1cIilcblxucHJpbnQoXCLinIUgUHl0aG9uQ0sgaXMgcmVhZHkgZm9yIGV4cGxvcmF0aW9uIVwiKSJ9
 </script>
 </div>
 </section>
-<section id="key-concepts" class="level2">
-<h2 class="anchored" data-anchor-id="key-concepts">Key Concepts</h2>
-<section id="core-tensor-abstractions" class="level3">
-<h3 class="anchored" data-anchor-id="core-tensor-abstractions">Core Tensor Abstractions</h3>
+<section id="learning-paths" class="level2">
+<h2 class="anchored" data-anchor-id="learning-paths">🎯 <strong>Learning Paths</strong></h2>
+<p>Choose your learning approach:</p>
 <ul>
-<li><strong><a href="concepts/tensor-adaptor.qmd">Tensor Adaptor</a></strong> - The foundation for tensor transformations</li>
-<li><strong><a href="concepts/tensor-descriptor.qmd">Tensor Descriptor</a></strong> - Describes tensor layout and properties</li>
-<li><strong><a href="./concepts/buffer-view.html">Buffer View</a></strong> - Low-level memory access patterns</li>
-<li><strong><a href="./concepts/tensor-coordinate.html">Tensor Coordinate</a></strong> - Multi-dimensional indexing</li>
+<li><strong>🎓 <a href="./concepts/learning-path.html">Structured Path</a></strong> - Follow the complete 10-step progression</li>
+<li><strong>🔍 <a href="./concepts/buffer-view.html">Concept-Driven</a></strong> - Explore individual concepts as needed</li>
+<li><strong>💻 <a href="./api/index.html">Code-First</a></strong> - Jump into the API documentation</li>
+<li><strong>🎮 <a href="./tutorials/index.html">Interactive</a></strong> - Try hands-on tutorials</li>
 </ul>
 </section>
-<section id="tile-operations" class="level3">
-<h3 class="anchored" data-anchor-id="tile-operations">Tile Operations</h3>
-<ul>
-<li><strong><a href="concepts/tile-distribution.qmd">Tile Distribution</a></strong> - How data is distributed across tiles</li>
-<li><strong><a href="concepts/tile-window.qmd">Tile Window</a></strong> - Windowed access to tile data</li>
-<li><strong><a href="concepts/shuffle-tile.qmd">Shuffle Tile</a></strong> - Data rearrangement operations</li>
-<li><strong><a href="concepts/sweep-tile.qmd">Sweep Tile</a></strong> - Iterative tile processing</li>
-</ul>
-</section>
-<section id="advanced-features" class="level3">
-<h3 class="anchored" data-anchor-id="advanced-features">Advanced Features</h3>
-<ul>
-<li><strong><a href="concepts/static-distributed-tensor.qmd">Static Distributed Tensor</a></strong> - Compile-time optimized tensors</li>
-<li><strong><a href="concepts/space-filling-curve.qmd">Space Filling Curves</a></strong> - Advanced memory access patterns</li>
-</ul>
-</section>
-</section>
-<section id="getting-started" class="level2">
-<h2 class="anchored" data-anchor-id="getting-started">Getting Started</h2>
-<ol type="1">
-<li><strong><a href="./tutorials/index.html">Tutorials</a></strong> - Step-by-step guides</li>
-<li><strong><a href="./api/index.html">API Reference</a></strong> - Complete API documentation</li>
-<li><strong>Interactive Examples</strong> - All code examples are runnable in your browser!</li>
-</ol>
-</section>
-<section id="features-of-this-documentation" class="level2">
-<h2 class="anchored" data-anchor-id="features-of-this-documentation">Features of This Documentation</h2>
+<section id="interactive-features" class="level2">
+<h2 class="anchored" data-anchor-id="interactive-features">✨ <strong>Interactive Features</strong></h2>
+<p>This documentation includes:</p>
 <ul>
 <li>🏃 <strong>Live Code Execution</strong> - Run Python code directly in your browser</li>
 <li>📱 <strong>Responsive Design</strong> - Works on desktop and mobile</li>
@@ -581,7 +666,7 @@ eyJhdHRyIjp7ImF1dG9ydW4iOnRydWUsImVkaXQiOnRydWUsImV2YWwiOnRydWV9LCJjb2RlIjoiZnJv
 <li>🔗 <strong>Deep Linking</strong> - Share links to specific sections</li>
 </ul>
 <hr>
-<p>Ready to dive in? Start with our <a href="./tutorials/index.html">Getting Started Tutorial</a> or explore specific <a href="concepts/tensor-adaptor.qmd">concepts</a>.</p>
+<p><em>Ready to dive deeper? Start with our <a href="./concepts/learning-path.html">Complete Learning Path</a> or jump to any concept that interests you.</em></p>
 
 
 <!-- -->
@@ -1086,94 +1171,132 @@ window._ojs.runtime.interpretFromScriptTags();
     }
   });
   </script><div class="modal fade" id="quarto-embedded-source-code-modal" tabindex="-1" aria-labelledby="quarto-embedded-source-code-modal-label" aria-hidden="true"><div class="modal-dialog modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="quarto-embedded-source-code-modal-label">Source Code</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="">
-<div class="sourceCode" id="cb1" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> "Composable-Kernels Python Documentation"</span></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu"># Welcome to PythonCK</span></span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>PythonCK is a Python implementation of Composable Kernels tensor operations, providing a high-level interface for understanding and experimenting with GPU tensor computations.</span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="fu">## What is Composable Kernels?</span></span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>Composable Kernels (CK) is a performance portable programming model for writing high performance GPU kernels for machine learning workloads across multiple architectures including GCDCore, CDNA, RDNA architectures, and various other GPU architectures.</span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>This Python implementation allows you to:</span>
-<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Understand** the core concepts behind tensor operations</span>
-<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Experiment** with tensor transformations interactively</span>
-<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Visualize** how data flows through different tensor operations</span>
-<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Learn** GPU kernel design patterns</span>
-<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a><span class="fu">## Quick Example</span></span>
-<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
-<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: false</span></span>
-<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: false</span></span>
-<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a><span class="co"># Hidden setup - automatically install the package</span></span>
-<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> micropip</span>
-<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> js</span>
-<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a><span class="cf">try</span>:</span>
-<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Use current domain + root path (works with any web server)</span></span>
-<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a>    base_url <span class="op">=</span> <span class="bu">str</span>(js.window.location.origin)</span>
-<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a>    wheel_url <span class="op">=</span> <span class="ss">f"</span><span class="sc">{</span>base_url<span class="sc">}</span><span class="ss">/pythonck-0.1.0-py3-none-any.whl"</span></span>
-<span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a>    <span class="cf">await</span> micropip.install(wheel_url)</span>
-<span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a><span class="cf">except</span>:</span>
-<span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a>    <span class="cf">pass</span>  <span class="co"># Package may already be installed or available</span></span>
-<span id="cb1-38"><a href="#cb1-38" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb1-39"><a href="#cb1-39" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-40"><a href="#cb1-40" aria-hidden="true" tabindex="-1"></a>Let's start with a simple tensor coordinate example:</span>
-<span id="cb1-41"><a href="#cb1-41" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-44"><a href="#cb1-44" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
-<span id="cb1-45"><a href="#cb1-45" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tensor_coordinate <span class="im">import</span> TensorCoordinate, MultiIndex</span>
-<span id="cb1-46"><a href="#cb1-46" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-47"><a href="#cb1-47" aria-hidden="true" tabindex="-1"></a><span class="co"># Create a 2D tensor coordinate</span></span>
-<span id="cb1-48"><a href="#cb1-48" aria-hidden="true" tabindex="-1"></a>coord <span class="op">=</span> TensorCoordinate(</span>
-<span id="cb1-49"><a href="#cb1-49" aria-hidden="true" tabindex="-1"></a>    ndim_hidden<span class="op">=</span><span class="dv">3</span>,</span>
-<span id="cb1-50"><a href="#cb1-50" aria-hidden="true" tabindex="-1"></a>    top_dimension_hidden_ids<span class="op">=</span>[<span class="dv">1</span>, <span class="dv">2</span>],</span>
-<span id="cb1-51"><a href="#cb1-51" aria-hidden="true" tabindex="-1"></a>    idx_hidden<span class="op">=</span>MultiIndex(<span class="dv">3</span>, [<span class="dv">0</span>, <span class="dv">2</span>, <span class="dv">3</span>])</span>
-<span id="cb1-52"><a href="#cb1-52" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb1-53"><a href="#cb1-53" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Tensor coordinate: </span><span class="sc">{</span>coord<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb1-54"><a href="#cb1-54" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Tensor index: </span><span class="sc">{</span>coord<span class="sc">.</span>get_index()<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb1-55"><a href="#cb1-55" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb1-56"><a href="#cb1-56" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-57"><a href="#cb1-57" aria-hidden="true" tabindex="-1"></a><span class="fu">## Key Concepts</span></span>
-<span id="cb1-58"><a href="#cb1-58" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-59"><a href="#cb1-59" aria-hidden="true" tabindex="-1"></a><span class="fu">### Core Tensor Abstractions</span></span>
-<span id="cb1-60"><a href="#cb1-60" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Tensor Adaptor](concepts/tensor-adaptor.qmd)** - The foundation for tensor transformations</span>
-<span id="cb1-61"><a href="#cb1-61" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Tensor Descriptor](concepts/tensor-descriptor.qmd)** - Describes tensor layout and properties</span>
-<span id="cb1-62"><a href="#cb1-62" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Buffer View](concepts/buffer-view.qmd)** - Low-level memory access patterns</span>
-<span id="cb1-63"><a href="#cb1-63" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Tensor Coordinate](concepts/tensor-coordinate.qmd)** - Multi-dimensional indexing</span>
-<span id="cb1-64"><a href="#cb1-64" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-65"><a href="#cb1-65" aria-hidden="true" tabindex="-1"></a><span class="fu">### Tile Operations</span></span>
-<span id="cb1-66"><a href="#cb1-66" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Tile Distribution](concepts/tile-distribution.qmd)** - How data is distributed across tiles</span>
-<span id="cb1-67"><a href="#cb1-67" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Tile Window](concepts/tile-window.qmd)** - Windowed access to tile data</span>
-<span id="cb1-68"><a href="#cb1-68" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Shuffle Tile](concepts/shuffle-tile.qmd)** - Data rearrangement operations</span>
-<span id="cb1-69"><a href="#cb1-69" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Sweep Tile](concepts/sweep-tile.qmd)** - Iterative tile processing</span>
-<span id="cb1-70"><a href="#cb1-70" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-71"><a href="#cb1-71" aria-hidden="true" tabindex="-1"></a><span class="fu">### Advanced Features</span></span>
-<span id="cb1-72"><a href="#cb1-72" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Static Distributed Tensor](concepts/static-distributed-tensor.qmd)** - Compile-time optimized tensors</span>
-<span id="cb1-73"><a href="#cb1-73" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Space Filling Curves](concepts/space-filling-curve.qmd)** - Advanced memory access patterns</span>
-<span id="cb1-74"><a href="#cb1-74" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-75"><a href="#cb1-75" aria-hidden="true" tabindex="-1"></a><span class="fu">## Getting Started</span></span>
-<span id="cb1-76"><a href="#cb1-76" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-77"><a href="#cb1-77" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>**[Tutorials](tutorials/index.qmd)** - Step-by-step guides</span>
-<span id="cb1-78"><a href="#cb1-78" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>**[API Reference](api/index.qmd)** - Complete API documentation</span>
-<span id="cb1-79"><a href="#cb1-79" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>**Interactive Examples** - All code examples are runnable in your browser!</span>
-<span id="cb1-80"><a href="#cb1-80" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-81"><a href="#cb1-81" aria-hidden="true" tabindex="-1"></a><span class="fu">## Features of This Documentation</span></span>
-<span id="cb1-82"><a href="#cb1-82" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-83"><a href="#cb1-83" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>🏃 **Live Code Execution** - Run Python code directly in your browser</span>
-<span id="cb1-84"><a href="#cb1-84" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>📱 **Responsive Design** - Works on desktop and mobile</span>
-<span id="cb1-85"><a href="#cb1-85" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>🌓 **Dark/Light Mode** - Toggle between themes</span>
-<span id="cb1-86"><a href="#cb1-86" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>🔍 **Full-Text Search** - Find what you need quickly</span>
-<span id="cb1-87"><a href="#cb1-87" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>📋 **Copy Code** - One-click code copying</span>
-<span id="cb1-88"><a href="#cb1-88" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>🔗 **Deep Linking** - Share links to specific sections</span>
-<span id="cb1-89"><a href="#cb1-89" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-90"><a href="#cb1-90" aria-hidden="true" tabindex="-1"></a>---</span>
-<span id="cb1-91"><a href="#cb1-91" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-92"><a href="#cb1-92" aria-hidden="true" tabindex="-1"></a>Ready to dive in? Start with our <span class="co">[</span><span class="ot">Getting Started Tutorial</span><span class="co">](tutorials/index.qmd)</span> or explore specific <span class="co">[</span><span class="ot">concepts</span><span class="co">](concepts/tensor-adaptor.qmd)</span>. </span>
+<div class="sourceCode" id="cb2" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> "Composable-Kernels Python Documentation"</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="an">format:</span><span class="co"> live-html</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: false</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: false</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="co">#| autorun: true</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Auto-install pythonck package</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> micropip</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="cf">await</span> micropip.install(<span class="st">"https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl"</span>)</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a><span class="fu"># PythonCK: Python Implementation of Composable Kernels</span></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>Welcome to PythonCK, a Python implementation of tensor operations and concepts from the AMD Composable Kernels library. This package provides educational implementations that focus on clarity and understanding rather than performance.</span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a><span class="fu">## 🎓 **Recommended Learning Path**</span></span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>**New to PythonCK?** Follow our structured learning path to understand all concepts:</span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a><span class="fu">### **[📚 Complete Learning Path](concepts/learning-path.qmd)**</span></span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>A step-by-step guide that builds from basic concepts to advanced GPU thread coordination, culminating in understanding the complete <span class="in">`tile_distr_thread_mapping.py`</span> example.</span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a><span class="fu">## 📖 **Learning by Topic**</span></span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a><span class="fu">### 1. **Foundation Concepts**</span></span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Buffer Views</span><span class="co">](concepts/buffer-view.qmd)</span> - Memory buffer abstraction</span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Tensor Coordinates</span><span class="co">](concepts/tensor-coordinate.qmd)</span> - Multi-dimensional indexing</span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Tensor Descriptors</span><span class="co">](concepts/tensor-descriptor.qmd)</span> - Layout transformations</span>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Tensor Views</span><span class="co">](concepts/tensor-view.qmd)</span> - Unified tensor access</span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a><span class="fu">### 2. **Distribution Concepts**</span></span>
+<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Tile Distribution Encoding</span><span class="co">](concepts/tile-distribution-encoding.qmd)</span> - How data is distributed</span>
+<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Tile Distribution</span><span class="co">](concepts/tile-distribution.qmd)</span> - Parallel processing coordination</span>
+<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Static Distributed Tensors</span><span class="co">](concepts/static-distributed-tensor.qmd)</span> - Thread-local data</span>
+<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a><span class="fu">### 3. **Advanced Operations**</span></span>
+<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Tile Windows</span><span class="co">](concepts/tile-window.qmd)</span> - Windowed tensor access</span>
+<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Sweep Operations</span><span class="co">](concepts/sweep-tile.qmd)</span> - Iterating over distributed data</span>
+<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Thread Mapping</span><span class="co">](concepts/thread-mapping.qmd)</span> - Understanding the complete pipeline</span>
+<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a><span class="fu">## 📦 **Package Structure**</span></span>
+<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a><span class="in">pytensor/                    # Core tensor operations</span></span>
+<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a><span class="in">├── buffer_view.py          # Memory abstraction</span></span>
+<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a><span class="in">├── tensor_coordinate.py    # Multi-dimensional indexing</span></span>
+<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a><span class="in">├── tensor_descriptor.py    # Layout transformations  </span></span>
+<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a><span class="in">├── tensor_view.py          # Unified access interface</span></span>
+<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a><span class="in">├── tile_distribution.py    # Data distribution</span></span>
+<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a><span class="in">├── tile_window.py          # Windowed access</span></span>
+<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a><span class="in">├── sweep_tile.py           # Coordinated iteration</span></span>
+<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a><span class="in">└── ...</span></span>
+<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a><span class="in">tensor_transforms/          # Analysis tools</span></span>
+<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a><span class="in">├── parser.py              # Descriptor parsing</span></span>
+<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a><span class="in">├── analyzer.py            # Transformation analysis</span></span>
+<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a><span class="in">└── ...</span></span>
+<span id="cb2-64"><a href="#cb2-64" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-65"><a href="#cb2-65" aria-hidden="true" tabindex="-1"></a><span class="in">tile_distribution/          # Visualization tools</span></span>
+<span id="cb2-66"><a href="#cb2-66" aria-hidden="true" tabindex="-1"></a><span class="in">├── parser.py              # C++ encoding parsing</span></span>
+<span id="cb2-67"><a href="#cb2-67" aria-hidden="true" tabindex="-1"></a><span class="in">├── visualizer.py          # Interactive visualization</span></span>
+<span id="cb2-68"><a href="#cb2-68" aria-hidden="true" tabindex="-1"></a><span class="in">└── ...</span></span>
+<span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-71"><a href="#cb2-71" aria-hidden="true" tabindex="-1"></a><span class="fu">## 🔑 **Key Concepts**</span></span>
+<span id="cb2-72"><a href="#cb2-72" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-73"><a href="#cb2-73" aria-hidden="true" tabindex="-1"></a>**PythonCK** implements several interconnected concepts:</span>
+<span id="cb2-74"><a href="#cb2-74" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-75"><a href="#cb2-75" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>**Tensors** are multi-dimensional arrays with flexible layouts</span>
+<span id="cb2-76"><a href="#cb2-76" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>**Coordinates** provide multi-dimensional indexing with transformations</span>
+<span id="cb2-77"><a href="#cb2-77" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>**Distributions** define how data is spread across parallel processing elements</span>
+<span id="cb2-78"><a href="#cb2-78" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>**Tiles** represent chunks of data processed by individual threads/warps</span>
+<span id="cb2-79"><a href="#cb2-79" aria-hidden="true" tabindex="-1"></a><span class="ss">5. </span>**Sweeps** iterate over distributed data in a coordinated manner</span>
+<span id="cb2-80"><a href="#cb2-80" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-81"><a href="#cb2-81" aria-hidden="true" tabindex="-1"></a>The ultimate goal is understanding how GPU threads coordinate to process large tensors efficiently, as demonstrated in the complete example at <span class="in">`tile_distr_thread_mapping.py`</span>.</span>
+<span id="cb2-82"><a href="#cb2-82" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-83"><a href="#cb2-83" aria-hidden="true" tabindex="-1"></a><span class="fu">## 🚀 **Quick Start**</span></span>
+<span id="cb2-84"><a href="#cb2-84" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-85"><a href="#cb2-85" aria-hidden="true" tabindex="-1"></a>Jump right in with interactive examples:</span>
+<span id="cb2-86"><a href="#cb2-86" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-89"><a href="#cb2-89" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb2-90"><a href="#cb2-90" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
+<span id="cb2-91"><a href="#cb2-91" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
+<span id="cb2-92"><a href="#cb2-92" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-93"><a href="#cb2-93" aria-hidden="true" tabindex="-1"></a><span class="co"># PythonCK is now available - let's explore!</span></span>
+<span id="cb2-94"><a href="#cb2-94" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pytensor</span>
+<span id="cb2-95"><a href="#cb2-95" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tensor_coordinate <span class="im">import</span> MultiIndex, TensorCoordinate</span>
+<span id="cb2-96"><a href="#cb2-96" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-97"><a href="#cb2-97" aria-hidden="true" tabindex="-1"></a><span class="co"># Create a simple multi-dimensional index</span></span>
+<span id="cb2-98"><a href="#cb2-98" aria-hidden="true" tabindex="-1"></a>multi_idx <span class="op">=</span> MultiIndex(<span class="dv">3</span>, [<span class="dv">2</span>, <span class="dv">1</span>, <span class="dv">0</span>])</span>
+<span id="cb2-99"><a href="#cb2-99" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"3D index: </span><span class="sc">{</span>multi_idx<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb2-100"><a href="#cb2-100" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-101"><a href="#cb2-101" aria-hidden="true" tabindex="-1"></a><span class="co"># Create a tensor coordinate</span></span>
+<span id="cb2-102"><a href="#cb2-102" aria-hidden="true" tabindex="-1"></a>coord <span class="op">=</span> TensorCoordinate(multi_idx)</span>
+<span id="cb2-103"><a href="#cb2-103" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Tensor coordinate: </span><span class="sc">{</span>coord<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb2-104"><a href="#cb2-104" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-105"><a href="#cb2-105" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"✅ PythonCK is ready for exploration!"</span>)</span>
+<span id="cb2-106"><a href="#cb2-106" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb2-107"><a href="#cb2-107" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-108"><a href="#cb2-108" aria-hidden="true" tabindex="-1"></a><span class="fu">## 🎯 **Learning Paths**</span></span>
+<span id="cb2-109"><a href="#cb2-109" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-110"><a href="#cb2-110" aria-hidden="true" tabindex="-1"></a>Choose your learning approach:</span>
+<span id="cb2-111"><a href="#cb2-111" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-112"><a href="#cb2-112" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**🎓 [Structured Path](concepts/learning-path.qmd)** - Follow the complete 10-step progression</span>
+<span id="cb2-113"><a href="#cb2-113" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**🔍 [Concept-Driven](concepts/buffer-view.qmd)** - Explore individual concepts as needed</span>
+<span id="cb2-114"><a href="#cb2-114" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**💻 [Code-First](api/index.qmd)** - Jump into the API documentation</span>
+<span id="cb2-115"><a href="#cb2-115" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**🎮 [Interactive](tutorials/index.qmd)** - Try hands-on tutorials</span>
+<span id="cb2-116"><a href="#cb2-116" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-117"><a href="#cb2-117" aria-hidden="true" tabindex="-1"></a><span class="fu">## ✨ **Interactive Features**</span></span>
+<span id="cb2-118"><a href="#cb2-118" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-119"><a href="#cb2-119" aria-hidden="true" tabindex="-1"></a>This documentation includes:</span>
+<span id="cb2-120"><a href="#cb2-120" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-121"><a href="#cb2-121" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>🏃 **Live Code Execution** - Run Python code directly in your browser</span>
+<span id="cb2-122"><a href="#cb2-122" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>📱 **Responsive Design** - Works on desktop and mobile</span>
+<span id="cb2-123"><a href="#cb2-123" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>🌓 **Dark/Light Mode** - Toggle between themes</span>
+<span id="cb2-124"><a href="#cb2-124" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>🔍 **Full-Text Search** - Find what you need quickly</span>
+<span id="cb2-125"><a href="#cb2-125" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>📋 **Copy Code** - One-click code copying</span>
+<span id="cb2-126"><a href="#cb2-126" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>🔗 **Deep Linking** - Share links to specific sections</span>
+<span id="cb2-127"><a href="#cb2-127" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-128"><a href="#cb2-128" aria-hidden="true" tabindex="-1"></a>---</span>
+<span id="cb2-129"><a href="#cb2-129" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-130"><a href="#cb2-130" aria-hidden="true" tabindex="-1"></a>*Ready to dive deeper? Start with our [Complete Learning Path](concepts/learning-path.qmd) or jump to any concept that interests you.*</span>
 </code><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></pre></div>
 </div></div></div></div></div>
 </div> <!-- /content -->

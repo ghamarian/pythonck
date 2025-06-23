@@ -1,0 +1,322 @@
+---
+title: "Tensor Adaptor Coordinate: The Result Container"
+format: live-html
+---
+
+```{pyodide}
+#| echo: false
+#| output: false
+#| autorun: true
+
+# Auto-install pythonck package
+import micropip
+await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl")
+```
+
+```{pyodide}
+#| echo: false
+#| output: false
+#| autorun: true
+
+# Import required classes
+from pytensor.tensor_coordinate import MultiIndex, make_tensor_adaptor_coordinate
+```
+
+# Tensor Adaptor Coordinate: The Result Container
+
+**Prerequisites**: [Tensor Transforms](tensor-transforms.qmd), [Tensor Descriptor](tensor-descriptor.qmd), [Tensor Coordinate](tensor-coordinate.qmd), [Tensor Adaptor](tensor-adaptor.qmd)
+
+A **Tensor Adaptor Coordinate** is a **result container** that stores the transformed indices and offsets produced by a Tensor Adaptor. It serves as an intermediate representation between the transformation engine and the final memory-mapped coordinate.
+
+## 🎯 **Core Concept**
+
+A **Tensor Adaptor Coordinate** stores the results of coordinate transformations:
+
+```
+Input Index → Tensor Adaptor → Tensor Adaptor Coordinate → Final Tensor Coordinate
+```
+
+The adaptor coordinate contains:
+- **Top Index**: The original input coordinates
+- **Bottom Index**: The transformed output coordinates  
+- **Hidden Index**: Internal storage for the transformation results
+
+## 🔧 **Creating Tensor Adaptor Coordinates**
+
+### From Tensor Adaptors
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+# Create an adaptor coordinate using a descriptor's internal adaptor
+from pytensor.tensor_descriptor import make_naive_tensor_descriptor
+
+descriptor = make_naive_tensor_descriptor([4, 6], [6, 1])
+# Since TensorDescriptor extends TensorAdaptor, we can use it directly
+adaptor = descriptor
+
+# Create an adaptor coordinate from the adaptor
+top_index = MultiIndex(2, [2, 3])  # 4x6 coordinate
+adaptor_coord = make_tensor_adaptor_coordinate(adaptor, top_index)
+
+print(f"Adaptor coordinate created:")
+print(f"  Top index (4x6): {adaptor_coord.get_top_index().to_list()}")
+print(f"  Bottom index (linear): {adaptor_coord.get_bottom_index().to_list()}")
+print(f"  Hidden index: {adaptor_coord.get_hidden_index().to_list()}")
+print("✅ Adaptor coordinate from descriptor's adaptor")
+```
+
+### Manual Creation (Advanced)
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+from pytensor.tensor_coordinate import TensorAdaptorCoordinate
+
+# Create an adaptor coordinate manually
+ndim_hidden = 3
+bottom_dimension_hidden_ids = [0]  # Maps to bottom index
+top_dimension_hidden_ids = [1, 2]  # Maps to top index
+idx_hidden = MultiIndex(3, [15, 2, 3])  # [bottom, top0, top1]
+
+manual_coord = TensorAdaptorCoordinate(
+    ndim_hidden=ndim_hidden,
+    bottom_dimension_hidden_ids=bottom_dimension_hidden_ids,
+    top_dimension_hidden_ids=top_dimension_hidden_ids,
+    idx_hidden=idx_hidden
+)
+
+print(f"Manual adaptor coordinate:")
+print(f"  Top index: {manual_coord.get_top_index().to_list()}")
+print(f"  Bottom index: {manual_coord.get_bottom_index().to_list()}")
+print(f"  Hidden index: {manual_coord.get_hidden_index().to_list()}")
+print("✅ Manual adaptor coordinate creation")
+```
+
+## 🔍 **Understanding the Three-Level Structure**
+
+### Top Index (Input Coordinates)
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+# The top index represents the original input coordinates
+top_coords = adaptor_coord.get_top_index()
+print(f"Top index (input coordinates):")
+print(f"  Values: {top_coords.to_list()}")
+print(f"  Dimensions: {len(top_coords)}")
+print(f"  Represents: The original 4x6 coordinate [2, 3]")
+print("✅ Top index explained")
+```
+
+### Bottom Index (Transformed Coordinates)
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+# The bottom index represents the transformed output coordinates
+bottom_coords = adaptor_coord.get_bottom_index()
+print(f"Bottom index (transformed coordinates):")
+print(f"  Values: {bottom_coords.to_list()}")
+print(f"  Dimensions: {len(bottom_coords)}")
+print(f"  Represents: The linear memory offset 15 (2*6 + 3*1)")
+print("✅ Bottom index explained")
+```
+
+### Hidden Index (Internal Storage)
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+# The hidden index contains all the internal storage
+hidden_coords = adaptor_coord.get_hidden_index()
+print(f"Hidden index (internal storage):")
+print(f"  Values: {hidden_coords.to_list()}")
+print(f"  Dimensions: {len(hidden_coords)}")
+print(f"  Contains: [bottom_offset, top_dim0, top_dim1]")
+print(f"  Structure: [15, 2, 3] where 15 is the linear offset")
+print("✅ Hidden index explained")
+```
+
+## 🔄 **Coordinate Access Patterns**
+
+### Getting Specific Indices
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+def analyze_adaptor_coordinate(coord):
+    """Analyze all aspects of an adaptor coordinate"""
+    
+    print(f"🔍 Adaptor Coordinate Analysis:")
+    print(f"  Top index: {coord.get_top_index().to_list()}")
+    print(f"  Bottom index: {coord.get_bottom_index().to_list()}")
+    print(f"  Hidden index: {coord.get_hidden_index().to_list()}")
+    
+    # Show the mapping relationships
+    print(f"  Top dimension IDs: {coord.top_dimension_hidden_ids}")
+    print(f"  Bottom dimension IDs: {coord.bottom_dimension_hidden_ids}")
+    print(f"  Hidden dimensions: {coord.ndim_hidden}")
+    
+    return coord
+
+# Analyze our adaptor coordinate
+analyzed_coord = analyze_adaptor_coordinate(adaptor_coord)
+print("✅ Coordinate analysis complete")
+```
+
+### Index Manipulation
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+# You can access individual components
+top_idx = adaptor_coord.get_top_index()
+bottom_idx = adaptor_coord.get_bottom_index()
+
+print(f"Index manipulation:")
+print(f"  Top index [0]: {top_idx[0]}")  # First top dimension
+print(f"  Top index [1]: {top_idx[1]}")  # Second top dimension
+print(f"  Bottom index [0]: {bottom_idx[0]}")  # Linear offset
+print(f"  Top index as list: {top_idx.to_list()}")
+print("✅ Index manipulation demonstrated")
+```
+
+## 🔗 **Relationship to Other Components**
+
+### How Adaptor Coordinates Become Tensor Coordinates
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+from pytensor.tensor_coordinate import TensorCoordinate
+
+# An adaptor coordinate can be converted to a tensor coordinate
+# The key difference: tensor coordinates have a single offset in hidden[0]
+
+# Create a tensor coordinate from the adaptor coordinate
+tensor_coord = TensorCoordinate(
+    ndim_hidden=adaptor_coord.ndim_hidden,
+    top_dimension_hidden_ids=adaptor_coord.top_dimension_hidden_ids,
+    idx_hidden=adaptor_coord.idx_hidden
+)
+
+print(f"Conversion to tensor coordinate:")
+print(f"  Original top index: {adaptor_coord.get_top_index().to_list()}")
+print(f"  Tensor coordinate top index: {tensor_coord.get_index().to_list()}")
+print(f"  Tensor coordinate offset: {tensor_coord.get_offset()}")
+print(f"  Offset matches bottom: {tensor_coord.get_offset() == adaptor_coord.get_bottom_index()[0]}")
+print("✅ Adaptor to tensor coordinate conversion")
+```
+
+### Integration with Descriptors
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+from pytensor.tensor_descriptor import make_naive_tensor_descriptor
+
+# Descriptors can create adaptor coordinates through their internal adaptors
+descriptor = make_naive_tensor_descriptor([4, 6], [6, 1])
+# Since TensorDescriptor extends TensorAdaptor, we can use it directly
+adaptor = descriptor
+
+# Create an adaptor coordinate from the adaptor
+top_index = MultiIndex(2, [2, 3])  # 4x6 coordinate
+adaptor_coord = make_tensor_adaptor_coordinate(adaptor, top_index)
+
+print(f"Adaptor coordinate created:")
+print(f"  Top index (4x6): {adaptor_coord.get_top_index().to_list()}")
+print(f"  Bottom index (linear): {adaptor_coord.get_bottom_index().to_list()}")
+print(f"  Hidden index: {adaptor_coord.get_hidden_index().to_list()}")
+print("✅ Adaptor coordinate from descriptor's adaptor")
+```
+
+## 🎯 **Advanced Operations**
+
+### Multi-Transform Adaptor Coordinates
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+# Create a different descriptor to show variety
+complex_descriptor = make_naive_tensor_descriptor([3, 4], [4, 1])
+# Since TensorDescriptor extends TensorAdaptor, we can use it directly
+complex_adaptor = complex_descriptor
+
+# Create adaptor coordinate with different layout
+complex_coord = make_tensor_adaptor_coordinate(complex_adaptor, MultiIndex(2, [1, 2]))
+
+print(f"Different layout adaptor coordinate:")
+print(f"  Top index (3x4): {complex_coord.get_top_index().to_list()}")
+print(f"  Bottom index (linear): {complex_coord.get_bottom_index().to_list()}")
+print(f"  Hidden index: {complex_coord.get_hidden_index().to_list()}")
+print(f"  Manual calculation: 1*4 + 2*1 = {1*4 + 2*1}")
+print("✅ Different layout coordinate demonstrated")
+```
+
+### Coordinate Validation
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+from pytensor.tensor_coordinate import adaptor_coordinate_is_valid
+
+# Check if an adaptor coordinate is valid
+is_valid = adaptor_coordinate_is_valid(adaptor_coord)
+print(f"Adaptor coordinate validation:")
+print(f"  Is valid: {is_valid}")
+
+# Test with different coordinates
+test_coords = [
+    make_tensor_adaptor_coordinate(adaptor, MultiIndex(2, [0, 0])),
+    make_tensor_adaptor_coordinate(adaptor, MultiIndex(2, [3, 5])),
+    make_tensor_adaptor_coordinate(adaptor, MultiIndex(2, [4, 6]))  # Out of bounds
+]
+
+for i, coord in enumerate(test_coords):
+    valid = adaptor_coordinate_is_valid(coord)
+    print(f"  Test {i}: {coord.get_top_index().to_list()} → Valid: {valid}")
+
+print("✅ Coordinate validation demonstrated")
+```
+
+## 🔍 **Why This Matters**
+
+Understanding Tensor Adaptor Coordinates is crucial because:
+
+1. **They store transformation results** - All coordinate transformations produce adaptor coordinates
+2. **They enable complex layouts** - Multiple transforms can be chained and stored
+3. **They bridge adaptors and coordinates** - They're the intermediate step between transformation and final result
+4. **They support validation** - They can be checked for validity before use
+
+## 🎯 **Integration with Real Applications**
+
+Adaptor coordinates are used throughout PythonCK:
+
+- **Tile Distributions** create adaptor coordinates for thread mapping
+- **Tensor Views** use adaptor coordinates for coordinate transformations
+- **Sweep Operations** work with adaptor coordinates for navigation
+- **Memory Access** relies on adaptor coordinates for address calculations
+
+## ✅ **Next Steps**
+
+Now that you understand adaptor coordinates, you can explore:
+- [**Advanced Coordinate Operations**](tensor-coordinate-advanced.qmd) - Functions that work with adaptor coordinates
+- [**Tile Distribution**](tile-distribution.qmd) - How adaptor coordinates enable parallel processing
+- [**Tensor Views**](tensor-view.qmd) - How adaptor coordinates integrate with tensor access
+
+---
+
+*Tensor Adaptor Coordinates are the result containers that store the transformed indices and offsets. They serve as the bridge between transformation engines and final memory-mapped coordinates, enabling complex coordinate operations throughout PythonCK.* 
