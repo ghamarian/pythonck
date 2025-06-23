@@ -1,0 +1,31 @@
+[Unit]
+Description=PythonCK Streamlit Applications
+After=network.target
+Wants=network.target
+
+[Service]
+Type=forking
+User=www-data
+Group=www-data
+WorkingDirectory=/projects/pythonck
+ExecStart=/projects/pythonck/deploy_apps.sh
+ExecStop=/projects/pythonck/stop_apps.sh
+ExecReload=/bin/bash -c '/projects/pythonck/stop_apps.sh && /projects/pythonck/deploy_apps.sh'
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Environment variables
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+Environment=PYTHONPATH=/projects/pythonck
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/projects/pythonck/logs
+
+[Install]
+WantedBy=multi-user.target 
