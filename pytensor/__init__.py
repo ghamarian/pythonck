@@ -78,10 +78,15 @@ from .tile_distribution import (
     make_tile_distribution,
     make_static_tile_distribution,
     slice_distribution_from_x,
-    StaticDistributedTensor,
     make_embedding_tile_distribution,
     make_reduction_tile_distribution,
     compose_tile_distributions
+)
+
+# Static distributed tensor
+from .static_distributed_tensor import (
+    StaticDistributedTensor,
+    make_static_distributed_tensor
 )
 
 # Tile distribution encoding
@@ -202,7 +207,6 @@ __all__ = [
     'make_tile_distribution',
     'make_static_tile_distribution',
     'slice_distribution_from_x',
-    'StaticDistributedTensor',
     'make_embedding_tile_distribution',
     'make_reduction_tile_distribution',
     'compose_tile_distributions',
@@ -245,6 +249,10 @@ __all__ = [
     # Tile window linear
     'TileWindowLinear',
     'make_tile_window_linear',
+    
+    # Static distributed tensor
+    'StaticDistributedTensor',
+    'make_static_distributed_tensor',
 ]
 
 __version__ = '0.1.0' 

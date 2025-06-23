@@ -15,9 +15,10 @@ from pytensor.tile_distribution import (
     TileDistribution, make_tile_distributed_span, make_tile_distributed_index,
     make_tile_distribution_encoding, make_tile_distribution,
     make_static_tile_distribution, slice_distribution_from_x,
-    StaticDistributedTensor, make_embedding_tile_distribution,
+    make_embedding_tile_distribution,
     make_reduction_tile_distribution, compose_tile_distributions
 )
+from pytensor.static_distributed_tensor import StaticDistributedTensor
 from pytensor.tensor_descriptor import (
     TensorAdaptor, TensorDescriptor, UnmergeTransform, make_naive_tensor_descriptor
 )
@@ -577,11 +578,11 @@ class TestStaticDistributedTensor:
             ys_to_rhs_minor=[1]
         )
         distribution = make_static_tile_distribution(encoding)
-        # Create a thread buffer (simplified for testing)
-        thread_buffer = [0] * 16  # 4 * 4 = 16
-        tensor = StaticDistributedTensor(thread_buffer, distribution)
-        assert tensor.distribution == distribution
-        assert tensor.thread_buffer == thread_buffer
+        # Create tensor using proper API (data_type, tile_distribution)
+        tensor = StaticDistributedTensor(int, distribution)
+        assert tensor.tile_distribution == distribution
+        # The actual element space size is calculated from the descriptor
+        assert len(tensor.thread_buffer) == distribution.ys_to_d_descriptor.get_element_space_size()
 
     def test_get_y_sliced_thread_data(self):
         """Test getting a slice of the thread buffer."""
@@ -594,13 +595,16 @@ class TestStaticDistributedTensor:
             ys_to_rhs_minor=[1]
         )
         distribution = make_static_tile_distribution(encoding)
-        thread_buffer = list(range(16))  # [0, 1, 2, ..., 15]
-        tensor = StaticDistributedTensor(thread_buffer, distribution)
-        # Slice from index 4 to 8
-        y_slice_origins = [4]
-        y_slice_lengths = [4]
+        tensor = StaticDistributedTensor(int, distribution)
+        # Fill with test data
+        buffer_size = len(tensor.thread_buffer)
+        for i in range(buffer_size):
+            tensor.thread_buffer[i] = i
+        # Slice appropriately for the actual buffer size
+        y_slice_origins = [1]
+        y_slice_lengths = [2]
         sliced_data = tensor.get_y_sliced_thread_data(y_slice_origins, y_slice_lengths)
-        assert sliced_data == [4, 5, 6, 7]
+        assert sliced_data == [1, 2]
 
     def test_set_y_sliced_thread_data(self):
         """Test setting a slice of the thread buffer."""
@@ -613,14 +617,13 @@ class TestStaticDistributedTensor:
             ys_to_rhs_minor=[1]
         )
         distribution = make_static_tile_distribution(encoding)
-        thread_buffer = [0] * 16
-        tensor = StaticDistributedTensor(thread_buffer, distribution)
-        # Set slice from index 4 to 8
-        y_slice_origins = [4]
-        y_slice_lengths = [4]
-        new_data = [10, 11, 12, 13]
+        tensor = StaticDistributedTensor(int, distribution)
+        # Set slice appropriately for the actual buffer size
+        y_slice_origins = [1]
+        y_slice_lengths = [2]
+        new_data = [10, 11]
         tensor.set_y_sliced_thread_data(y_slice_origins, y_slice_lengths, new_data)
-        assert tensor.thread_buffer[4:8] == new_data
+        assert tensor.thread_buffer[1:3].tolist() == new_data
 
 
 class TestSliceDistributionFromX:
