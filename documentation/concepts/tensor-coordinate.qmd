@@ -6,6 +6,7 @@ format: live-html
 ```{pyodide}
 #| echo: false
 #| output: false
+#| autorun: true
 
 # Auto-install pythonck package
 import micropip
