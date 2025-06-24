@@ -1340,5 +1340,16 @@
       "API Reference",
       "API Reference"
     ]
+  },
+  {
+    "objectID": "index.html#interactive-applications",
+    "href": "index.html#interactive-applications",
+    "title": "Composable-Kernels Python Documentation",
+    "section": "🎮 Interactive Applications",
+    "text": "🎮 Interactive Applications\nExplore PythonCK concepts through three interactive web applications:\n\n📊 Tile Distribution Visualizer\nInteractive visualization of tile distribution structures and GPU memory layouts. Perfect for understanding how data is distributed across parallel processing elements.\n\n\n🔄 Tensor Transform Visualizer\nExplore tensor descriptor transformations with visual graphs and mathematical formulas. See how data layouts change through various transformations.\n\n\n🧵 Thread Visualization App\nVisualize GPU thread coordinate mapping and access patterns. Understand how individual threads access distributed tensor data.",
+    "crumbs": [
+      "Getting Started",
+      "Composable-Kernels Python Documentation"
+    ]
   }
 ]

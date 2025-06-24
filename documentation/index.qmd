@@ -101,6 +101,19 @@ print(f"Tensor coordinate: {coord}")
 print("✅ PythonCK is ready for exploration!")
 ```
 
+## 🎮 **Interactive Applications**
+
+Explore PythonCK concepts through three interactive web applications:
+
+### **[📊 Tile Distribution Visualizer](../app.py)**
+Interactive visualization of tile distribution structures and GPU memory layouts. Perfect for understanding how data is distributed across parallel processing elements.
+
+### **[🔄 Tensor Transform Visualizer](../tensor_transform_app.py)**  
+Explore tensor descriptor transformations with visual graphs and mathematical formulas. See how data layouts change through various transformations.
+
+### **[🧵 Thread Visualization App](../thread_visualization_app.py)**
+Visualize GPU thread coordinate mapping and access patterns. Understand how individual threads access distributed tensor data.
+
 ## 🎯 **Learning Paths**
 
 Choose your learning approach:
