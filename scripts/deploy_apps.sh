@@ -19,14 +19,15 @@ start_app() {
     local app_file=$1
     local port=$2
     local app_name=$3
+    local base_url_path=$4
     
-    echo "🎯 Starting $app_name on port $port..."
+    echo "🎯 Starting $app_name on port $port with base URL path $base_url_path..."
     
-    # Start the app in the background WITHOUT baseUrlPath
-    # Let nginx handle the path routing
+    # Start the app in the background WITH baseUrlPath
     nohup streamlit run "$app_file" \
         --server.port=$port \
         --server.address=0.0.0.0 \
+        --server.baseUrlPath="$base_url_path" \
         --server.enableCORS=false \
         --server.enableXsrfProtection=false \
         --server.enableWebsocketCompression=false \
@@ -43,15 +44,15 @@ start_app() {
 # Create logs directory if it doesn't exist
 mkdir -p logs
 
-# Start each Streamlit app without base URL paths
+# Start each Streamlit app with correct base URL paths
 echo "📊 Starting Tensor Transform App..."
-start_app "tensor_transform_app.py" 8501 "tensor-transform"
+start_app "tensor_transform_app.py" 8501 "tensor-transform" "/tensor-transform"
 
 echo "📊 Starting Tile Distribution App..."  
-start_app "app.py" 8502 "tile-distribution"
+start_app "app.py" 8502 "tile-distribution" "/tile-distribution"
 
 echo "🧵 Starting Thread Visualization App..."
-start_app "thread_visualization_app.py" 8503 "thread-visualization"
+start_app "thread_visualization_app.py" 8503 "thread-visualization" "/thread-visualization"
 
 # Wait for apps to start
 echo "⏳ Waiting for apps to start..."
