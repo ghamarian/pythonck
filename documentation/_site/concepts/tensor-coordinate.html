@@ -513,9 +513,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#tensor-coordinates-the-final-result" id="toc-tensor-coordinates-the-final-result" class="nav-link active" data-scroll-target="#tensor-coordinates-the-final-result">Tensor Coordinates: The Final Result</a>
-  <ul class="collapse">
-  <li><a href="#what-is-a-tensorcoordinate" id="toc-what-is-a-tensorcoordinate" class="nav-link" data-scroll-target="#what-is-a-tensorcoordinate">What is a TensorCoordinate?</a></li>
+  <li><a href="#what-is-a-tensorcoordinate" id="toc-what-is-a-tensorcoordinate" class="nav-link active" data-scroll-target="#what-is-a-tensorcoordinate">What is a TensorCoordinate?</a></li>
   <li><a href="#why-tensorcoordinate-matters" id="toc-why-tensorcoordinate-matters" class="nav-link" data-scroll-target="#why-tensorcoordinate-matters">Why TensorCoordinate Matters</a></li>
   <li><a href="#core-components" id="toc-core-components" class="nav-link" data-scroll-target="#core-components">Core Components</a>
   <ul class="collapse">
@@ -533,7 +531,6 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#tensorcoordinate-index-offset-storage" id="toc-tensorcoordinate-index-offset-storage" class="nav-link" data-scroll-target="#tensorcoordinate-index-offset-storage">TensorCoordinate: Index + Offset Storage</a></li>
   <li><a href="#key-methods" id="toc-key-methods" class="nav-link" data-scroll-target="#key-methods">Key Methods</a></li>
   <li><a href="#comparison-with-tensoradaptorcoordinate" id="toc-comparison-with-tensoradaptorcoordinate" class="nav-link" data-scroll-target="#comparison-with-tensoradaptorcoordinate">Comparison with TensorAdaptorCoordinate</a></li>
-  </ul></li>
   </ul></li>
   </ul>
 </nav>
@@ -577,8 +574,6 @@ eyJhdHRyIjp7ImF1dG9ydW4iOnRydWUsImVjaG8iOmZhbHNlLCJlZGl0IjpmYWxzZSwiZXZhbCI6dHJ1
 eyJhdHRyIjp7ImF1dG9ydW4iOnRydWUsImVjaG8iOmZhbHNlLCJlZGl0IjpmYWxzZSwiZXZhbCI6dHJ1ZSwib3V0cHV0IjpmYWxzZX0sImNvZGUiOiJcbiMgSW1wb3J0IHJlcXVpcmVkIGNsYXNzZXNcbmZyb20gcHl0ZW5zb3IudGVuc29yX2Nvb3JkaW5hdGUgaW1wb3J0IE11bHRpSW5kZXgsIFRlbnNvckNvb3JkaW5hdGUsIFRlbnNvckFkYXB0b3JDb29yZGluYXRlLCBtYWtlX3RlbnNvcl9jb29yZGluYXRlLCBtYWtlX3RlbnNvcl9hZGFwdG9yX2Nvb3JkaW5hdGVcbmZyb20gcHl0ZW5zb3IudGVuc29yX2Rlc2NyaXB0b3IgaW1wb3J0IG1ha2VfbmFpdmVfdGVuc29yX2Rlc2NyaXB0b3IifQ==
 </script>
 </div>
-<section id="tensor-coordinates-the-final-result" class="level1">
-<h1>Tensor Coordinates: The Final Result</h1>
 <p><strong>Prerequisites</strong>: <a href="../concepts/buffer-view.html">Buffer Views</a>, <a href="../concepts/tensor-descriptor.html">Tensor Descriptors</a></p>
 <p>Tensor coordinates represent <strong>the final result</strong> after all tensor layout transformations have been applied. They store both the multi-dimensional index and the linear memory offset that results from complex coordinate transformations.</p>
 <section id="what-is-a-tensorcoordinate" class="level2">
@@ -717,7 +712,6 @@ eyJjb250ZW50cyI6W3siY2VsbE5hbWUiOiJweW9kaWRlLTkiLCJpbmxpbmUiOmZhbHNlLCJtZXRob2RO
 <script type="vfs-file">
 W10=
 </script>
-</section>
 </section>
 </section>
 
@@ -1226,203 +1220,201 @@ window._ojs.runtime.interpretFromScriptTags();
 <span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tensor_descriptor <span class="im">import</span> make_naive_tensor_descriptor</span>
 <span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
 <span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a><span class="fu"># Tensor Coordinates: The Final Result</span></span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>**Prerequisites**: <span class="co">[</span><span class="ot">Buffer Views</span><span class="co">](buffer-view.qmd)</span>, <span class="co">[</span><span class="ot">Tensor Descriptors</span><span class="co">](tensor-descriptor.qmd)</span></span>
 <span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>**Prerequisites**: <span class="co">[</span><span class="ot">Buffer Views</span><span class="co">](buffer-view.qmd)</span>, <span class="co">[</span><span class="ot">Tensor Descriptors</span><span class="co">](tensor-descriptor.qmd)</span></span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>Tensor coordinates represent **the final result** after all tensor layout transformations have been applied. They store both the multi-dimensional index and the linear memory offset that results from complex coordinate transformations.</span>
 <span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>Tensor coordinates represent **the final result** after all tensor layout transformations have been applied. They store both the multi-dimensional index and the linear memory offset that results from complex coordinate transformations.</span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a><span class="fu">## What is a TensorCoordinate?</span></span>
 <span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a><span class="fu">## What is a TensorCoordinate?</span></span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>A <span class="in">`TensorCoordinate`</span> is the end product of the tensor transformation pipeline:</span>
 <span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>A <span class="in">`TensorCoordinate`</span> is the end product of the tensor transformation pipeline:</span>
-<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a><span class="in">Input Index → Transforms → TensorCoordinate (Index + Offset)</span></span>
 <span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a><span class="in">Input Index → Transforms → TensorCoordinate (Index + Offset)</span></span>
-<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>**Key characteristics:**</span>
-<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Stores the final index**: The transformed multi-dimensional coordinate</span>
-<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Stores the linear offset**: The final memory location after all transformations</span>
-<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Extends TensorAdaptorCoordinate**: Inherits transformation tracking but focuses on the final result</span>
-<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Always has a single bottom dimension**: The linear offset is stored in hidden dimension <span class="in">`[0]`</span></span>
+<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>**Key characteristics:**</span>
+<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Stores the final index**: The transformed multi-dimensional coordinate</span>
+<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Stores the linear offset**: The final memory location after all transformations</span>
+<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Extends TensorAdaptorCoordinate**: Inherits transformation tracking but focuses on the final result</span>
+<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Always has a single bottom dimension**: The linear offset is stored in hidden dimension <span class="in">`[0]`</span></span>
+<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a><span class="fu">## Why TensorCoordinate Matters</span></span>
 <span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a><span class="fu">## Why TensorCoordinate Matters</span></span>
-<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a>After complex transformations (embedding, merging, unmerging, etc.), you need:</span>
-<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>**The final index**: Where you are in the logical tensor space</span>
-<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>**The linear offset**: Where to actually access memory</span>
+<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a>After complex transformations (embedding, merging, unmerging, etc.), you need:</span>
+<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>**The final index**: Where you are in the logical tensor space</span>
+<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>**The linear offset**: Where to actually access memory</span>
+<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a>TensorCoordinate provides both pieces of information in a single, convenient container.</span>
 <span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a>TensorCoordinate provides both pieces of information in a single, convenient container.</span>
+<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a><span class="fu">## Core Components</span></span>
 <span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a><span class="fu">## Core Components</span></span>
-<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a><span class="fu">### MultiIndex</span></span>
-<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a>A <span class="in">`MultiIndex`</span> represents a multi-dimensional index with a specific number of dimensions:</span>
-<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-65"><a href="#cb2-65" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
-<span id="cb2-66"><a href="#cb2-66" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
-<span id="cb2-67"><a href="#cb2-67" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
+<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a><span class="fu">### MultiIndex</span></span>
+<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a>A <span class="in">`MultiIndex`</span> represents a multi-dimensional index with a specific number of dimensions:</span>
+<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb2-64"><a href="#cb2-64" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
+<span id="cb2-65"><a href="#cb2-65" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
+<span id="cb2-66"><a href="#cb2-66" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-67"><a href="#cb2-67" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tensor_coordinate <span class="im">import</span> MultiIndex</span>
 <span id="cb2-68"><a href="#cb2-68" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tensor_coordinate <span class="im">import</span> MultiIndex</span>
-<span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-71"><a href="#cb2-71" aria-hidden="true" tabindex="-1"></a><span class="co"># Create a 3D index</span></span>
-<span id="cb2-72"><a href="#cb2-72" aria-hidden="true" tabindex="-1"></a>idx <span class="op">=</span> MultiIndex(<span class="dv">3</span>, [<span class="dv">2</span>, <span class="dv">1</span>, <span class="dv">4</span>])</span>
-<span id="cb2-73"><a href="#cb2-73" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"3D index: </span><span class="sc">{</span>idx<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb2-74"><a href="#cb2-74" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Dimensions: </span><span class="sc">{</span><span class="bu">len</span>(idx)<span class="sc">}</span><span class="ss">"</span>)  <span class="co"># Use len() like in C++ size()</span></span>
-<span id="cb2-75"><a href="#cb2-75" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Size: </span><span class="sc">{</span>idx<span class="sc">.</span>size<span class="sc">}</span><span class="ss">"</span>)  <span class="co"># Direct access to size attribute</span></span>
-<span id="cb2-76"><a href="#cb2-76" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Values: </span><span class="sc">{</span>idx<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb2-77"><a href="#cb2-77" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb2-78"><a href="#cb2-78" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-79"><a href="#cb2-79" aria-hidden="true" tabindex="-1"></a><span class="fu">### TensorCoordinate</span></span>
-<span id="cb2-80"><a href="#cb2-80" aria-hidden="true" tabindex="-1"></a>A <span class="in">`TensorCoordinate`</span> represents coordinates in a tensor space with transformations:</span>
-<span id="cb2-81"><a href="#cb2-81" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-84"><a href="#cb2-84" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
-<span id="cb2-85"><a href="#cb2-85" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
-<span id="cb2-86"><a href="#cb2-86" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
+<span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a><span class="co"># Create a 3D index</span></span>
+<span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a>idx <span class="op">=</span> MultiIndex(<span class="dv">3</span>, [<span class="dv">2</span>, <span class="dv">1</span>, <span class="dv">4</span>])</span>
+<span id="cb2-71"><a href="#cb2-71" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"3D index: </span><span class="sc">{</span>idx<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb2-72"><a href="#cb2-72" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Dimensions: </span><span class="sc">{</span><span class="bu">len</span>(idx)<span class="sc">}</span><span class="ss">"</span>)  <span class="co"># Use len() like in C++ size()</span></span>
+<span id="cb2-73"><a href="#cb2-73" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Size: </span><span class="sc">{</span>idx<span class="sc">.</span>size<span class="sc">}</span><span class="ss">"</span>)  <span class="co"># Direct access to size attribute</span></span>
+<span id="cb2-74"><a href="#cb2-74" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Values: </span><span class="sc">{</span>idx<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb2-75"><a href="#cb2-75" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb2-76"><a href="#cb2-76" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-77"><a href="#cb2-77" aria-hidden="true" tabindex="-1"></a><span class="fu">### TensorCoordinate</span></span>
+<span id="cb2-78"><a href="#cb2-78" aria-hidden="true" tabindex="-1"></a>A <span class="in">`TensorCoordinate`</span> represents coordinates in a tensor space with transformations:</span>
+<span id="cb2-79"><a href="#cb2-79" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-82"><a href="#cb2-82" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb2-83"><a href="#cb2-83" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
+<span id="cb2-84"><a href="#cb2-84" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
+<span id="cb2-85"><a href="#cb2-85" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-86"><a href="#cb2-86" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tensor_coordinate <span class="im">import</span> TensorCoordinate, MultiIndex</span>
 <span id="cb2-87"><a href="#cb2-87" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-88"><a href="#cb2-88" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tensor_coordinate <span class="im">import</span> TensorCoordinate, MultiIndex</span>
-<span id="cb2-89"><a href="#cb2-89" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-90"><a href="#cb2-90" aria-hidden="true" tabindex="-1"></a><span class="co"># Create a tensor coordinate</span></span>
-<span id="cb2-91"><a href="#cb2-91" aria-hidden="true" tabindex="-1"></a><span class="co"># TensorCoordinate needs: ndim_hidden, top_dimension_hidden_ids, idx_hidden</span></span>
-<span id="cb2-92"><a href="#cb2-92" aria-hidden="true" tabindex="-1"></a>ndim_hidden <span class="op">=</span> <span class="dv">4</span>  <span class="co"># Total hidden dimensions</span></span>
-<span id="cb2-93"><a href="#cb2-93" aria-hidden="true" tabindex="-1"></a>top_dimension_hidden_ids <span class="op">=</span> [<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>]  <span class="co"># Which hidden dims map to top</span></span>
-<span id="cb2-94"><a href="#cb2-94" aria-hidden="true" tabindex="-1"></a>idx_hidden <span class="op">=</span> MultiIndex(<span class="dv">4</span>, [<span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>])  <span class="co"># Initial hidden index</span></span>
-<span id="cb2-95"><a href="#cb2-95" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-96"><a href="#cb2-96" aria-hidden="true" tabindex="-1"></a>coord <span class="op">=</span> TensorCoordinate(</span>
-<span id="cb2-97"><a href="#cb2-97" aria-hidden="true" tabindex="-1"></a>    ndim_hidden<span class="op">=</span>ndim_hidden,</span>
-<span id="cb2-98"><a href="#cb2-98" aria-hidden="true" tabindex="-1"></a>    top_dimension_hidden_ids<span class="op">=</span>top_dimension_hidden_ids,</span>
-<span id="cb2-99"><a href="#cb2-99" aria-hidden="true" tabindex="-1"></a>    idx_hidden<span class="op">=</span>idx_hidden</span>
-<span id="cb2-100"><a href="#cb2-100" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb2-101"><a href="#cb2-101" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-102"><a href="#cb2-102" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Tensor coordinate created"</span>)</span>
-<span id="cb2-103"><a href="#cb2-103" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Top index: </span><span class="sc">{</span>coord<span class="sc">.</span>get_index()<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb2-104"><a href="#cb2-104" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Offset: </span><span class="sc">{</span>coord<span class="sc">.</span>get_offset()<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb2-105"><a href="#cb2-105" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb2-88"><a href="#cb2-88" aria-hidden="true" tabindex="-1"></a><span class="co"># Create a tensor coordinate</span></span>
+<span id="cb2-89"><a href="#cb2-89" aria-hidden="true" tabindex="-1"></a><span class="co"># TensorCoordinate needs: ndim_hidden, top_dimension_hidden_ids, idx_hidden</span></span>
+<span id="cb2-90"><a href="#cb2-90" aria-hidden="true" tabindex="-1"></a>ndim_hidden <span class="op">=</span> <span class="dv">4</span>  <span class="co"># Total hidden dimensions</span></span>
+<span id="cb2-91"><a href="#cb2-91" aria-hidden="true" tabindex="-1"></a>top_dimension_hidden_ids <span class="op">=</span> [<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>]  <span class="co"># Which hidden dims map to top</span></span>
+<span id="cb2-92"><a href="#cb2-92" aria-hidden="true" tabindex="-1"></a>idx_hidden <span class="op">=</span> MultiIndex(<span class="dv">4</span>, [<span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>])  <span class="co"># Initial hidden index</span></span>
+<span id="cb2-93"><a href="#cb2-93" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-94"><a href="#cb2-94" aria-hidden="true" tabindex="-1"></a>coord <span class="op">=</span> TensorCoordinate(</span>
+<span id="cb2-95"><a href="#cb2-95" aria-hidden="true" tabindex="-1"></a>    ndim_hidden<span class="op">=</span>ndim_hidden,</span>
+<span id="cb2-96"><a href="#cb2-96" aria-hidden="true" tabindex="-1"></a>    top_dimension_hidden_ids<span class="op">=</span>top_dimension_hidden_ids,</span>
+<span id="cb2-97"><a href="#cb2-97" aria-hidden="true" tabindex="-1"></a>    idx_hidden<span class="op">=</span>idx_hidden</span>
+<span id="cb2-98"><a href="#cb2-98" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb2-99"><a href="#cb2-99" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-100"><a href="#cb2-100" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Tensor coordinate created"</span>)</span>
+<span id="cb2-101"><a href="#cb2-101" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Top index: </span><span class="sc">{</span>coord<span class="sc">.</span>get_index()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb2-102"><a href="#cb2-102" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Offset: </span><span class="sc">{</span>coord<span class="sc">.</span>get_offset()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb2-103"><a href="#cb2-103" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb2-104"><a href="#cb2-104" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-105"><a href="#cb2-105" aria-hidden="true" tabindex="-1"></a><span class="fu">## Key Operations</span></span>
 <span id="cb2-106"><a href="#cb2-106" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-107"><a href="#cb2-107" aria-hidden="true" tabindex="-1"></a><span class="fu">## Key Operations</span></span>
+<span id="cb2-107"><a href="#cb2-107" aria-hidden="true" tabindex="-1"></a><span class="fu">### Index Manipulation</span></span>
 <span id="cb2-108"><a href="#cb2-108" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-109"><a href="#cb2-109" aria-hidden="true" tabindex="-1"></a><span class="fu">### Index Manipulation</span></span>
-<span id="cb2-110"><a href="#cb2-110" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-113"><a href="#cb2-113" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
-<span id="cb2-114"><a href="#cb2-114" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
-<span id="cb2-115"><a href="#cb2-115" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
-<span id="cb2-116"><a href="#cb2-116" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-117"><a href="#cb2-117" aria-hidden="true" tabindex="-1"></a><span class="co"># Create and manipulate indices</span></span>
-<span id="cb2-118"><a href="#cb2-118" aria-hidden="true" tabindex="-1"></a>idx1 <span class="op">=</span> MultiIndex(<span class="dv">2</span>, [<span class="dv">3</span>, <span class="dv">7</span>])</span>
-<span id="cb2-119"><a href="#cb2-119" aria-hidden="true" tabindex="-1"></a>idx2 <span class="op">=</span> MultiIndex(<span class="dv">2</span>, [<span class="dv">1</span>, <span class="dv">2</span>])</span>
-<span id="cb2-120"><a href="#cb2-120" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-121"><a href="#cb2-121" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Original: </span><span class="sc">{</span>idx1<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb2-122"><a href="#cb2-122" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Offset: </span><span class="sc">{</span>idx2<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb2-123"><a href="#cb2-123" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-124"><a href="#cb2-124" aria-hidden="true" tabindex="-1"></a><span class="co"># Element-wise operations</span></span>
-<span id="cb2-125"><a href="#cb2-125" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> MultiIndex(<span class="dv">2</span>, [idx1[i] <span class="op">+</span> idx2[i] <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">2</span>)])</span>
-<span id="cb2-126"><a href="#cb2-126" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Sum: </span><span class="sc">{</span>result<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb2-127"><a href="#cb2-127" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb2-111"><a href="#cb2-111" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb2-112"><a href="#cb2-112" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
+<span id="cb2-113"><a href="#cb2-113" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
+<span id="cb2-114"><a href="#cb2-114" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-115"><a href="#cb2-115" aria-hidden="true" tabindex="-1"></a><span class="co"># Create and manipulate indices</span></span>
+<span id="cb2-116"><a href="#cb2-116" aria-hidden="true" tabindex="-1"></a>idx1 <span class="op">=</span> MultiIndex(<span class="dv">2</span>, [<span class="dv">3</span>, <span class="dv">7</span>])</span>
+<span id="cb2-117"><a href="#cb2-117" aria-hidden="true" tabindex="-1"></a>idx2 <span class="op">=</span> MultiIndex(<span class="dv">2</span>, [<span class="dv">1</span>, <span class="dv">2</span>])</span>
+<span id="cb2-118"><a href="#cb2-118" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-119"><a href="#cb2-119" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Original: </span><span class="sc">{</span>idx1<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb2-120"><a href="#cb2-120" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Offset: </span><span class="sc">{</span>idx2<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb2-121"><a href="#cb2-121" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-122"><a href="#cb2-122" aria-hidden="true" tabindex="-1"></a><span class="co"># Element-wise operations</span></span>
+<span id="cb2-123"><a href="#cb2-123" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> MultiIndex(<span class="dv">2</span>, [idx1[i] <span class="op">+</span> idx2[i] <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">2</span>)])</span>
+<span id="cb2-124"><a href="#cb2-124" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Sum: </span><span class="sc">{</span>result<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb2-125"><a href="#cb2-125" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb2-126"><a href="#cb2-126" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-127"><a href="#cb2-127" aria-hidden="true" tabindex="-1"></a><span class="fu">### Coordinate Transformations</span></span>
 <span id="cb2-128"><a href="#cb2-128" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-129"><a href="#cb2-129" aria-hidden="true" tabindex="-1"></a><span class="fu">### Coordinate Transformations</span></span>
-<span id="cb2-130"><a href="#cb2-130" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-133"><a href="#cb2-133" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
-<span id="cb2-134"><a href="#cb2-134" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
-<span id="cb2-135"><a href="#cb2-135" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
+<span id="cb2-131"><a href="#cb2-131" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb2-132"><a href="#cb2-132" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
+<span id="cb2-133"><a href="#cb2-133" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
+<span id="cb2-134"><a href="#cb2-134" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-135"><a href="#cb2-135" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tensor_coordinate <span class="im">import</span> TensorAdaptorCoordinate</span>
 <span id="cb2-136"><a href="#cb2-136" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-137"><a href="#cb2-137" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tensor_coordinate <span class="im">import</span> TensorAdaptorCoordinate</span>
-<span id="cb2-138"><a href="#cb2-138" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-139"><a href="#cb2-139" aria-hidden="true" tabindex="-1"></a><span class="co"># Create an adaptor coordinate manually for demonstration</span></span>
-<span id="cb2-140"><a href="#cb2-140" aria-hidden="true" tabindex="-1"></a><span class="co"># In practice, these are created through tensor descriptors and adaptors</span></span>
-<span id="cb2-141"><a href="#cb2-141" aria-hidden="true" tabindex="-1"></a>ndim_hidden <span class="op">=</span> <span class="dv">3</span></span>
-<span id="cb2-142"><a href="#cb2-142" aria-hidden="true" tabindex="-1"></a>bottom_dimension_hidden_ids <span class="op">=</span> [<span class="dv">0</span>]  <span class="co"># Maps to offset</span></span>
-<span id="cb2-143"><a href="#cb2-143" aria-hidden="true" tabindex="-1"></a>top_dimension_hidden_ids <span class="op">=</span> [<span class="dv">1</span>, <span class="dv">2</span>]  <span class="co"># Maps to 2D index</span></span>
-<span id="cb2-144"><a href="#cb2-144" aria-hidden="true" tabindex="-1"></a>idx_hidden <span class="op">=</span> MultiIndex(<span class="dv">3</span>, [<span class="dv">5</span>, <span class="dv">2</span>, <span class="dv">3</span>])  <span class="co"># offset=5, index=(2,3)</span></span>
-<span id="cb2-145"><a href="#cb2-145" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-146"><a href="#cb2-146" aria-hidden="true" tabindex="-1"></a>adaptor_coord <span class="op">=</span> TensorAdaptorCoordinate(</span>
-<span id="cb2-147"><a href="#cb2-147" aria-hidden="true" tabindex="-1"></a>    ndim_hidden<span class="op">=</span>ndim_hidden,</span>
-<span id="cb2-148"><a href="#cb2-148" aria-hidden="true" tabindex="-1"></a>    bottom_dimension_hidden_ids<span class="op">=</span>bottom_dimension_hidden_ids,</span>
-<span id="cb2-149"><a href="#cb2-149" aria-hidden="true" tabindex="-1"></a>    top_dimension_hidden_ids<span class="op">=</span>top_dimension_hidden_ids,</span>
-<span id="cb2-150"><a href="#cb2-150" aria-hidden="true" tabindex="-1"></a>    idx_hidden<span class="op">=</span>idx_hidden</span>
-<span id="cb2-151"><a href="#cb2-151" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb2-152"><a href="#cb2-152" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-153"><a href="#cb2-153" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Adaptor coordinate created"</span>)</span>
-<span id="cb2-154"><a href="#cb2-154" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Top index: </span><span class="sc">{</span>adaptor_coord<span class="sc">.</span>get_top_index()<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb2-155"><a href="#cb2-155" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Bottom index: </span><span class="sc">{</span>adaptor_coord<span class="sc">.</span>get_bottom_index()<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb2-156"><a href="#cb2-156" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Hidden index: </span><span class="sc">{</span>adaptor_coord<span class="sc">.</span>get_hidden_index()<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb2-157"><a href="#cb2-157" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb2-137"><a href="#cb2-137" aria-hidden="true" tabindex="-1"></a><span class="co"># Create an adaptor coordinate manually for demonstration</span></span>
+<span id="cb2-138"><a href="#cb2-138" aria-hidden="true" tabindex="-1"></a><span class="co"># In practice, these are created through tensor descriptors and adaptors</span></span>
+<span id="cb2-139"><a href="#cb2-139" aria-hidden="true" tabindex="-1"></a>ndim_hidden <span class="op">=</span> <span class="dv">3</span></span>
+<span id="cb2-140"><a href="#cb2-140" aria-hidden="true" tabindex="-1"></a>bottom_dimension_hidden_ids <span class="op">=</span> [<span class="dv">0</span>]  <span class="co"># Maps to offset</span></span>
+<span id="cb2-141"><a href="#cb2-141" aria-hidden="true" tabindex="-1"></a>top_dimension_hidden_ids <span class="op">=</span> [<span class="dv">1</span>, <span class="dv">2</span>]  <span class="co"># Maps to 2D index</span></span>
+<span id="cb2-142"><a href="#cb2-142" aria-hidden="true" tabindex="-1"></a>idx_hidden <span class="op">=</span> MultiIndex(<span class="dv">3</span>, [<span class="dv">5</span>, <span class="dv">2</span>, <span class="dv">3</span>])  <span class="co"># offset=5, index=(2,3)</span></span>
+<span id="cb2-143"><a href="#cb2-143" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-144"><a href="#cb2-144" aria-hidden="true" tabindex="-1"></a>adaptor_coord <span class="op">=</span> TensorAdaptorCoordinate(</span>
+<span id="cb2-145"><a href="#cb2-145" aria-hidden="true" tabindex="-1"></a>    ndim_hidden<span class="op">=</span>ndim_hidden,</span>
+<span id="cb2-146"><a href="#cb2-146" aria-hidden="true" tabindex="-1"></a>    bottom_dimension_hidden_ids<span class="op">=</span>bottom_dimension_hidden_ids,</span>
+<span id="cb2-147"><a href="#cb2-147" aria-hidden="true" tabindex="-1"></a>    top_dimension_hidden_ids<span class="op">=</span>top_dimension_hidden_ids,</span>
+<span id="cb2-148"><a href="#cb2-148" aria-hidden="true" tabindex="-1"></a>    idx_hidden<span class="op">=</span>idx_hidden</span>
+<span id="cb2-149"><a href="#cb2-149" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb2-150"><a href="#cb2-150" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-151"><a href="#cb2-151" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Adaptor coordinate created"</span>)</span>
+<span id="cb2-152"><a href="#cb2-152" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Top index: </span><span class="sc">{</span>adaptor_coord<span class="sc">.</span>get_top_index()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb2-153"><a href="#cb2-153" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Bottom index: </span><span class="sc">{</span>adaptor_coord<span class="sc">.</span>get_bottom_index()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb2-154"><a href="#cb2-154" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Hidden index: </span><span class="sc">{</span>adaptor_coord<span class="sc">.</span>get_hidden_index()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb2-155"><a href="#cb2-155" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb2-156"><a href="#cb2-156" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-157"><a href="#cb2-157" aria-hidden="true" tabindex="-1"></a><span class="fu">## Relationship to Other Concepts</span></span>
 <span id="cb2-158"><a href="#cb2-158" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-159"><a href="#cb2-159" aria-hidden="true" tabindex="-1"></a><span class="fu">## Relationship to Other Concepts</span></span>
+<span id="cb2-159"><a href="#cb2-159" aria-hidden="true" tabindex="-1"></a>Tensor coordinates are used throughout PythonCK:</span>
 <span id="cb2-160"><a href="#cb2-160" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-161"><a href="#cb2-161" aria-hidden="true" tabindex="-1"></a>Tensor coordinates are used throughout PythonCK:</span>
-<span id="cb2-162"><a href="#cb2-162" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-163"><a href="#cb2-163" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Buffer Views** use coordinates to access memory locations</span>
-<span id="cb2-164"><a href="#cb2-164" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Tensor Descriptors** transform coordinates through layout changes  </span>
-<span id="cb2-165"><a href="#cb2-165" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Tile Distributions** map coordinates between different spaces</span>
-<span id="cb2-166"><a href="#cb2-166" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Sweep Operations** iterate through coordinate ranges</span>
+<span id="cb2-161"><a href="#cb2-161" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Buffer Views** use coordinates to access memory locations</span>
+<span id="cb2-162"><a href="#cb2-162" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Tensor Descriptors** transform coordinates through layout changes  </span>
+<span id="cb2-163"><a href="#cb2-163" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Tile Distributions** map coordinates between different spaces</span>
+<span id="cb2-164"><a href="#cb2-164" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Sweep Operations** iterate through coordinate ranges</span>
+<span id="cb2-165"><a href="#cb2-165" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-166"><a href="#cb2-166" aria-hidden="true" tabindex="-1"></a><span class="fu">## Next Steps</span></span>
 <span id="cb2-167"><a href="#cb2-167" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-168"><a href="#cb2-168" aria-hidden="true" tabindex="-1"></a><span class="fu">## Next Steps</span></span>
-<span id="cb2-169"><a href="#cb2-169" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-170"><a href="#cb2-170" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Learn about <span class="co">[</span><span class="ot">**Tensor Adaptors**</span><span class="co">](tensor-adaptor.qmd)</span> - The transformation engines that execute descriptors</span>
-<span id="cb2-171"><a href="#cb2-171" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Explore <span class="co">[</span><span class="ot">**Tensor Adaptor Coordinates**</span><span class="co">](tensor-adaptor-coordinate.qmd)</span> - Result containers for transformed indices</span>
-<span id="cb2-172"><a href="#cb2-172" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Understand <span class="co">[</span><span class="ot">**Advanced Coordinate Operations**</span><span class="co">](tensor-coordinate-advanced.qmd)</span> - Functions that require descriptors</span>
+<span id="cb2-168"><a href="#cb2-168" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Learn about <span class="co">[</span><span class="ot">**Tensor Adaptors**</span><span class="co">](tensor-adaptor.qmd)</span> - The transformation engines that execute descriptors</span>
+<span id="cb2-169"><a href="#cb2-169" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Explore <span class="co">[</span><span class="ot">**Tensor Adaptor Coordinates**</span><span class="co">](tensor-adaptor-coordinate.qmd)</span> - Result containers for transformed indices</span>
+<span id="cb2-170"><a href="#cb2-170" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Understand <span class="co">[</span><span class="ot">**Advanced Coordinate Operations**</span><span class="co">](tensor-coordinate-advanced.qmd)</span> - Functions that require descriptors</span>
+<span id="cb2-171"><a href="#cb2-171" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-172"><a href="#cb2-172" aria-hidden="true" tabindex="-1"></a>The coordinate system provides the mathematical foundation that enables all the advanced tensor operations in PythonCK. </span>
 <span id="cb2-173"><a href="#cb2-173" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-174"><a href="#cb2-174" aria-hidden="true" tabindex="-1"></a>The coordinate system provides the mathematical foundation that enables all the advanced tensor operations in PythonCK. </span>
+<span id="cb2-174"><a href="#cb2-174" aria-hidden="true" tabindex="-1"></a><span class="fu">### TensorCoordinate: Index + Offset Storage</span></span>
 <span id="cb2-175"><a href="#cb2-175" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-176"><a href="#cb2-176" aria-hidden="true" tabindex="-1"></a><span class="fu">### TensorCoordinate: Index + Offset Storage</span></span>
+<span id="cb2-176"><a href="#cb2-176" aria-hidden="true" tabindex="-1"></a>A <span class="in">`TensorCoordinate`</span> stores the final result of tensor transformations - both the logical index and the linear memory offset:</span>
 <span id="cb2-177"><a href="#cb2-177" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-178"><a href="#cb2-178" aria-hidden="true" tabindex="-1"></a>A <span class="in">`TensorCoordinate`</span> stores the final result of tensor transformations - both the logical index and the linear memory offset:</span>
-<span id="cb2-179"><a href="#cb2-179" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-182"><a href="#cb2-182" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
-<span id="cb2-183"><a href="#cb2-183" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
-<span id="cb2-184"><a href="#cb2-184" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
-<span id="cb2-185"><a href="#cb2-185" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-186"><a href="#cb2-186" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tensor_coordinate <span class="im">import</span> make_tensor_coordinate</span>
-<span id="cb2-187"><a href="#cb2-187" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tensor_descriptor <span class="im">import</span> make_naive_tensor_descriptor</span>
-<span id="cb2-188"><a href="#cb2-188" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-189"><a href="#cb2-189" aria-hidden="true" tabindex="-1"></a><span class="co"># Create a 4x6 tensor descriptor (row-major layout)</span></span>
-<span id="cb2-190"><a href="#cb2-190" aria-hidden="true" tabindex="-1"></a>descriptor <span class="op">=</span> make_naive_tensor_descriptor([<span class="dv">4</span>, <span class="dv">6</span>], [<span class="dv">6</span>, <span class="dv">1</span>])</span>
-<span id="cb2-191"><a href="#cb2-191" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-192"><a href="#cb2-192" aria-hidden="true" tabindex="-1"></a><span class="co"># Create a tensor coordinate for logical index [2, 3]</span></span>
-<span id="cb2-193"><a href="#cb2-193" aria-hidden="true" tabindex="-1"></a>logical_index <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">3</span>]</span>
-<span id="cb2-194"><a href="#cb2-194" aria-hidden="true" tabindex="-1"></a>coord <span class="op">=</span> make_tensor_coordinate(descriptor, logical_index)</span>
-<span id="cb2-195"><a href="#cb2-195" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-196"><a href="#cb2-196" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"🎯 TensorCoordinate stores the final result:"</span>)</span>
-<span id="cb2-197"><a href="#cb2-197" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  Input logical index: </span><span class="sc">{</span>logical_index<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb2-198"><a href="#cb2-198" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  Final index: </span><span class="sc">{</span>coord<span class="sc">.</span>get_index()<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb2-199"><a href="#cb2-199" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  Linear offset: </span><span class="sc">{</span>coord<span class="sc">.</span>get_offset()<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb2-200"><a href="#cb2-200" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  Manual calculation: 2*6 + 3*1 = </span><span class="sc">{</span><span class="dv">2</span><span class="op">*</span><span class="dv">6</span> <span class="op">+</span> <span class="dv">3</span><span class="op">*</span><span class="dv">1</span><span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb2-201"><a href="#cb2-201" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  ✅ Both index and offset stored!"</span>)</span>
-<span id="cb2-202"><a href="#cb2-202" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb2-180"><a href="#cb2-180" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb2-181"><a href="#cb2-181" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
+<span id="cb2-182"><a href="#cb2-182" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
+<span id="cb2-183"><a href="#cb2-183" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-184"><a href="#cb2-184" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tensor_coordinate <span class="im">import</span> make_tensor_coordinate</span>
+<span id="cb2-185"><a href="#cb2-185" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tensor_descriptor <span class="im">import</span> make_naive_tensor_descriptor</span>
+<span id="cb2-186"><a href="#cb2-186" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-187"><a href="#cb2-187" aria-hidden="true" tabindex="-1"></a><span class="co"># Create a 4x6 tensor descriptor (row-major layout)</span></span>
+<span id="cb2-188"><a href="#cb2-188" aria-hidden="true" tabindex="-1"></a>descriptor <span class="op">=</span> make_naive_tensor_descriptor([<span class="dv">4</span>, <span class="dv">6</span>], [<span class="dv">6</span>, <span class="dv">1</span>])</span>
+<span id="cb2-189"><a href="#cb2-189" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-190"><a href="#cb2-190" aria-hidden="true" tabindex="-1"></a><span class="co"># Create a tensor coordinate for logical index [2, 3]</span></span>
+<span id="cb2-191"><a href="#cb2-191" aria-hidden="true" tabindex="-1"></a>logical_index <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">3</span>]</span>
+<span id="cb2-192"><a href="#cb2-192" aria-hidden="true" tabindex="-1"></a>coord <span class="op">=</span> make_tensor_coordinate(descriptor, logical_index)</span>
+<span id="cb2-193"><a href="#cb2-193" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-194"><a href="#cb2-194" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"🎯 TensorCoordinate stores the final result:"</span>)</span>
+<span id="cb2-195"><a href="#cb2-195" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  Input logical index: </span><span class="sc">{</span>logical_index<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb2-196"><a href="#cb2-196" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  Final index: </span><span class="sc">{</span>coord<span class="sc">.</span>get_index()<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb2-197"><a href="#cb2-197" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  Linear offset: </span><span class="sc">{</span>coord<span class="sc">.</span>get_offset()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb2-198"><a href="#cb2-198" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  Manual calculation: 2*6 + 3*1 = </span><span class="sc">{</span><span class="dv">2</span><span class="op">*</span><span class="dv">6</span> <span class="op">+</span> <span class="dv">3</span><span class="op">*</span><span class="dv">1</span><span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb2-199"><a href="#cb2-199" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  ✅ Both index and offset stored!"</span>)</span>
+<span id="cb2-200"><a href="#cb2-200" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb2-201"><a href="#cb2-201" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-202"><a href="#cb2-202" aria-hidden="true" tabindex="-1"></a><span class="fu">### Key Methods</span></span>
 <span id="cb2-203"><a href="#cb2-203" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-204"><a href="#cb2-204" aria-hidden="true" tabindex="-1"></a><span class="fu">### Key Methods</span></span>
-<span id="cb2-205"><a href="#cb2-205" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-208"><a href="#cb2-208" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
-<span id="cb2-209"><a href="#cb2-209" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
-<span id="cb2-210"><a href="#cb2-210" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
-<span id="cb2-211"><a href="#cb2-211" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-212"><a href="#cb2-212" aria-hidden="true" tabindex="-1"></a><span class="co"># TensorCoordinate provides clear access to both pieces of information</span></span>
-<span id="cb2-213"><a href="#cb2-213" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"📍 TensorCoordinate key methods:"</span>)</span>
-<span id="cb2-214"><a href="#cb2-214" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  coord.get_index(): </span><span class="sc">{</span>coord<span class="sc">.</span>get_index()<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss"> (the logical index)"</span>)</span>
-<span id="cb2-215"><a href="#cb2-215" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  coord.get_offset(): </span><span class="sc">{</span>coord<span class="sc">.</span>get_offset()<span class="sc">}</span><span class="ss"> (the memory offset)"</span>)</span>
-<span id="cb2-216"><a href="#cb2-216" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  coord.get_hidden_index(): </span><span class="sc">{</span>coord<span class="sc">.</span>get_hidden_index()<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss"> (internal storage)"</span>)</span>
-<span id="cb2-217"><a href="#cb2-217" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-218"><a href="#cb2-218" aria-hidden="true" tabindex="-1"></a><span class="co"># The beauty: after complex transformations, you always get both!</span></span>
-<span id="cb2-219"><a href="#cb2-219" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"✨ Perfect for memory access: tensor[</span><span class="sc">{</span>coord<span class="sc">.</span>get_index()<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">] = memory[</span><span class="sc">{</span>coord<span class="sc">.</span>get_offset()<span class="sc">}</span><span class="ss">]"</span>)</span>
-<span id="cb2-220"><a href="#cb2-220" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb2-206"><a href="#cb2-206" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb2-207"><a href="#cb2-207" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
+<span id="cb2-208"><a href="#cb2-208" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
+<span id="cb2-209"><a href="#cb2-209" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-210"><a href="#cb2-210" aria-hidden="true" tabindex="-1"></a><span class="co"># TensorCoordinate provides clear access to both pieces of information</span></span>
+<span id="cb2-211"><a href="#cb2-211" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"📍 TensorCoordinate key methods:"</span>)</span>
+<span id="cb2-212"><a href="#cb2-212" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  coord.get_index(): </span><span class="sc">{</span>coord<span class="sc">.</span>get_index()<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss"> (the logical index)"</span>)</span>
+<span id="cb2-213"><a href="#cb2-213" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  coord.get_offset(): </span><span class="sc">{</span>coord<span class="sc">.</span>get_offset()<span class="sc">}</span><span class="ss"> (the memory offset)"</span>)</span>
+<span id="cb2-214"><a href="#cb2-214" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  coord.get_hidden_index(): </span><span class="sc">{</span>coord<span class="sc">.</span>get_hidden_index()<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss"> (internal storage)"</span>)</span>
+<span id="cb2-215"><a href="#cb2-215" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-216"><a href="#cb2-216" aria-hidden="true" tabindex="-1"></a><span class="co"># The beauty: after complex transformations, you always get both!</span></span>
+<span id="cb2-217"><a href="#cb2-217" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"✨ Perfect for memory access: tensor[</span><span class="sc">{</span>coord<span class="sc">.</span>get_index()<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">] = memory[</span><span class="sc">{</span>coord<span class="sc">.</span>get_offset()<span class="sc">}</span><span class="ss">]"</span>)</span>
+<span id="cb2-218"><a href="#cb2-218" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb2-219"><a href="#cb2-219" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-220"><a href="#cb2-220" aria-hidden="true" tabindex="-1"></a><span class="fu">### Comparison with TensorAdaptorCoordinate</span></span>
 <span id="cb2-221"><a href="#cb2-221" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-222"><a href="#cb2-222" aria-hidden="true" tabindex="-1"></a><span class="fu">### Comparison with TensorAdaptorCoordinate</span></span>
-<span id="cb2-223"><a href="#cb2-223" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-226"><a href="#cb2-226" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
-<span id="cb2-227"><a href="#cb2-227" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
-<span id="cb2-228"><a href="#cb2-228" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
+<span id="cb2-224"><a href="#cb2-224" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb2-225"><a href="#cb2-225" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
+<span id="cb2-226"><a href="#cb2-226" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
+<span id="cb2-227"><a href="#cb2-227" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-228"><a href="#cb2-228" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tensor_coordinate <span class="im">import</span> make_tensor_adaptor_coordinate</span>
 <span id="cb2-229"><a href="#cb2-229" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-230"><a href="#cb2-230" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tensor_coordinate <span class="im">import</span> make_tensor_adaptor_coordinate</span>
-<span id="cb2-231"><a href="#cb2-231" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-232"><a href="#cb2-232" aria-hidden="true" tabindex="-1"></a><span class="co"># Create an adaptor coordinate (intermediate result)</span></span>
-<span id="cb2-233"><a href="#cb2-233" aria-hidden="true" tabindex="-1"></a><span class="co"># Since TensorDescriptor extends TensorAdaptor, we can use it directly</span></span>
-<span id="cb2-234"><a href="#cb2-234" aria-hidden="true" tabindex="-1"></a>adaptor_coord <span class="op">=</span> make_tensor_adaptor_coordinate(descriptor, coord.get_index())</span>
-<span id="cb2-235"><a href="#cb2-235" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-236"><a href="#cb2-236" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"🔄 TensorAdaptorCoordinate vs TensorCoordinate:"</span>)</span>
-<span id="cb2-237"><a href="#cb2-237" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  Adaptor - Top: </span><span class="sc">{</span>adaptor_coord<span class="sc">.</span>get_top_index()<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">, Bottom: </span><span class="sc">{</span>adaptor_coord<span class="sc">.</span>get_bottom_index()<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb2-238"><a href="#cb2-238" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  Tensor  - Index: </span><span class="sc">{</span>coord<span class="sc">.</span>get_index()<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">, Offset: </span><span class="sc">{</span>coord<span class="sc">.</span>get_offset()<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb2-239"><a href="#cb2-239" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  🎯 TensorCoordinate simplifies: single offset instead of bottom index"</span>)</span>
-<span id="cb2-240"><a href="#cb2-240" aria-hidden="true" tabindex="-1"></a><span class="in">```</span> </span>
+<span id="cb2-230"><a href="#cb2-230" aria-hidden="true" tabindex="-1"></a><span class="co"># Create an adaptor coordinate (intermediate result)</span></span>
+<span id="cb2-231"><a href="#cb2-231" aria-hidden="true" tabindex="-1"></a><span class="co"># Since TensorDescriptor extends TensorAdaptor, we can use it directly</span></span>
+<span id="cb2-232"><a href="#cb2-232" aria-hidden="true" tabindex="-1"></a>adaptor_coord <span class="op">=</span> make_tensor_adaptor_coordinate(descriptor, coord.get_index())</span>
+<span id="cb2-233"><a href="#cb2-233" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-234"><a href="#cb2-234" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"🔄 TensorAdaptorCoordinate vs TensorCoordinate:"</span>)</span>
+<span id="cb2-235"><a href="#cb2-235" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  Adaptor - Top: </span><span class="sc">{</span>adaptor_coord<span class="sc">.</span>get_top_index()<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">, Bottom: </span><span class="sc">{</span>adaptor_coord<span class="sc">.</span>get_bottom_index()<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb2-236"><a href="#cb2-236" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  Tensor  - Index: </span><span class="sc">{</span>coord<span class="sc">.</span>get_index()<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">, Offset: </span><span class="sc">{</span>coord<span class="sc">.</span>get_offset()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb2-237"><a href="#cb2-237" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  🎯 TensorCoordinate simplifies: single offset instead of bottom index"</span>)</span>
+<span id="cb2-238"><a href="#cb2-238" aria-hidden="true" tabindex="-1"></a><span class="in">```</span> </span>
 </code><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></pre></div>
 </div></div></div></div></div>
 </div> <!-- /content -->
