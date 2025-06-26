@@ -13,8 +13,6 @@ import micropip
 await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl")
 ```
 
-# PythonCK: Python Implementation of Composable Kernels
-
 Welcome to PythonCK, a Python implementation of tensor operations and concepts from the AMD Composable Kernels library. This package provides educational implementations that focus on clarity and understanding rather than performance.
 
 ## 🎓 **Recommended Learning Path**

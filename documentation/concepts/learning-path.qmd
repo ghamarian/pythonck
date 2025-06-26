@@ -13,8 +13,6 @@ import micropip
 await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl")
 ```
 
-# Complete Learning Path to Understanding Thread Mapping
-
 This document provides a **restructured learning path** to understand all concepts in PythonCK, with proper dependency ordering and focused explanations.
 
 ## 🎯 **Ultimate Goal: Understanding `tile_distr_thread_mapping.py`**

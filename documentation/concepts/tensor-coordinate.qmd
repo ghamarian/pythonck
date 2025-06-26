@@ -23,8 +23,6 @@ from pytensor.tensor_coordinate import MultiIndex, TensorCoordinate, TensorAdapt
 from pytensor.tensor_descriptor import make_naive_tensor_descriptor
 ```
 
-# Tensor Coordinates: The Final Result
-
 **Prerequisites**: [Buffer Views](buffer-view.qmd), [Tensor Descriptors](tensor-descriptor.qmd)
 
 Tensor coordinates represent **the final result** after all tensor layout transformations have been applied. They store both the multi-dimensional index and the linear memory offset that results from complex coordinate transformations.

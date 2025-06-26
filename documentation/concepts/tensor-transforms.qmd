@@ -13,8 +13,6 @@ import micropip
 await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl")
 ```
 
-# Tensor Transforms: The Building Blocks
-
 **Prerequisites**: [Buffer Views](buffer-view.qmd)
 
 **Tensor Transforms** are the fundamental building blocks that define how coordinates map between different spaces. Understanding these individual transforms is essential before learning how they're combined into descriptors and adaptors.

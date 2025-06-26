@@ -2,8 +2,6 @@
 title: "Getting Started with PythonCK"
 ---
 
-# Tutorials
-
 Welcome to the PythonCK tutorials! These step-by-step guides will help you understand the core concepts and learn how to use the library effectively.
 
 ```{pyodide}

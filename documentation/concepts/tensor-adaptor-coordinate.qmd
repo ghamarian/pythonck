@@ -22,8 +22,6 @@ await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/mas
 from pytensor.tensor_coordinate import MultiIndex, make_tensor_adaptor_coordinate
 ```
 
-# Tensor Adaptor Coordinate: The Result Container
-
 **Prerequisites**: [Tensor Transforms](tensor-transforms.qmd), [Tensor Descriptor](tensor-descriptor.qmd), [Tensor Coordinate](tensor-coordinate.qmd), [Tensor Adaptor](tensor-adaptor.qmd)
 
 A **Tensor Adaptor Coordinate** is a **result container** that stores the transformed indices and offsets produced by a Tensor Adaptor. It serves as an intermediate representation between the transformation engine and the final memory-mapped coordinate.

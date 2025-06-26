@@ -13,8 +13,6 @@ import micropip
 await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl")
 ```
 
-# Buffer View
-
 Buffer views provide a unified abstraction for accessing memory across different address spaces and with various access patterns. They form the lowest level of the PythonCK memory hierarchy.
 
 ## Core Concepts

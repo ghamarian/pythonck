@@ -13,8 +13,6 @@ import micropip
 await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl")
 ```
 
-# TensorAdaptor: The Transformation Engine
-
 A **TensorAdaptor** is the core engine in PythonCK for managing coordinate transformations between different index spaces. It is responsible for:
 
 - **Chaining multiple transforms** (like Embed, Merge, Unmerge, Replicate, etc.) to map between user-facing (top) coordinates and memory (bottom) coordinates.

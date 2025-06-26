@@ -23,8 +23,6 @@ from pytensor.tensor_coordinate import MultiIndex, make_tensor_coordinate, make_
 from pytensor.tensor_descriptor import make_naive_tensor_descriptor, TensorAdaptor, EmbedTransform, UnmergeTransform
 ```
 
-# Advanced Coordinate Operations
-
 **Prerequisites**: [Tensor Descriptors](tensor-descriptor.qmd), [Tensor Coordinates](tensor-coordinate.qmd), [Tensor Adaptors](tensor-adaptor.qmd), [Tensor Adaptor Coordinates](tensor-adaptor-coordinate.qmd)
 
 Advanced coordinate operations require understanding of **Tensor Descriptors**, **Tensor Coordinates**, **Tensor Adaptors**, and **Tensor Adaptor Coordinates**. These operations enable:

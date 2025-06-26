@@ -13,8 +13,6 @@ import micropip
 await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl")
 ```
 
-# TensorDescriptor: The Complete Layout Description
-
 A **TensorDescriptor** is a specialized form of TensorAdaptor that not only manages coordinate transformations, but also describes the full memory layout of a tensor. It is the central object for defining how a tensor is stored and accessed in memory.
 
 ## What is a TensorDescriptor?
@@ -76,8 +74,6 @@ These functions let you easily define the most common tensor layouts, or build u
 ---
 
 Next: See [Tensor Coordinates](tensor-coordinate.qmd) for how descriptors and adaptors are used to create and manipulate actual tensor indices.
-
-# Tensor Descriptors: Layout Transformations
 
 **Prerequisites**: [Buffer Views](buffer-view.qmd), [Tensor Transforms](tensor-transforms.qmd)
 
