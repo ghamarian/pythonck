@@ -1112,8 +1112,8 @@ class TensorTransformParser:
                 transform_obj = PassThroughTransform(length=1)  # Length will be updated later
                 # Get input symbol
                 input_symbol = symbols[lower_dims[0]]
-                # Use sympy_forward to get output
-                output = transform_obj.sympy_forward([input_symbol])
+                # Use sympy_calculate_upper to get output
+                output = transform_obj.sympy_calculate_upper([input_symbol])
                 result['transforms'].append({
                     'type': 'pass_through',
                     'expr': output[0]
@@ -1134,8 +1134,8 @@ class TensorTransformParser:
                 
                 # Create MergeTransform
                 transform_obj = MergeTransform(lengths=lengths)
-                # Use sympy_forward to get output
-                output = transform_obj.sympy_forward(input_symbols)
+                # Use sympy_calculate_upper to get output
+                output = transform_obj.sympy_calculate_upper(input_symbols)
                 result['transforms'].append({
                     'type': 'merge',
                     'expr': output[0]

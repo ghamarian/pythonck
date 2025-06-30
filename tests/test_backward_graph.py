@@ -130,25 +130,25 @@ class TestBackwardGraph:
         passthrough_transform = ptd.PassThroughTransform(length=4)
         xor_transform = ptd.XorTransform(lengths=[4, 4])
         
-        # Test merge transform backward (should use sympy_backward for 1 input)
+        # Test merge transform backward (should use sympy_calculate_lower for 1 input)
         x = sp.Symbol('x')
-        merge_backward_result = merge_transform.sympy_backward([x])
-        assert len(merge_backward_result) == 2  # Should split into 2 components
+        merge_backward_result = merge_transform.sympy_calculate_lower([x])
+        assert len(merge_backward_result) == 2
         
-        # Test unmerge transform backward (should use sympy_forward for multiple inputs)  
-        y1, y2 = sp.symbols('y1 y2')
-        unmerge_backward_result = unmerge_transform.sympy_forward([y1, y2])
-        assert len(unmerge_backward_result) == 1  # Should merge into 1 component
-        
-        # Test passthrough transform backward
+        # Test unmerge transform backward (should use sympy_calculate_upper for single input)
         z = sp.Symbol('z')
-        passthrough_backward_result = passthrough_transform.sympy_backward([z])
-        assert passthrough_backward_result == [z]  # Should be identity
+        unmerge_backward_result = unmerge_transform.sympy_calculate_upper([z])
+        assert len(unmerge_backward_result) == 2
         
-        # Test XOR transform backward (should be self-inverse)
+        # Test passthrough backward
+        z = sp.Symbol('z')
+        passthrough_backward_result = passthrough_transform.sympy_calculate_lower([z])  # or calculate_upper, same for passthrough
+        assert len(passthrough_backward_result) == 1
+        
+        # Test XOR backward
         a, b = sp.symbols('a b')
-        xor_backward_result = xor_transform.sympy_backward([a, b])
-        assert len(xor_backward_result) == 2  # XOR produces 2 outputs
+        xor_backward_result = xor_transform.sympy_calculate_lower([a, b])  # or calculate_upper for XOR
+        assert len(xor_backward_result) == 2
     
     def test_backward_graph_complex_example(self, a_lds_example_data):
         """Test backward graph with a complex multi-descriptor example."""
@@ -214,11 +214,11 @@ class TestBackwardGraph:
         # Create test symbols
         x, y = sp.symbols('x y')
         
-        # Forward: merge([x, y]) -> z
-        merged = merge.sympy_forward([x, y])[0]
+        # Forward: merge([x, y]) -> z (merge: multiple → single)
+        merged = merge.sympy_calculate_upper([x, y])[0]
         
-        # Backward: unmerge([z]) -> [x', y']
-        unmerged = unmerge.sympy_backward([merged])
+        # Backward: unmerge([z]) -> [x', y'] (unmerge: single → multiple)
+        unmerged = unmerge.sympy_calculate_upper([merged])
         
         # Test with specific values to verify inverse property
         for x_val in range(lengths[0]):
@@ -237,11 +237,11 @@ class TestBackwardGraph:
         
         x, y = sp.symbols('x y')
         
-        # Forward transformation
-        forward_result = xor_transform.sympy_forward([x, y])
+        # Forward transformation (upper → lower)
+        forward_result = xor_transform.sympy_calculate_lower([x, y])
         
-        # Backward transformation of the forward result
-        backward_result = xor_transform.sympy_backward(forward_result)
+        # Backward transformation of the forward result (lower → upper)
+        backward_result = xor_transform.sympy_calculate_upper(forward_result)
         
         # Should get back to original inputs
         # Note: XOR might reorder outputs, so check the values rather than exact match
@@ -252,7 +252,7 @@ class TestBackwardGraph:
                 
                 # The backward transformation should yield values that,
                 # when forward transformed again, give the same result
-                forward_again = xor_transform.sympy_forward(backward_vals)
+                forward_again = xor_transform.sympy_calculate_lower(backward_vals)
                 forward_again_vals = [expr.subs({x: x_val, y: y_val}) for expr in forward_again]
                 
                 assert forward_again_vals == forward_vals

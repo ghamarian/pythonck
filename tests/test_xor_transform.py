@@ -36,8 +36,9 @@ class TestXorTransform:
         xor1 = XorTransform([4, 8], apply_modulo=True)
         x, y = sp.Symbol('x'), sp.Symbol('y')
         
-        forward = xor1.sympy_forward([x, y])  # lower -> upper
-        backward = xor1.sympy_backward([x, y])  # upper -> lower
+        # Test basic sympy operations
+        forward = xor1.sympy_calculate_lower([x, y])  # upper → lower
+        backward = xor1.sympy_calculate_upper([x, y])  # lower → upper (same for XOR)
         
         # Both should have same mathematical form but different semantic meaning
         assert len(forward) == 2
