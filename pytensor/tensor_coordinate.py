@@ -263,6 +263,8 @@ def move_tensor_adaptor_coordinate(adaptor: 'TensorAdaptor', coord: TensorAdapto
     """
     Move tensor adaptor coordinate and return bottom index difference.
     
+    CURRENT IMPLEMENTATION: Recalculates everything from scratch.
+    
     Args:
         adaptor: Tensor adaptor
         coord: Coordinate to move
@@ -310,6 +312,79 @@ def move_tensor_adaptor_coordinate(adaptor: 'TensorAdaptor', coord: TensorAdapto
     coord.set_hidden_index(new_coord.get_hidden_index())
     
     return idx_diff_bottom
+
+
+def move_tensor_adaptor_coordinate_efficient(adaptor: 'TensorAdaptor', coord: TensorAdaptorCoordinate,
+                                           idx_diff_top: MultiIndex, judge_do_transforms: bool = True) -> MultiIndex:
+    """
+    Move tensor adaptor coordinate using efficient C++-like update_lower_index methods.
+    
+    NEW IMPLEMENTATION: Uses update_lower_index for efficiency, matching C++ exactly.
+    
+    Args:
+        adaptor: Tensor adaptor
+        coord: Coordinate to move (modified in place)
+        idx_diff_top: Top index difference
+        judge_do_transforms: Whether to optimize transforms (currently ignored)
+        
+    Returns:
+        Bottom index difference
+    """
+    ndim_hidden = adaptor.get_num_of_hidden_dimension()
+    ndim_bottom = adaptor.get_num_of_bottom_dimension()
+    ntransform = adaptor.get_num_of_transform()
+    
+    # Get current state (work directly on the coordinate's hidden index)
+    idx_hidden = coord.get_hidden_index()
+    top_dim_ids = adaptor.get_top_dimension_hidden_ids()
+    bottom_dim_ids = adaptor.get_bottom_dimension_hidden_ids()
+    
+    # Initialize hidden index differences (matches C++ idx_diff_hidden)
+    idx_diff_hidden = MultiIndex(ndim_hidden, [0] * ndim_hidden)
+    
+    # Set top index difference in hidden space (matches C++)
+    for i, hid in enumerate(top_dim_ids):
+        if i < len(idx_diff_top):
+            idx_diff_hidden[hid] = idx_diff_top[i]
+    
+    # Update top indices first (matches C++)
+    for i, hid in enumerate(top_dim_ids):
+        if i < len(idx_diff_top):
+            idx_hidden[hid] += idx_diff_top[i]
+    
+    # Update rest through transforms (backwards iteration like C++)
+    transforms = adaptor.get_transforms()
+    lower_dim_idss = adaptor.get_lower_dimension_hidden_idss()
+    upper_dim_idss = adaptor.get_upper_dimension_hidden_idss()
+    
+    for itran in reversed(range(ntransform)):
+        transform = transforms[itran]
+        dims_low = lower_dim_idss[itran]
+        dims_up = upper_dim_idss[itran]
+        
+        # Skip transforms without update_lower_index method
+        if not hasattr(transform, 'update_lower_index'):
+            continue
+        
+        # Get current state for this transform (C++ pattern)
+        idx_low_current = MultiIndex(len(dims_low), [idx_hidden[hid] for hid in dims_low])
+        idx_up_new = MultiIndex(len(dims_up), [idx_hidden[hid] for hid in dims_up])
+        idx_diff_up = MultiIndex(len(dims_up), [idx_diff_hidden[hid] for hid in dims_up])
+        
+        # Call update_lower_index (matches C++)
+        idx_diff_low, idx_low_updated = transform.update_lower_index(
+            idx_diff_up, idx_low_current, idx_up_new
+        )
+        
+        # Update hidden index and differences (matches C++)
+        for i, hid in enumerate(dims_low):
+            idx_diff_hidden[hid] = idx_diff_low[i]
+            idx_hidden[hid] = idx_low_updated[i]
+    
+    # The coordinate is already updated in place (no need to call set_hidden_index)
+    
+    # Return bottom index difference (matches C++)
+    return MultiIndex(ndim_bottom, [idx_diff_hidden[hid] for hid in bottom_dim_ids])
 
 
 def coordinate_has_valid_offset_assuming_top_index_is_valid(tensor_desc: 'TensorDescriptor', 

@@ -514,7 +514,7 @@ class TestCoordinateMovement:
         # Move to padded index 3 (out of bounds)
         move_tensor_coordinate(adaptor, coord, [1])
         hidden_idx = coord.get_hidden_index()
-        assert hidden_idx[0] == 1  # Should be clamped to 1 (3 - 1 = 2, clamped to max 1)
+        assert hidden_idx[0] == 2  # Should be 3 - 1 = 2 (no clamping to match C++)
         assert hidden_idx[1] == 3  # Top index should be 3
 
 

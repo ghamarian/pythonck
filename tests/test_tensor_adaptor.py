@@ -225,11 +225,11 @@ class TestTransformClasses:
         
         assert transform.get_upper_lengths() == [7]  # 4 + 1 + 2
         
-        # Test index mapping with MultiIndee
-        assert list(transform.calculate_lower_index(MultiIndex(1, [0]))) == [0]  # In left pad
-        assert list(transform.calculate_lower_index(MultiIndex(1, [1]))) == [0]  # First real element
-        assert list(transform.calculate_lower_index(MultiIndex(1, [4]))) == [3]  # Last real element
-        assert list(transform.calculate_lower_index(MultiIndex(1, [6]))) == [3]  # In right pad
+        # Test index mapping with MultiIndex (matches C++ - no clamping)
+        assert list(transform.calculate_lower_index(MultiIndex(1, [0]))) == [-1]  # In left pad
+        assert list(transform.calculate_lower_index(MultiIndex(1, [1]))) == [0]   # First real element
+        assert list(transform.calculate_lower_index(MultiIndex(1, [4]))) == [3]   # Last real element
+        assert list(transform.calculate_lower_index(MultiIndex(1, [6]))) == [5]   # In right pad
         
         # Padding breaks vectorization
         vec_lens, vec_strides = transform.calculate_upper_dimension_safe_vector_length_strides(

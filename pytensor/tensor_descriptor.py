@@ -89,6 +89,26 @@ class Transform(ABC):
         """
         pass
     
+    @abstractmethod
+    def update_lower_index(self, idx_upper_diff: MultiIndex, idx_lower_current: MultiIndex, 
+                          idx_upper_new: MultiIndex) -> Tuple[MultiIndex, MultiIndex]:
+        """Update lower index using difference in upper indices.
+        
+        This is more efficient than recalculating from scratch and matches the C++ 
+        update_lower_index implementation pattern.
+        
+        Args:
+            idx_upper_diff: Difference in upper indices (new - current)
+            idx_lower_current: Current lower index to update
+            idx_upper_new: New upper index (for reference/validation)
+            
+        Returns:
+            Tuple of (idx_lower_diff, idx_lower_updated) where:
+            - idx_lower_diff: Difference in lower indices
+            - idx_lower_updated: Updated lower index (idx_lower_current + idx_lower_diff)
+        """
+        pass
+    
     # Backward compatibility aliases for the old directional naming
     def sympy_upper_to_lower(self, upper_symbols: List[sp.Expr]) -> List[sp.Expr]:
         """Deprecated: Use sympy_calculate_lower instead (computes lower from upper)."""
@@ -191,6 +211,24 @@ class EmbedTransform(Transform):
                 upper_symbols.append(sp.Integer(0))
         
         return upper_symbols
+    
+    def update_lower_index(self, idx_upper_diff: MultiIndex, idx_lower_current: MultiIndex, 
+                          idx_upper_new: MultiIndex) -> Tuple[MultiIndex, MultiIndex]:
+        """Update lower index using stride multiplication."""
+        if len(idx_upper_diff) != self.ndim or len(idx_lower_current) != 1:
+            raise ValueError(f"EmbedTransform expects {self.ndim}D upper and 1D lower indices")
+        
+        # Calculate lower difference: sum of (upper_diff[i] * stride[i])
+        lower_diff_value = 0
+        for i in range(self.ndim):
+            lower_diff_value += idx_upper_diff[i] * self.strides[i]
+        
+        idx_lower_diff = MultiIndex(1, [lower_diff_value])
+        
+        # Update: lower_new = lower_current + lower_diff
+        idx_lower_updated = MultiIndex(1, [idx_lower_current[0] + idx_lower_diff[0]])
+        
+        return idx_lower_diff, idx_lower_updated
 
 
 class UnmergeTransform(Transform):
@@ -280,6 +318,31 @@ class UnmergeTransform(Transform):
             upper_symbols.append(idx)
         
         return upper_symbols
+    
+    def update_lower_index(self, idx_upper_diff: MultiIndex, idx_lower_current: MultiIndex, 
+                          idx_upper_new: MultiIndex) -> Tuple[MultiIndex, MultiIndex]:
+        """Update lower index using incremental calculation.
+        
+        Following C++ unmerge pattern: calculate lower diff from upper diff,
+        then add to current lower index.
+        """
+        if len(idx_upper_diff) != self.ndim or len(idx_lower_current) != 1:
+            raise ValueError(f"UnmergeTransform expects {self.ndim}D upper and 1D lower indices")
+        
+        # Match C++ unmerge update_lower_index: calculate_lower_index(idx_diff_low, idx_diff_up)
+        # Then: idx_low += idx_diff_low
+        
+        # Calculate lower diff from upper diff using the same logic as calculate_lower_index
+        lower_diff = 0
+        for i in range(self.ndim):
+            lower_diff += idx_upper_diff[i] * self.strides[i]
+        
+        idx_lower_diff = MultiIndex(1, [lower_diff])
+        
+        # Update: lower_new = lower_current + lower_diff
+        idx_lower_updated = MultiIndex(1, [idx_lower_current[0] + idx_lower_diff[0]])
+        
+        return idx_lower_diff, idx_lower_updated
 
 
 class OffsetTransform(Transform):
@@ -333,6 +396,20 @@ class OffsetTransform(Transform):
             raise ValueError("Offset transform expects 1D lower symbols")
         
         return [lower_symbols[0] - self.offset]
+    
+    def update_lower_index(self, idx_upper_diff: MultiIndex, idx_lower_current: MultiIndex, 
+                          idx_upper_new: MultiIndex) -> Tuple[MultiIndex, MultiIndex]:
+        """Update lower index (add same offset to difference)."""
+        if len(idx_upper_diff) != 1 or len(idx_lower_current) != 1:
+            raise ValueError("Offset transform expects 1D indices")
+        
+        # For offset: lower_diff = upper_diff (offset cancels out in difference)
+        idx_lower_diff = MultiIndex(1, [idx_upper_diff[0]])
+        
+        # Update: lower_new = lower_current + lower_diff
+        idx_lower_updated = MultiIndex(1, [idx_lower_current[0] + idx_lower_diff[0]])
+        
+        return idx_lower_diff, idx_lower_updated
     
     def __repr__(self) -> str:
         """String representation."""
@@ -392,6 +469,20 @@ class PassThroughTransform(Transform):
             raise ValueError("PassThrough transform expects 1D lower symbols")
         return lower_symbols
     
+    def update_lower_index(self, idx_upper_diff: MultiIndex, idx_lower_current: MultiIndex, 
+                          idx_upper_new: MultiIndex) -> Tuple[MultiIndex, MultiIndex]:
+        """Update lower index (pass through for PassThroughTransform)."""
+        if len(idx_upper_diff) != 1 or len(idx_lower_current) != 1:
+            raise ValueError("PassThrough transform expects 1D indices")
+        
+        # For pass-through: lower_diff = upper_diff
+        idx_lower_diff = MultiIndex(1, [idx_upper_diff[0]])
+        
+        # Update: lower_new = lower_current + lower_diff
+        idx_lower_updated = MultiIndex(1, [idx_lower_current[0] + idx_lower_diff[0]])
+        
+        return idx_lower_diff, idx_lower_updated
+    
     def calculate_upper_dimension_safe_vector_length_strides(
         self,
         vector_lengths_lower: List[int],
@@ -435,8 +526,7 @@ class PadTransform(Transform):
     def calculate_lower_index(self, idx_upper: MultiIndex) -> MultiIndex:
         """Calculate lower index (adjust for padding)."""
         idx = idx_upper[0] - self.left_pad
-        # Clamp to valid range
-        idx = max(0, min(idx, self.lower_length - 1))
+        # Match C++: NO clamping, just subtract left padding
         return MultiIndex(1, [idx])
     
     def calculate_upper_index(self, idx_lower: MultiIndex) -> MultiIndex:
@@ -444,8 +534,8 @@ class PadTransform(Transform):
         return MultiIndex(1, [idx_lower[0] + self.left_pad])
     
     def is_valid_upper_index_always_mapped_to_valid_lower_index(self) -> bool:
-        """Padding maps all indices to valid lower indices (clamped)."""
-        return True
+        """Padding with no clamping doesn't guarantee valid lower indices."""
+        return False
     
     def is_valid_upper_index_mapped_to_valid_lower_index(self, idx_upper: MultiIndex) -> bool:
         """Check if index is within padded bounds."""
@@ -456,11 +546,9 @@ class PadTransform(Transform):
         if len(upper_symbols) != 1:
             raise ValueError("Pad transform expects 1D upper symbols")
         
-        # For upper -> lower: subtract left padding
-        # But clamp to valid range [0, lower_length-1]
+        # For upper -> lower: subtract left padding (match C++ - no clamping)
         adjusted = upper_symbols[0] - self.left_pad
-        clamped = sp.Max(0, sp.Min(adjusted, self.lower_length - 1))
-        return [clamped]
+        return [adjusted]
     
     def sympy_calculate_upper(self, lower_symbols: List[sp.Expr]) -> List[sp.Expr]:
         """Add padding offset to symbol (computes upper from lower)."""
@@ -480,6 +568,24 @@ class PadTransform(Transform):
         if self.left_pad > 0 or self.right_pad > 0:
             return [1], [1]
         return vector_lengths_lower, vector_strides_lower
+    
+    def update_lower_index(self, idx_upper_diff: MultiIndex, idx_lower_current: MultiIndex, 
+                          idx_upper_new: MultiIndex) -> Tuple[MultiIndex, MultiIndex]:
+        """Update lower index with direct pass-through.
+        
+        Match C++ behavior: idx_diff_low[I0] = idx_diff_up[I0]; idx_low += idx_diff_low;
+        Since padding is just an offset, the difference passes through unchanged.
+        """
+        if len(idx_upper_diff) != 1 or len(idx_lower_current) != 1:
+            raise ValueError("Pad transform expects 1D indices")
+        
+        # Match C++: Direct pass-through of differences
+        idx_lower_diff = MultiIndex(1, [idx_upper_diff[0]])
+        
+        # Update: lower_new = lower_current + lower_diff
+        idx_lower_updated = MultiIndex(1, [idx_lower_current[0] + idx_lower_diff[0]])
+        
+        return idx_lower_diff, idx_lower_updated
     
     def __repr__(self) -> str:
         """String representation."""
@@ -611,6 +717,45 @@ class MergeTransform(Transform):
         if vector_strides_lower[-1] == 1:
             return [vector_lengths_lower[-1]], [1]
         return [1], [1]
+    
+    def update_lower_index(self, idx_upper_diff: MultiIndex, idx_lower_current: MultiIndex, 
+                          idx_upper_new: MultiIndex) -> Tuple[MultiIndex, MultiIndex]:
+        """Update lower index using incremental calculation.
+        
+        Match C++ merge_v3_division_mod update_lower_index pattern:
+        - Calculate new lower indices from new upper index using division/mod
+        - Compute differences incrementally
+        """
+        if len(idx_upper_diff) != 1 or len(idx_lower_current) != len(self.lengths):
+            raise ValueError(f"MergeTransform expects 1D upper and {len(self.lengths)}D lower indices")
+        
+        # Match C++ merge_v3_division_mod update_lower_index implementation
+        tmp = idx_upper_new[0]
+        lower_diff_values = []
+        lower_updated_values = []
+        
+        # Calculate strides for packed layout (row-major)
+        strides = [1]
+        for i in range(len(self.lengths) - 1, 0, -1):
+            strides.insert(0, strides[0] * self.lengths[i])
+        
+        # Incremental update using division and mod (matches C++ pattern)
+        for i in range(len(self.lengths) - 1):
+            tmp2 = idx_lower_current[i]
+            new_val = tmp // strides[i]
+            lower_updated_values.append(new_val)
+            lower_diff_values.append(new_val - tmp2)
+            tmp %= strides[i]
+        
+        # Handle last dimension
+        tmp2 = idx_lower_current[len(self.lengths) - 1]
+        lower_updated_values.append(tmp)
+        lower_diff_values.append(tmp - tmp2)
+        
+        idx_lower_diff = MultiIndex(len(self.lengths), lower_diff_values)
+        idx_lower_updated = MultiIndex(len(self.lengths), lower_updated_values)
+        
+        return idx_lower_diff, idx_lower_updated
     
     def __repr__(self) -> str:
         """String representation."""
@@ -749,6 +894,33 @@ class XorTransform(Transform):
         # XOR can break vectorization patterns, so be conservative
         return [1, 1], [1, 1]
     
+    def update_lower_index(self, idx_upper_diff: MultiIndex, idx_lower_current: MultiIndex, 
+                          idx_upper_new: MultiIndex) -> Tuple[MultiIndex, MultiIndex]:
+        """Update lower index using incremental calculation.
+        
+        Match C++ xor_t update_lower_index pattern:
+        - Calculate new lower index from new upper index
+        - Compute difference incrementally
+        """
+        if len(idx_upper_diff) != 2 or len(idx_lower_current) != 2:
+            raise ValueError("XorTransform expects 2D indices")
+        
+        # Match C++ xor_t update_lower_index: calculate_lower_index(idx_low, idx_up)
+        # Then: idx_diff_low = idx_low - idx_low_old
+        
+        # Calculate new lower index from new upper index
+        idx_lower_new = self.calculate_lower_index(idx_upper_new)
+        
+        # Calculate difference incrementally
+        lower_diff_values = []
+        for i in range(2):
+            diff = idx_lower_new[i] - idx_lower_current[i]
+            lower_diff_values.append(diff)
+        
+        idx_lower_diff = MultiIndex(2, lower_diff_values)
+        
+        return idx_lower_diff, idx_lower_new
+    
     def __repr__(self) -> str:
         """String representation."""
         return f"XorTransform(lengths={self.lengths}, apply_modulo={self.apply_modulo})"
@@ -837,6 +1009,22 @@ class ReplicateTransform(Transform):
         """Calculate safe vector lengths and strides."""
         # All dimensions can be vectorized since they're replicated
         return [length for length in self.upper_lengths], [0 for _ in self.upper_lengths]  # Stride 0 for broadcast
+    
+    def update_lower_index(self, idx_upper_diff: MultiIndex, idx_lower_current: MultiIndex, 
+                          idx_upper_new: MultiIndex) -> Tuple[MultiIndex, MultiIndex]:
+        """Update lower index (no change for ReplicateTransform).
+        
+        ReplicateTransform has no lower dimensions, so the difference and
+        current index are both empty.
+        """
+        if len(idx_upper_diff) != len(self.upper_lengths) or len(idx_lower_current) != 0:
+            raise ValueError(f"ReplicateTransform expects {len(self.upper_lengths)}D upper and 0D lower indices")
+        
+        # No lower dimensions, so both diff and updated are empty
+        idx_lower_diff = MultiIndex(0, [])
+        idx_lower_updated = MultiIndex(0, [])
+        
+        return idx_lower_diff, idx_lower_updated
     
     def __repr__(self) -> str:
         """String representation."""
