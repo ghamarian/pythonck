@@ -95,7 +95,7 @@ class TileWindowWithStaticDistribution:
         
         window_adaptor_coord_base = make_tensor_adaptor_coordinate(
             adaptor,
-            idx_top_base
+            MultiIndex(ndim_top, idx_top_base)
         )
         
         # Create base bottom tensor coordinate
@@ -709,36 +709,36 @@ class LoadStoreTraits:
     def _get_vector_dim_y_scalar_per_vector(self):
         """
         Find best Y dimension for vectorization.
-        C++ alignment: use individual element access (scalar_per_vector = 1).
+        Matches C++ get_vector_dim_y_scalar_per_vector() exactly.
         """
         # Get vector lengths and strides
         ys_vector_lengths = self.tile_distribution.get_y_vector_lengths()
         ys_vector_strides = self.tile_distribution.get_y_vector_strides()
         
-        # Find dimension with stride 1 and maximum length (for vector_dim_y selection)
+        # Find dimension with stride 1 and maximum length (matches C++ exactly)
         vector_dim_y = 0
-        max_length = 1
+        scalar_per_vector = 1
         
         for i in range(self.ndim_y):
-            if ys_vector_strides[i] == 1 and ys_vector_lengths[i] > max_length:
-                max_length = ys_vector_lengths[i]
+            if ys_vector_strides[i] == 1 and ys_vector_lengths[i] > scalar_per_vector:
+                scalar_per_vector = ys_vector_lengths[i]
                 vector_dim_y = i
-        
-        # C++ alignment: always use scalar_per_vector = 1 for individual element access
-        scalar_per_vector = 1
         
         return (vector_dim_y, scalar_per_vector)
     
     def _get_scalars_per_access(self):
         """
         Get number of scalars to access per dimension.
-        Matches C++ scalars_per_access_.
-        
-        Always use 1 scalar per access in each dimension to match C++ incremental movement pattern.
+        Matches C++ scalars_per_access_ exactly.
         """
-        # C++ style alignment: always use 1 scalar per dimension
-        # This ensures we get the full access pattern that can be moved incrementally
-        return [1] * self.ndim_y
+        # C++ pattern: (i == VectorDimY) ? ScalarPerVector : 1
+        scalars_per_access = []
+        for i in range(self.ndim_y):
+            if i == self.vector_dim_y:
+                scalars_per_access.append(self.scalar_per_vector)
+            else:
+                scalars_per_access.append(1)
+        return scalars_per_access
     
     def _get_space_filling_curve(self):
         """
@@ -778,24 +778,31 @@ class LoadStoreTraits:
     def get_vectorized_access_info(self, i_access):
         """
         Get vectorized access information for a given access index.
-        This combines several C++ operations into one Python-friendly interface.
-        
-        C++ alignment: each access handles exactly 1 element (no vectorization).
+        This matches C++ load pattern exactly: one access handles ScalarPerVector elements.
         """
-        # Get base Y indices - now this is exactly the access we want
+        # Get base Y indices (starting point for the vector)
         idx_ys_start = self.get_y_indices(i_access)
         
         # Ensure idx_ys_start is a list
         if not isinstance(idx_ys_start, list):
             idx_ys_start = [idx_ys_start]
         
-        # C++ alignment: Each access handles exactly 1 element
-        # No vectorization to match incremental movement pattern exactly
+        # Generate vector indices (matches C++ pattern exactly)
+        # For each j in [0, ScalarPerVector), create idx_ys by modifying VectorDimY
+        vector_indices = []
+        for j in range(self.scalar_per_vector):
+            # Create new index list for each vector element
+            idx_ys = list(idx_ys_start)  # Explicit list copy
+            # Matches C++: jj == Traits::VectorDimY ? (idx_ys_start[jj] + j) : idx_ys_start[jj]
+            if self.vector_dim_y < len(idx_ys):
+                idx_ys[self.vector_dim_y] = idx_ys_start[self.vector_dim_y] + j
+            vector_indices.append(idx_ys)
+        
         result = {
             'base_indices': idx_ys_start,
-            'vector_indices': [idx_ys_start],  # Only one element per access
+            'vector_indices': vector_indices,
             'vector_dim': self.vector_dim_y,
-            'vector_size': 1  # Always 1 to match C++ incremental pattern
+            'vector_size': self.scalar_per_vector  # Use actual ScalarPerVector like C++
         }
         
         return result

@@ -343,7 +343,7 @@ class TestTransformInverseVerification:
             # Check direct subtraction (no clamping)
             expected_lower = val - 2  # Direct C++ style subtraction
             assert lower_idx[0] == expected_lower, f"Forward mapping should be {val} - 2 = {expected_lower}, got {lower_idx[0]}"
-            
+                
             # Test backward from valid lower indices only
             if 0 <= val < 8:  # Test backward only for valid lower range  
                 lower_test = MultiIndex(1, [val])

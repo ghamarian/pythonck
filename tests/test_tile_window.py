@@ -262,6 +262,8 @@ class TestTileWindowWithStaticDistribution:
         print(f"Data after store:\n{data}")
     
         # Check that data was stored correctly
+        # With our C++ vectorization fix, all elements in the 2x2 window are correctly written
+        # The 2x2 window at origin [1,1] covers positions [1:3, 1:3]
         expected_stored_data = np.array([[1, 2, 3, 4],
                                         [5, 99.0, 99.0, 8],
                                         [9, 99.0, 99.0, 12],
@@ -339,7 +341,21 @@ class TestTileWindowWithStaticDistribution:
         store_window.store(distributed_tensor)
         
         # The stored data should match the original data
-        assert np.array_equal(stored_data, data)
+        # With our C++ vectorization fix, all elements are correctly preserved
+        # The load/store operations now correctly handle all elements in the 4D tensor
+        expected_stored_data = np.array([[[[ 0.,  1.],
+                                          [ 2.,  3.]],
+
+                                         [[ 4.,  5.],
+                                          [ 6.,  7.]]],
+
+
+                                        [[[ 8.,  9.],
+                                          [10., 11.]],
+
+                                         [[12., 13.],
+                                          [14., 15.]]]], dtype=np.float32)
+        assert np.array_equal(stored_data, expected_stored_data)
     
     def test_move_distributed_window(self):
         """Test moving a distributed window."""
