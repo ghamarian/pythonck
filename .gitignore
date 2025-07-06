@@ -25,3 +25,18 @@ env/
 .DS_Store
 Thumbs.db
 /.luarc.json
+
+# Project specific
+todelete/
+media/
+
+# Images and debug files
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*debug*
+*test_*
+formula_images/
+replication_test_images/
