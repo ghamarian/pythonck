@@ -1,299 +1,79 @@
 [
   {
-    "objectID": "tutorials/index.html",
-    "href": "tutorials/index.html",
-    "title": "Getting Started with PythonCK",
+    "objectID": "api/index.html",
+    "href": "api/index.html",
+    "title": "API Reference",
     "section": "",
-    "text": "Welcome to the PythonCK tutorials! These step-by-step guides will help you understand the core concepts and learn how to use the library effectively.",
+    "text": "Complete reference documentation for all PythonCK modules and classes.",
     "crumbs": [
-      "Getting Started",
-      "Getting Started with PythonCK"
+      "API Reference",
+      "API Reference"
     ]
   },
   {
-    "objectID": "tutorials/index.html#setup",
-    "href": "tutorials/index.html#setup",
-    "title": "Getting Started with PythonCK",
-    "section": "Setup",
-    "text": "Setup\nLet’s import the necessary modules:",
+    "objectID": "api/index.html#core-tensor-operations",
+    "href": "api/index.html#core-tensor-operations",
+    "title": "API Reference",
+    "section": "Core Tensor Operations",
+    "text": "Core Tensor Operations\n\nPyTensor Module\nThe main tensor operations module containing all core functionality.\n\ntensor_coordinate - Multi-dimensional coordinate handling\ntensor_descriptor - Tensor layout and metadata\ntensor_adaptor - Tensor transformations and adaptations\ntensor_view - Views and slicing operations\nbuffer_view - Low-level memory access patterns",
     "crumbs": [
-      "Getting Started",
-      "Getting Started with PythonCK"
+      "API Reference",
+      "API Reference"
     ]
   },
   {
-    "objectID": "tutorials/index.html#tutorial-1-understanding-tensor-coordinates",
-    "href": "tutorials/index.html#tutorial-1-understanding-tensor-coordinates",
-    "title": "Getting Started with PythonCK",
-    "section": "Tutorial 1: Understanding Tensor Coordinates",
-    "text": "Tutorial 1: Understanding Tensor Coordinates\nTensor coordinates are the foundation of how we address multi-dimensional data:",
+    "objectID": "api/index.html#tile-operations",
+    "href": "api/index.html#tile-operations",
+    "title": "API Reference",
+    "section": "Tile Operations",
+    "text": "Tile Operations\n\ntile_distribution - Data distribution across tiles\ntile_distribution_encoding - Encoding schemes for tile distribution\ntile_window - Windowed access to tile data\ntile_window_linear - Linear tile window operations\ntile_window_utils - Utility functions for tile windows",
     "crumbs": [
-      "Getting Started",
-      "Getting Started with PythonCK"
+      "API Reference",
+      "API Reference"
     ]
   },
   {
-    "objectID": "tutorials/index.html#tutorial-2-working-with-tensor-descriptors",
-    "href": "tutorials/index.html#tutorial-2-working-with-tensor-descriptors",
-    "title": "Getting Started with PythonCK",
-    "section": "Tutorial 2: Working with Tensor Descriptors",
-    "text": "Tutorial 2: Working with Tensor Descriptors\nTensor descriptors provide metadata about tensor layout and properties:",
+    "objectID": "api/index.html#specialized-tile-operations",
+    "href": "api/index.html#specialized-tile-operations",
+    "title": "API Reference",
+    "section": "Specialized Tile Operations",
+    "text": "Specialized Tile Operations\n\nshuffle_tile - Data shuffling and rearrangement\nsweep_tile - Iterative tile processing\nstore_tile - Tile storage operations\nupdate_tile - In-place tile updates\ntile_scatter_gather - Scatter/gather operations",
     "crumbs": [
-      "Getting Started",
-      "Getting Started with PythonCK"
+      "API Reference",
+      "API Reference"
     ]
   },
   {
-    "objectID": "tutorials/index.html#tutorial-3-buffer-views-and-memory-access",
-    "href": "tutorials/index.html#tutorial-3-buffer-views-and-memory-access",
-    "title": "Getting Started with PythonCK",
-    "section": "Tutorial 3: Buffer Views and Memory Access",
-    "text": "Tutorial 3: Buffer Views and Memory Access\nBuffer views provide low-level control over memory access patterns:",
+    "objectID": "api/index.html#advanced-features",
+    "href": "api/index.html#advanced-features",
+    "title": "API Reference",
+    "section": "Advanced Features",
+    "text": "Advanced Features\n\nstatic_distributed_tensor - Compile-time optimized tensors\nspace_filling_curve - Advanced memory access patterns\nstatic_encoding_pattern - Static encoding strategies",
     "crumbs": [
-      "Getting Started",
-      "Getting Started with PythonCK"
+      "API Reference",
+      "API Reference"
     ]
   },
   {
-    "objectID": "tutorials/index.html#tutorial-4-tile-based-operations",
-    "href": "tutorials/index.html#tutorial-4-tile-based-operations",
-    "title": "Getting Started with PythonCK",
-    "section": "Tutorial 4: Tile-Based Operations",
-    "text": "Tutorial 4: Tile-Based Operations\nLearn how data is organized and processed in tiles:",
+    "objectID": "api/index.html#utilities",
+    "href": "api/index.html#utilities",
+    "title": "API Reference",
+    "section": "Utilities",
+    "text": "Utilities\n\nTensor Transforms Module\nHigher-level transformation utilities and examples.\n\nanalyzer - Tensor operation analysis\nparser - Parsing tensor expressions\nexamples - Common transformation patterns\n\n\n\nTile Distribution Module\nAdvanced tile distribution strategies and visualization.\n\nparser - Tile distribution parsing\nvisualizer - Tile distribution visualization\nexamples - Tile distribution examples",
     "crumbs": [
-      "Getting Started",
-      "Getting Started with PythonCK"
+      "API Reference",
+      "API Reference"
     ]
   },
   {
-    "objectID": "tutorials/index.html#tutorial-5-advanced-tensor-transformations",
-    "href": "tutorials/index.html#tutorial-5-advanced-tensor-transformations",
-    "title": "Getting Started with PythonCK",
-    "section": "Tutorial 5: Advanced Tensor Transformations",
-    "text": "Tutorial 5: Advanced Tensor Transformations\nExplore how tensor adaptors enable complex transformations:",
+    "objectID": "api/index.html#quick-reference",
+    "href": "api/index.html#quick-reference",
+    "title": "API Reference",
+    "section": "Quick Reference",
+    "text": "Quick Reference\n\nCommon Imports\n\n\n\n\n\n\n\n\nKey Classes Overview\n\n\n\n\n\n\n\n\nClass\nPurpose\nKey Methods\n\n\n\n\nTensorCoordinate\nMulti-dimensional indexing\n__init__(), get_element_count()\n\n\nTensorDescriptor\nTensor metadata\ncalculate_offset(), get_strides()\n\n\nTensorAdaptor\nTensor transformations\ntransform_coordinate(), get_output_shape()\n\n\nBufferView\nMemory access patterns\ngenerate_access_sequence()\n\n\nTileDistribution\nTile-based processing\nget_tile_coordinates(), get_num_tiles()\n\n\nTileWindow\nWindowed tile access\nget_window_data(), slide_window()\n\n\n\n\nFor detailed documentation of each module, click on the links above. Each page includes:\n\nClass definitions with full method signatures\nUsage examples with runnable code\nParameter descriptions and return values\nRelated concepts and cross-references",
     "crumbs": [
-      "Getting Started",
-      "Getting Started with PythonCK"
-    ]
-  },
-  {
-    "objectID": "tutorials/index.html#next-steps",
-    "href": "tutorials/index.html#next-steps",
-    "title": "Getting Started with PythonCK",
-    "section": "Next Steps",
-    "text": "Next Steps\nNow that you’ve learned the basics, explore specific concepts in detail:\n\nTensor Adaptor - Deep dive into tensor transformations\nTile Operations - Advanced tiling strategies\nBuffer Management - Memory access optimization",
-    "crumbs": [
-      "Getting Started",
-      "Getting Started with PythonCK"
-    ]
-  },
-  {
-    "objectID": "tutorials/index.html#interactive-experimentation",
-    "href": "tutorials/index.html#interactive-experimentation",
-    "title": "Getting Started with PythonCK",
-    "section": "Interactive Experimentation",
-    "text": "Interactive Experimentation\nTry modifying the examples above! Change the tensor dimensions, tile sizes, or transformation types to see how the system behaves. All code runs directly in your browser, so feel free to experiment.",
-    "crumbs": [
-      "Getting Started",
-      "Getting Started with PythonCK"
-    ]
-  },
-  {
-    "objectID": "tutorials/index.html#common-patterns",
-    "href": "tutorials/index.html#common-patterns",
-    "title": "Getting Started with PythonCK",
-    "section": "Common Patterns",
-    "text": "Common Patterns\nHere are some common usage patterns you’ll encounter:\n\nCreating multi-dimensional coordinates for indexing\nSetting up tile distributions for parallel processing\nApplying tensor adaptors for data transformations\nManaging buffer views for memory optimization\n\nEach concept builds on the previous ones, creating a powerful framework for GPU kernel development.",
-    "crumbs": [
-      "Getting Started",
-      "Getting Started with PythonCK"
-    ]
-  },
-  {
-    "objectID": "concepts/tensor-coordinate.html",
-    "href": "concepts/tensor-coordinate.html",
-    "title": "Tensor Coordinates",
-    "section": "",
-    "text": "Prerequisites: Buffer Views, Tensor Descriptors\nTensor coordinates represent the final result after all tensor layout transformations have been applied. They store both the multi-dimensional index and the linear memory offset that results from complex coordinate transformations.",
-    "crumbs": [
-      "Foundation",
-      "Tensor Coordinates"
-    ]
-  },
-  {
-    "objectID": "concepts/tensor-coordinate.html#what-is-a-tensorcoordinate",
-    "href": "concepts/tensor-coordinate.html#what-is-a-tensorcoordinate",
-    "title": "Tensor Coordinates",
-    "section": "What is a TensorCoordinate?",
-    "text": "What is a TensorCoordinate?\nA TensorCoordinate is the end product of the tensor transformation pipeline:\nInput Index → Transforms → TensorCoordinate (Index + Offset)\nKey characteristics: - Stores the final index: The transformed multi-dimensional coordinate - Stores the linear offset: The final memory location after all transformations - Extends TensorAdaptorCoordinate: Inherits transformation tracking but focuses on the final result - Always has a single bottom dimension: The linear offset is stored in hidden dimension [0]",
-    "crumbs": [
-      "Foundation",
-      "Tensor Coordinates"
-    ]
-  },
-  {
-    "objectID": "concepts/tensor-coordinate.html#why-tensorcoordinate-matters",
-    "href": "concepts/tensor-coordinate.html#why-tensorcoordinate-matters",
-    "title": "Tensor Coordinates",
-    "section": "Why TensorCoordinate Matters",
-    "text": "Why TensorCoordinate Matters\nAfter complex transformations (embedding, merging, unmerging, etc.), you need: 1. The final index: Where you are in the logical tensor space 2. The linear offset: Where to actually access memory\nTensorCoordinate provides both pieces of information in a single, convenient container.",
-    "crumbs": [
-      "Foundation",
-      "Tensor Coordinates"
-    ]
-  },
-  {
-    "objectID": "concepts/tensor-coordinate.html#core-components",
-    "href": "concepts/tensor-coordinate.html#core-components",
-    "title": "Tensor Coordinates",
-    "section": "Core Components",
-    "text": "Core Components\n\nMultiIndex\nA MultiIndex represents a multi-dimensional index with a specific number of dimensions:\n\n\n\n\n\n\n\n\nTensorCoordinate\nA TensorCoordinate represents coordinates in a tensor space with transformations:",
-    "crumbs": [
-      "Foundation",
-      "Tensor Coordinates"
-    ]
-  },
-  {
-    "objectID": "concepts/tensor-coordinate.html#key-operations",
-    "href": "concepts/tensor-coordinate.html#key-operations",
-    "title": "Tensor Coordinates",
-    "section": "Key Operations",
-    "text": "Key Operations\n\nIndex Manipulation\n\n\n\n\n\n\n\n\nCoordinate Transformations",
-    "crumbs": [
-      "Foundation",
-      "Tensor Coordinates"
-    ]
-  },
-  {
-    "objectID": "concepts/tensor-coordinate.html#relationship-to-other-concepts",
-    "href": "concepts/tensor-coordinate.html#relationship-to-other-concepts",
-    "title": "Tensor Coordinates",
-    "section": "Relationship to Other Concepts",
-    "text": "Relationship to Other Concepts\nTensor coordinates are used throughout PythonCK:\n\nBuffer Views use coordinates to access memory locations\nTensor Descriptors transform coordinates through layout changes\n\nTile Distributions map coordinates between different spaces\nSweep Operations iterate through coordinate ranges",
-    "crumbs": [
-      "Foundation",
-      "Tensor Coordinates"
-    ]
-  },
-  {
-    "objectID": "concepts/tensor-coordinate.html#next-steps",
-    "href": "concepts/tensor-coordinate.html#next-steps",
-    "title": "Tensor Coordinates",
-    "section": "Next Steps",
-    "text": "Next Steps\n\nLearn about Tensor Adaptors - The transformation engines that execute descriptors\nExplore Tensor Adaptor Coordinates - Result containers for transformed indices\nUnderstand Advanced Coordinate Operations - Functions that require descriptors\n\nThe coordinate system provides the mathematical foundation that enables all the advanced tensor operations in PythonCK.\n\nTensorCoordinate: Index + Offset Storage\nA TensorCoordinate stores the final result of tensor transformations - both the logical index and the linear memory offset:\n\n\n\n\n\n\n\n\nKey Methods\n\n\n\n\n\n\n\n\nComparison with TensorAdaptorCoordinate",
-    "crumbs": [
-      "Foundation",
-      "Tensor Coordinates"
-    ]
-  },
-  {
-    "objectID": "concepts/tensor-adaptor-coordinate.html",
-    "href": "concepts/tensor-adaptor-coordinate.html",
-    "title": "Tensor Adaptor Coordinate: The Result Container",
-    "section": "",
-    "text": "Prerequisites: Tensor Transforms, Tensor Descriptor, Tensor Coordinate, Tensor Adaptor\nA Tensor Adaptor Coordinate is a result container that stores the transformed indices and offsets produced by a Tensor Adaptor. It serves as an intermediate representation between the transformation engine and the final memory-mapped coordinate.",
-    "crumbs": [
-      "Foundation",
-      "Tensor Adaptor Coordinate: The Result Container"
-    ]
-  },
-  {
-    "objectID": "concepts/tensor-adaptor-coordinate.html#core-concept",
-    "href": "concepts/tensor-adaptor-coordinate.html#core-concept",
-    "title": "Tensor Adaptor Coordinate: The Result Container",
-    "section": "🎯 Core Concept",
-    "text": "🎯 Core Concept\nA Tensor Adaptor Coordinate stores the results of coordinate transformations:\nInput Index → Tensor Adaptor → Tensor Adaptor Coordinate → Final Tensor Coordinate\nThe adaptor coordinate contains: - Top Index: The original input coordinates - Bottom Index: The transformed output coordinates\n- Hidden Index: Internal storage for the transformation results",
-    "crumbs": [
-      "Foundation",
-      "Tensor Adaptor Coordinate: The Result Container"
-    ]
-  },
-  {
-    "objectID": "concepts/tensor-adaptor-coordinate.html#creating-tensor-adaptor-coordinates",
-    "href": "concepts/tensor-adaptor-coordinate.html#creating-tensor-adaptor-coordinates",
-    "title": "Tensor Adaptor Coordinate: The Result Container",
-    "section": "🔧 Creating Tensor Adaptor Coordinates",
-    "text": "🔧 Creating Tensor Adaptor Coordinates\n\nFrom Tensor Adaptors\n\n\n\n\n\n\n\n\nManual Creation (Advanced)",
-    "crumbs": [
-      "Foundation",
-      "Tensor Adaptor Coordinate: The Result Container"
-    ]
-  },
-  {
-    "objectID": "concepts/tensor-adaptor-coordinate.html#understanding-the-three-level-structure",
-    "href": "concepts/tensor-adaptor-coordinate.html#understanding-the-three-level-structure",
-    "title": "Tensor Adaptor Coordinate: The Result Container",
-    "section": "🔍 Understanding the Three-Level Structure",
-    "text": "🔍 Understanding the Three-Level Structure\n\nTop Index (Input Coordinates)\n\n\n\n\n\n\n\n\nBottom Index (Transformed Coordinates)\n\n\n\n\n\n\n\n\nHidden Index (Internal Storage)",
-    "crumbs": [
-      "Foundation",
-      "Tensor Adaptor Coordinate: The Result Container"
-    ]
-  },
-  {
-    "objectID": "concepts/tensor-adaptor-coordinate.html#coordinate-access-patterns",
-    "href": "concepts/tensor-adaptor-coordinate.html#coordinate-access-patterns",
-    "title": "Tensor Adaptor Coordinate: The Result Container",
-    "section": "🔄 Coordinate Access Patterns",
-    "text": "🔄 Coordinate Access Patterns\n\nGetting Specific Indices\n\n\n\n\n\n\n\n\nIndex Manipulation",
-    "crumbs": [
-      "Foundation",
-      "Tensor Adaptor Coordinate: The Result Container"
-    ]
-  },
-  {
-    "objectID": "concepts/tensor-adaptor-coordinate.html#relationship-to-other-components",
-    "href": "concepts/tensor-adaptor-coordinate.html#relationship-to-other-components",
-    "title": "Tensor Adaptor Coordinate: The Result Container",
-    "section": "🔗 Relationship to Other Components",
-    "text": "🔗 Relationship to Other Components\n\nHow Adaptor Coordinates Become Tensor Coordinates\n\n\n\n\n\n\n\n\nIntegration with Descriptors",
-    "crumbs": [
-      "Foundation",
-      "Tensor Adaptor Coordinate: The Result Container"
-    ]
-  },
-  {
-    "objectID": "concepts/tensor-adaptor-coordinate.html#advanced-operations",
-    "href": "concepts/tensor-adaptor-coordinate.html#advanced-operations",
-    "title": "Tensor Adaptor Coordinate: The Result Container",
-    "section": "🎯 Advanced Operations",
-    "text": "🎯 Advanced Operations\n\nMulti-Transform Adaptor Coordinates\n\n\n\n\n\n\n\n\nCoordinate Validation",
-    "crumbs": [
-      "Foundation",
-      "Tensor Adaptor Coordinate: The Result Container"
-    ]
-  },
-  {
-    "objectID": "concepts/tensor-adaptor-coordinate.html#why-this-matters",
-    "href": "concepts/tensor-adaptor-coordinate.html#why-this-matters",
-    "title": "Tensor Adaptor Coordinate: The Result Container",
-    "section": "🔍 Why This Matters",
-    "text": "🔍 Why This Matters\nUnderstanding Tensor Adaptor Coordinates is crucial because:\n\nThey store transformation results - All coordinate transformations produce adaptor coordinates\nThey enable complex layouts - Multiple transforms can be chained and stored\nThey bridge adaptors and coordinates - They’re the intermediate step between transformation and final result\nThey support validation - They can be checked for validity before use",
-    "crumbs": [
-      "Foundation",
-      "Tensor Adaptor Coordinate: The Result Container"
-    ]
-  },
-  {
-    "objectID": "concepts/tensor-adaptor-coordinate.html#integration-with-real-applications",
-    "href": "concepts/tensor-adaptor-coordinate.html#integration-with-real-applications",
-    "title": "Tensor Adaptor Coordinate: The Result Container",
-    "section": "🎯 Integration with Real Applications",
-    "text": "🎯 Integration with Real Applications\nAdaptor coordinates are used throughout PythonCK:\n\nTile Distributions create adaptor coordinates for thread mapping\nTensor Views use adaptor coordinates for coordinate transformations\nSweep Operations work with adaptor coordinates for navigation\nMemory Access relies on adaptor coordinates for address calculations",
-    "crumbs": [
-      "Foundation",
-      "Tensor Adaptor Coordinate: The Result Container"
-    ]
-  },
-  {
-    "objectID": "concepts/tensor-adaptor-coordinate.html#next-steps",
-    "href": "concepts/tensor-adaptor-coordinate.html#next-steps",
-    "title": "Tensor Adaptor Coordinate: The Result Container",
-    "section": "✅ Next Steps",
-    "text": "✅ Next Steps\nNow that you understand adaptor coordinates, you can explore: - Advanced Coordinate Operations - Functions that work with adaptor coordinates - Tile Distribution - How adaptor coordinates enable parallel processing - Tensor Views - How adaptor coordinates integrate with tensor access\n\nTensor Adaptor Coordinates are the result containers that store the transformed indices and offsets. They serve as the bridge between transformation engines and final memory-mapped coordinates, enabling complex coordinate operations throughout PythonCK.",
-    "crumbs": [
-      "Foundation",
-      "Tensor Adaptor Coordinate: The Result Container"
+      "API Reference",
+      "API Reference"
     ]
   },
   {
@@ -440,6 +220,83 @@
     ]
   },
   {
+    "objectID": "concepts/tensor-coordinate.html",
+    "href": "concepts/tensor-coordinate.html",
+    "title": "Tensor Coordinates",
+    "section": "",
+    "text": "Prerequisites: Buffer Views, Tensor Descriptors\nTensor coordinates represent the final result after all tensor layout transformations have been applied. They store both the multi-dimensional index and the linear memory offset that results from complex coordinate transformations.",
+    "crumbs": [
+      "Foundation",
+      "Tensor Coordinates"
+    ]
+  },
+  {
+    "objectID": "concepts/tensor-coordinate.html#what-is-a-tensorcoordinate",
+    "href": "concepts/tensor-coordinate.html#what-is-a-tensorcoordinate",
+    "title": "Tensor Coordinates",
+    "section": "What is a TensorCoordinate?",
+    "text": "What is a TensorCoordinate?\nA TensorCoordinate is the end product of the tensor transformation pipeline:\nInput Index → Transforms → TensorCoordinate (Index + Offset)\nKey characteristics: - Stores the final index: The transformed multi-dimensional coordinate - Stores the linear offset: The final memory location after all transformations - Extends TensorAdaptorCoordinate: Inherits transformation tracking but focuses on the final result - Always has a single bottom dimension: The linear offset is stored in hidden dimension [0]",
+    "crumbs": [
+      "Foundation",
+      "Tensor Coordinates"
+    ]
+  },
+  {
+    "objectID": "concepts/tensor-coordinate.html#why-tensorcoordinate-matters",
+    "href": "concepts/tensor-coordinate.html#why-tensorcoordinate-matters",
+    "title": "Tensor Coordinates",
+    "section": "Why TensorCoordinate Matters",
+    "text": "Why TensorCoordinate Matters\nAfter complex transformations (embedding, merging, unmerging, etc.), you need: 1. The final index: Where you are in the logical tensor space 2. The linear offset: Where to actually access memory\nTensorCoordinate provides both pieces of information in a single, convenient container.",
+    "crumbs": [
+      "Foundation",
+      "Tensor Coordinates"
+    ]
+  },
+  {
+    "objectID": "concepts/tensor-coordinate.html#core-components",
+    "href": "concepts/tensor-coordinate.html#core-components",
+    "title": "Tensor Coordinates",
+    "section": "Core Components",
+    "text": "Core Components\n\nMultiIndex\nA MultiIndex represents a multi-dimensional index with a specific number of dimensions:\n\n\n\n\n\n\n\n\nTensorCoordinate\nA TensorCoordinate represents coordinates in a tensor space with transformations:",
+    "crumbs": [
+      "Foundation",
+      "Tensor Coordinates"
+    ]
+  },
+  {
+    "objectID": "concepts/tensor-coordinate.html#key-operations",
+    "href": "concepts/tensor-coordinate.html#key-operations",
+    "title": "Tensor Coordinates",
+    "section": "Key Operations",
+    "text": "Key Operations\n\nIndex Manipulation\n\n\n\n\n\n\n\n\nCoordinate Transformations",
+    "crumbs": [
+      "Foundation",
+      "Tensor Coordinates"
+    ]
+  },
+  {
+    "objectID": "concepts/tensor-coordinate.html#relationship-to-other-concepts",
+    "href": "concepts/tensor-coordinate.html#relationship-to-other-concepts",
+    "title": "Tensor Coordinates",
+    "section": "Relationship to Other Concepts",
+    "text": "Relationship to Other Concepts\nTensor coordinates are used throughout PythonCK:\n\nBuffer Views use coordinates to access memory locations\nTensor Descriptors transform coordinates through layout changes\n\nTile Distributions map coordinates between different spaces\nSweep Operations iterate through coordinate ranges",
+    "crumbs": [
+      "Foundation",
+      "Tensor Coordinates"
+    ]
+  },
+  {
+    "objectID": "concepts/tensor-coordinate.html#next-steps",
+    "href": "concepts/tensor-coordinate.html#next-steps",
+    "title": "Tensor Coordinates",
+    "section": "Next Steps",
+    "text": "Next Steps\n\nLearn about Tensor Adaptors - The transformation engines that execute descriptors\nExplore Tensor Adaptor Coordinates - Result containers for transformed indices\nUnderstand Advanced Coordinate Operations - Functions that require descriptors\n\nThe coordinate system provides the mathematical foundation that enables all the advanced tensor operations in PythonCK.\n\nTensorCoordinate: Index + Offset Storage\nA TensorCoordinate stores the final result of tensor transformations - both the logical index and the linear memory offset:\n\n\n\n\n\n\n\n\nKey Methods\n\n\n\n\n\n\n\n\nComparison with TensorAdaptorCoordinate",
+    "crumbs": [
+      "Foundation",
+      "Tensor Coordinates"
+    ]
+  },
+  {
     "objectID": "concepts/tile-distribution.html",
     "href": "concepts/tile-distribution.html",
     "title": "Tile Distribution: Parallel Processing Coordination",
@@ -569,6 +426,380 @@
     "crumbs": [
       "Distribution",
       "Tile Distribution: Parallel Processing Coordination"
+    ]
+  },
+  {
+    "objectID": "concepts/tile-distribution-encoding.html",
+    "href": "concepts/tile-distribution-encoding.html",
+    "title": "Tile Distribution Encoding: Mathematical Graph Structure",
+    "section": "",
+    "text": "Tile Distribution Encoding is a mathematical framework that describes how tensor data is distributed across parallel processing elements (threads, warps, blocks). It represents the distribution pattern as a graph structure where:\n\nNODES: R, H₀, H₁, … Hₙ dimension sequences\n\nEDGES: P and Y mappings that create connections\nINCIDENCE MATRIX: Major/Minor indices define the edge structure\n\nThe following video visualises the tile distribution encoding in a graph format. We use this graph format to explain the relevant conepts.",
+    "crumbs": [
+      "Distribution",
+      "Tile Distribution Encoding: Mathematical Graph Structure"
+    ]
+  },
+  {
+    "objectID": "concepts/tile-distribution-encoding.html#what-is-tile-distribution-encoding",
+    "href": "concepts/tile-distribution-encoding.html#what-is-tile-distribution-encoding",
+    "title": "Tile Distribution Encoding: Mathematical Graph Structure",
+    "section": "",
+    "text": "Tile Distribution Encoding is a mathematical framework that describes how tensor data is distributed across parallel processing elements (threads, warps, blocks). It represents the distribution pattern as a graph structure where:\n\nNODES: R, H₀, H₁, … Hₙ dimension sequences\n\nEDGES: P and Y mappings that create connections\nINCIDENCE MATRIX: Major/Minor indices define the edge structure\n\nThe following video visualises the tile distribution encoding in a graph format. We use this graph format to explain the relevant conepts.",
+    "crumbs": [
+      "Distribution",
+      "Tile Distribution Encoding: Mathematical Graph Structure"
+    ]
+  },
+  {
+    "objectID": "concepts/tile-distribution-encoding.html#graph-structure-concept",
+    "href": "concepts/tile-distribution-encoding.html#graph-structure-concept",
+    "title": "Tile Distribution Encoding: Mathematical Graph Structure",
+    "section": "🕸️ Graph Structure Concept",
+    "text": "🕸️ Graph Structure Concept\nThe encoding creates a mathematical graph that systematically maps processing elements (P) to tensor coordinates (Y). This graph structure enables efficient parallel tensor processing by establishing clear relationships between threads and data elements.\n\n\n\nGraph Structure Overview\n\n\nThe graph consists of:\n\nNODES: R sequences (replication), H₀ sequences (dimension 0), H₁ sequences (dimension 1), … Hₙ sequences\n\nEDGES: P→RH mappings and Y→RH mappings that define connectivity\nINCIDENCE MATRIX: Major/minor indices that specify exactly which nodes connect\n\n\n\n\nCoordinate Transform Process\n\n\n\nMajor/Minor Indexing System\nThe graph connectivity uses a systematic indexing where: - 0 = R space (replication sequences) - 1 = H₀ space (first hierarchical dimension) - 2 = H₁ space (second hierarchical dimension) - n+1 = Hₙ space (nth hierarchical dimension)\nBoth P (processing elements) and Y (tensor coordinates) map to this RH space through major/minor index pairs that define precise graph connectivity:",
+    "crumbs": [
+      "Distribution",
+      "Tile Distribution Encoding: Mathematical Graph Structure"
+    ]
+  },
+  {
+    "objectID": "concepts/tile-distribution-encoding.html#creating-the-encoding",
+    "href": "concepts/tile-distribution-encoding.html#creating-the-encoding",
+    "title": "Tile Distribution Encoding: Mathematical Graph Structure",
+    "section": "🔧 Creating the Encoding",
+    "text": "🔧 Creating the Encoding\nThe encoding combines all graph structure information:",
+    "crumbs": [
+      "Distribution",
+      "Tile Distribution Encoding: Mathematical Graph Structure"
+    ]
+  },
+  {
+    "objectID": "concepts/tile-distribution-encoding.html#encoding-detail-information",
+    "href": "concepts/tile-distribution-encoding.html#encoding-detail-information",
+    "title": "Tile Distribution Encoding: Mathematical Graph Structure",
+    "section": "📊 Encoding Detail Information",
+    "text": "📊 Encoding Detail Information\nThe encoding automatically computes detailed mapping information:",
+    "crumbs": [
+      "Distribution",
+      "Tile Distribution Encoding: Mathematical Graph Structure"
+    ]
+  },
+  {
+    "objectID": "concepts/tile-distribution-encoding.html#understanding-the-prh-and-yrh-mappings",
+    "href": "concepts/tile-distribution-encoding.html#understanding-the-prh-and-yrh-mappings",
+    "title": "Tile Distribution Encoding: Mathematical Graph Structure",
+    "section": "🎯 Understanding the P→RH and Y→RH Mappings",
+    "text": "🎯 Understanding the P→RH and Y→RH Mappings\nThe major/minor system creates a precise incidence matrix:",
+    "crumbs": [
+      "Distribution",
+      "Tile Distribution Encoding: Mathematical Graph Structure"
+    ]
+  },
+  {
+    "objectID": "concepts/tile-distribution-encoding.html#real-world-interpretation",
+    "href": "concepts/tile-distribution-encoding.html#real-world-interpretation",
+    "title": "Tile Distribution Encoding: Mathematical Graph Structure",
+    "section": "🚀 Real-World Interpretation",
+    "text": "🚀 Real-World Interpretation\nUnderstanding what the RMSNorm encoding means in practice:",
+    "crumbs": [
+      "Distribution",
+      "Tile Distribution Encoding: Mathematical Graph Structure"
+    ]
+  },
+  {
+    "objectID": "concepts/tile-distribution-encoding.html#spans-distributed-computation-patterns",
+    "href": "concepts/tile-distribution-encoding.html#spans-distributed-computation-patterns",
+    "title": "Tile Distribution Encoding: Mathematical Graph Structure",
+    "section": "🎨 Spans: Distributed Computation Patterns",
+    "text": "🎨 Spans: Distributed Computation Patterns\nSpans represent how computation is distributed spatially:",
+    "crumbs": [
+      "Distribution",
+      "Tile Distribution Encoding: Mathematical Graph Structure"
+    ]
+  },
+  {
+    "objectID": "concepts/tile-distribution-encoding.html#factory-functions",
+    "href": "concepts/tile-distribution-encoding.html#factory-functions",
+    "title": "Tile Distribution Encoding: Mathematical Graph Structure",
+    "section": "🏗️ Factory Functions",
+    "text": "🏗️ Factory Functions\nKey functions for creating encoding structures:",
+    "crumbs": [
+      "Distribution",
+      "Tile Distribution Encoding: Mathematical Graph Structure"
+    ]
+  },
+  {
+    "objectID": "concepts/tile-distribution-encoding.html#key-takeaways",
+    "href": "concepts/tile-distribution-encoding.html#key-takeaways",
+    "title": "Tile Distribution Encoding: Mathematical Graph Structure",
+    "section": "🎓 Key Takeaways",
+    "text": "🎓 Key Takeaways\n\nGraph Structure: Tile distribution encoding represents parallel computation as a graph with R/H nodes and P/Y edges\nIncidence Matrix: Major/minor indices create precise mappings between processing elements and data\nHierarchical Organization: R (replication) → H (hierarchical tiles) → spans → Y (element indexing)\nEfficiency: The encoding ensures optimal work distribution across parallel processing elements\nFoundation: This mathematical structure enables all higher-level tile distribution operations\n\nThe tile distribution encoding serves as the mathematical foundation for all parallel tensor operations in the Composable Kernels framework!",
+    "crumbs": [
+      "Distribution",
+      "Tile Distribution Encoding: Mathematical Graph Structure"
+    ]
+  },
+  {
+    "objectID": "concepts/buffer-view.html",
+    "href": "concepts/buffer-view.html",
+    "title": "Buffer View",
+    "section": "",
+    "text": "Buffer views provide a unified abstraction for accessing memory across different address spaces and with various access patterns. They form the lowest level of the PythonCK memory hierarchy.",
+    "crumbs": [
+      "Foundation",
+      "Buffer View"
+    ]
+  },
+  {
+    "objectID": "concepts/buffer-view.html#core-concepts",
+    "href": "concepts/buffer-view.html#core-concepts",
+    "title": "Buffer View",
+    "section": "Core Concepts",
+    "text": "Core Concepts\n\nMemory Address Spaces\n\n\n\n\n\n\n\n\nMemory Operations",
+    "crumbs": [
+      "Foundation",
+      "Buffer View"
+    ]
+  },
+  {
+    "objectID": "concepts/buffer-view.html#creating-buffer-views",
+    "href": "concepts/buffer-view.html#creating-buffer-views",
+    "title": "Buffer View",
+    "section": "Creating Buffer Views",
+    "text": "Creating Buffer Views\n\nBasic Buffer View\n\n\n\n\n\n\n\n\nAccessing Buffer Elements",
+    "crumbs": [
+      "Foundation",
+      "Buffer View"
+    ]
+  },
+  {
+    "objectID": "concepts/buffer-view.html#memory-operations-1",
+    "href": "concepts/buffer-view.html#memory-operations-1",
+    "title": "Buffer View",
+    "section": "Memory Operations",
+    "text": "Memory Operations\n\nSET Operation\n\n\n\n\n\n\n\n\nADD Operation",
+    "crumbs": [
+      "Foundation",
+      "Buffer View"
+    ]
+  },
+  {
+    "objectID": "concepts/buffer-view.html#advanced-buffer-operations",
+    "href": "concepts/buffer-view.html#advanced-buffer-operations",
+    "title": "Buffer View",
+    "section": "Advanced Buffer Operations",
+    "text": "Advanced Buffer Operations\n\nBuffer Views with Strides\n\n\n\n\n\n\n\n\nBuffer Reshaping",
+    "crumbs": [
+      "Foundation",
+      "Buffer View"
+    ]
+  },
+  {
+    "objectID": "concepts/buffer-view.html#buffer-view-integration",
+    "href": "concepts/buffer-view.html#buffer-view-integration",
+    "title": "Buffer View",
+    "section": "Buffer View Integration",
+    "text": "Buffer View Integration\nBuffer views serve as the foundation for all tensor operations in PythonCK. They provide the memory abstraction that higher-level components like tensor views and tile windows build upon.",
+    "crumbs": [
+      "Foundation",
+      "Buffer View"
+    ]
+  },
+  {
+    "objectID": "concepts/buffer-view.html#relationship-to-other-concepts",
+    "href": "concepts/buffer-view.html#relationship-to-other-concepts",
+    "title": "Buffer View",
+    "section": "Relationship to Other Concepts",
+    "text": "Relationship to Other Concepts\nBuffer views are the foundation for:\n\nTensor Views - Combine buffers with tensor descriptors for structured access\nTile Windows - Provide windowed access to buffer regions\nStatic Distributed Tensors - Thread-local buffer management\nMemory Operations - All tensor operations ultimately access memory through buffer views",
+    "crumbs": [
+      "Foundation",
+      "Buffer View"
+    ]
+  },
+  {
+    "objectID": "concepts/buffer-view.html#next-steps",
+    "href": "concepts/buffer-view.html#next-steps",
+    "title": "Buffer View",
+    "section": "Next Steps",
+    "text": "Next Steps\n\nLearn about Tensor Coordinates for multi-dimensional indexing\nExplore Tensor Views to see how buffers combine with descriptors\nUnderstand Static Distributed Tensors for parallel buffer management\n\nBuffer views provide the essential memory abstraction that enables all higher-level tensor operations in PythonCK.",
+    "crumbs": [
+      "Foundation",
+      "Buffer View"
+    ]
+  },
+  {
+    "objectID": "concepts/tensor-adaptor.html",
+    "href": "concepts/tensor-adaptor.html",
+    "title": "TensorAdaptor: The Transformation Engine",
+    "section": "",
+    "text": "A TensorAdaptor is the core engine in PythonCK for managing coordinate transformations between different index spaces. It is responsible for:",
+    "crumbs": [
+      "Foundation",
+      "TensorAdaptor: The Transformation Engine"
+    ]
+  },
+  {
+    "objectID": "concepts/tensor-adaptor.html#what-does-a-tensoradaptor-do",
+    "href": "concepts/tensor-adaptor.html#what-does-a-tensoradaptor-do",
+    "title": "TensorAdaptor: The Transformation Engine",
+    "section": "What does a TensorAdaptor do?",
+    "text": "What does a TensorAdaptor do?\nA TensorAdaptor manages the transformation pipeline from top coordinates (user-facing, logical indices) to bottom coordinates (memory layout, physical indices).\n\nCoordinate transformation: Provides calculate_bottom_index() method to transform from top-level indices to bottom-level (memory) indices.\nTransform chain management: Internally manages a sequence of transforms but does not allow adding/removing transforms after creation.\nHidden dimension tracking: Maintains the mapping between transform inputs/outputs through hidden dimension IDs.\n\n\nKey Methods\n\ncalculate_bottom_index(idx_top): Transform top coordinates to bottom coordinates\nget_num_of_transform(): Get the number of transforms in the chain\nget_num_of_top_dimension(): Get number of top (user-facing) dimensions\nget_num_of_bottom_dimension(): Get number of bottom (memory) dimensions\nget_num_of_hidden_dimension(): Get total number of hidden dimensions",
+    "crumbs": [
+      "Foundation",
+      "TensorAdaptor: The Transformation Engine"
+    ]
+  },
+  {
+    "objectID": "concepts/tensor-adaptor.html#example-usage",
+    "href": "concepts/tensor-adaptor.html#example-usage",
+    "title": "TensorAdaptor: The Transformation Engine",
+    "section": "Example Usage",
+    "text": "Example Usage\nHere is how you create a TensorAdaptor that merges two dimensions into one (e.g., for a 2D-to-1D mapping):\n\n\n\n\n\n\nHere’s a more complex example with an embed transform:",
+    "crumbs": [
+      "Foundation",
+      "TensorAdaptor: The Transformation Engine"
+    ]
+  },
+  {
+    "objectID": "concepts/tensor-adaptor.html#coordinate-transformation",
+    "href": "concepts/tensor-adaptor.html#coordinate-transformation",
+    "title": "TensorAdaptor: The Transformation Engine",
+    "section": "Coordinate Transformation",
+    "text": "Coordinate Transformation\nHere’s how to use a TensorAdaptor to transform coordinates from top to bottom:",
+    "crumbs": [
+      "Foundation",
+      "TensorAdaptor: The Transformation Engine"
+    ]
+  },
+  {
+    "objectID": "concepts/tensor-adaptor.html#tensoradaptor-vs-tensordescriptor",
+    "href": "concepts/tensor-adaptor.html#tensoradaptor-vs-tensordescriptor",
+    "title": "TensorAdaptor: The Transformation Engine",
+    "section": "TensorAdaptor vs TensorDescriptor",
+    "text": "TensorAdaptor vs TensorDescriptor\n\n\n\n\n\n\n\nTensorAdaptor\nTensorDescriptor\n\n\n\n\nManages coordinate transformations\nExtends TensorAdaptor with element space info\n\n\nHas calculate_bottom_index()\nAdds calculate_offset(), get_lengths()\n\n\nTracks hidden dimension mappings\nAdds element space size and vector guarantees\n\n\nUsed as building block\nUsed for complete tensor layout description\n\n\nNo element space concept\nKnows total number of elements",
+    "crumbs": [
+      "Foundation",
+      "TensorAdaptor: The Transformation Engine"
+    ]
+  },
+  {
+    "objectID": "concepts/tensor-adaptor.html#when-to-use-tensoradaptor",
+    "href": "concepts/tensor-adaptor.html#when-to-use-tensoradaptor",
+    "title": "TensorAdaptor: The Transformation Engine",
+    "section": "When to Use TensorAdaptor",
+    "text": "When to Use TensorAdaptor\n\nBuilding coordinate transformation pipelines: When you need to chain multiple transforms\nCustom tensor layouts: When standard layouts don’t meet your needs\n\nAs components in larger systems: TensorDescriptor internally uses TensorAdaptor\nResearch and experimentation: When exploring new transformation patterns\n\nTensorAdaptor provides the foundation for coordinate transformations, while TensorDescriptor builds upon it to provide complete tensor layout descriptions for practical use.\nNext: TensorDescriptor — Learn how TensorDescriptor extends TensorAdaptor with element space information.",
+    "crumbs": [
+      "Foundation",
+      "TensorAdaptor: The Transformation Engine"
+    ]
+  },
+  {
+    "objectID": "tutorials/index.html",
+    "href": "tutorials/index.html",
+    "title": "Getting Started with PythonCK",
+    "section": "",
+    "text": "Welcome to the PythonCK tutorials! These step-by-step guides will help you understand the core concepts and learn how to use the library effectively.",
+    "crumbs": [
+      "Getting Started",
+      "Getting Started with PythonCK"
+    ]
+  },
+  {
+    "objectID": "tutorials/index.html#setup",
+    "href": "tutorials/index.html#setup",
+    "title": "Getting Started with PythonCK",
+    "section": "Setup",
+    "text": "Setup\nLet’s import the necessary modules:",
+    "crumbs": [
+      "Getting Started",
+      "Getting Started with PythonCK"
+    ]
+  },
+  {
+    "objectID": "tutorials/index.html#tutorial-1-understanding-tensor-coordinates",
+    "href": "tutorials/index.html#tutorial-1-understanding-tensor-coordinates",
+    "title": "Getting Started with PythonCK",
+    "section": "Tutorial 1: Understanding Tensor Coordinates",
+    "text": "Tutorial 1: Understanding Tensor Coordinates\nTensor coordinates are the foundation of how we address multi-dimensional data:",
+    "crumbs": [
+      "Getting Started",
+      "Getting Started with PythonCK"
+    ]
+  },
+  {
+    "objectID": "tutorials/index.html#tutorial-2-working-with-tensor-descriptors",
+    "href": "tutorials/index.html#tutorial-2-working-with-tensor-descriptors",
+    "title": "Getting Started with PythonCK",
+    "section": "Tutorial 2: Working with Tensor Descriptors",
+    "text": "Tutorial 2: Working with Tensor Descriptors\nTensor descriptors provide metadata about tensor layout and properties:",
+    "crumbs": [
+      "Getting Started",
+      "Getting Started with PythonCK"
+    ]
+  },
+  {
+    "objectID": "tutorials/index.html#tutorial-3-buffer-views-and-memory-access",
+    "href": "tutorials/index.html#tutorial-3-buffer-views-and-memory-access",
+    "title": "Getting Started with PythonCK",
+    "section": "Tutorial 3: Buffer Views and Memory Access",
+    "text": "Tutorial 3: Buffer Views and Memory Access\nBuffer views provide low-level control over memory access patterns:",
+    "crumbs": [
+      "Getting Started",
+      "Getting Started with PythonCK"
+    ]
+  },
+  {
+    "objectID": "tutorials/index.html#tutorial-4-tile-based-operations",
+    "href": "tutorials/index.html#tutorial-4-tile-based-operations",
+    "title": "Getting Started with PythonCK",
+    "section": "Tutorial 4: Tile-Based Operations",
+    "text": "Tutorial 4: Tile-Based Operations\nLearn how data is organized and processed in tiles:",
+    "crumbs": [
+      "Getting Started",
+      "Getting Started with PythonCK"
+    ]
+  },
+  {
+    "objectID": "tutorials/index.html#tutorial-5-advanced-tensor-transformations",
+    "href": "tutorials/index.html#tutorial-5-advanced-tensor-transformations",
+    "title": "Getting Started with PythonCK",
+    "section": "Tutorial 5: Advanced Tensor Transformations",
+    "text": "Tutorial 5: Advanced Tensor Transformations\nExplore how tensor adaptors enable complex transformations:",
+    "crumbs": [
+      "Getting Started",
+      "Getting Started with PythonCK"
+    ]
+  },
+  {
+    "objectID": "tutorials/index.html#next-steps",
+    "href": "tutorials/index.html#next-steps",
+    "title": "Getting Started with PythonCK",
+    "section": "Next Steps",
+    "text": "Next Steps\nNow that you’ve learned the basics, explore specific concepts in detail:\n\nTensor Adaptor - Deep dive into tensor transformations\nTile Operations - Advanced tiling strategies\nBuffer Management - Memory access optimization",
+    "crumbs": [
+      "Getting Started",
+      "Getting Started with PythonCK"
+    ]
+  },
+  {
+    "objectID": "tutorials/index.html#interactive-experimentation",
+    "href": "tutorials/index.html#interactive-experimentation",
+    "title": "Getting Started with PythonCK",
+    "section": "Interactive Experimentation",
+    "text": "Interactive Experimentation\nTry modifying the examples above! Change the tensor dimensions, tile sizes, or transformation types to see how the system behaves. All code runs directly in your browser, so feel free to experiment.",
+    "crumbs": [
+      "Getting Started",
+      "Getting Started with PythonCK"
+    ]
+  },
+  {
+    "objectID": "tutorials/index.html#common-patterns",
+    "href": "tutorials/index.html#common-patterns",
+    "title": "Getting Started with PythonCK",
+    "section": "Common Patterns",
+    "text": "Common Patterns\nHere are some common usage patterns you’ll encounter:\n\nCreating multi-dimensional coordinates for indexing\nSetting up tile distributions for parallel processing\nApplying tensor adaptors for data transformations\nManaging buffer views for memory optimization\n\nEach concept builds on the previous ones, creating a powerful framework for GPU kernel development.",
+    "crumbs": [
+      "Getting Started",
+      "Getting Started with PythonCK"
     ]
   },
   {
@@ -712,358 +943,6 @@
     "crumbs": [
       "Advanced Indexing",
       "Advanced Coordinate Operations"
-    ]
-  },
-  {
-    "objectID": "concepts/tile-distribution-encoding.html",
-    "href": "concepts/tile-distribution-encoding.html",
-    "title": "Tile Distribution Encoding: Mathematical Graph Structure",
-    "section": "",
-    "text": "Tile Distribution Encoding is a mathematical framework that describes how tensor data is distributed across parallel processing elements (threads, warps, blocks). It represents the distribution pattern as a graph structure where:\n\nNODES: R, H₀, H₁, … Hₙ dimension sequences\n\nEDGES: P and Y mappings that create connections\nINCIDENCE MATRIX: Major/Minor indices define the edge structure",
-    "crumbs": [
-      "Distribution",
-      "Tile Distribution Encoding: Mathematical Graph Structure"
-    ]
-  },
-  {
-    "objectID": "concepts/tile-distribution-encoding.html#what-is-tile-distribution-encoding",
-    "href": "concepts/tile-distribution-encoding.html#what-is-tile-distribution-encoding",
-    "title": "Tile Distribution Encoding: Mathematical Graph Structure",
-    "section": "",
-    "text": "Tile Distribution Encoding is a mathematical framework that describes how tensor data is distributed across parallel processing elements (threads, warps, blocks). It represents the distribution pattern as a graph structure where:\n\nNODES: R, H₀, H₁, … Hₙ dimension sequences\n\nEDGES: P and Y mappings that create connections\nINCIDENCE MATRIX: Major/Minor indices define the edge structure",
-    "crumbs": [
-      "Distribution",
-      "Tile Distribution Encoding: Mathematical Graph Structure"
-    ]
-  },
-  {
-    "objectID": "concepts/tile-distribution-encoding.html#graph-structure-concept",
-    "href": "concepts/tile-distribution-encoding.html#graph-structure-concept",
-    "title": "Tile Distribution Encoding: Mathematical Graph Structure",
-    "section": "🕸️ Graph Structure Concept",
-    "text": "🕸️ Graph Structure Concept\nThe encoding creates a mathematical graph that systematically maps processing elements (P) to tensor coordinates (Y). This graph structure enables efficient parallel tensor processing by establishing clear relationships between threads and data elements.\n\n\n\nGraph Structure Overview\n\n\nThe graph consists of:\n\nNODES: R sequences (replication), H₀ sequences (dimension 0), H₁ sequences (dimension 1), … Hₙ sequences\n\nEDGES: P→RH mappings and Y→RH mappings that define connectivity\nINCIDENCE MATRIX: Major/minor indices that specify exactly which nodes connect\n\n\n\n\nCoordinate Transform Process\n\n\n\nMajor/Minor Indexing System\nThe graph connectivity uses a systematic indexing where: - 0 = R space (replication sequences) - 1 = H₀ space (first hierarchical dimension) - 2 = H₁ space (second hierarchical dimension) - n+1 = Hₙ space (nth hierarchical dimension)\nBoth P (processing elements) and Y (tensor coordinates) map to this RH space through major/minor index pairs that define precise graph connectivity:",
-    "crumbs": [
-      "Distribution",
-      "Tile Distribution Encoding: Mathematical Graph Structure"
-    ]
-  },
-  {
-    "objectID": "concepts/tile-distribution-encoding.html#creating-the-encoding",
-    "href": "concepts/tile-distribution-encoding.html#creating-the-encoding",
-    "title": "Tile Distribution Encoding: Mathematical Graph Structure",
-    "section": "🔧 Creating the Encoding",
-    "text": "🔧 Creating the Encoding\nThe encoding combines all graph structure information:",
-    "crumbs": [
-      "Distribution",
-      "Tile Distribution Encoding: Mathematical Graph Structure"
-    ]
-  },
-  {
-    "objectID": "concepts/tile-distribution-encoding.html#encoding-detail-information",
-    "href": "concepts/tile-distribution-encoding.html#encoding-detail-information",
-    "title": "Tile Distribution Encoding: Mathematical Graph Structure",
-    "section": "📊 Encoding Detail Information",
-    "text": "📊 Encoding Detail Information\nThe encoding automatically computes detailed mapping information:",
-    "crumbs": [
-      "Distribution",
-      "Tile Distribution Encoding: Mathematical Graph Structure"
-    ]
-  },
-  {
-    "objectID": "concepts/tile-distribution-encoding.html#understanding-the-prh-and-yrh-mappings",
-    "href": "concepts/tile-distribution-encoding.html#understanding-the-prh-and-yrh-mappings",
-    "title": "Tile Distribution Encoding: Mathematical Graph Structure",
-    "section": "🎯 Understanding the P→RH and Y→RH Mappings",
-    "text": "🎯 Understanding the P→RH and Y→RH Mappings\nThe major/minor system creates a precise incidence matrix:",
-    "crumbs": [
-      "Distribution",
-      "Tile Distribution Encoding: Mathematical Graph Structure"
-    ]
-  },
-  {
-    "objectID": "concepts/tile-distribution-encoding.html#real-world-interpretation",
-    "href": "concepts/tile-distribution-encoding.html#real-world-interpretation",
-    "title": "Tile Distribution Encoding: Mathematical Graph Structure",
-    "section": "🚀 Real-World Interpretation",
-    "text": "🚀 Real-World Interpretation\nUnderstanding what the RMSNorm encoding means in practice:",
-    "crumbs": [
-      "Distribution",
-      "Tile Distribution Encoding: Mathematical Graph Structure"
-    ]
-  },
-  {
-    "objectID": "concepts/tile-distribution-encoding.html#spans-distributed-computation-patterns",
-    "href": "concepts/tile-distribution-encoding.html#spans-distributed-computation-patterns",
-    "title": "Tile Distribution Encoding: Mathematical Graph Structure",
-    "section": "🎨 Spans: Distributed Computation Patterns",
-    "text": "🎨 Spans: Distributed Computation Patterns\nSpans represent how computation is distributed spatially:",
-    "crumbs": [
-      "Distribution",
-      "Tile Distribution Encoding: Mathematical Graph Structure"
-    ]
-  },
-  {
-    "objectID": "concepts/tile-distribution-encoding.html#factory-functions",
-    "href": "concepts/tile-distribution-encoding.html#factory-functions",
-    "title": "Tile Distribution Encoding: Mathematical Graph Structure",
-    "section": "🏗️ Factory Functions",
-    "text": "🏗️ Factory Functions\nKey functions for creating encoding structures:",
-    "crumbs": [
-      "Distribution",
-      "Tile Distribution Encoding: Mathematical Graph Structure"
-    ]
-  },
-  {
-    "objectID": "concepts/tile-distribution-encoding.html#key-takeaways",
-    "href": "concepts/tile-distribution-encoding.html#key-takeaways",
-    "title": "Tile Distribution Encoding: Mathematical Graph Structure",
-    "section": "🎓 Key Takeaways",
-    "text": "🎓 Key Takeaways\n\nGraph Structure: Tile distribution encoding represents parallel computation as a graph with R/H nodes and P/Y edges\nIncidence Matrix: Major/minor indices create precise mappings between processing elements and data\nHierarchical Organization: R (replication) → H (hierarchical tiles) → spans → Y (element indexing)\nEfficiency: The encoding ensures optimal work distribution across parallel processing elements\nFoundation: This mathematical structure enables all higher-level tile distribution operations\n\nThe tile distribution encoding serves as the mathematical foundation for all parallel tensor operations in the Composable Kernels framework!",
-    "crumbs": [
-      "Distribution",
-      "Tile Distribution Encoding: Mathematical Graph Structure"
-    ]
-  },
-  {
-    "objectID": "index.html",
-    "href": "index.html",
-    "title": "Composable-Kernels Python Documentation",
-    "section": "",
-    "text": "Welcome to PythonCK, a Python implementation of tensor operations and concepts from the AMD Composable Kernels library. This package provides educational implementations that focus on clarity and understanding rather than performance.",
-    "crumbs": [
-      "Getting Started",
-      "Composable-Kernels Python Documentation"
-    ]
-  },
-  {
-    "objectID": "index.html#recommended-learning-path",
-    "href": "index.html#recommended-learning-path",
-    "title": "Composable-Kernels Python Documentation",
-    "section": "🎓 Recommended Learning Path",
-    "text": "🎓 Recommended Learning Path\nNew to PythonCK? Follow our structured learning path to understand all concepts:\n\n📚 Complete Learning Path\nA step-by-step guide that builds from basic concepts to advanced GPU thread coordination, culminating in understanding the complete tile_distr_thread_mapping.py example.",
-    "crumbs": [
-      "Getting Started",
-      "Composable-Kernels Python Documentation"
-    ]
-  },
-  {
-    "objectID": "index.html#learning-by-topic",
-    "href": "index.html#learning-by-topic",
-    "title": "Composable-Kernels Python Documentation",
-    "section": "📖 Learning by Topic",
-    "text": "📖 Learning by Topic\n\n1. Foundation Concepts\n\nBuffer Views - Memory buffer abstraction\nTensor Coordinates - Multi-dimensional indexing\nTensor Descriptors - Layout transformations\nTensor Views - Unified tensor access\n\n\n\n2. Distribution Concepts\n\nTile Distribution Encoding - How data is distributed\nTile Distribution - Parallel processing coordination\nStatic Distributed Tensors - Thread-local data\n\n\n\n3. Advanced Operations\n\nTile Windows - Windowed tensor access\nSweep Operations - Iterating over distributed data\nThread Mapping - Understanding the complete pipeline",
-    "crumbs": [
-      "Getting Started",
-      "Composable-Kernels Python Documentation"
-    ]
-  },
-  {
-    "objectID": "index.html#package-structure",
-    "href": "index.html#package-structure",
-    "title": "Composable-Kernels Python Documentation",
-    "section": "📦 Package Structure",
-    "text": "📦 Package Structure\npytensor/                    # Core tensor operations\n├── buffer_view.py          # Memory abstraction\n├── tensor_coordinate.py    # Multi-dimensional indexing\n├── tensor_descriptor.py    # Layout transformations  \n├── tensor_view.py          # Unified access interface\n├── tile_distribution.py    # Data distribution\n├── tile_window.py          # Windowed access\n├── sweep_tile.py           # Coordinated iteration\n└── ...\n\ntensor_transforms/          # Analysis tools\n├── parser.py              # Descriptor parsing\n├── analyzer.py            # Transformation analysis\n└── ...\n\ntile_distribution/          # Visualization tools\n├── parser.py              # C++ encoding parsing\n├── visualizer.py          # Interactive visualization\n└── ...",
-    "crumbs": [
-      "Getting Started",
-      "Composable-Kernels Python Documentation"
-    ]
-  },
-  {
-    "objectID": "index.html#key-concepts",
-    "href": "index.html#key-concepts",
-    "title": "Composable-Kernels Python Documentation",
-    "section": "🔑 Key Concepts",
-    "text": "🔑 Key Concepts\nPythonCK implements several interconnected concepts:\n\nTensors are multi-dimensional arrays with flexible layouts\nCoordinates provide multi-dimensional indexing with transformations\nDistributions define how data is spread across parallel processing elements\nTiles represent chunks of data processed by individual threads/warps\nSweeps iterate over distributed data in a coordinated manner\n\nThe ultimate goal is understanding how GPU threads coordinate to process large tensors efficiently, as demonstrated in the complete example at tile_distr_thread_mapping.py.",
-    "crumbs": [
-      "Getting Started",
-      "Composable-Kernels Python Documentation"
-    ]
-  },
-  {
-    "objectID": "index.html#quick-start",
-    "href": "index.html#quick-start",
-    "title": "Composable-Kernels Python Documentation",
-    "section": "🚀 Quick Start",
-    "text": "🚀 Quick Start\nJump right in with interactive examples:",
-    "crumbs": [
-      "Getting Started",
-      "Composable-Kernels Python Documentation"
-    ]
-  },
-  {
-    "objectID": "index.html#interactive-applications",
-    "href": "index.html#interactive-applications",
-    "title": "Composable-Kernels Python Documentation",
-    "section": "🎮 Interactive Applications",
-    "text": "🎮 Interactive Applications\nExplore PythonCK concepts through three interactive web applications:\n\n📊 Tile Distribution Visualizer\nInteractive visualization of tile distribution structures and GPU memory layouts. Perfect for understanding how data is distributed across parallel processing elements.\n\n\n🔄 Tensor Transform Visualizer\nExplore tensor descriptor transformations with visual graphs and mathematical formulas. See how data layouts change through various transformations.\n\n\n🧵 Thread Visualization App\nVisualize GPU thread coordinate mapping and access patterns. Understand how individual threads access distributed tensor data.",
-    "crumbs": [
-      "Getting Started",
-      "Composable-Kernels Python Documentation"
-    ]
-  },
-  {
-    "objectID": "index.html#learning-paths",
-    "href": "index.html#learning-paths",
-    "title": "Composable-Kernels Python Documentation",
-    "section": "🎯 Learning Paths",
-    "text": "🎯 Learning Paths\nChoose your learning approach:\n\n🎓 Structured Path - Follow the complete 10-step progression\n🔍 Concept-Driven - Explore individual concepts as needed\n💻 Code-First - Jump into the API documentation\n🎮 Interactive - Try hands-on tutorials",
-    "crumbs": [
-      "Getting Started",
-      "Composable-Kernels Python Documentation"
-    ]
-  },
-  {
-    "objectID": "index.html#interactive-features",
-    "href": "index.html#interactive-features",
-    "title": "Composable-Kernels Python Documentation",
-    "section": "✨ Interactive Features",
-    "text": "✨ Interactive Features\nThis documentation includes:\n\n🏃 Live Code Execution - Run Python code directly in your browser\n📱 Responsive Design - Works on desktop and mobile\n🌓 Dark/Light Mode - Toggle between themes\n🔍 Full-Text Search - Find what you need quickly\n📋 Copy Code - One-click code copying\n🔗 Deep Linking - Share links to specific sections\n\n\nReady to dive deeper? Start with our Complete Learning Path or jump to any concept that interests you.",
-    "crumbs": [
-      "Getting Started",
-      "Composable-Kernels Python Documentation"
-    ]
-  },
-  {
-    "objectID": "concepts/tensor-adaptor.html",
-    "href": "concepts/tensor-adaptor.html",
-    "title": "TensorAdaptor: The Transformation Engine",
-    "section": "",
-    "text": "A TensorAdaptor is the core engine in PythonCK for managing coordinate transformations between different index spaces. It is responsible for:",
-    "crumbs": [
-      "Foundation",
-      "TensorAdaptor: The Transformation Engine"
-    ]
-  },
-  {
-    "objectID": "concepts/tensor-adaptor.html#what-does-a-tensoradaptor-do",
-    "href": "concepts/tensor-adaptor.html#what-does-a-tensoradaptor-do",
-    "title": "TensorAdaptor: The Transformation Engine",
-    "section": "What does a TensorAdaptor do?",
-    "text": "What does a TensorAdaptor do?\nA TensorAdaptor manages the transformation pipeline from top coordinates (user-facing, logical indices) to bottom coordinates (memory layout, physical indices).\n\nCoordinate transformation: Provides calculate_bottom_index() method to transform from top-level indices to bottom-level (memory) indices.\nTransform chain management: Internally manages a sequence of transforms but does not allow adding/removing transforms after creation.\nHidden dimension tracking: Maintains the mapping between transform inputs/outputs through hidden dimension IDs.\n\n\nKey Methods\n\ncalculate_bottom_index(idx_top): Transform top coordinates to bottom coordinates\nget_num_of_transform(): Get the number of transforms in the chain\nget_num_of_top_dimension(): Get number of top (user-facing) dimensions\nget_num_of_bottom_dimension(): Get number of bottom (memory) dimensions\nget_num_of_hidden_dimension(): Get total number of hidden dimensions",
-    "crumbs": [
-      "Foundation",
-      "TensorAdaptor: The Transformation Engine"
-    ]
-  },
-  {
-    "objectID": "concepts/tensor-adaptor.html#example-usage",
-    "href": "concepts/tensor-adaptor.html#example-usage",
-    "title": "TensorAdaptor: The Transformation Engine",
-    "section": "Example Usage",
-    "text": "Example Usage\nHere is how you create a TensorAdaptor that merges two dimensions into one (e.g., for a 2D-to-1D mapping):\n\n\n\n\n\n\nHere’s a more complex example with an embed transform:",
-    "crumbs": [
-      "Foundation",
-      "TensorAdaptor: The Transformation Engine"
-    ]
-  },
-  {
-    "objectID": "concepts/tensor-adaptor.html#coordinate-transformation",
-    "href": "concepts/tensor-adaptor.html#coordinate-transformation",
-    "title": "TensorAdaptor: The Transformation Engine",
-    "section": "Coordinate Transformation",
-    "text": "Coordinate Transformation\nHere’s how to use a TensorAdaptor to transform coordinates from top to bottom:",
-    "crumbs": [
-      "Foundation",
-      "TensorAdaptor: The Transformation Engine"
-    ]
-  },
-  {
-    "objectID": "concepts/tensor-adaptor.html#tensoradaptor-vs-tensordescriptor",
-    "href": "concepts/tensor-adaptor.html#tensoradaptor-vs-tensordescriptor",
-    "title": "TensorAdaptor: The Transformation Engine",
-    "section": "TensorAdaptor vs TensorDescriptor",
-    "text": "TensorAdaptor vs TensorDescriptor\n\n\n\n\n\n\n\nTensorAdaptor\nTensorDescriptor\n\n\n\n\nManages coordinate transformations\nExtends TensorAdaptor with element space info\n\n\nHas calculate_bottom_index()\nAdds calculate_offset(), get_lengths()\n\n\nTracks hidden dimension mappings\nAdds element space size and vector guarantees\n\n\nUsed as building block\nUsed for complete tensor layout description\n\n\nNo element space concept\nKnows total number of elements",
-    "crumbs": [
-      "Foundation",
-      "TensorAdaptor: The Transformation Engine"
-    ]
-  },
-  {
-    "objectID": "concepts/tensor-adaptor.html#when-to-use-tensoradaptor",
-    "href": "concepts/tensor-adaptor.html#when-to-use-tensoradaptor",
-    "title": "TensorAdaptor: The Transformation Engine",
-    "section": "When to Use TensorAdaptor",
-    "text": "When to Use TensorAdaptor\n\nBuilding coordinate transformation pipelines: When you need to chain multiple transforms\nCustom tensor layouts: When standard layouts don’t meet your needs\n\nAs components in larger systems: TensorDescriptor internally uses TensorAdaptor\nResearch and experimentation: When exploring new transformation patterns\n\nTensorAdaptor provides the foundation for coordinate transformations, while TensorDescriptor builds upon it to provide complete tensor layout descriptions for practical use.\nNext: TensorDescriptor — Learn how TensorDescriptor extends TensorAdaptor with element space information.",
-    "crumbs": [
-      "Foundation",
-      "TensorAdaptor: The Transformation Engine"
-    ]
-  },
-  {
-    "objectID": "concepts/learning-path.html",
-    "href": "concepts/learning-path.html",
-    "title": "PythonCK Learning Path",
-    "section": "",
-    "text": "This document provides a restructured learning path to understand all concepts in PythonCK, with proper dependency ordering and focused explanations.",
-    "crumbs": [
-      "Reference",
-      "PythonCK Learning Path"
-    ]
-  },
-  {
-    "objectID": "concepts/learning-path.html#ultimate-goal-understanding-tile_distr_thread_mapping.py",
-    "href": "concepts/learning-path.html#ultimate-goal-understanding-tile_distr_thread_mapping.py",
-    "title": "PythonCK Learning Path",
-    "section": "🎯 Ultimate Goal: Understanding tile_distr_thread_mapping.py",
-    "text": "🎯 Ultimate Goal: Understanding tile_distr_thread_mapping.py\nThe final example demonstrates complete GPU thread coordination - how threads cooperatively process tensor data using tile windows, sweep operations, and distribution strategies.",
-    "crumbs": [
-      "Reference",
-      "PythonCK Learning Path"
-    ]
-  },
-  {
-    "objectID": "concepts/learning-path.html#reorganized-learning-path",
-    "href": "concepts/learning-path.html#reorganized-learning-path",
-    "title": "PythonCK Learning Path",
-    "section": "📚 Reorganized Learning Path",
-    "text": "📚 Reorganized Learning Path\n\nPhase 1: Foundation (Memory & Basic Indexing)\n\nBuffer Views - Memory abstraction layer\nTensor Transforms - The building blocks for coordinate transformations\nTensor Descriptors - Layout configuration and transformations\nTensor Coordinates - Final memory-mapped coordinates with offsets\nTensor Adaptors - The transformation engines that execute descriptors\nTensor Adaptor Coordinates - Result containers for transformed indices/offsets\n\n\n\nPhase 2: Advanced Indexing (Requires Descriptors)\n\nAdvanced Coordinate Operations - move_tensor_coordinate and transform-dependent operations\nTensor Views - Unified access interface\n\n\n\nPhase 3: Distribution (Parallel Processing)\n\nTile Distribution Encoding - Mathematical encoding framework\nTile Distribution Deep Dive - make_static_tile_distribution, adaptors, descriptors\nStatic Distributed Tensors - Thread-local data management\n\n\n\nPhase 4: Advanced Operations (GPU Coordination)\n\nTile Windows Deep Dive - precompute, load, descriptor integration\nSweep Operations - Coordinated iteration patterns\nComplete Thread Mapping - Understanding the full pipeline",
-    "crumbs": [
-      "Reference",
-      "PythonCK Learning Path"
-    ]
-  },
-  {
-    "objectID": "concepts/learning-path.html#key-restructuring-changes",
-    "href": "concepts/learning-path.html#key-restructuring-changes",
-    "title": "PythonCK Learning Path",
-    "section": "🔄 Key Restructuring Changes",
-    "text": "🔄 Key Restructuring Changes\n\nLogical Learning Order\n\nBefore: Basic Coordinates → Descriptors → Advanced Coordinates (❌ Mixed concepts)\nAfter: Transforms → Descriptors → Coordinates → Adaptors → Adaptor Coordinates (✅ Clear flow)\n\n\n\nConceptual Flow\n\nTensor Transforms: The building blocks for coordinate transformations (Embed, Unmerge, Merge, Replicate)\nTensorDescriptor: Configuration/metadata for transformations (what to do)\nTensorCoordinate: Final memory-mapped coordinates with offsets (what users work with)\nTensorAdaptor: Transformation engine that executes descriptors (how to do it)\nTensorAdaptorCoordinate: Result containers for transformed indices/offsets (intermediate results)\n\n\n\nDependency-Aware Ordering\n\nBefore: Coordinates → Descriptors (❌ Wrong dependency order)\nAfter: Descriptors → Coordinates → Adaptors → Adaptor Coordinates (✅ Correct)\n\n\n\nFocused Pages\n\nBefore: Long pages with multiple concepts\nAfter: One concept per page with deep explanations\n\n\n\nTransform Examples\n\nComplete to_upper/to_lower examples for all transforms\nVisual demonstrations of coordinate transformations\n\n\n\nDeep Integration Examples\n\nHow precompute uses both tensor and distribution descriptors\nComplete breakdown of make_static_tile_distribution\nLinks to interactive apps",
-    "crumbs": [
-      "Reference",
-      "PythonCK Learning Path"
-    ]
-  },
-  {
-    "objectID": "concepts/learning-path.html#learning-strategy",
-    "href": "concepts/learning-path.html#learning-strategy",
-    "title": "PythonCK Learning Path",
-    "section": "🎓 Learning Strategy",
-    "text": "🎓 Learning Strategy\n\nFollow the order strictly - later concepts build on earlier ones\nRun all examples - hands-on understanding is crucial\nExperiment with parameters - modify examples to see effects\nUse the apps - tensor_transform_app and app for visualization",
-    "crumbs": [
-      "Reference",
-      "PythonCK Learning Path"
-    ]
-  },
-  {
-    "objectID": "concepts/learning-path.html#interactive-applications",
-    "href": "concepts/learning-path.html#interactive-applications",
-    "title": "PythonCK Learning Path",
-    "section": "🔗 Interactive Applications",
-    "text": "🔗 Interactive Applications\n\nTensor Transform App - Visualize descriptor transformations\nMain App - Explore tile distributions and thread mapping\nThread Mapping Example - Complete GPU coordination",
-    "crumbs": [
-      "Reference",
-      "PythonCK Learning Path"
-    ]
-  },
-  {
-    "objectID": "concepts/learning-path.html#page-structure",
-    "href": "concepts/learning-path.html#page-structure",
-    "title": "PythonCK Learning Path",
-    "section": "📖 Page Structure",
-    "text": "📖 Page Structure\nEach concept page now includes: - ✅ Prerequisites - What you need to understand first - ✅ Core Concept - Focused explanation - ✅ Interactive Examples - Hands-on code - ✅ Transform Examples - to_upper/to_lower for applicable concepts - ✅ Integration Points - How it connects to other concepts - ✅ Next Steps - What to learn next\n\nReady to start? Begin with Buffer Views - the foundation of memory abstraction, then learn Tensor Transforms - the building blocks for all coordinate operations.",
-    "crumbs": [
-      "Reference",
-      "PythonCK Learning Path"
     ]
   },
   {
@@ -1221,6 +1100,83 @@
     ]
   },
   {
+    "objectID": "concepts/learning-path.html",
+    "href": "concepts/learning-path.html",
+    "title": "PythonCK Learning Path",
+    "section": "",
+    "text": "This document provides a restructured learning path to understand all concepts in PythonCK, with proper dependency ordering and focused explanations.",
+    "crumbs": [
+      "Reference",
+      "PythonCK Learning Path"
+    ]
+  },
+  {
+    "objectID": "concepts/learning-path.html#ultimate-goal-understanding-tile_distr_thread_mapping.py",
+    "href": "concepts/learning-path.html#ultimate-goal-understanding-tile_distr_thread_mapping.py",
+    "title": "PythonCK Learning Path",
+    "section": "🎯 Ultimate Goal: Understanding tile_distr_thread_mapping.py",
+    "text": "🎯 Ultimate Goal: Understanding tile_distr_thread_mapping.py\nThe final example demonstrates complete GPU thread coordination - how threads cooperatively process tensor data using tile windows, sweep operations, and distribution strategies.",
+    "crumbs": [
+      "Reference",
+      "PythonCK Learning Path"
+    ]
+  },
+  {
+    "objectID": "concepts/learning-path.html#reorganized-learning-path",
+    "href": "concepts/learning-path.html#reorganized-learning-path",
+    "title": "PythonCK Learning Path",
+    "section": "📚 Reorganized Learning Path",
+    "text": "📚 Reorganized Learning Path\n\nPhase 1: Foundation (Memory & Basic Indexing)\n\nBuffer Views - Memory abstraction layer\nTensor Transforms - The building blocks for coordinate transformations\nTensor Descriptors - Layout configuration and transformations\nTensor Coordinates - Final memory-mapped coordinates with offsets\nTensor Adaptors - The transformation engines that execute descriptors\nTensor Adaptor Coordinates - Result containers for transformed indices/offsets\n\n\n\nPhase 2: Advanced Indexing (Requires Descriptors)\n\nAdvanced Coordinate Operations - move_tensor_coordinate and transform-dependent operations\nTensor Views - Unified access interface\n\n\n\nPhase 3: Distribution (Parallel Processing)\n\nTile Distribution Encoding - Mathematical encoding framework\nTile Distribution Deep Dive - make_static_tile_distribution, adaptors, descriptors\nStatic Distributed Tensors - Thread-local data management\n\n\n\nPhase 4: Advanced Operations (GPU Coordination)\n\nTile Windows Deep Dive - precompute, load, descriptor integration\nSweep Operations - Coordinated iteration patterns\nComplete Thread Mapping - Understanding the full pipeline",
+    "crumbs": [
+      "Reference",
+      "PythonCK Learning Path"
+    ]
+  },
+  {
+    "objectID": "concepts/learning-path.html#key-restructuring-changes",
+    "href": "concepts/learning-path.html#key-restructuring-changes",
+    "title": "PythonCK Learning Path",
+    "section": "🔄 Key Restructuring Changes",
+    "text": "🔄 Key Restructuring Changes\n\nLogical Learning Order\n\nBefore: Basic Coordinates → Descriptors → Advanced Coordinates (❌ Mixed concepts)\nAfter: Transforms → Descriptors → Coordinates → Adaptors → Adaptor Coordinates (✅ Clear flow)\n\n\n\nConceptual Flow\n\nTensor Transforms: The building blocks for coordinate transformations (Embed, Unmerge, Merge, Replicate)\nTensorDescriptor: Configuration/metadata for transformations (what to do)\nTensorCoordinate: Final memory-mapped coordinates with offsets (what users work with)\nTensorAdaptor: Transformation engine that executes descriptors (how to do it)\nTensorAdaptorCoordinate: Result containers for transformed indices/offsets (intermediate results)\n\n\n\nDependency-Aware Ordering\n\nBefore: Coordinates → Descriptors (❌ Wrong dependency order)\nAfter: Descriptors → Coordinates → Adaptors → Adaptor Coordinates (✅ Correct)\n\n\n\nFocused Pages\n\nBefore: Long pages with multiple concepts\nAfter: One concept per page with deep explanations\n\n\n\nTransform Examples\n\nComplete to_upper/to_lower examples for all transforms\nVisual demonstrations of coordinate transformations\n\n\n\nDeep Integration Examples\n\nHow precompute uses both tensor and distribution descriptors\nComplete breakdown of make_static_tile_distribution\nLinks to interactive apps",
+    "crumbs": [
+      "Reference",
+      "PythonCK Learning Path"
+    ]
+  },
+  {
+    "objectID": "concepts/learning-path.html#learning-strategy",
+    "href": "concepts/learning-path.html#learning-strategy",
+    "title": "PythonCK Learning Path",
+    "section": "🎓 Learning Strategy",
+    "text": "🎓 Learning Strategy\n\nFollow the order strictly - later concepts build on earlier ones\nRun all examples - hands-on understanding is crucial\nExperiment with parameters - modify examples to see effects\nUse the apps - tensor_transform_app and app for visualization",
+    "crumbs": [
+      "Reference",
+      "PythonCK Learning Path"
+    ]
+  },
+  {
+    "objectID": "concepts/learning-path.html#interactive-applications",
+    "href": "concepts/learning-path.html#interactive-applications",
+    "title": "PythonCK Learning Path",
+    "section": "🔗 Interactive Applications",
+    "text": "🔗 Interactive Applications\n\nTensor Transform App - Visualize descriptor transformations\nMain App - Explore tile distributions and thread mapping\nThread Mapping Example - Complete GPU coordination",
+    "crumbs": [
+      "Reference",
+      "PythonCK Learning Path"
+    ]
+  },
+  {
+    "objectID": "concepts/learning-path.html#page-structure",
+    "href": "concepts/learning-path.html#page-structure",
+    "title": "PythonCK Learning Path",
+    "section": "📖 Page Structure",
+    "text": "📖 Page Structure\nEach concept page now includes: - ✅ Prerequisites - What you need to understand first - ✅ Core Concept - Focused explanation - ✅ Interactive Examples - Hands-on code - ✅ Transform Examples - to_upper/to_lower for applicable concepts - ✅ Integration Points - How it connects to other concepts - ✅ Next Steps - What to learn next\n\nReady to start? Begin with Buffer Views - the foundation of memory abstraction, then learn Tensor Transforms - the building blocks for all coordinate operations.",
+    "crumbs": [
+      "Reference",
+      "PythonCK Learning Path"
+    ]
+  },
+  {
     "objectID": "concepts/tensor-transforms.html",
     "href": "concepts/tensor-transforms.html",
     "title": "Tensor Transforms: The Building Blocks",
@@ -1287,168 +1243,212 @@
     ]
   },
   {
-    "objectID": "concepts/buffer-view.html",
-    "href": "concepts/buffer-view.html",
-    "title": "Buffer View",
+    "objectID": "concepts/tensor-adaptor-coordinate.html",
+    "href": "concepts/tensor-adaptor-coordinate.html",
+    "title": "Tensor Adaptor Coordinate: The Result Container",
     "section": "",
-    "text": "Buffer views provide a unified abstraction for accessing memory across different address spaces and with various access patterns. They form the lowest level of the PythonCK memory hierarchy.",
+    "text": "Prerequisites: Tensor Transforms, Tensor Descriptor, Tensor Coordinate, Tensor Adaptor\nA Tensor Adaptor Coordinate is a result container that stores the transformed indices and offsets produced by a Tensor Adaptor. It serves as an intermediate representation between the transformation engine and the final memory-mapped coordinate.",
     "crumbs": [
       "Foundation",
-      "Buffer View"
+      "Tensor Adaptor Coordinate: The Result Container"
     ]
   },
   {
-    "objectID": "concepts/buffer-view.html#core-concepts",
-    "href": "concepts/buffer-view.html#core-concepts",
-    "title": "Buffer View",
-    "section": "Core Concepts",
-    "text": "Core Concepts\n\nMemory Address Spaces\n\n\n\n\n\n\n\n\nMemory Operations",
+    "objectID": "concepts/tensor-adaptor-coordinate.html#core-concept",
+    "href": "concepts/tensor-adaptor-coordinate.html#core-concept",
+    "title": "Tensor Adaptor Coordinate: The Result Container",
+    "section": "🎯 Core Concept",
+    "text": "🎯 Core Concept\nA Tensor Adaptor Coordinate stores the results of coordinate transformations:\nInput Index → Tensor Adaptor → Tensor Adaptor Coordinate → Final Tensor Coordinate\nThe adaptor coordinate contains: - Top Index: The original input coordinates - Bottom Index: The transformed output coordinates\n- Hidden Index: Internal storage for the transformation results",
     "crumbs": [
       "Foundation",
-      "Buffer View"
+      "Tensor Adaptor Coordinate: The Result Container"
     ]
   },
   {
-    "objectID": "concepts/buffer-view.html#creating-buffer-views",
-    "href": "concepts/buffer-view.html#creating-buffer-views",
-    "title": "Buffer View",
-    "section": "Creating Buffer Views",
-    "text": "Creating Buffer Views\n\nBasic Buffer View\n\n\n\n\n\n\n\n\nAccessing Buffer Elements",
+    "objectID": "concepts/tensor-adaptor-coordinate.html#creating-tensor-adaptor-coordinates",
+    "href": "concepts/tensor-adaptor-coordinate.html#creating-tensor-adaptor-coordinates",
+    "title": "Tensor Adaptor Coordinate: The Result Container",
+    "section": "🔧 Creating Tensor Adaptor Coordinates",
+    "text": "🔧 Creating Tensor Adaptor Coordinates\n\nFrom Tensor Adaptors\n\n\n\n\n\n\n\n\nManual Creation (Advanced)",
     "crumbs": [
       "Foundation",
-      "Buffer View"
+      "Tensor Adaptor Coordinate: The Result Container"
     ]
   },
   {
-    "objectID": "concepts/buffer-view.html#memory-operations-1",
-    "href": "concepts/buffer-view.html#memory-operations-1",
-    "title": "Buffer View",
-    "section": "Memory Operations",
-    "text": "Memory Operations\n\nSET Operation\n\n\n\n\n\n\n\n\nADD Operation",
+    "objectID": "concepts/tensor-adaptor-coordinate.html#understanding-the-three-level-structure",
+    "href": "concepts/tensor-adaptor-coordinate.html#understanding-the-three-level-structure",
+    "title": "Tensor Adaptor Coordinate: The Result Container",
+    "section": "🔍 Understanding the Three-Level Structure",
+    "text": "🔍 Understanding the Three-Level Structure\n\nTop Index (Input Coordinates)\n\n\n\n\n\n\n\n\nBottom Index (Transformed Coordinates)\n\n\n\n\n\n\n\n\nHidden Index (Internal Storage)",
     "crumbs": [
       "Foundation",
-      "Buffer View"
+      "Tensor Adaptor Coordinate: The Result Container"
     ]
   },
   {
-    "objectID": "concepts/buffer-view.html#advanced-buffer-operations",
-    "href": "concepts/buffer-view.html#advanced-buffer-operations",
-    "title": "Buffer View",
-    "section": "Advanced Buffer Operations",
-    "text": "Advanced Buffer Operations\n\nBuffer Views with Strides\n\n\n\n\n\n\n\n\nBuffer Reshaping",
+    "objectID": "concepts/tensor-adaptor-coordinate.html#coordinate-access-patterns",
+    "href": "concepts/tensor-adaptor-coordinate.html#coordinate-access-patterns",
+    "title": "Tensor Adaptor Coordinate: The Result Container",
+    "section": "🔄 Coordinate Access Patterns",
+    "text": "🔄 Coordinate Access Patterns\n\nGetting Specific Indices\n\n\n\n\n\n\n\n\nIndex Manipulation",
     "crumbs": [
       "Foundation",
-      "Buffer View"
+      "Tensor Adaptor Coordinate: The Result Container"
     ]
   },
   {
-    "objectID": "concepts/buffer-view.html#buffer-view-integration",
-    "href": "concepts/buffer-view.html#buffer-view-integration",
-    "title": "Buffer View",
-    "section": "Buffer View Integration",
-    "text": "Buffer View Integration\nBuffer views serve as the foundation for all tensor operations in PythonCK. They provide the memory abstraction that higher-level components like tensor views and tile windows build upon.",
+    "objectID": "concepts/tensor-adaptor-coordinate.html#relationship-to-other-components",
+    "href": "concepts/tensor-adaptor-coordinate.html#relationship-to-other-components",
+    "title": "Tensor Adaptor Coordinate: The Result Container",
+    "section": "🔗 Relationship to Other Components",
+    "text": "🔗 Relationship to Other Components\n\nHow Adaptor Coordinates Become Tensor Coordinates\n\n\n\n\n\n\n\n\nIntegration with Descriptors",
     "crumbs": [
       "Foundation",
-      "Buffer View"
+      "Tensor Adaptor Coordinate: The Result Container"
     ]
   },
   {
-    "objectID": "concepts/buffer-view.html#relationship-to-other-concepts",
-    "href": "concepts/buffer-view.html#relationship-to-other-concepts",
-    "title": "Buffer View",
-    "section": "Relationship to Other Concepts",
-    "text": "Relationship to Other Concepts\nBuffer views are the foundation for:\n\nTensor Views - Combine buffers with tensor descriptors for structured access\nTile Windows - Provide windowed access to buffer regions\nStatic Distributed Tensors - Thread-local buffer management\nMemory Operations - All tensor operations ultimately access memory through buffer views",
+    "objectID": "concepts/tensor-adaptor-coordinate.html#advanced-operations",
+    "href": "concepts/tensor-adaptor-coordinate.html#advanced-operations",
+    "title": "Tensor Adaptor Coordinate: The Result Container",
+    "section": "🎯 Advanced Operations",
+    "text": "🎯 Advanced Operations\n\nMulti-Transform Adaptor Coordinates\n\n\n\n\n\n\n\n\nCoordinate Validation",
     "crumbs": [
       "Foundation",
-      "Buffer View"
+      "Tensor Adaptor Coordinate: The Result Container"
     ]
   },
   {
-    "objectID": "concepts/buffer-view.html#next-steps",
-    "href": "concepts/buffer-view.html#next-steps",
-    "title": "Buffer View",
-    "section": "Next Steps",
-    "text": "Next Steps\n\nLearn about Tensor Coordinates for multi-dimensional indexing\nExplore Tensor Views to see how buffers combine with descriptors\nUnderstand Static Distributed Tensors for parallel buffer management\n\nBuffer views provide the essential memory abstraction that enables all higher-level tensor operations in PythonCK.",
+    "objectID": "concepts/tensor-adaptor-coordinate.html#why-this-matters",
+    "href": "concepts/tensor-adaptor-coordinate.html#why-this-matters",
+    "title": "Tensor Adaptor Coordinate: The Result Container",
+    "section": "🔍 Why This Matters",
+    "text": "🔍 Why This Matters\nUnderstanding Tensor Adaptor Coordinates is crucial because:\n\nThey store transformation results - All coordinate transformations produce adaptor coordinates\nThey enable complex layouts - Multiple transforms can be chained and stored\nThey bridge adaptors and coordinates - They’re the intermediate step between transformation and final result\nThey support validation - They can be checked for validity before use",
     "crumbs": [
       "Foundation",
-      "Buffer View"
+      "Tensor Adaptor Coordinate: The Result Container"
     ]
   },
   {
-    "objectID": "api/index.html",
-    "href": "api/index.html",
-    "title": "API Reference",
+    "objectID": "concepts/tensor-adaptor-coordinate.html#integration-with-real-applications",
+    "href": "concepts/tensor-adaptor-coordinate.html#integration-with-real-applications",
+    "title": "Tensor Adaptor Coordinate: The Result Container",
+    "section": "🎯 Integration with Real Applications",
+    "text": "🎯 Integration with Real Applications\nAdaptor coordinates are used throughout PythonCK:\n\nTile Distributions create adaptor coordinates for thread mapping\nTensor Views use adaptor coordinates for coordinate transformations\nSweep Operations work with adaptor coordinates for navigation\nMemory Access relies on adaptor coordinates for address calculations",
+    "crumbs": [
+      "Foundation",
+      "Tensor Adaptor Coordinate: The Result Container"
+    ]
+  },
+  {
+    "objectID": "concepts/tensor-adaptor-coordinate.html#next-steps",
+    "href": "concepts/tensor-adaptor-coordinate.html#next-steps",
+    "title": "Tensor Adaptor Coordinate: The Result Container",
+    "section": "✅ Next Steps",
+    "text": "✅ Next Steps\nNow that you understand adaptor coordinates, you can explore: - Advanced Coordinate Operations - Functions that work with adaptor coordinates - Tile Distribution - How adaptor coordinates enable parallel processing - Tensor Views - How adaptor coordinates integrate with tensor access\n\nTensor Adaptor Coordinates are the result containers that store the transformed indices and offsets. They serve as the bridge between transformation engines and final memory-mapped coordinates, enabling complex coordinate operations throughout PythonCK.",
+    "crumbs": [
+      "Foundation",
+      "Tensor Adaptor Coordinate: The Result Container"
+    ]
+  },
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "Composable-Kernels Python Documentation",
     "section": "",
-    "text": "Complete reference documentation for all PythonCK modules and classes.",
+    "text": "Welcome to PythonCK, a Python implementation of tensor operations and concepts from the AMD Composable Kernels library. This package provides educational implementations that focus on clarity and understanding rather than performance.",
     "crumbs": [
-      "API Reference",
-      "API Reference"
+      "Getting Started",
+      "Composable-Kernels Python Documentation"
     ]
   },
   {
-    "objectID": "api/index.html#core-tensor-operations",
-    "href": "api/index.html#core-tensor-operations",
-    "title": "API Reference",
-    "section": "Core Tensor Operations",
-    "text": "Core Tensor Operations\n\nPyTensor Module\nThe main tensor operations module containing all core functionality.\n\ntensor_coordinate - Multi-dimensional coordinate handling\ntensor_descriptor - Tensor layout and metadata\ntensor_adaptor - Tensor transformations and adaptations\ntensor_view - Views and slicing operations\nbuffer_view - Low-level memory access patterns",
+    "objectID": "index.html#recommended-learning-path",
+    "href": "index.html#recommended-learning-path",
+    "title": "Composable-Kernels Python Documentation",
+    "section": "🎓 Recommended Learning Path",
+    "text": "🎓 Recommended Learning Path\nNew to PythonCK? Follow our structured learning path to understand all concepts:\n\n📚 Complete Learning Path\nA step-by-step guide that builds from basic concepts to advanced GPU thread coordination, culminating in understanding the complete tile_distr_thread_mapping.py example.",
     "crumbs": [
-      "API Reference",
-      "API Reference"
+      "Getting Started",
+      "Composable-Kernels Python Documentation"
     ]
   },
   {
-    "objectID": "api/index.html#tile-operations",
-    "href": "api/index.html#tile-operations",
-    "title": "API Reference",
-    "section": "Tile Operations",
-    "text": "Tile Operations\n\ntile_distribution - Data distribution across tiles\ntile_distribution_encoding - Encoding schemes for tile distribution\ntile_window - Windowed access to tile data\ntile_window_linear - Linear tile window operations\ntile_window_utils - Utility functions for tile windows",
+    "objectID": "index.html#learning-by-topic",
+    "href": "index.html#learning-by-topic",
+    "title": "Composable-Kernels Python Documentation",
+    "section": "📖 Learning by Topic",
+    "text": "📖 Learning by Topic\n\n1. Foundation Concepts\n\nBuffer Views - Memory buffer abstraction\nTensor Coordinates - Multi-dimensional indexing\nTensor Descriptors - Layout transformations\nTensor Views - Unified tensor access\n\n\n\n2. Distribution Concepts\n\nTile Distribution Encoding - How data is distributed\nTile Distribution - Parallel processing coordination\nStatic Distributed Tensors - Thread-local data\n\n\n\n3. Advanced Operations\n\nTile Windows - Windowed tensor access\nSweep Operations - Iterating over distributed data\nThread Mapping - Understanding the complete pipeline",
     "crumbs": [
-      "API Reference",
-      "API Reference"
+      "Getting Started",
+      "Composable-Kernels Python Documentation"
     ]
   },
   {
-    "objectID": "api/index.html#specialized-tile-operations",
-    "href": "api/index.html#specialized-tile-operations",
-    "title": "API Reference",
-    "section": "Specialized Tile Operations",
-    "text": "Specialized Tile Operations\n\nshuffle_tile - Data shuffling and rearrangement\nsweep_tile - Iterative tile processing\nstore_tile - Tile storage operations\nupdate_tile - In-place tile updates\ntile_scatter_gather - Scatter/gather operations",
+    "objectID": "index.html#package-structure",
+    "href": "index.html#package-structure",
+    "title": "Composable-Kernels Python Documentation",
+    "section": "📦 Package Structure",
+    "text": "📦 Package Structure\npytensor/                    # Core tensor operations\n├── buffer_view.py          # Memory abstraction\n├── tensor_coordinate.py    # Multi-dimensional indexing\n├── tensor_descriptor.py    # Layout transformations  \n├── tensor_view.py          # Unified access interface\n├── tile_distribution.py    # Data distribution\n├── tile_window.py          # Windowed access\n├── sweep_tile.py           # Coordinated iteration\n└── ...\n\ntensor_transforms/          # Analysis tools\n├── parser.py              # Descriptor parsing\n├── analyzer.py            # Transformation analysis\n└── ...\n\ntile_distribution/          # Visualization tools\n├── parser.py              # C++ encoding parsing\n├── visualizer.py          # Interactive visualization\n└── ...",
     "crumbs": [
-      "API Reference",
-      "API Reference"
+      "Getting Started",
+      "Composable-Kernels Python Documentation"
     ]
   },
   {
-    "objectID": "api/index.html#advanced-features",
-    "href": "api/index.html#advanced-features",
-    "title": "API Reference",
-    "section": "Advanced Features",
-    "text": "Advanced Features\n\nstatic_distributed_tensor - Compile-time optimized tensors\nspace_filling_curve - Advanced memory access patterns\nstatic_encoding_pattern - Static encoding strategies",
+    "objectID": "index.html#key-concepts",
+    "href": "index.html#key-concepts",
+    "title": "Composable-Kernels Python Documentation",
+    "section": "🔑 Key Concepts",
+    "text": "🔑 Key Concepts\nPythonCK implements several interconnected concepts:\n\nTensors are multi-dimensional arrays with flexible layouts\nCoordinates provide multi-dimensional indexing with transformations\nDistributions define how data is spread across parallel processing elements\nTiles represent chunks of data processed by individual threads/warps\nSweeps iterate over distributed data in a coordinated manner\n\nThe ultimate goal is understanding how GPU threads coordinate to process large tensors efficiently, as demonstrated in the complete example at tile_distr_thread_mapping.py.",
     "crumbs": [
-      "API Reference",
-      "API Reference"
+      "Getting Started",
+      "Composable-Kernels Python Documentation"
     ]
   },
   {
-    "objectID": "api/index.html#utilities",
-    "href": "api/index.html#utilities",
-    "title": "API Reference",
-    "section": "Utilities",
-    "text": "Utilities\n\nTensor Transforms Module\nHigher-level transformation utilities and examples.\n\nanalyzer - Tensor operation analysis\nparser - Parsing tensor expressions\nexamples - Common transformation patterns\n\n\n\nTile Distribution Module\nAdvanced tile distribution strategies and visualization.\n\nparser - Tile distribution parsing\nvisualizer - Tile distribution visualization\nexamples - Tile distribution examples",
+    "objectID": "index.html#quick-start",
+    "href": "index.html#quick-start",
+    "title": "Composable-Kernels Python Documentation",
+    "section": "🚀 Quick Start",
+    "text": "🚀 Quick Start\nJump right in with interactive examples:",
     "crumbs": [
-      "API Reference",
-      "API Reference"
+      "Getting Started",
+      "Composable-Kernels Python Documentation"
     ]
   },
   {
-    "objectID": "api/index.html#quick-reference",
-    "href": "api/index.html#quick-reference",
-    "title": "API Reference",
-    "section": "Quick Reference",
-    "text": "Quick Reference\n\nCommon Imports\n\n\n\n\n\n\n\n\nKey Classes Overview\n\n\n\n\n\n\n\n\nClass\nPurpose\nKey Methods\n\n\n\n\nTensorCoordinate\nMulti-dimensional indexing\n__init__(), get_element_count()\n\n\nTensorDescriptor\nTensor metadata\ncalculate_offset(), get_strides()\n\n\nTensorAdaptor\nTensor transformations\ntransform_coordinate(), get_output_shape()\n\n\nBufferView\nMemory access patterns\ngenerate_access_sequence()\n\n\nTileDistribution\nTile-based processing\nget_tile_coordinates(), get_num_tiles()\n\n\nTileWindow\nWindowed tile access\nget_window_data(), slide_window()\n\n\n\n\nFor detailed documentation of each module, click on the links above. Each page includes:\n\nClass definitions with full method signatures\nUsage examples with runnable code\nParameter descriptions and return values\nRelated concepts and cross-references",
+    "objectID": "index.html#interactive-applications",
+    "href": "index.html#interactive-applications",
+    "title": "Composable-Kernels Python Documentation",
+    "section": "🎮 Interactive Applications",
+    "text": "🎮 Interactive Applications\nExplore PythonCK concepts through three interactive web applications:\n\n📊 Tile Distribution Visualizer\nInteractive visualization of tile distribution structures and GPU memory layouts. Perfect for understanding how data is distributed across parallel processing elements.\n\n\n🔄 Tensor Transform Visualizer\nExplore tensor descriptor transformations with visual graphs and mathematical formulas. See how data layouts change through various transformations.\n\n\n🧵 Thread Visualization App\nVisualize GPU thread coordinate mapping and access patterns. Understand how individual threads access distributed tensor data.",
     "crumbs": [
-      "API Reference",
-      "API Reference"
+      "Getting Started",
+      "Composable-Kernels Python Documentation"
+    ]
+  },
+  {
+    "objectID": "index.html#learning-paths",
+    "href": "index.html#learning-paths",
+    "title": "Composable-Kernels Python Documentation",
+    "section": "🎯 Learning Paths",
+    "text": "🎯 Learning Paths\nChoose your learning approach:\n\n🎓 Structured Path - Follow the complete 10-step progression\n🔍 Concept-Driven - Explore individual concepts as needed\n💻 Code-First - Jump into the API documentation\n🎮 Interactive - Try hands-on tutorials",
+    "crumbs": [
+      "Getting Started",
+      "Composable-Kernels Python Documentation"
+    ]
+  },
+  {
+    "objectID": "index.html#interactive-features",
+    "href": "index.html#interactive-features",
+    "title": "Composable-Kernels Python Documentation",
+    "section": "✨ Interactive Features",
+    "text": "✨ Interactive Features\nThis documentation includes:\n\n🏃 Live Code Execution - Run Python code directly in your browser\n📱 Responsive Design - Works on desktop and mobile\n🌓 Dark/Light Mode - Toggle between themes\n🔍 Full-Text Search - Find what you need quickly\n📋 Copy Code - One-click code copying\n🔗 Deep Linking - Share links to specific sections\n\n\nReady to dive deeper? Start with our Complete Learning Path or jump to any concept that interests you.",
+    "crumbs": [
+      "Getting Started",
+      "Composable-Kernels Python Documentation"
     ]
   }
 ]

@@ -11,6 +11,9 @@ format: live-html
 - **EDGES**: P and Y mappings that create connections
 - **INCIDENCE MATRIX**: Major/Minor indices define the edge structure
 
+The following video visualises the tile distribution encoding in a graph format. We use this graph format to explain the relevant conepts.
+{{< video https://www.youtube.com/watch?v=9ONbP5Ppsi0 >}}
+
 ```{pyodide}
 #| echo: false
 #| output: false

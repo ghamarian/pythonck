@@ -64,6 +64,11 @@ class TileWindowWithStaticDistribution:
         if window_adaptor.get_num_of_bottom_dimension() != ndim_bottom:
             raise ValueError("Window adaptor bottom dimensions must match tensor dimensions")
         
+        # TODO: check WindowLengths and StaticTileDistribution are consistent
+        # NOTE: Y dimensions represent per-thread access pattern, NOT total tile size
+        # The relationship between Y lengths and window lengths is complex and depends
+        # on the hierarchical structure defined in the tile distribution encoding
+        
         # Initialize load/store traits
         self.traits = LoadStoreTraits(
             tile_distribution=self.tile_distribution,

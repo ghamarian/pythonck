@@ -43,6 +43,19 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}"
             }
+        },
+        {
+            "name": "tile distribution mapping",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/tile_distr_thread_mapping.py",
+            "args": [
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
         }
     ]
 } 
