@@ -30,6 +30,10 @@ Thumbs.db
 todelete/
 media/
 
+# Documentation temporary files (but keep _site for deployment)
+documentation/**/*.quarto_ipynb
+*.quarto_ipynb
+
 # Images and debug files
 *.png
 *.jpg
@@ -40,3 +44,17 @@ media/
 *test_*
 formula_images/
 replication_test_images/
+
+# Temporary and development files
+*.md.bak
+*.hpp
+MATH_OPERATIONS_TEST_RESULTS.md
+README_spans.md
+spans_explanation.md
+pytensor/CPP_CONCEPTS_SUMMARY.md
+pytensor/IMPLEMENTATION_COMPARISON.md
+pytensor/readingplan.md
+pytensor/rocm.md
+pytensor/sweep_tile_faithful.py
+pytensor/tensor_coordinate_faithful.py
+tile_distribution_documentation_plan.md
