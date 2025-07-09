@@ -385,6 +385,14 @@ class OffsetTransform(Transform):
         self.element_space_size = element_space_size
         self.offset = offset
     
+    def get_num_of_lower_dimension(self) -> int:
+        """Get number of lower dimensions (1)."""
+        return 1
+    
+    def get_num_of_upper_dimension(self) -> int:
+        """Get number of upper dimensions (1)."""
+        return 1
+    
     def calculate_lower_index(self, idx_upper: MultiIndex) -> MultiIndex:
         """Add offset to index."""
         if len(idx_upper) != 1:
