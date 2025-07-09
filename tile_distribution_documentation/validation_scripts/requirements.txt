@@ -1,0 +1,6 @@
+# Dependencies for validation scripts
+# We keep it minimal - only what's needed for examples
+
+numpy>=1.20.0
+matplotlib>=3.5.0  # For visualization helpers
+pytest>=6.0.0      # For test validation 

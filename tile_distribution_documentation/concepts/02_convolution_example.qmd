@@ -1,0 +1,608 @@
+---
+title: "Convolution Implementation with Tensor Descriptors"
+format: html
+jupyter: python3
+---
+
+# Introduction
+
+This chapter demonstrates a practical application of tensor descriptors by implementing convolution operations. We'll progress from a naive implementation to an optimized approach using tensor descriptors, showing how they enable efficient memory access patterns for GPU acceleration.
+
+The convolution operation is fundamental in deep learning, and understanding its implementation details reveals how high-performance libraries achieve their efficiency. We'll explore:
+
+1. **Naive Implementation**: Direct nested loops for reference
+2. **Window Extraction**: Using NumPy's `as_strided` for overlapping windows
+3. **Tensor Descriptor Windows**: Achieving the same with tensor descriptors
+4. **Im2col Transformation**: Converting convolution to matrix multiplication
+5. **Multi-channel Extension**: Handling realistic deep learning scenarios
+
+## Setup and Test Data
+
+```{python}
+import numpy as np
+import sys
+sys.path.append('../..')
+from pytensor.tensor_descriptor import (
+    EmbedTransform, MergeTransform, MultiIndex,
+    make_naive_tensor_descriptor, transform_tensor_descriptor
+)
+
+def create_test_data():
+    """Create test data for convolution examples."""
+    # 6x6 input image with sequential numbers (easier to follow)
+    image = np.arange(1, 37).reshape(6, 6)
+    
+    # Random 3x3 kernel for more interesting output
+    np.random.seed(42)  # For reproducible results
+    kernel = np.random.randint(-2, 3, (3, 3))
+    
+    return image, kernel
+
+def print_matrix(matrix, title="Matrix"):
+    """Print a matrix in a nice format."""
+    if title:
+        print(f"\n{title}:")
+    if len(matrix.shape) == 2:
+        for row in matrix:
+            print(" ".join(f"{val:3.0f}" if abs(val - round(val)) < 1e-10 else f"{val:3.1f}" 
+                          for val in row))
+    else:
+        print(f"Shape: {matrix.shape}")
+        print(matrix)
+
+
+def print_windows_tiled(windows, title="Windows Tiled View"):
+    """Print 4D windows tensor as a tiled 2D layout with spacing."""
+    if title:
+        print(f"\n{title}:")
+    
+    out_h, out_w, K, K = windows.shape
+    
+    # Create separator patterns
+    # Each number takes 3 chars, separated by spaces, so K numbers = 3*K + (K-1) chars
+    window_width = 3 * K + (K - 1)
+    row_sep = "-" * window_width
+    col_sep = " | "
+    
+    for window_row in range(out_h):
+        # Print each row of windows
+        for k_row in range(K):
+            line_parts = []
+            for window_col in range(out_w):
+                window_data = " ".join(f"{val:3.0f}" for val in windows[window_row, window_col, k_row, :])
+                line_parts.append(window_data)
+            print(col_sep.join(line_parts))
+        
+        # Print horizontal separator between window rows (except after last row)
+        if window_row < out_h - 1:
+            # Create separator that aligns with the | characters in content lines
+            # Content uses " | " so separator should use " + "
+            sep_parts = [row_sep] * out_w
+            sep_line = (" + ").join(sep_parts)
+            print(sep_line)
+    
+    print()  # Empty line for spacing
+
+# Create our test data
+image, kernel = create_test_data()
+print_matrix(image, "6×6 Input Image")
+print_matrix(kernel, "3×3 Kernel (Edge Detection)")
+```
+
+## Understanding as_strided: Simple Tiling First
+
+Before diving into convolution, let's understand how `as_strided` works with a simple example. We'll start by tiling our matrix into non-overlapping blocks.
+
+```{python}
+def demonstrate_simple_tiling():
+    """Demonstrate simple tiling with as_strided (no overlap)."""
+    from numpy.lib.stride_tricks import as_strided
+    
+    # Create a simple 6x6 matrix
+    matrix = np.arange(1, 37).reshape(6, 6)
+    print_matrix(matrix, "Original 6×6 Matrix")
+    
+    # Tile into 2x2 blocks (no overlap)
+    tile_size = 2
+    matrix_h, matrix_w = matrix.shape
+    num_tiles_h = matrix_h // tile_size
+    num_tiles_w = matrix_w // tile_size
+    
+    print(f"\nTiling into {num_tiles_h}×{num_tiles_w} tiles of size {tile_size}×{tile_size}")
+    print(f"Original strides: {matrix.strides} (bytes per step)")
+    
+    # Calculate new strides for tiling
+    # To move to next tile vertically: jump tile_size rows
+    # To move to next tile horizontally: jump tile_size columns  
+    # Within tile: use original strides
+    tiles = as_strided(
+        matrix,
+        shape=(num_tiles_h, num_tiles_w, tile_size, tile_size),
+        strides=(matrix.strides[0] * tile_size, matrix.strides[1] * tile_size, 
+                matrix.strides[0], matrix.strides[1])
+    )
+    
+    print(f"Tiles shape: {tiles.shape}")
+    print(f"New strides: {tiles.strides}")
+    print(f"Stride calculation:")
+    print(f"  - Move to next tile row: {matrix.strides[0]} × {tile_size} = {matrix.strides[0] * tile_size}")
+    print(f"  - Move to next tile col: {matrix.strides[1]} × {tile_size} = {matrix.strides[1] * tile_size}")
+    print(f"  - Within tile row: {matrix.strides[0]} (original)")
+    print(f"  - Within tile col: {matrix.strides[1]} (original)")
+    
+    return tiles
+
+# Demonstrate simple tiling
+tiles = demonstrate_simple_tiling()
+
+# Show all tiles in tiled layout
+print_windows_tiled(tiles, "All 2×2 Tiles in Tiled Layout")
+```
+
+### Understanding Strides
+
+The key insight is understanding **strides** - how many bytes to skip to move to the next element in each dimension:
+
+- **Original matrix**: `shape=(6, 6)`, `strides=(48, 8)` (8 bytes per int64, 6 elements per row)
+- **Tiled view**: `shape=(3, 3, 2, 2)`, `strides=(96, 16, 48, 8)`
+  - To move to next tile row: skip 2 matrix rows = `48 × 2 = 96` bytes
+  - To move to next tile col: skip 2 matrix cols = `8 × 2 = 16` bytes  
+  - Within tile: use original strides `(48, 8)`
+
+## Overlapping Windows with as_strided
+
+Now let's see how to create overlapping windows - the foundation of convolution:
+
+```{python}
+def demonstrate_overlapping_windows():
+    """Demonstrate overlapping windows with as_strided."""
+    from numpy.lib.stride_tricks import as_strided
+    
+    # Use our test image
+    image, _ = create_test_data()
+    print_matrix(image, "6×6 Input Image")
+    
+    # Extract 3x3 overlapping windows
+    K = 3  # kernel size
+    H, W = image.shape
+    out_h, out_w = H - K + 1, W - K + 1
+    
+    print(f"\nExtracting {K}×{K} overlapping windows")
+    print(f"Output positions: {out_h}×{out_w} = {out_h * out_w} windows")
+    print(f"Original strides: {image.strides}")
+    
+    # For overlapping windows, we move by 1 element (not tile_size)
+    # But within each window, we still use original strides
+    windows = as_strided(
+        image,
+        shape=(out_h, out_w, K, K),
+        strides=(image.strides[0], image.strides[1], image.strides[0], image.strides[1])
+    )
+    
+    print(f"Windows shape: {windows.shape}")
+    print(f"New strides: {windows.strides}")
+    print(f"Stride meaning:")
+    print(f"  - Move to next window row: {image.strides[0]} (1 row down)")
+    print(f"  - Move to next window col: {image.strides[1]} (1 col right)")
+    print(f"  - Within window row: {image.strides[0]} (1 row down)")
+    print(f"  - Within window col: {image.strides[1]} (1 col right)")
+    
+    return windows
+
+# Demonstrate overlapping windows
+windows = demonstrate_overlapping_windows()
+
+# Show all overlapping windows in tiled layout
+print_windows_tiled(windows, "All 3×3 Overlapping Windows in Tiled Layout")
+
+print(f"\nNotice the overlap - adjacent windows share columns and rows!")
+```
+
+### Key Difference: Overlap vs No Overlap
+
+- **Non-overlapping tiles**: We skip by `tile_size` in strides: `(stride[0] * tile_size, stride[1] * tile_size, ...)`
+- **Overlapping windows**: We skip by `1` in strides: `(stride[0] * 1, stride[1] * 1, ...)`
+
+This creates sliding windows that overlap, which is exactly what we need for convolution!
+
+## 1. Naive Convolution Reference
+
+Let's start with the most straightforward implementation using nested loops:
+
+```{python}
+def naive_convolution_2d(image, kernel):
+    """Reference implementation: naive 2D convolution with nested loops."""
+    H, W = image.shape
+    K = kernel.shape[0]  # Assume square kernel
+    out_h, out_w = H - K + 1, W - K + 1
+    
+    output = np.zeros((out_h, out_w))
+    
+    print(f"Input shape: {image.shape}")
+    print(f"Kernel shape: {kernel.shape}")
+    print(f"Output shape: {output.shape}")
+    
+    for i in range(out_h):
+        for j in range(out_w):
+            # Extract window
+            window = image[i:i+K, j:j+K]
+            # Apply convolution
+            output[i, j] = np.sum(window * kernel)
+    
+    return output
+
+# Run naive convolution
+reference_output = naive_convolution_2d(image, kernel)
+print_matrix(reference_output, "Naive Convolution Output")
+```
+
+This implementation directly follows the mathematical definition of convolution. For each output position, we extract the corresponding window from the input image and compute the element-wise product with the kernel.
+
+## 2. Window Extraction with NumPy as_strided
+
+Now let's apply what we learned about overlapping windows to convolution. We need to extract all 3×3 windows for convolution:
+
+```{python}
+def extract_windows_numpy(image, kernel_size=3):
+    """Extract convolution windows using numpy as_strided."""
+    from numpy.lib.stride_tricks import as_strided
+    
+    H, W = image.shape
+    K = kernel_size
+    out_h, out_w = H - K + 1, W - K + 1
+    
+    # Use as_strided to create overlapping windows
+    windows = as_strided(
+        image,
+        shape=(out_h, out_w, K, K),
+        strides=(image.strides[0], image.strides[1], image.strides[0], image.strides[1])
+    )
+    
+    print(f"Original image shape: {image.shape}")
+    print(f"Windows shape: {windows.shape}")
+    print(f"Memory view: 4D tensor [out_h, out_w, kernel_h, kernel_w]")
+    
+    return windows
+
+# Extract windows
+windows_numpy = extract_windows_numpy(image)
+
+# Show windows in tiled layout
+print_windows_tiled(windows_numpy, "All Windows in Tiled Layout")
+```
+
+Perfect! We now have a 4D tensor `[4, 4, 3, 3]` containing all 16 convolution windows. Each `[i, j, :, :]` slice contains the window at output position `(i, j)`.
+
+## 3. Window Extraction with Tensor Descriptors
+
+Now let's achieve the same result using tensor descriptors:
+
+```{python}
+def extract_windows_tensor_descriptor(image, kernel_size=3):
+    """Extract convolution windows using Tensor Descriptors."""
+    H, W = image.shape
+    K = kernel_size
+    out_h, out_w = H - K + 1, W - K + 1
+    
+    # Create tensor descriptor for 4D windows
+    window_lengths = [out_h, out_w, K, K]
+    window_strides = [W, 1, W, 1]  # Strides for overlapping windows
+    
+    windows_descriptor = make_naive_tensor_descriptor(window_lengths, window_strides)
+    
+    print(f"Tensor descriptor shape: {windows_descriptor.get_lengths()}")
+    print(f"Element space size: {windows_descriptor.get_element_space_size()}")
+    
+    # Extract windows using tensor descriptor
+    image_flat = image.flatten()
+    windows_td = np.zeros((out_h, out_w, K, K))
+    
+    for i in range(out_h):
+        for j in range(out_w):
+            for ki in range(K):
+                for kj in range(K):
+                    offset = windows_descriptor.calculate_offset([i, j, ki, kj])
+                    windows_td[i, j, ki, kj] = image_flat[offset]
+    
+    return windows_td
+
+# Extract windows using tensor descriptor
+windows_td = extract_windows_tensor_descriptor(image)
+
+# Show all windows in tiled layout
+print_windows_tiled(windows_td, "All Windows in Tiled Layout (Tensor Descriptor)")
+```
+
+The key insight is the stride pattern `[W, 1, W, 1]`:
+
+- Moving one step in `out_h` direction requires jumping `W` elements (one row)
+- Moving one step in `out_w` direction requires jumping `1` element (one column)  
+- Moving one step in `kernel_h` direction requires jumping `W` elements (one row)
+- Moving one step in `kernel_w` direction requires jumping `1` element (one column)
+
+### Verification: NumPy vs Tensor Descriptor Windows
+
+```{python}
+# Compare the two approaches
+difference = np.linalg.norm(windows_numpy - windows_td)
+print(f"L2 norm of difference: {difference}")
+
+if difference < 1e-10:
+    print("✅ SUCCESS: Tensor descriptor windows identical to NumPy!")
+else:
+    print("❌ ERROR: Tensor descriptor windows differ from NumPy")
+    print(f"Max difference: {np.max(np.abs(windows_numpy - windows_td))}")
+```
+
+## 4. Im2col Transformation with NumPy
+
+The next step is converting our 4D windows to a 2D matrix format suitable for matrix multiplication. This is called the "im2col" (image to column) transformation:
+
+```{python}
+def im2col_numpy(windows):
+    """Convert 4D windows to 2D im2col matrix using NumPy."""
+    out_h, out_w, K, K = windows.shape
+    num_windows = out_h * out_w
+    patch_size = K * K
+    
+    # Reshape to 2D matrix
+    im2col_matrix = windows.reshape(num_windows, patch_size)
+    
+    print(f"4D windows shape: {windows.shape}")
+    print(f"2D im2col shape: {im2col_matrix.shape}")
+    print(f"Transformation: [{out_h}, {out_w}, {K}, {K}] → [{num_windows}, {patch_size}]")
+    
+    return im2col_matrix
+
+# Create im2col matrix
+im2col_numpy = im2col_numpy(windows_numpy)
+
+# Show the matrix structure
+print(f"\nIm2col matrix (each row is a flattened window):")
+out_h, out_w = 4, 4  # Our output dimensions
+for i, row in enumerate(im2col_numpy):
+    win_i, win_j = i // out_w, i % out_w
+    print(f"Row {i} (window [{win_i},{win_j}]): {' '.join(f'{val:3.0f}' for val in row)}")
+```
+
+Each row of the im2col matrix contains a flattened convolution window. This transformation allows us to compute all convolutions simultaneously using a single matrix multiplication.
+
+## 5. Im2col with Tensor Descriptors
+
+Great question! Since we already extracted windows using tensor descriptors, we can simply reshape them just like the NumPy version:
+
+```{python}
+# Use the windows we already extracted with tensor descriptors
+im2col_td_simple = windows_td.reshape(16, 9)
+
+print(f"Tensor descriptor windows shape: {windows_td.shape}")
+print(f"Tensor descriptor im2col shape: {im2col_td_simple.shape}")
+print(f"Simple reshape: just like NumPy!")
+
+# Show it's identical to our NumPy version
+print(f"\nFirst few rows of TD im2col matrix:")
+for i in range(3):
+    win_i, win_j = i // 4, i % 4
+    print(f"Row {i} (window [{win_i},{win_j}]): {' '.join(f'{val:3.0f}' for val in im2col_td_simple[i])}")
+```
+
+Perfect! This is exactly the same as the NumPy approach - just reshape the 4D windows into a 2D matrix.
+
+### Advanced: Direct 2D Tensor Descriptor
+
+However, tensor descriptors can also create the im2col layout directly without intermediate 4D windows. This is useful for GPU implementations:
+
+```{python}
+def create_direct_im2col_descriptor(image, kernel_size=3):
+    """Create im2col matrix directly using tensor descriptors."""
+    H, W = image.shape
+    K = kernel_size
+    out_h, out_w = H - K + 1, W - K + 1
+    
+    # Step 1: Create 4D windows descriptor
+    window_lengths = [out_h, out_w, K, K]
+    window_strides = [W, 1, W, 1]
+    windows_descriptor = make_naive_tensor_descriptor(window_lengths, window_strides)
+    
+    # Step 2: Apply merge transforms to create 2D im2col layout directly
+    merge_windows = MergeTransform([out_h, out_w])  # Merge spatial output dimensions
+    merge_patch = MergeTransform([K, K])  # Merge kernel dimensions
+    
+    im2col_descriptor = transform_tensor_descriptor(
+        windows_descriptor,
+        transforms=[merge_windows, merge_patch],
+        lower_dimension_hidden_idss=[[1, 2], [3, 4]],
+        upper_dimension_hidden_idss=[[5], [6]]
+    )
+    
+    print(f"Direct im2col descriptor shape: {im2col_descriptor.get_lengths()}")
+    return im2col_descriptor
+
+# Create direct im2col descriptor
+im2col_descriptor = create_direct_im2col_descriptor(image)
+
+# This descriptor can directly compute offsets for the 2D im2col layout
+print(f"\nExample: offset for window 0, patch element 0: {im2col_descriptor.calculate_offset([0, 0])}")
+print(f"Example: offset for window 0, patch element 4: {im2col_descriptor.calculate_offset([0, 4])}")
+print(f"Example: offset for window 1, patch element 0: {im2col_descriptor.calculate_offset([1, 0])}")
+```
+
+### Why Both Approaches?
+
+- **Simple reshape**: Easy to understand, perfect for CPU implementations
+- **Direct tensor descriptor**: Enables efficient GPU kernel generation where the hardware can directly compute memory addresses for the im2col layout without materializing intermediate 4D arrays
+
+The advanced direct tensor descriptor approach uses two `MergeTransform` operations:
+1. **Merge spatial dimensions**: `[out_h, out_w] → num_windows`
+2. **Merge kernel dimensions**: `[K, K] → patch_size`
+
+This transforms the 4D tensor `[out_h, out_w, K, K]` directly into a 2D matrix `[num_windows, patch_size]` without materializing the intermediate 4D array.
+
+### Verification: NumPy vs Tensor Descriptor Im2col
+
+```{python}
+# Compare the simple reshape approaches
+difference = np.linalg.norm(im2col_numpy - im2col_td_simple)
+print(f"L2 norm of difference: {difference}")
+
+if difference < 1e-10:
+    print("✅ SUCCESS: Tensor descriptor im2col identical to NumPy!")
+else:
+    print("❌ ERROR: Tensor descriptor im2col differs from NumPy")
+    print(f"Max difference: {np.max(np.abs(im2col_numpy - im2col_td_simple))}")
+```
+
+## 6. Convolution via Matrix Multiplication
+
+With our im2col matrix ready, we can now perform convolution using simple matrix multiplication:
+
+```{python}
+def convolution_with_im2col(im2col_matrix, kernel, out_shape):
+    """Perform convolution using im2col matrix multiplication."""
+    # Flatten kernel
+    kernel_flat = kernel.flatten()
+    
+    print(f"Im2col matrix shape: {im2col_matrix.shape}")
+    print(f"Kernel flat shape: {kernel_flat.shape}")
+    
+    # Matrix multiplication: each row of im2col with kernel
+    output_flat = im2col_matrix @ kernel_flat
+    
+    # Reshape to output dimensions
+    output = output_flat.reshape(out_shape)
+    
+    print(f"Output flat shape: {output_flat.shape}")
+    print(f"Final output shape: {output.shape}")
+    
+    return output
+
+# Perform convolution using im2col
+out_shape = reference_output.shape
+im2col_output = convolution_with_im2col(im2col_numpy, kernel, out_shape)
+
+print_matrix(im2col_output, "Convolution via Im2col")
+```
+
+### Final Verification: All Methods Equivalent
+
+```{python}
+# Verify that all methods produce the same result
+difference = np.linalg.norm(reference_output - im2col_output)
+print(f"L2 norm difference (naive vs im2col): {difference}")
+
+if difference < 1e-10:
+    print("✅ SUCCESS: Im2col convolution matches naive reference!")
+else:
+    print("❌ ERROR: Im2col convolution differs from reference")
+    print(f"Max difference: {np.max(np.abs(reference_output - im2col_output))}")
+```
+
+## 7. Multi-Channel Convolution
+
+Real-world deep learning scenarios involve multiple input and output channels. Let's extend our approach:
+
+```{python}
+def multi_channel_convolution():
+    """Demonstrate multi-channel convolution."""
+    # Create multi-channel input: 6x6x2 (2 input channels)
+    np.random.seed(123)
+    input_tensor = np.random.randint(0, 5, (6, 6, 2))
+    
+    # Create multi-channel filters: 3x3x2x3 (2 input, 3 output channels)
+    filters = np.random.randint(-1, 2, (3, 3, 2, 3))
+    
+    H, W, C_in = input_tensor.shape
+    K, K, C_in_filter, C_out = filters.shape
+    out_h, out_w = H - K + 1, W - K + 1
+    
+    print(f"Input shape: {input_tensor.shape}")
+    print(f"Filters shape: {filters.shape}")
+    print(f"Output shape: ({out_h}, {out_w}, {C_out})")
+    
+    # Reference convolution with nested loops
+    reference_output = np.zeros((out_h, out_w, C_out))
+    for i in range(out_h):
+        for j in range(out_w):
+            for c_out in range(C_out):
+                window = input_tensor[i:i+K, j:j+K, :]  # [K, K, C_in]
+                reference_output[i, j, c_out] = np.sum(window * filters[:, :, :, c_out])
+    
+    # Im2col approach using direct as_strided (like the figure shows)
+    # Extract all channels at once using as_strided
+    from numpy.lib.stride_tricks import as_strided
+    
+    # Create 5D windows [out_h, out_w, K, K, C_in] directly
+    windows_5d = as_strided(
+        input_tensor,
+        shape=(out_h, out_w, K, K, C_in),
+        strides=(input_tensor.strides[0], input_tensor.strides[1], 
+                input_tensor.strides[0], input_tensor.strides[1], input_tensor.strides[2])
+    )
+    
+    # Convert to im2col format: [num_windows, patch_size]
+    num_windows = out_h * out_w
+    patch_size = K * K * C_in
+    im2col_matrix = windows_5d.reshape(num_windows, patch_size)
+    
+    # Reshape filters and apply
+    filters_reshaped = filters.reshape(patch_size, C_out)
+    im2col_output_flat = im2col_matrix @ filters_reshaped
+    im2col_output = im2col_output_flat.reshape(out_h, out_w, C_out)
+    
+    print(f"\nIm2col matrix shape: {im2col_matrix.shape}")
+    print(f"Reshaped filters shape: {filters_reshaped.shape}")
+    
+    # Compare results
+    difference = np.linalg.norm(reference_output - im2col_output)
+    print(f"\nL2 norm difference (reference vs im2col): {difference}")
+    
+    if difference < 1e-10:
+        print("✅ SUCCESS: Multi-channel im2col matches reference!")
+    else:
+        print("❌ ERROR: Multi-channel results differ")
+    
+    return reference_output, im2col_output
+
+# Run multi-channel demonstration
+multi_channel_convolution()
+```
+
+For multi-channel convolution:
+
+- **Input**: `[H, W, C_in]` 
+- **Filters**: `[K, K, C_in, C_out]`
+- **Im2col matrix**: `[num_windows, K×K×C_in]`
+- **Reshaped filters**: `[K×K×C_in, C_out]`
+- **Output**: `[out_h, out_w, C_out]`
+
+The same im2col principle applies, but now each window includes all input channels, and we can compute all output channels simultaneously.
+
+## Summary
+
+We've demonstrated the complete evolution from naive convolution to optimized tensor descriptor-based implementation:
+
+1. **Naive approach**: Direct mathematical implementation with nested loops
+2. **Window extraction**: Using `as_strided` to create efficient memory views
+3. **Tensor descriptors**: Achieving the same with structured transformations
+4. **Im2col transformation**: Converting convolution to matrix multiplication
+5. **Multi-channel extension**: Scaling to realistic deep learning scenarios
+
+### Key Insights
+
+- **Memory efficiency**: Tensor descriptors avoid data duplication by creating views
+- **Parallelization**: Im2col enables massive parallelization through matrix multiplication
+- **Generalization**: The tensor descriptor approach extends naturally to complex memory patterns
+- **GPU acceleration**: These transformations form the foundation for efficient GPU kernels
+
+The tensor descriptor system provides a unified framework for describing these transformations, making it possible to generate efficient code for various hardware architectures automatically. It is also important to note that the tensor descriptor machinary is implmented in compile time C++ code, therefore very efficient. This python implementation is just a simulator to demonstrate the concept.
+
+### Performance Characteristics
+
+| Method | Memory Usage | Parallelization | GPU Suitability |
+|--------|--------------|-----------------|-----------------|
+| Naive loops | Low | Poor | Poor |
+| As_strided | Medium | Good | Limited |
+| Tensor descriptors | Medium | Excellent | Excellent |
+| Im2col | High | Excellent | Excellent |
+
+Tensor descriptors strike the optimal balance: they provide the parallelization benefits of im2col while maintaining the memory efficiency of strided operations, making them ideal for high-performance GPU implementations. 

@@ -1,0 +1,507 @@
+---
+title: "Coordinate Systems - The Mathematical Foundation"
+format: live-html
+---
+
+```{pyodide}
+#| echo: false
+#| output: false
+#| autorun: true
+
+# Auto-install pythonck package
+import micropip
+await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl")
+
+# Setup pytensor path for pyodide environment
+import sys
+import os
+import numpy as np
+
+# Add the project root to path so we can import pytensor
+sys.path.insert(0, '/home/aghamari/github/composable_kernel/visualisation')
+
+# Import the actual CK modules
+from pytensor.tile_distribution import make_static_tile_distribution, make_tile_distribution_encoding
+from pytensor.tensor_descriptor import make_naive_tensor_descriptor_packed
+```
+
+## Overview
+
+Now that you understand the APIs and basic transformations, it's time to learn the mathematical foundation that makes it all work: **the coordinate system**. 
+
+Tile distribution uses five interconnected coordinate spaces to map from thread identification all the way to memory addresses. Understanding these coordinate spaces is the key to mastering tile distribution.
+
+## The Five Coordinate Spaces
+
+Before diving into code, let's understand what problem these coordinate spaces solve:
+
+**The Challenge**: You have an 8×8 matrix and 4 GPU threads. Each thread needs to know:
+
+1. Which thread am I? (Thread identification)  
+2. What work should I do? (Work assignment)
+3. Where is my data in the tensor? (Physical location)
+4. How do I share data with other threads? (Cooperation)
+5. What's the memory address? (Hardware access)
+
+**The Solution**: Five coordinate spaces that transform from logical to physical:
+
+**📐 The Five Coordinate Spaces:**
+
+- **🔹 P-space (Partition)**: Thread identification
+  - `thread_x, thread_y, warp_id, block_id`
+  - Maps to: which thread is doing the work
+
+- **🔹 Y-space (Logical Tile)**: Element within thread's work  
+  - `y0, y1, y2, y3` (logical coordinates)
+  - Maps to: which element within the thread's tile
+
+- **🔹 X-space (Physical Tensor)**: Actual tensor coordinates
+  - `x0, x1` (physical matrix coordinates)  
+  - Maps to: actual position in the tensor
+
+- **🔹 R-space (Replication)**: Data sharing across threads
+  - `r0, r1` (replication coordinates)
+  - Maps to: shared data across multiple threads
+
+- **🔹 D-space (Linearized Storage)**: Memory layout
+  - `d` (single linear index)
+  - Maps to: actual memory address
+
+## P-space: Partition Coordinates
+
+P-space identifies which thread is doing the work. Each thread gets a unique P coordinate.
+
+```{pyodide}
+print("🔹 P-space: Thread Identification")
+print("=" * 40)
+
+# Example: 2x2 thread grid
+thread_grid = [2, 2]
+print(f"Thread Grid: {thread_grid}")
+print("\nThread assignments:")
+
+for thread_x in range(thread_grid[0]):
+    for thread_y in range(thread_grid[1]):
+        p_coord = [thread_x, thread_y]
+        thread_id = thread_x * thread_grid[1] + thread_y
+        print(f"  Thread {thread_id}: P = {p_coord}")
+
+print("\n✅ P-space concept: Each thread has unique partition coordinates")
+```
+
+**Key Insight**: P-space gives each thread a unique identity. In real GPU kernels, these come from hardware intrinsics like `threadIdx.x`, `blockIdx.y`, etc.
+
+## Y-space: Logical Tile Coordinates
+
+Y-space defines what work each thread does. Each thread processes a "tile" of elements.
+
+```{pyodide}
+print("🔹 Y-space: Logical Tile Coordinates")
+print("=" * 40)
+
+# Example: each thread handles 2x2 elements
+tile_size = [2, 2]
+print(f"Tile Size: {tile_size}")
+print("\nY-space coordinates for one thread:")
+
+for y0 in range(tile_size[0]):
+    for y1 in range(tile_size[1]):
+        y_coord = [y0, y1]
+        element_id = y0 * tile_size[1] + y1
+        print(f"  Element {element_id}: Y = {y_coord}")
+
+print("\n✅ Y-space concept: Each thread's work is organized in logical tiles")
+```
+
+**Key Insight**: Y-space defines the structure of work within each thread. Every thread has the same Y-space structure, but processes different data.
+
+## X-space: Physical Tensor Coordinates
+
+X-space gives the actual position in the tensor. This is where the data lives.
+
+```{pyodide}
+print("🔹 X-space: Physical Tensor Coordinates")
+print("=" * 40)
+
+# Example: 8x8 tensor
+tensor_size = [8, 8]
+print(f"Tensor Size: {tensor_size}")
+print("\nSample X-space coordinates:")
+
+sample_coords = [[0, 0], [0, 7], [7, 0], [7, 7], [3, 4]]
+for x_coord in sample_coords:
+    linear_idx = x_coord[0] * tensor_size[1] + x_coord[1]
+    print(f"  X = {x_coord} → Linear index {linear_idx}")
+
+print("\n✅ X-space concept: Maps to actual tensor element positions")
+```
+
+**Key Insight**: X-space represents the actual tensor coordinates that users think about. This is the "physical reality" of where data lives.
+
+## The Core Transformation: P + Y → X
+
+This is the heart of tile distribution: combining thread identity (P) with logical work coordinates (Y) to get physical tensor coordinates (X).
+
+```{pyodide}
+print("🔄 The Key Transformation: P + Y → X")
+print("=" * 40)
+
+print("This is the heart of tile distribution:")
+print("P (which thread) + Y (which element) → X (where in tensor)")
+
+print("\n🔄 Conceptual Example:")
+print("Imagine a 4x4 matrix distributed across 4 threads")
+print("Each thread gets a 2x2 tile")
+
+# Show conceptual mapping
+examples = [
+    ([0, 0], [0, 0], [0, 0]),  # Thread (0,0), Element (0,0) → Tensor (0,0)
+    ([0, 0], [1, 1], [1, 1]),  # Thread (0,0), Element (1,1) → Tensor (1,1)
+    ([1, 0], [0, 0], [0, 2]),  # Thread (1,0), Element (0,0) → Tensor (0,2)
+    ([0, 1], [0, 0], [2, 0]),  # Thread (0,1), Element (0,0) → Tensor (2,0)
+]
+
+print("\n📝 Example Mappings:")
+for p_coord, y_coord, x_coord in examples:
+    print(f"  P={p_coord} + Y={y_coord} → X={x_coord}")
+
+print("\n💡 The Pattern:")
+print("  • Thread position determines base location")
+print("  • Y coordinates are offsets within the tile")
+print("  • X coordinates are the final tensor positions")
+```
+
+**Key Insight**: The P+Y→X transformation is what makes tile distribution work. It automatically maps logical thread work to physical tensor locations.
+
+## R-space: Replication Coordinates
+
+R-space handles data that needs to be shared across threads, useful for broadcast operations and reductions.
+
+```{pyodide}
+print("🔹 R-space: Replication Coordinates")
+print("=" * 40)
+
+# Example: data replicated across 2 warps
+replication_factor = [2, 1]
+print(f"Replication Factor: {replication_factor}")
+print("\nR-space coordinates:")
+
+for r0 in range(replication_factor[0]):
+    for r1 in range(replication_factor[1]):
+        r_coord = [r0, r1]
+        print(f"  Replica {r0*replication_factor[1] + r1}: R = {r_coord}")
+
+print("\n💡 Use Cases:")
+print("  • Broadcasting: Same value to multiple threads")
+print("  • Reductions: Collecting results from multiple threads")
+print("  • Shared memory: Data accessible by multiple threads")
+
+print("\n✅ R-space concept: Manages data sharing across threads")
+```
+
+**Key Insight**: R-space enables thread cooperation by managing data that needs to be shared or replicated across multiple threads.
+
+## D-space: Linearized Storage
+
+D-space is the final step - converting 2D coordinates to linear memory addresses for efficient access.
+
+```{pyodide}
+print("🔹 D-space: Linearized Storage")
+print("=" * 40)
+
+# Example: 4x4 tensor stored in row-major order
+tensor_shape = [4, 4]
+print(f"Tensor Shape: {tensor_shape}")
+print("\nX → D coordinate examples (row-major):")
+
+sample_x_coords = [[0, 0], [0, 3], [1, 0], [1, 2], [3, 3]]
+for x_coord in sample_x_coords:
+    # Row-major linearization: d = x0 * width + x1
+    d_coord = x_coord[0] * tensor_shape[1] + x_coord[1]
+    print(f"  X={x_coord} → D={d_coord}")
+
+print("\n💡 Memory Layout Options:")
+print("  • Row-major: d = x0 * width + x1")
+print("  • Column-major: d = x1 * height + x0")
+print("  • Blocked: More complex patterns for cache efficiency")
+
+print("\n✅ D-space concept: Converts 2D coordinates to memory addresses")
+```
+
+**Key Insight**: D-space handles the final step of converting logical coordinates to actual memory addresses that the hardware can access.
+
+## Complete Pipeline: P+Y → X → D
+
+Let's trace a complete example from thread identification all the way to memory access.
+
+```{pyodide}
+print("🔄 Complete Pipeline: P+Y → X → D")
+print("=" * 40)
+
+print("The Full Journey:")
+print("1. Thread gets P coordinates (which thread)")
+print("2. Thread picks Y coordinates (which element)")
+print("3. P+Y transform to X coordinates (where in tensor)")
+print("4. X transforms to D coordinates (memory address)")
+print("5. Memory access happens at address D")
+
+# Example walkthrough
+example_p = [1, 0]  # Thread (1,0)
+example_y = [0, 1]  # Element (0,1) in thread's tile
+
+print(f"\n📝 Example Walkthrough:")
+print(f"  Step 1: Thread identifies as P = {example_p}")
+print(f"  Step 2: Thread wants element Y = {example_y}")
+print(f"  Step 3: P+Y → X transformation")
+
+# Show a concrete example
+print(f"\n🔢 Concrete Example:")
+# For a 2x2 thread grid, each handling 2x2 tiles
+# Thread (1,0) starts at tensor position (0,2)
+# Y=(0,1) means offset by (0,1) from thread's base
+assumed_x = [0, 3]  # Base (0,2) + offset (0,1) = (0,3)
+tensor_shape = [4, 4]
+d_coord = assumed_x[0] * tensor_shape[1] + assumed_x[1]
+
+print(f"  Thread {example_p} base position: (0,2)")
+print(f"  Y offset {example_y} adds: (0,1)")
+print(f"  Final X coordinate: {assumed_x}")
+print(f"  D coordinate: {d_coord}")
+print(f"  Memory access: address {d_coord}")
+
+print("\n✅ Complete pipeline: P+Y → X → D transformation chain")
+```
+
+## Practical Example: Matrix Multiplication
+
+Let's see how coordinate spaces work in a real matrix multiplication kernel.
+
+```{pyodide}
+print("🎯 Practical Example: Matrix Multiplication")
+print("=" * 40)
+
+# Example: 8x8 matrix multiplication, 4 threads
+matrix_size = [8, 8]
+thread_grid = [2, 2]
+tile_size = [4, 4]
+
+print(f"Matrix Multiplication Setup:")
+print(f"  Matrix size: {matrix_size}")
+print(f"  Thread grid: {thread_grid}")
+print(f"  Tile size per thread: {tile_size}")
+
+print(f"\n📊 Work Distribution:")
+for thread_x in range(thread_grid[0]):
+    for thread_y in range(thread_grid[1]):
+        p_coord = [thread_x, thread_y]
+        
+        # Calculate base position for this thread
+        base_x = thread_x * tile_size[0]
+        base_y = thread_y * tile_size[1]
+        
+        print(f"  Thread P={p_coord}:")
+        print(f"    Handles matrix region: [{base_x}:{base_x+tile_size[0]}, {base_y}:{base_y+tile_size[1]}]")
+        print(f"    First element: X=[{base_x},{base_y}]")
+        print(f"    Last element: X=[{base_x+tile_size[0]-1},{base_y+tile_size[1]-1}]")
+
+print("\n✅ Practical example: Matrix multiplication work distribution")
+```
+
+## Real Tile Distribution Example: RMSNorm
+
+Let's see how these coordinate spaces work with a production CK tile distribution - RMSNorm:
+
+```{pyodide}
+print("🔧 Real Tile Distribution Example: RMSNorm")
+print("=" * 40)
+
+# Create the RMSNorm distribution (real production example)
+# Original 4D Y-space as it should be for RMSNorm
+encoding = make_tile_distribution_encoding(
+    rs_lengths=[],  # No replication
+    hs_lengthss=[
+        [4, 2, 8, 4],  # H for X0 (M): Repeat_M, WarpPerBlock_M, ThreadPerWarp_M, Vector_M
+        [4, 2, 8, 4]   # H for X1 (N): Repeat_N, WarpPerBlock_N, ThreadPerWarp_N, Vector_N
+    ],
+    ps_to_rhss_major=[[1, 2], [1, 2]],  # P maps to H dimensions
+    ps_to_rhss_minor=[[1, 1], [2, 2]],  # P minor mappings
+    ys_to_rhs_major=[1, 1, 2, 2],       # Y maps to H dimensions
+    ys_to_rhs_minor=[0, 3, 0, 3]        # Y minor mappings
+)
+distribution = make_static_tile_distribution(encoding)
+
+print(f"🎯 RMSNorm Distribution Structure:")
+print(f"  X dimensions: {distribution.ndim_x} (M, N logical dimensions)")
+print(f"  Y dimensions: {distribution.ndim_y} (4D hierarchical access pattern)")
+print(f"  P dimensions: {distribution.ndim_p} (Thread partitioning)")
+print(f"  R dimensions: {distribution.ndim_r} (No replication)")
+
+# Show the hierarchical structure
+x_lengths = distribution.get_lengths()
+y_lengths = distribution.get_y_vector_lengths()
+
+print(f"\n📊 Coordinate Space Structure:")
+print(f"  X-space (logical): {x_lengths}")
+print(f"    X0 (M): {x_lengths[0]} elements (256 = 4×2×8×4)")
+print(f"    X1 (N): {x_lengths[1]} elements (256 = 4×2×8×4)")
+print(f"  Y-space (access): {y_lengths}")
+print(f"    Y0: {y_lengths[0]} (Repeat pattern)")
+print(f"    Y1: {y_lengths[1]} (Repeat pattern)")
+print(f"    Y2: {y_lengths[2]} (Warp pattern)")
+print(f"    Y3: {y_lengths[3]} (Vector pattern)")
+
+print(f"\n🧵 Thread Organization:")
+print("  • Total tile: 256×256 elements")
+print("  • Warps per block: 2×2 = 4 warps")
+print("  • Threads per warp: 8×8 = 64 threads")
+print("  • Vector size: 4×4 = 16 elements per thread")
+print("  • Total threads: 4×64 = 256 threads")
+
+# Show P+Y → X transformation for specific examples
+print(f"\n🔄 P+Y → X Transformation Examples:")
+sample_cases = [
+    ([0, 0], [0, 0, 0, 0]),  # First thread, first element
+    ([1, 0], [0, 0, 0, 0]),  # Different warp, same element
+    ([0, 1], [0, 0, 0, 0]),  # Different thread in warp
+    ([0, 0], [1, 0, 0, 0]),  # Same thread, different repeat
+    ([0, 0], [0, 0, 1, 0]),  # Same thread, different warp element
+]
+
+for p_coord, y_coord in sample_cases:
+    try:
+        # Use only P coordinates for calculate_index (partition coordinates)
+        x_coord = distribution.calculate_index(p_coord)
+        print(f"  P={p_coord} + Y={y_coord} → X={x_coord.to_list()}")
+    except Exception as e:
+        print(f"  P={p_coord} + Y={y_coord} → Error: {e}")
+
+print(f"\n💡 Understanding the Coordinate Spaces:")
+print("  P-space: [warp_id, thread_in_warp] - Which physical thread")
+print("  Y-space: [repeat, repeat, warp_elem, vector_elem] - Which data element")
+print("  X-space: [m_position, n_position] - Where in the 256×256 tile")
+print("  D-space: Linear memory address for hardware access")
+
+print(f"\n🎯 The Mathematical Foundation in Action:")
+print("  1. P coordinates identify the physical thread")
+print("  2. Y coordinates specify which element that thread processes")
+print("  3. P+Y transform to X coordinates (logical position)")
+print("  4. X coordinates map to D addresses (memory location)")
+print("  5. Hardware executes the memory access")
+
+print(f"\n✅ This is the complete mathematical foundation that powers all CK kernels!")
+```
+
+## Testing Your Understanding
+
+Let's verify your understanding of coordinate systems:
+
+```{pyodide}
+print("🧪 Testing Coordinate System Understanding")
+print("=" * 40)
+
+def test_p_space_uniqueness():
+    """Test that P coordinates uniquely identify threads."""
+    thread_grid = [2, 2]
+    p_coords = []
+    for x in range(thread_grid[0]):
+        for y in range(thread_grid[1]):
+            p_coords.append([x, y])
+    
+    # Check uniqueness
+    return len(p_coords) == len(set(tuple(p) for p in p_coords))
+
+def test_y_space_completeness():
+    """Test that Y coordinates cover all elements in a tile."""
+    tile_size = [2, 2]
+    y_coords = []
+    for y0 in range(tile_size[0]):
+        for y1 in range(tile_size[1]):
+            y_coords.append([y0, y1])
+    
+    expected_count = tile_size[0] * tile_size[1]
+    return len(y_coords) == expected_count
+
+def test_x_to_d_linearization():
+    """Test X to D coordinate linearization."""
+    tensor_shape = [3, 4]
+    x_coord = [1, 2]
+    expected_d = x_coord[0] * tensor_shape[1] + x_coord[1]
+    actual_d = x_coord[0] * tensor_shape[1] + x_coord[1]
+    return actual_d == expected_d
+
+def test_r_space_replication():
+    """Test R-space replication count."""
+    replication_factor = [2, 3]
+    expected_replicas = replication_factor[0] * replication_factor[1]
+    
+    replica_count = 0
+    for r0 in range(replication_factor[0]):
+        for r1 in range(replication_factor[1]):
+            replica_count += 1
+    
+    return replica_count == expected_replicas
+
+# Run tests
+tests = [
+    ("P-space uniqueness", test_p_space_uniqueness),
+    ("Y-space completeness", test_y_space_completeness),
+    ("X→D linearization", test_x_to_d_linearization),
+    ("R-space replication", test_r_space_replication)
+]
+
+print("Running coordinate system tests:")
+for test_name, test_func in tests:
+    try:
+        result = test_func()
+        status = "✅ PASS" if result else "❌ FAIL"
+        print(f"  {status}: {test_name}")
+    except Exception as e:
+        print(f"  ❌ ERROR: {test_name} - {str(e)}")
+```
+
+## Key Takeaways
+
+Understanding coordinate systems is crucial for mastering tile distribution:
+
+**🎯 The Five Coordinate Spaces:**
+
+1. **P-space (Partition)**: Thread identification
+   - ✅ Each thread gets unique coordinates
+   - ✅ Maps to hardware thread IDs
+   - ✅ Foundation for work distribution
+
+2. **Y-space (Logical Tile)**: Per-thread work structure
+   - ✅ Defines what each thread processes
+   - ✅ Same structure for all threads
+   - ✅ Logical organization of computation
+
+3. **X-space (Physical Tensor)**: Actual data locations
+   - ✅ Real tensor coordinates users understand
+   - ✅ Where data actually lives
+   - ✅ Target of P+Y transformation
+
+4. **R-space (Replication)**: Data sharing
+   - ✅ Enables thread cooperation
+   - ✅ Handles broadcast and reduction
+   - ✅ Manages shared data
+
+5. **D-space (Linearized Storage)**: Memory addresses
+   - ✅ Final hardware-level addresses
+   - ✅ Enables efficient memory access
+   - ✅ Hardware interface layer
+
+**🔄 The Core Transformation: P + Y → X → D**
+
+- ✅ Maps thread work to physical memory
+- ✅ Enables automatic memory coalescing
+- ✅ Provides predictable access patterns
+- ✅ Foundation for GPU performance
+
+**💡 Why This Matters:**
+
+- ✅ Automatic thread cooperation
+- ✅ Optimal memory access patterns
+- ✅ Hardware-agnostic programming
+- ✅ Predictable performance characteristics
+
+These coordinate systems are the mathematical foundation that makes tile distribution both powerful and elegant. Master them, and you'll understand how CK achieves its remarkable performance! 

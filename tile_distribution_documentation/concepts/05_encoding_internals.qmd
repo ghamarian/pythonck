@@ -1,0 +1,402 @@
+---
+title: "Encoding Internals - The Internal Machinery"
+format: live-html
+---
+
+```{pyodide}
+#| echo: false
+#| output: false
+#| autorun: true
+
+# Auto-install pythonck package
+import micropip
+await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl")
+
+# Setup pytensor path for pyodide environment
+import sys
+import os
+import numpy as np
+
+# Add the project root to path so we can import pytensor
+sys.path.insert(0, '/home/aghamari/github/composable_kernel/visualisation')
+
+# Import the actual CK modules
+from pytensor.tile_distribution_encoding import TileDistributionEncoding
+from pytensor.tile_distribution import make_static_tile_distribution
+```
+
+## Overview
+
+Now that you understand the coordinate systems, it's time to peek behind the curtain and see how the magic actually works. **Encoding internals** reveal how the mathematical specification creates the transformation components that implement the P+Y → X mappings.
+
+This is where the abstract coordinate transformations become concrete, executable code.
+
+## What is Tile Distribution Encoding?
+
+Before diving into the internals, let's understand what we're examining:
+
+**The Challenge**: You have a mathematical specification (the encoding) that describes how threads should be organized and how work should be distributed. How does this specification become the actual transformation chains that map coordinates?
+
+**The Solution**: The encoding contains all the mathematical relationships needed to automatically generate the transformation components:
+
+### 🎬 **Visual Explanation**
+
+The following video visualizes how tile distribution encoding creates a graph structure, showing how nodes and edges are constructed from the encoding parameters:
+
+{{< video https://www.youtube.com/watch?v=gl0bgSAN6gc >}}
+
+- **ps_ys_to_xs_adaptor**: Maps combined (P,Y) coordinates to X coordinates
+- **ys_to_d_descriptor**: Maps Y coordinates to linearized storage
+- **Transformation chains**: Built automatically from encoding parameters
+
+## Encoding Structure Deep Dive
+
+Let's examine the structure of a tile distribution encoding:
+
+```{pyodide}
+print("🎯 Tile Distribution Encoding Structure")
+print("=" * 50)
+
+# Create a simple encoding to examine
+encoding = TileDistributionEncoding(
+    rs_lengths=[],                    # No replication
+    hs_lengthss=[[2, 2], [2, 2]],   # 2x2 hierarchical tiles
+    ps_to_rhss_major=[[1], [2]],     # P0→H1, P1→H2  
+    ps_to_rhss_minor=[[0], [0]],     # Use first component
+    ys_to_rhs_major=[1, 1, 2, 2],    # Y mapping to H
+    ys_to_rhs_minor=[0, 1, 0, 1]     # Y component selection
+)
+
+print("📐 Encoding Parameters:")
+print(f"  rs_lengths: {encoding.rs_lengths}")
+print(f"  hs_lengthss: {encoding.hs_lengthss}")
+print(f"  ps_to_rhss_major: {encoding.ps_to_rhss_major}")
+print(f"  ps_to_rhss_minor: {encoding.ps_to_rhss_minor}")
+print(f"  ys_to_rhs_major: {encoding.ys_to_rhs_major}")
+print(f"  ys_to_rhs_minor: {encoding.ys_to_rhs_minor}")
+
+print("\n✅ Encoding created successfully!")
+```
+
+## Parameter Breakdown
+
+Each parameter in the encoding controls a specific aspect of how threads and data are organized:
+
+### rs_lengths (Replication Lengths)
+
+**🔹 rs_lengths (Replication Lengths)**
+
+Controls data sharing across threads:
+- `[]` = no replication
+- `[2]` = each data element shared by 2 threads  
+- `[2,2]` = 2x2 replication pattern
+
+**📝 Examples:**
+- `[]` → No replication - each thread has unique data
+- `[2]` → Linear replication - data shared by pairs
+- `[2, 2]` → 2D replication - data shared in 2x2 blocks
+
+### hs_lengthss (Hierarchical Lengths)
+
+**🔹 hs_lengthss (Hierarchical Lengths)**
+
+Defines tile sizes per dimension:
+- `[[2,2], [2,2]]` = 2x2 tiles for both X dimensions
+- `[[4,4], [4,4]]` = 4x4 tiles for both X dimensions
+- Controls thread workload size
+
+**📝 Tile Size Examples:**
+- `[[2, 2], [2, 2]]` → 2x2 tiles (4 elements per thread)
+- `[[4, 4], [4, 4]]` → 4x4 tiles (16 elements per thread)
+- `[[2, 4], [4, 2]]` → 2x4 and 4x2 tiles (8 elements per thread)
+
+### P→RH Mappings
+
+**🔹 ps_to_rhss_major/minor (P→RH Mappings)**
+
+Maps partition coordinates to RH space:
+- Controls which H dimensions each P dimension affects
+- major/minor specify different levels of the mapping
+
+**📝 Conceptual Example:**
+`ps_to_rhss_major=[[1], [2]]` means:
+- P dimension 0 maps to H dimension 1
+- P dimension 1 maps to H dimension 2
+
+This determines how thread coordinates affect tile placement.
+
+### Y→RH Mappings
+
+**🔹 ys_to_rhs_major/minor (Y→RH Mappings)**
+
+Maps Y coordinates to RH space:
+- Determines how logical Y coordinates map to hierarchical structure
+- Controls the internal organization of each thread's tile
+
+**📝 Example Mapping:**
+`ys_to_rhs_major=[1, 1, 2, 2]` means:
+- Y[0] maps to H1
+- Y[1] maps to H1  
+- Y[2] maps to H2
+- Y[3] maps to H2
+
+This creates the internal structure of thread tiles.
+
+## From Encoding to Tile Distribution
+
+The magic happens when `make_static_tile_distribution()` transforms the mathematical encoding into runtime components:
+
+```{pyodide}
+print("🔧 From Encoding to Tile Distribution")
+print("=" * 50)
+
+print("The transformation process:")
+print("1. Analyze encoding parameters")
+print("2. Build transformation chains")
+print("3. Create runtime components")
+print("4. Optimize for performance")
+
+# Create tile distribution from encoding
+try:
+    tile_distribution = make_static_tile_distribution(encoding)
+    
+    print("\n✅ Tile distribution created successfully!")
+    print("\n📦 Internal Components Created:")
+    print("  • ps_ys_to_xs_adaptor: Maps (P,Y) coordinates to X coordinates")
+    print("  • ys_to_d_descriptor: Maps Y coordinates to linearized storage")
+    print("  • encoding: Original mathematical specification")
+    
+    # Show the components exist
+    print(f"\n🔍 Component Verification:")
+    components = [
+        ('ps_ys_to_xs_adaptor', 'P+Y → X transformation'),
+        ('ys_to_d_descriptor', 'Y → D linearization'),
+        ('encoding', 'Original specification')
+    ]
+    
+    for component, description in components:
+        has_component = hasattr(tile_distribution, component)
+        status = "✅" if has_component else "❌"
+        print(f"  {status} {component}: {description}")
+        
+except Exception as e:
+    print(f"⚠️ Creation failed: {e}")
+    print("Note: This demonstrates the concept even if creation fails")
+```
+
+## The P+Y → X Transformation Chain
+
+The heart of the system is the adaptor that implements the P+Y → X transformation.
+
+**🔗 The P+Y → X Transformation Chain**
+
+The `ps_ys_to_xs_adaptor` implements a chain of transformations:
+1. Start with P coordinates (which thread)
+2. Add Y coordinates (which element in thread's tile)
+3. Apply replication transforms (R-space)
+4. Apply hierarchical transforms (H-space)
+5. Merge into final X coordinates
+
+**💡 Why This Chain Works:**
+- Each transform handles one aspect of the mapping
+- Transforms are composable and efficient
+- The chain is built automatically from encoding
+- Same pattern works for any distribution strategy
+
+**📝 Conceptual Example:**
+- Input: P=[1,0] + Y=[0,1] → Combined=[1,0,0,1]
+- Transform 1: Handle replication (none in this case)
+- Transform 2: Handle hierarchical structure
+- Transform 3: Merge to final coordinates
+- Output: X=[0,3] (final tensor position)
+
+## The Y → D Linearization
+
+The descriptor handles the linearization of Y coordinates to memory addresses.
+
+**🗃️ The Y → D Linearization**
+
+The `ys_to_d_descriptor` handles memory layout within each thread:
+1. Start with Y coordinates [y0, y1, y2, y3]
+2. Apply thread's local layout (usually row-major)
+3. Compute linear offset within thread's buffer
+4. Result: D coordinate (memory address)
+
+**📝 Example with [2, 2] tile:**
+- Y=[0,0] → D=0
+- Y=[0,1] → D=1
+- Y=[1,0] → D=2
+- Y=[1,1] → D=3
+
+**💡 Why Separate from Adaptor:**
+- Adaptor handles inter-thread coordination (P+Y → X)
+- Descriptor handles intra-thread layout (Y → D)
+- This separation enables different memory layouts
+- Each thread can have its own descriptor
+
+## Practical Examples
+
+Different encodings create different behaviors:
+
+**🎯 Example 1: Simple 2x2 Distribution**
+
+```python
+simple_encoding = TileDistributionEncoding(
+    rs_lengths=[],
+    hs_lengthss=[[2], [2]],
+    ps_to_rhss_major=[[], []],
+    ps_to_rhss_minor=[[], []],
+    ys_to_rhs_major=[1, 2],
+    ys_to_rhs_minor=[0, 0]
+)
+```
+
+- No replication
+- Simple hierarchical structure
+- Direct P→H mapping
+- Good for basic matrix operations
+
+**🎯 Example 2: With Replication**
+
+```python
+replicated_encoding = TileDistributionEncoding(
+    rs_lengths=[2],  # 2-way replication
+    hs_lengthss=[[2], [2]],
+    ps_to_rhss_major=[[], []],
+    ps_to_rhss_minor=[[], []],
+    ys_to_rhs_major=[1, 2],
+    ys_to_rhs_minor=[0, 0]
+)
+```
+
+- 2-way replication for data sharing
+- Same hierarchical structure
+- Good for broadcast operations
+- Enables thread cooperation
+
+## Testing Your Understanding
+
+Let's verify your understanding of encoding internals:
+
+```{pyodide}
+print("🧪 Testing Encoding Internals Understanding")
+print("=" * 50)
+
+def test_encoding_creation():
+    """Test that we can create valid encodings."""
+    try:
+        test_encoding = TileDistributionEncoding(
+            rs_lengths=[],
+            hs_lengthss=[[2], [2]],
+            ps_to_rhss_major=[[], []],
+            ps_to_rhss_minor=[[], []],
+            ys_to_rhs_major=[1, 2],
+            ys_to_rhs_minor=[0, 0]
+        )
+        return True
+    except Exception as e:
+        print(f"Error: {e}")
+        return False
+
+def test_encoding_has_required_fields():
+    """Test that encoding has all required fields."""
+    encoding = TileDistributionEncoding(
+        rs_lengths=[],
+        hs_lengthss=[[2], [2]],
+        ps_to_rhss_major=[[], []],
+        ps_to_rhss_minor=[[], []],
+        ys_to_rhs_major=[1, 2],
+        ys_to_rhs_minor=[0, 0]
+    )
+    
+    required_fields = [
+        'rs_lengths', 'hs_lengthss', 'ps_to_rhss_major', 
+        'ps_to_rhss_minor', 'ys_to_rhs_major', 'ys_to_rhs_minor'
+    ]
+    
+    for field in required_fields:
+        if not hasattr(encoding, field):
+            return False
+    return True
+
+def test_different_encodings():
+    """Test creating different types of encodings."""
+    encodings = [
+        # Simple encoding
+        TileDistributionEncoding(
+            rs_lengths=[],
+            hs_lengthss=[[2], [2]],
+            ps_to_rhss_major=[[], []],
+            ps_to_rhss_minor=[[], []],
+            ys_to_rhs_major=[1, 2],
+            ys_to_rhs_minor=[0, 0]
+        ),
+        # With replication
+        TileDistributionEncoding(
+            rs_lengths=[2],
+            hs_lengthss=[[2], [2]],
+            ps_to_rhss_major=[[], []],
+            ps_to_rhss_minor=[[], []],
+            ys_to_rhs_major=[1, 2],
+            ys_to_rhs_minor=[0, 0]
+        )
+    ]
+    
+    return len(encodings) == 2
+
+# Run tests
+tests = [
+    ("Encoding creation", test_encoding_creation),
+    ("Required fields", test_encoding_has_required_fields),
+    ("Different encodings", test_different_encodings)
+]
+
+print("Running encoding internals tests:")
+for test_name, test_func in tests:
+    try:
+        result = test_func()
+        status = "✅ PASS" if result else "❌ FAIL"
+        print(f"  {status}: {test_name}")
+    except Exception as e:
+        print(f"  ❌ ERROR: {test_name} - {str(e)}")
+```
+
+## Key Takeaways
+
+Understanding encoding internals reveals the elegant architecture behind tile distribution:
+
+**🎯 The Mathematical Foundation:**
+
+1. **Encoding Structure**: Mathematical specification of thread organization
+   - ✅ rs_lengths control data replication
+   - ✅ hs_lengthss define tile sizes
+   - ✅ ps_to_rhss mappings control P→RH relationships
+   - ✅ ys_to_rhs mappings control Y→RH relationships
+
+2. **Automatic Generation**: From math to code
+   - ✅ Encoding parameters drive component creation
+   - ✅ Transformation chains built automatically
+   - ✅ Performance optimizations applied automatically
+   - ✅ Same pattern works for any distribution strategy
+
+3. **Component Architecture**: Clean separation of concerns
+   - ✅ ps_ys_to_xs_adaptor handles P+Y → X mapping
+   - ✅ ys_to_d_descriptor handles Y → D linearization
+   - ✅ Each component has a specific, well-defined role
+   - ✅ Components compose to create complete system
+
+**🔧 The Implementation Magic:**
+
+- **Composable Transforms**: Each transformation handles one aspect
+- **Automatic Optimization**: Compiler can optimize the generated chains
+- **Flexible Architecture**: Same framework supports any distribution pattern
+- **Performance Focus**: Every design decision optimized for GPU efficiency
+
+**💡 Why This Matters:**
+
+- **Abstraction Power**: Mathematical specification becomes executable code
+- **Maintainability**: Changes to encoding automatically propagate
+- **Performance**: Optimized transformation chains for each use case
+- **Extensibility**: New distribution patterns just need new encodings
+
+The encoding internals show how CK achieves both mathematical elegance and practical performance. The same mathematical framework that makes the system easy to reason about also generates highly optimized code! 

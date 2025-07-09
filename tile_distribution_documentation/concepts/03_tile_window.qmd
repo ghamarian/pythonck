@@ -1,0 +1,464 @@
+---
+title: "Tile Window - Data Access Gateway"
+format: live-html
+---
+
+## Overview
+
+TileWindow is the bridge between TileDistribution (work assignment) and actual data access. It provides a windowed view into tensors with distribution-aware access patterns, handling all the complex memory access details automatically.
+
+```{pyodide}
+#| echo: false
+#| output: false
+#| autorun: true
+
+# Auto-install pythonck package
+import micropip
+await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl")
+
+# Setup pytensor path for pyodide environment
+import sys
+import os
+import numpy as np
+
+# Add the project root to path so we can import pytensor
+sys.path.insert(0, '/home/aghamari/github/composable_kernel/visualisation')
+
+# Import the actual CK modules
+from pytensor.tile_distribution import make_static_tile_distribution, make_tile_distribution_encoding
+from pytensor.tile_window import make_tile_window, TileWindowWithStaticDistribution
+from pytensor.tensor_view import make_tensor_view
+from pytensor.tensor_descriptor import make_naive_tensor_descriptor_packed
+from pytensor.static_distributed_tensor import make_static_distributed_tensor
+```
+
+## What is a TileWindow?
+
+TileWindow is the missing piece between distribution and data access:
+
+**The Problem**: TileDistribution tells threads WHERE to work, but how do they actually ACCESS the data?
+
+**The Solution**: TileWindow provides a smart window into memory with distribution-aware access patterns.
+
+**🪟 Think of TileWindow as:**
+- A smart window into a large tensor
+- Knows about thread distribution
+- Handles memory access patterns automatically
+- Provides load/store operations
+
+**🔄 The Complete Flow:**
+
+1. TileDistribution: 'Thread 5, you handle coordinates [2,3]' 
+2. TileWindow: 'Here's the data at [2,3], loaded efficiently'
+3. Your code: 'Thanks! *does computation*'
+4. TileWindow: 'I'll store your result back optimally'
+
+**Key Insight**: TileWindow is like a smart cache manager. It knows which thread needs what data, and it loads/stores everything with optimal memory access patterns.
+
+## Creating a TileWindow
+
+Let's create a TileWindow step by step:
+
+```{pyodide}
+# First, create some sample data
+data = np.arange(16, dtype=np.float32).reshape(4, 4)
+print("📊 Creating a TileWindow")
+print("=" * 30)
+print("Sample data - 4x4 matrix:")
+print(data)
+print()
+
+# Create a tensor view for the data
+tensor_desc = make_naive_tensor_descriptor_packed([4, 4])
+tensor_view = make_tensor_view(data, tensor_desc)
+print(f"Tensor view created: {tensor_view}")
+print()
+
+# Create a tile distribution
+encoding = make_tile_distribution_encoding(
+    rs_lengths=[],
+    hs_lengthss=[[2], [2]],  # 2x2 tile
+    ps_to_rhss_major=[[], []],
+    ps_to_rhss_minor=[[], []],
+    ys_to_rhs_major=[1, 2],
+    ys_to_rhs_minor=[0, 0]
+)
+distribution = make_static_tile_distribution(encoding)
+print(f"Distribution created: {distribution}")
+print()
+
+# Create the tile window
+window_lengths = [2, 2]  # 2x2 window
+window_origin = [1, 1]   # Start at position [1,1]
+
+tile_window = make_tile_window(
+    tensor_view=tensor_view,
+    window_lengths=window_lengths,
+    origin=window_origin,
+    tile_distribution=distribution
+)
+
+print(f"TileWindow created: {tile_window}")
+print(f"Window size: {window_lengths}")
+print(f"Window origin: {window_origin}")
+print(f"Has distribution: {hasattr(tile_window, 'tile_distribution')}")
+```
+
+**What just happened?** We created a 2×2 window starting at position [1,1] in our 4×4 matrix. The window knows about our tile distribution, so it can load data efficiently for each thread.
+
+## Loading Data with TileWindow
+
+Now let's see how TileWindow loads data into distributed tensors:
+
+```{pyodide}
+print("🔄 Loading Data with TileWindow")
+print("=" * 35)
+
+# Show what we're loading
+print("Source data window at [1,1] size [2,2]:")
+print(data[1:3, 1:3])
+print()
+
+# Load data from the window - automatically creates distributed tensor!
+try:
+    distributed_tensor = tile_window.load()
+    print("✅ Load operation successful!")
+    print(f"✅ Distributed tensor created automatically: {type(distributed_tensor).__name__}")
+    print()
+    
+    # Show what each thread sees
+    print("🧵 What each thread loaded:")
+    y_lengths = distribution.get_y_vector_lengths()
+    
+    for y0 in range(y_lengths[0]):
+        for y1 in range(y_lengths[1]):
+            y_indices = [y0, y1]
+            try:
+                value = distributed_tensor.get_element(y_indices)
+                print(f"  Thread Y{y_indices}: loaded value {value}")
+            except Exception as e:
+                print(f"  Thread Y{y_indices}: error - {e}")
+                
+except Exception as e:
+    print(f"❌ Load operation failed: {e}")
+```
+
+**Loading Magic**: TileWindow's `load()` method automatically creates a distributed tensor AND figures out which memory locations each thread needs, loading them with optimal access patterns according to our tile distribution! No manual tensor creation needed!
+
+## Computing on Distributed Data
+
+Once data is loaded, we can perform computations with an optimized pattern:
+
+```{pyodide}
+print("🔢 Computing on Distributed Data")
+print("=" * 35)
+print("Performing computation (multiply by 2) with direct store:")
+print()
+
+# Create output data and window
+output_data = data.copy()
+output_tensor_view = make_tensor_view(output_data, tensor_desc)
+output_window = make_tile_window(
+    tensor_view=output_tensor_view,
+    window_lengths=window_lengths,
+    origin=window_origin,
+    tile_distribution=distribution
+)
+
+# Load current output values and compute directly
+result_tensor = output_window.load()
+
+# Do computation on each element
+y_lengths = distribution.get_y_vector_lengths()
+for y0 in range(y_lengths[0]):
+    for y1 in range(y_lengths[1]):
+        y_indices = [y0, y1]
+        try:
+            # Load input value
+            input_value = distributed_tensor.get_element(y_indices)
+            
+            # Compute result (simple example: multiply by 2)
+            output_value = input_value * 2
+            
+            # Store result directly in output tensor
+            result_tensor.set_element(y_indices, output_value)
+            
+            print(f"  Y{y_indices}: {input_value} → {output_value}")
+            
+        except Exception as e:
+            print(f"  Y{y_indices}: error - {e}")
+
+# Store results back to memory
+try:
+    output_window.store(result_tensor)
+    print("✅ Store operation successful - computed and stored in one step!")
+except Exception as e:
+    print(f"❌ Store operation failed: {e}")
+```
+
+**Optimized Pattern**: No intermediate tensor needed! We load input, compute results, and store directly to output window. This saves memory and is more efficient than creating separate intermediate tensors.
+
+```{pyodide}
+print("🔍 Verification:")
+print("  Window region [1:3, 1:3] should be doubled:")
+print(f"  Original: {data[1:3, 1:3].flatten()}")
+print(f"  Result:   {output_data[1:3, 1:3].flatten()}")
+print(f"  Expected: {(data[1:3, 1:3] * 2).flatten()}")
+```
+
+## The Complete Load-Compute-Store Pattern
+
+Let's demonstrate the complete optimized pattern in a single function. Notice how we avoid creating intermediate tensors by computing and storing directly:
+
+```{pyodide}
+print("🔄 Complete Load-Compute-Store Pattern")
+print("=" * 45)
+
+def tile_operation(input_data, window_origin, window_size, operation_name, compute_func):
+    """Complete tile operation pattern."""
+    print(f"🚀 Performing {operation_name}")
+    print(f"   Input size: {input_data.shape}")
+    print(f"   Window: {window_size} at {window_origin}")
+    print()
+    
+    # Setup
+    tensor_desc = make_naive_tensor_descriptor_packed(list(input_data.shape))
+    input_view = make_tensor_view(input_data, tensor_desc)
+    
+    # Create distribution
+    encoding = make_tile_distribution_encoding(
+        rs_lengths=[],
+        hs_lengthss=[[window_size[0]], [window_size[1]]],
+        ps_to_rhss_major=[[], []],
+        ps_to_rhss_minor=[[], []],
+        ys_to_rhs_major=[1, 2],
+        ys_to_rhs_minor=[0, 0]
+    )
+    distribution = make_static_tile_distribution(encoding)
+    
+    # Create input window
+    input_window = make_tile_window(input_view, window_size, window_origin, distribution)
+    
+    # Load data - automatically creates distributed tensor!
+    distributed_input = input_window.load()
+    
+    # Optimized pattern: Compute and store directly - no intermediate tensor needed!
+    output_data = input_data.copy()
+    output_view = make_tensor_view(output_data, tensor_desc)
+    output_window = make_tile_window(output_view, window_size, window_origin, distribution)
+    
+    # Create output distributed tensor and compute+store in one loop
+    distributed_output = output_window.load()  # Load current values
+    y_lengths = distribution.get_y_vector_lengths()
+    
+    for y0 in range(y_lengths[0]):
+        for y1 in range(y_lengths[1]):
+            y_indices = [y0, y1]
+            # Load, compute, and store in one step - more efficient!
+            input_val = distributed_input.get_element(y_indices)
+            output_val = compute_func(input_val)
+            distributed_output.set_element(y_indices, output_val)
+    
+    # Store results back to memory
+    output_window.store(distributed_output)
+    
+    return output_data
+
+# Test with different operations
+test_data = np.arange(9, dtype=np.float32).reshape(3, 3)
+print("Test data:")
+print(test_data)
+print()
+
+# Square operation
+result1 = tile_operation(test_data, [0, 0], [2, 2], "Square", lambda x: x ** 2)
+print("After square operation:")
+print(result1)
+print()
+
+# Add 10 operation
+result2 = tile_operation(test_data, [1, 1], [2, 2], "Add 10", lambda x: x + 10)
+print("After add 10 operation:")
+print(result2)
+```
+
+## Window Properties and Flexibility
+
+TileWindow provides flexible windowing capabilities:
+
+```{pyodide}
+print("🪟 Window Properties and Flexibility")
+print("=" * 40)
+
+# Create different window configurations
+test_matrix = np.arange(25, dtype=np.float32).reshape(5, 5)
+print("Test matrix (5x5):")
+print(test_matrix)
+print()
+
+window_configs = [
+    ([2, 2], [0, 0], "Top-left 2x2"),
+    ([3, 3], [1, 1], "Center 3x3"),
+    ([2, 3], [2, 1], "Bottom 2x3"),
+    ([1, 5], [2, 0], "Row slice"),
+    ([5, 1], [0, 2], "Column slice")
+]
+
+for window_size, origin, description in window_configs:
+    print(f"📍 {description} - size {window_size} at {origin}:")
+    
+    # Extract the window data manually for verification
+    end_row = origin[0] + window_size[0]
+    end_col = origin[1] + window_size[1]
+    
+    if end_row <= test_matrix.shape[0] and end_col <= test_matrix.shape[1]:
+        window_data = test_matrix[origin[0]:end_row, origin[1]:end_col]
+        print(f"   Window data: {window_data.flatten()}")
+    else:
+        print(f"   Window extends beyond matrix bounds!")
+    print()
+```
+
+## Testing Your Understanding
+
+Let's verify that TileWindow operations work correctly:
+
+```{pyodide}
+print("🧪 Testing TileWindow Operations")
+print("=" * 35)
+
+def test_window_creation():
+    """Test creating tile windows."""
+    try:
+        data = np.ones((4, 4), dtype=np.float32)
+        desc = make_naive_tensor_descriptor_packed([4, 4])
+        view = make_tensor_view(data, desc)
+        
+        encoding = make_tile_distribution_encoding(
+            rs_lengths=[],
+            hs_lengthss=[[2], [2]],
+            ps_to_rhss_major=[[], []],
+            ps_to_rhss_minor=[[], []],
+            ys_to_rhs_major=[1, 2],
+            ys_to_rhs_minor=[0, 0]
+        )
+        dist = make_static_tile_distribution(encoding)
+        
+        window = make_tile_window(view, [2, 2], [1, 1], dist)
+        return window is not None
+    except Exception:
+        return False
+
+def test_load_store_roundtrip():
+    """Test complete load-store cycle."""
+    try:
+        # Create test data
+        data = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]], dtype=np.float32)
+        desc = make_naive_tensor_descriptor_packed([3, 3])
+        view = make_tensor_view(data, desc)
+        
+        # Create distribution
+        encoding = make_tile_distribution_encoding(
+            rs_lengths=[],
+            hs_lengthss=[[2], [2]],
+            ps_to_rhss_major=[[], []],
+            ps_to_rhss_minor=[[], []],
+            ys_to_rhs_major=[1, 2],
+            ys_to_rhs_minor=[0, 0]
+        )
+        dist = make_static_tile_distribution(encoding)
+        
+        # Create window
+        window = make_tile_window(view, [2, 2], [0, 0], dist)
+        
+        # Load data - automatically creates distributed tensor!
+        loaded = window.load()
+        
+        # Verify we can access the data
+        y_lengths = dist.get_y_vector_lengths()
+        for y0 in range(y_lengths[0]):
+            for y1 in range(y_lengths[1]):
+                val = loaded.get_element([y0, y1])
+                if val <= 0:  # Should have positive values
+                    return False
+        
+        return True
+    except Exception:
+        return False
+
+def test_window_flexibility():
+    """Test different window configurations."""
+    try:
+        data = np.ones((5, 5), dtype=np.float32)
+        desc = make_naive_tensor_descriptor_packed([5, 5])
+        view = make_tensor_view(data, desc)
+        
+        # Test different window sizes
+        window_configs = [
+            ([2, 2], [0, 0]),
+            ([3, 3], [1, 1]),
+            ([1, 5], [2, 0])
+        ]
+        
+        for window_size, origin in window_configs:
+            encoding = make_tile_distribution_encoding(
+                rs_lengths=[],
+                hs_lengthss=[[window_size[0]], [window_size[1]]],
+                ps_to_rhss_major=[[], []],
+                ps_to_rhss_minor=[[], []],
+                ys_to_rhs_major=[1, 2],
+                ys_to_rhs_minor=[0, 0]
+            )
+            dist = make_static_tile_distribution(encoding)
+            
+            window = make_tile_window(view, window_size, origin, dist)
+            if window is None:
+                return False
+                
+        return True
+    except Exception:
+        return False
+
+# Run tests
+tests = [
+    ("Window creation", test_window_creation),
+    ("Load-store roundtrip", test_load_store_roundtrip),
+    ("Window flexibility", test_window_flexibility)
+]
+
+print("Running TileWindow tests:")
+for test_name, test_func in tests:
+    result = test_func()
+    status = "✅ PASS" if result else "❌ FAIL"
+    print(f"  {status}: {test_name}")
+```
+
+## Key Takeaways
+
+TileWindow is the essential bridge between distribution and data access:
+
+**1. Smart Data Access**
+   - ✅ Provides windowed views into large tensors
+   - ✅ Handles distribution-aware memory access
+   - ✅ Optimizes load/store operations automatically
+
+**2. Seamless Integration**
+   - ✅ Works perfectly with TileDistribution
+   - ✅ Bridges tensor views and distributed computation
+   - ✅ Enables efficient thread cooperation
+
+**3. Flexible Windowing**
+   - ✅ Supports arbitrary window sizes and positions
+   - ✅ Handles different tensor layouts
+   - ✅ Adapts to various access patterns
+
+**4. Optimized Workflow**
+   - ✅ `load()` automatically creates distributed tensors
+   - ✅ Compute and store directly - no intermediate tensors needed
+   - ✅ More efficient than traditional load→compute→store pattern
+
+**5. Two Loading Methods**
+   - ✅ `load()` for convenience (automatically creates tensor)
+   - ✅ `load_into(tensor)` for control (when you need specific tensor setup)
+
+TileWindow completes the data access story. Next, we'll learn about sweep operations - the elegant way to iterate over all distributed data elements! 

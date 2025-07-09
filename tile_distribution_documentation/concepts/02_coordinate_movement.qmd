@@ -1,0 +1,352 @@
+---
+title: "Advanced Coordinate Operations"
+format: live-html
+engine: jupyter
+pyodide:
+  packages:
+    - micropip
+---
+
+# Advanced Coordinate Operations
+
+Now that you understand transforms, adaptors, and descriptors, it's time to learn advanced coordinate operations. These enable navigation through complex tensor layouts and are essential for tile operations.
+
+## Prerequisites
+
+This builds on everything we've learned:
+- **MultiIndex**: Basic coordinates
+- **Transforms**: Individual coordinate mappings  
+- **Adaptors**: Transform chains
+- **Descriptors**: Complete tensor specifications
+
+
+```{pyodide}
+#| echo: false
+#| output: false
+#| autorun: true
+
+# Auto-install pythonck package
+import micropip
+await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl")
+```
+
+
+```{pyodide}
+
+from pytensor.tensor_coordinate import (
+    MultiIndex,
+    TensorCoordinate,
+    TensorAdaptorCoordinate,
+    make_tensor_coordinate,
+    make_tensor_adaptor_coordinate,
+    move_tensor_coordinate,
+    move_tensor_adaptor_coordinate
+)
+from pytensor.tensor_descriptor import make_naive_tensor_descriptor
+from pytensor.tensor_adaptor import make_transpose_adaptor
+import numpy as np
+
+print("🚀 Advanced Coordinate Operations")
+print("=" * 40)
+print("TensorCoordinate: Descriptor-aware coordinates")
+print("TensorAdaptorCoordinate: Adaptor-aware coordinates") 
+print("move_tensor_coordinate: Navigate through tensor layouts")
+```
+
+## TensorCoordinate: Descriptor-Aware Coordinates
+
+TensorCoordinate works with TensorDescriptor to provide descriptor-aware coordinate navigation:
+
+```{pyodide}
+print("1️⃣ TensorCoordinate: Descriptor Integration")
+print("-" * 45)
+
+# Create a tensor descriptor first
+tensor_desc = make_naive_tensor_descriptor([4, 3])  # 4x3 matrix
+print(f"Tensor descriptor: {tensor_desc.get_lengths()} shape")
+
+# Create tensor coordinate from descriptor + index
+top_index = [2, 1]
+tensor_coord = make_tensor_coordinate(tensor_desc, top_index)
+
+print(f"\nTensor coordinate created from {top_index}:")
+print(f"  Top index: {tensor_coord.get_index().to_list()}")
+print(f"  Linear offset: {tensor_coord.get_offset()}")
+print(f"  Hidden dimensions: {tensor_coord.ndim_hidden}")
+print(f"  Hidden index: {tensor_coord.get_hidden_index().to_list()}")
+
+# Show the key difference: descriptor provides context
+print(f"\n🔍 Why descriptor matters:")
+print(f"  Descriptor defines: {tensor_desc.get_lengths()} tensor shape")
+print(f"  Coordinate tracks: position {tensor_coord.get_index().to_list()}")
+print(f"  Result: linear offset {tensor_coord.get_offset()} for memory access")
+```
+
+## TensorAdaptorCoordinate: Adaptor-Aware Coordinates
+
+TensorAdaptorCoordinate works with adaptors to track coordinates through transformation chains:
+
+```{pyodide}
+print("2️⃣ TensorAdaptorCoordinate: Adaptor Integration")
+print("-" * 50)
+
+# Create a transpose adaptor for demonstration
+transpose_adaptor = make_transpose_adaptor(2, [1, 0])  # Swap dimensions
+print(f"Transpose adaptor: [1, 0] permutation")
+
+# Create adaptor coordinate
+top_index = [2, 3]
+adaptor_coord = make_tensor_adaptor_coordinate(transpose_adaptor, top_index)
+
+print(f"\nAdaptor coordinate for {top_index}:")
+print(f"  Hidden dimensions: {adaptor_coord.ndim_hidden}")
+print(f"  Hidden index: {adaptor_coord.get_hidden_index().to_list()}")
+
+# Show how it tracks transformation 
+top_idx = adaptor_coord.get_top_index()
+bottom_idx = adaptor_coord.get_bottom_index()
+print(f"\n🔄 Transformation tracking:")
+print(f"  Input (top): {top_idx.to_list()}")
+print(f"  Output (bottom): {bottom_idx.to_list()}")
+print(f"  Transformation: dimensions swapped as expected")
+```
+
+## The Power of move_tensor_coordinate
+
+`move_tensor_coordinate` is the key function for navigating tensor layouts. It updates coordinates efficiently through descriptor-defined transformations:
+
+```{pyodide}
+print("3️⃣ move_tensor_coordinate: Efficient Navigation")
+print("-" * 50)
+
+# Create a more interesting descriptor - 3x4 matrix with custom strides
+desc_3x4 = make_naive_tensor_descriptor([3, 4], [4, 1])  # Row-major
+print(f"Descriptor: {desc_3x4.get_lengths()} shape, strides [4, 1]")
+
+# Start at position [1, 1]
+coord = make_tensor_coordinate(desc_3x4, [1, 1])
+print(f"\nStarting position:")
+print(f"  Index: {coord.get_index().to_list()}")
+print(f"  Offset: {coord.get_offset()}")
+
+# Move right by 1 column
+print(f"\n🏃 Move [0, 1] (right 1 column):")
+move_tensor_coordinate(desc_3x4, coord, [0, 1])
+print(f"  New index: {coord.get_index().to_list()}")
+print(f"  New offset: {coord.get_offset()}")
+
+# Move down by 1 row
+print(f"\n🏃 Move [1, 0] (down 1 row):")
+move_tensor_coordinate(desc_3x4, coord, [1, 0])
+print(f"  New index: {coord.get_index().to_list()}")
+print(f"  New offset: {coord.get_offset()}")
+
+# Move diagonally
+print(f"\n🏃 Move [1, 1] (diagonal):")
+move_tensor_coordinate(desc_3x4, coord, [1, 1])
+print(f"  Final index: {coord.get_index().to_list()}")
+print(f"  Final offset: {coord.get_offset()}")
+```
+
+## Movement Through Complex Transformations
+
+The real power shows when moving through complex adaptor transformations:
+
+```{pyodide}
+print("4️⃣ Movement Through Adaptors")
+print("-" * 35)
+
+# Create transpose adaptor coordinate
+transpose_coord = make_tensor_adaptor_coordinate(transpose_adaptor, [1, 2])
+print(f"Initial adaptor coordinate:")
+print(f"  Top: {transpose_coord.get_top_index().to_list()}")
+print(f"  Bottom: {transpose_coord.get_bottom_index().to_list()}")
+
+# Move through the adaptor
+print(f"\n🔄 Move [1, 0] through transpose adaptor:")
+bottom_diff = move_tensor_adaptor_coordinate(transpose_adaptor, transpose_coord, [1, 0])
+print(f"  New top: {transpose_coord.get_top_index().to_list()}")  
+print(f"  New bottom: {transpose_coord.get_bottom_index().to_list()}")
+print(f"  Bottom difference: {bottom_diff.to_list()}")
+
+# Move again
+print(f"\n🔄 Move [0, 1] through transpose adaptor:")
+bottom_diff = move_tensor_adaptor_coordinate(transpose_adaptor, transpose_coord, [0, 1])
+print(f"  New top: {transpose_coord.get_top_index().to_list()}")
+print(f"  New bottom: {transpose_coord.get_bottom_index().to_list()}")
+print(f"  Bottom difference: {bottom_diff.to_list()}")
+```
+
+## Practical Applications
+
+These coordinate operations are used everywhere in real applications:
+
+```{pyodide}
+print("5️⃣ Practical Applications")
+print("-" * 30)
+
+print("🎯 Tile Operations:")
+print("   - Window positioning: move_tensor_coordinate(desc, coord, window_step)")
+print("   - Tile traversal: iterate through tensor regions")
+print("   - Memory access: convert coordinates to linear offsets")
+print()
+print("🎯 Distribution Patterns:")
+print("   - Thread coordination: map thread indices to tensor positions")
+print("   - Load balancing: distribute work across coordinate spaces")
+print("   - Synchronization: coordinate access patterns")
+print()
+print("🎯 Transform Chains:")
+print("   - Pipeline navigation: move through complex transform sequences")
+print("   - Layout conversion: navigate between different memory layouts")
+print("   - Optimization: efficient coordinate updates without full recalculation")
+```
+
+## Understanding Movement Efficiency
+
+One key insight: `move_tensor_coordinate` is much more efficient than recreating coordinates:
+
+```{pyodide}
+print("6️⃣ Movement Efficiency")
+print("-" * 25)
+
+# Demonstrate why movement is efficient
+desc = make_naive_tensor_descriptor([100, 100])  # Large tensor
+coord = make_tensor_coordinate(desc, [50, 50])   # Middle position
+
+print("❌ Inefficient approach:")
+print("   new_coord = make_tensor_coordinate(desc, [51, 50])")
+print("   → Recalculates entire transformation chain")
+print("   → Slow for complex descriptors")
+print()
+print("✅ Efficient approach:")
+print("   move_tensor_coordinate(desc, coord, [1, 0])")
+print("   → Updates existing coordinate incrementally")
+print("   → Fast even for complex transformations")
+print("   → Used by all high-performance tile operations")
+
+# Show the result
+move_tensor_coordinate(desc, coord, [1, 0])
+print(f"\n🚀 Moved to: {coord.get_index().to_list()}")
+```
+
+## Advanced Movement Patterns
+
+Real applications use sophisticated movement patterns:
+
+```{pyodide}
+print("7️⃣ Advanced Movement Patterns")  
+print("-" * 35)
+
+# Create a coordinate for demonstration
+desc = make_naive_tensor_descriptor([8, 8])
+coord = make_tensor_coordinate(desc, [0, 0])
+
+print("🌟 Pattern 1: Row-wise scan")
+for i in range(3):
+    for j in range(3):
+        if i == 0 and j == 0:
+            print(f"  Start: {coord.get_index().to_list()}")
+        else:
+            if j == 0 and i > 0:
+                # New row: move down, reset to column 0
+                move_tensor_coordinate(desc, coord, [1, -j])
+            else:
+                # Same row: move right
+                move_tensor_coordinate(desc, coord, [0, 1])
+            print(f"  Step {i*3+j}: {coord.get_index().to_list()}")
+
+print(f"\n🌟 Pattern 2: Diagonal movement")
+coord = make_tensor_coordinate(desc, [2, 2])  # Start at center
+moves = [[1, 1], [-1, 1], [1, -1], [-1, -1]]  # Diamond pattern
+print(f"  Center: {coord.get_index().to_list()}")
+for i, move in enumerate(moves):
+    move_tensor_coordinate(desc, coord, move)
+    print(f"  Diagonal {i+1}: {coord.get_index().to_list()}")
+```
+
+## Testing Your Understanding
+
+Let's test your understanding of advanced coordinate operations:
+
+```{pyodide}
+print("8️⃣ Testing Advanced Coordinates")
+print("-" * 35)
+
+def test_tensor_coordinate_creation():
+    """Test creating tensor coordinates from descriptors."""
+    desc = make_naive_tensor_descriptor([3, 4])
+    coord = make_tensor_coordinate(desc, [1, 2])
+    return coord.get_index().to_list() == [1, 2] and coord.get_offset() == 6
+
+def test_coordinate_movement():
+    """Test basic coordinate movement."""
+    desc = make_naive_tensor_descriptor([5, 5])
+    coord = make_tensor_coordinate(desc, [1, 1])
+    initial_offset = coord.get_offset()
+    move_tensor_coordinate(desc, coord, [1, 1])
+    return coord.get_index().to_list() == [2, 2] and coord.get_offset() == initial_offset + 6
+
+def test_adaptor_coordinate():
+    """Test adaptor coordinate creation and access."""
+    adaptor = make_transpose_adaptor(2, [1, 0])
+    coord = make_tensor_adaptor_coordinate(adaptor, [3, 4])
+    top = coord.get_top_index().to_list()
+    bottom = coord.get_bottom_index().to_list()
+    return top == [3, 4] and bottom == [4, 3]  # Swapped
+
+def test_adaptor_movement():
+    """Test movement through adaptors."""
+    adaptor = make_transpose_adaptor(2, [1, 0])
+    coord = make_tensor_adaptor_coordinate(adaptor, [1, 2])
+    diff = move_tensor_adaptor_coordinate(adaptor, coord, [1, 0])
+    new_top = coord.get_top_index().to_list()
+    new_bottom = coord.get_bottom_index().to_list()
+    return new_top == [2, 2] and new_bottom == [2, 2]
+
+# Run tests
+tests = [
+    ("Tensor coordinate creation", test_tensor_coordinate_creation),
+    ("Coordinate movement", test_coordinate_movement),
+    ("Adaptor coordinate", test_adaptor_coordinate),
+    ("Adaptor movement", test_adaptor_movement)
+]
+
+print("Running advanced coordinate tests:")
+for test_name, test_func in tests:
+    try:
+        result = test_func()
+        status = "✅ PASS" if result else "❌ FAIL"
+        print(f"  {status}: {test_name}")
+    except Exception as e:
+        print(f"  ❌ ERROR: {test_name} - {str(e)}")
+```
+
+## Key Takeaways
+
+Advanced coordinate operations are the bridge between mathematical transforms and practical tensor manipulation:
+
+**1. TensorCoordinate: Descriptor-aware navigation**
+
+   - ✅ Combines MultiIndex with descriptor context
+   - ✅ Provides linear offset for memory access  
+   - ✅ Enables descriptor-validated operations
+
+**2. TensorAdaptorCoordinate: Adaptor-aware tracking**
+
+   - ✅ Tracks coordinates through transformation chains
+   - ✅ Handles complex multi-stage transformations
+   - ✅ Enables efficient pipeline navigation
+
+**3. move_tensor_coordinate: Efficient navigation**
+
+   - ✅ Updates coordinates without full recalculation
+   - ✅ Essential for high-performance operations
+   - ✅ Used by all tile and distribution operations
+
+**4. Real-world applications:**
+
+   - ✅ Tile window positioning and traversal
+   - ✅ Thread coordinate mapping and distribution
+   - ✅ Memory layout navigation and optimization
+
+These operations form the foundation for all advanced tensor operations in the system. Master them, and you're ready for the Distribution API! 

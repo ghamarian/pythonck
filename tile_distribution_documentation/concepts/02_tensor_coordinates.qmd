@@ -1,0 +1,117 @@
+---
+title: "Basic Coordinates"
+format: live-html
+engine: jupyter
+pyodide:
+  packages:
+    - micropip
+---
+
+Before diving into transforms and adaptors, we need to understand the basic coordinate system. MultiIndex is the fundamental building block used throughout the pytensor system.
+
+## What is MultiIndex?
+
+MultiIndex represents a position in N-dimensional space - think of it as GPS coordinates for tensors:
+
+- **Simple**: Just stores a list of integers
+- **Fundamental**: Used by all transforms, adaptors, and descriptors
+- **Flexible**: Supports copying, comparison, and modification
+
+```{pyodide}
+#| echo: false
+#| output: false
+#| autorun: true
+
+# Auto-install pythonck package
+import micropip
+await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl")
+```
+
+```{pyodide}
+from pytensor.tensor_coordinate import MultiIndex
+import numpy as np
+
+print("🧭 Basic Coordinate System")
+print("=" * 30)
+print("MultiIndex: The foundation of all tensor operations")
+print("Used by: Transforms, Adaptors, Descriptors, and Tensors")
+```
+
+## MultiIndex: Basic Multi-Dimensional Coordinates
+
+MultiIndex is the simplest form of tensor coordinate - it represents a position in N-dimensional space:
+
+```{pyodide}
+print("1️⃣ MultiIndex Basics")
+print("-" * 30)
+
+# Create basic 2D coordinate
+coord_2d = MultiIndex(2, [1, 2])
+print(f"2D coordinate: {coord_2d}")
+print(f"  Size: {coord_2d.size}")
+print(f"  Values: {coord_2d.to_list()}")
+print(f"  Access by index: coord[0]={coord_2d[0]}, coord[1]={coord_2d[1]}")
+
+# Create 3D coordinate
+coord_3d = MultiIndex(3, [0, 1, 2])
+print(f"\n3D coordinate: {coord_3d}")
+print(f"  Size: {coord_3d.size}")
+print(f"  Values: {coord_3d.to_list()}")
+
+# Coordinates can be modified
+coord_3d[1] = 5
+print(f"  After modification: {coord_3d.to_list()}")
+```
+
+## Why MultiIndex Matters
+
+MultiIndex is a simple but essential compile-time templated container in the C++ codebase. In the Python implementation, it serves as a runtime equivalent that provides:
+
+### What MultiIndex Actually Is
+
+- **Compile-time sized container**: In C++, `MultiIndex<N>` has size known at compile time
+- **Simple coordinate storage**: Just holds N integers representing positions in N-dimensional space
+- **Transform interface**: Used as input/output for coordinate transformations
+- **Basic operations**: Supports indexing, copying, and comparison
+
+### Where MultiIndex is Actually Used
+
+Based on the C++ codebase analysis:
+
+- **Transform inputs and outputs**: Every transform takes and returns MultiIndex coordinates
+- **Adaptor coordinate tracking**: TensorAdaptor uses MultiIndex to track positions through transform chains
+- **Element access**: Tensor views use MultiIndex to specify which element to access
+
+## Quick Check
+
+Try creating and modifying a MultiIndex yourself:
+
+```{pyodide}
+# Create a 3D coordinate
+my_coord = MultiIndex(3, [1, 2, 3])
+print(f"Original: {my_coord.to_list()}")
+
+# Modify one element
+my_coord[1] = 99
+print(f"Modified: {my_coord.to_list()}")
+
+# Check size
+print(f"Size: {my_coord.size}")
+```
+
+## Key Takeaways
+
+🎯 **MultiIndex: Your basic coordinate toolkit**
+
+1. **Simple but essential**: MultiIndex is just a container for N integers, but it's used everywhere in the coordinate system
+2. **Transform interface**: Every coordinate transformation takes MultiIndex input and produces MultiIndex output
+3. **Adaptor foundation**: TensorAdaptor chains coordinate transformations using MultiIndex to track positions
+4. **Element access**: Tensor views use MultiIndex to specify which element to access
+
+**Next steps:**
+- Learn individual transforms (merge, unmerge, pad, etc.)
+- Understand how adaptors chain transforms together
+- See how descriptors define complete tensor layouts
+- Master advanced coordinate operations
+
+MultiIndex is simple but powerful - master it now, and everything else will make sense! 

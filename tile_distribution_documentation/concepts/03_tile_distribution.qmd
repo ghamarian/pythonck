@@ -1,0 +1,347 @@
+---
+title: "Tile Distribution - The Core API"
+format: live-html
+---
+
+## Overview
+
+TileDistribution is the heart of Composable Kernels' efficient GPU computation. It automatically maps logical coordinates to physical threads and memory locations, eliminating the need for manual thread management. This is the high-level API that GPU programmers actually use.
+
+## 🎮 **Interactive Exploration**
+
+Explore tile distribution concepts interactively:
+
+**[📊 Tile Distribution Visualizer](../../app.py)** - Interactive visualization of tile distribution structures and GPU memory layouts. Perfect for understanding how data is distributed across parallel processing elements.
+
+```{pyodide}
+#| echo: false
+#| output: false
+#| autorun: true
+
+# Auto-install pythonck package
+import micropip
+await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl")
+
+# Setup pytensor path for pyodide environment
+import sys
+import os
+import numpy as np
+
+# Add the project root to path so we can import pytensor
+sys.path.insert(0, '/home/aghamari/github/composable_kernel/visualisation')
+
+# Import the actual CK modules
+from pytensor.tile_distribution import (
+    TileDistribution, make_static_tile_distribution, make_tile_distribution_encoding
+)
+from pytensor.tensor_descriptor import make_naive_tensor_descriptor_packed
+```
+
+## What is Tile Distribution?
+
+Before diving into code, let's understand the fundamental problem TileDistribution solves:
+
+**The Challenge**: You have a 64×64 matrix multiplication and 32 GPU threads. How do you divide the work efficiently?
+
+**The Solution**: TileDistribution automatically maps logical coordinates (like matrix position [i,j]) to physical threads and memory locations.
+
+**🎯 Without TileDistribution:**
+
+- Manual thread ID calculations
+- Complex index arithmetic 
+- Error-prone memory access patterns
+- Different code for different matrix sizes
+
+**🎯 With TileDistribution:**
+
+- Automatic work assignment
+- Optimized memory access patterns
+- Same code works for any size
+- Hardware-aware thread cooperation
+
+**Key Insight**: TileDistribution is like a smart GPS for GPU threads. Give it your logical coordinates [i,j], and it tells each thread exactly where to go in memory and what to compute.
+
+## Creating Real-World Distributions
+
+Let's create a real tile distribution from RMSNorm, a common GPU operation:
+
+```{pyodide}
+print("📊 Creating RMSNorm Distribution")
+print("=" * 40)
+
+# RMSNorm distribution parameters
+# S::Repeat_M=4, S::WarpPerBlock_M=2, S::ThreadPerWarp_M=8, S::Vector_M=4
+# S::Repeat_N=4, S::WarpPerBlock_N=2, S::ThreadPerWarp_N=8, S::Vector_N=4
+encoding = make_tile_distribution_encoding(
+    rs_lengths=[],  # Empty R sequence
+    hs_lengthss=[
+        [4, 2, 8, 4],  # H for X0: Repeat_M, WarpPerBlock_M, ThreadPerWarp_M, Vector_M
+        [4, 2, 8, 4]   # H for X1: Repeat_N, WarpPerBlock_N, ThreadPerWarp_N, Vector_N
+    ],
+    ps_to_rhss_major=[[1, 2], [1, 2]],  # P maps to H dimensions
+    ps_to_rhss_minor=[[1, 1], [2, 2]],  # P minor mappings
+    ys_to_rhs_major=[1, 1, 2, 2],       # Y maps to H dimensions
+    ys_to_rhs_minor=[0, 3, 0, 3]        # Y minor mappings
+)
+
+distribution = make_static_tile_distribution(encoding)
+
+print(f"Distribution created: {type(distribution).__name__}")
+print(f"X dimensions: {distribution.ndim_x} (logical data dimensions)")
+print(f"Y dimensions: {distribution.ndim_y} (access pattern dimensions)")
+print(f"P dimensions: {distribution.ndim_p} (thread partition dimensions)")
+```
+
+## Understanding Distribution Structure
+
+Let's analyze what this distribution actually represents:
+
+**📈 RMSNorm Distribution Structure:**
+
+The hierarchical structure breaks down as:
+- **X0 (M dimension)**: 4×2×8×4 = 256 elements
+- **X1 (N dimension)**: 4×2×8×4 = 256 elements
+- **Total tile size**: 256×256
+- **P dimensions**: 2 (warp + thread within warp)
+- **Y dimensions**: 4 (access pattern)
+
+**🔄 P + Y → X Magic:**
+P dimensions (thread partitioning) + Y dimensions (access patterns) = X dimensions (logical data)
+
+This is the core CK pattern!
+
+## Thread Work Assignments
+
+Now let's see how different threads get their work assignments:
+
+```{pyodide}
+print("🧵 Thread Work Assignments (2D Thread Grid):")
+print("-" * 45)
+
+# Use specific (M, N) tuples to ensure both dimensions change
+thread_positions = [
+    (0, 0), (0, 1), (1, 0), (1, 1),  # Basic 2x2 grid
+    (2, 0), (0, 2), (2, 2), (3, 3)   # Extended positions
+]
+
+for i, (thread_m, thread_n) in enumerate(thread_positions):
+    partition_index = [thread_m, thread_n]  # M, N thread coordinates
+    
+    try:
+        # Calculate what X coordinates this thread handles
+        x_index = distribution.calculate_index(partition_index)
+        
+        print(f"Thread[{thread_m},{thread_n}] (position {i+1}):")
+        print(f"  → Partition: {partition_index}")
+        print(f"  → X coordinates: {x_index.to_list()}")
+        
+        # Show Y access pattern for this thread
+        y_lengths = distribution.get_y_vector_lengths()
+        print(f"  → Y pattern: {y_lengths}")
+        print()
+        
+    except Exception as e:
+        print(f"Thread[{thread_m},{thread_n}]: Error - {e}")
+        print()
+```
+
+**2D Thread Cooperation**: Notice how threads in different positions (M,N) get different X coordinates. Thread[0,0] handles different data than Thread[1,0] or Thread[0,1]. This creates a 2D grid of work distribution where:
+- **M dimension changes**: Thread[0,0] vs Thread[1,0] - different M positions
+- **N dimension changes**: Thread[0,0] vs Thread[0,1] - different N positions
+
+Each thread gets a unique partition index and automatically calculates which data elements to process. No conflicts, perfect cooperation!
+
+## Real-World GPU Kernel Pattern
+
+Here's how this looks in actual GPU kernel code:
+
+**🔥 Typical CK Kernel Structure:**
+
+```cpp
+__global__ void my_kernel() {
+    // 1. Get thread's partition index (automatic)
+    auto partition_idx = distribution.get_partition_index();
+    
+    // 2. Calculate this thread's coordinates (automatic)  
+    auto x_coords = distribution.calculate_index(partition_idx);
+    
+    // 3. Do the actual work
+    for (auto y_idx : y_access_pattern) {
+        auto data = load_from_memory(x_coords, y_idx);
+        auto result = compute(data);
+        store_to_memory(result, x_coords, y_idx);
+    }
+}
+```
+
+**The Magic**: Notice what you DON'T see: manual thread ID arithmetic, complex index calculations, or memory offset computations. TileDistribution handles all of that automatically!
+
+## Comparing Distribution Patterns
+
+Let's create and compare different distribution patterns:
+
+```{pyodide}
+# Create a simpler 2x2 distribution
+simple_encoding = make_tile_distribution_encoding(
+    rs_lengths=[],
+    hs_lengthss=[[2], [2]],  # Simple 2x2 tile
+    ps_to_rhss_major=[[], []],
+    ps_to_rhss_minor=[[], []],
+    ys_to_rhs_major=[1, 2],
+    ys_to_rhs_minor=[0, 0]
+)
+simple_distribution = make_static_tile_distribution(simple_encoding)
+
+# Create a distribution with replication
+replication_encoding = make_tile_distribution_encoding(
+    rs_lengths=[2],  # R sequence with length 2
+    hs_lengthss=[[2], [2]],  # 2x2 tile in H
+    ps_to_rhss_major=[[], []],
+    ps_to_rhss_minor=[[], []],
+    ys_to_rhs_major=[1, 2],
+    ys_to_rhs_minor=[0, 0]
+)
+replication_distribution = make_static_tile_distribution(replication_encoding)
+
+distributions = [
+    ("Simple 2x2", simple_distribution),
+    ("RMSNorm 256x256", distribution),
+    ("With Replication", replication_distribution)
+]
+
+print("⚖️  Comparing Distribution Patterns:")
+print("=" * 40)
+for name, dist in distributions:
+    print(f"{name}:")
+    print(f"  X dims: {dist.ndim_x}, Y dims: {dist.ndim_y}, P dims: {dist.ndim_p}")
+    print(f"  Y lengths: {dist.get_y_vector_lengths()}")
+    print(f"  Static: {dist.is_static()}")
+    print()
+```
+
+## Distribution Properties
+
+Let's explore important properties of tile distributions:
+
+```{pyodide}
+# Test different aspects of distributions
+def analyze_distribution(name, dist):
+    print(f"{name}:")
+    print(f"  Is static: {dist.is_static()}")
+    print(f"  Number of dimensions:")
+    print(f"    X (logical): {dist.ndim_x}")
+    print(f"    Y (access): {dist.ndim_y}")
+    print(f"    P (threads): {dist.ndim_p}")
+    
+    y_lengths = dist.get_y_vector_lengths()
+    total_elements = 1
+    for length in y_lengths:
+        total_elements *= length
+    print(f"  Total elements per thread: {total_elements}")
+    print()
+
+print("🔍 Distribution Properties Analysis:")
+print("=" * 40)
+analyze_distribution("Simple Distribution", simple_distribution)
+analyze_distribution("RMSNorm Distribution", distribution)
+```
+
+## Testing Your Understanding
+
+Let's verify that tile distribution operations work correctly:
+
+```{pyodide}
+
+def test_rmsnorm_creation():
+    """Test creating RMSNorm distribution."""
+    try:
+        encoding = make_tile_distribution_encoding(
+            rs_lengths=[],
+            hs_lengthss=[[4, 2, 8, 4], [4, 2, 8, 4]],
+            ps_to_rhss_major=[[1, 2], [1, 2]],
+            ps_to_rhss_minor=[[1, 1], [2, 2]],
+            ys_to_rhs_major=[1, 1, 2, 2],
+            ys_to_rhs_minor=[0, 3, 0, 3]
+        )
+        dist = make_static_tile_distribution(encoding)
+        return dist.ndim_x == 2 and dist.ndim_y == 4
+    except Exception:
+        return False
+
+def test_simple_distribution():
+    """Test creating simple distribution."""
+    try:
+        encoding = make_tile_distribution_encoding(
+            rs_lengths=[],
+            hs_lengthss=[[2], [2]],
+            ps_to_rhss_major=[[], []],
+            ps_to_rhss_minor=[[], []],
+            ys_to_rhs_major=[1, 2],
+            ys_to_rhs_minor=[0, 0]
+        )
+        dist = make_static_tile_distribution(encoding)
+        return dist.is_static() and dist.ndim_x == 2
+    except Exception:
+        return False
+
+def test_replication_distribution():
+    """Test creating distribution with replication."""
+    try:
+        encoding = make_tile_distribution_encoding(
+            rs_lengths=[2],
+            hs_lengthss=[[2], [2]],
+            ps_to_rhss_major=[[], []],
+            ps_to_rhss_minor=[[], []],
+            ys_to_rhs_major=[1, 2],
+            ys_to_rhs_minor=[0, 0]
+        )
+        dist = make_static_tile_distribution(encoding)
+        return len(encoding.rs_lengths) == 1 and encoding.rs_lengths[0] == 2
+    except Exception:
+        return False
+
+# Run tests
+tests = [
+    ("RMSNorm creation", test_rmsnorm_creation),
+    ("Simple distribution", test_simple_distribution),
+    ("Replication distribution", test_replication_distribution)
+]
+
+print("🧪 Testing Tile Distribution:")
+print("=" * 35)
+print("Running distribution tests:")
+for test_name, test_func in tests:
+    result = test_func()
+    status = "✅ PASS" if result else "❌ FAIL"
+    print(f"  {status}: {test_name}")
+```
+
+## Key Takeaways
+
+TileDistribution is the foundation of efficient GPU computation in Composable Kernels:
+
+**1. Automatic Work Assignment**
+
+   - ✅ Maps logical coordinates to physical threads
+   - ✅ Eliminates manual thread ID calculations
+   - ✅ Ensures optimal work distribution
+
+**2. Hardware-Aware Optimization**
+
+   - ✅ Optimizes memory access patterns
+   - ✅ Enables efficient thread cooperation
+   - ✅ Adapts to different GPU architectures
+
+**3. Scalable Design**
+
+   - ✅ Same code works for any tensor size
+   - ✅ Handles complex hierarchical patterns
+   - ✅ Supports replication for broadcast operations
+
+**4. Real-World Applications**
+
+   - ✅ Powers operations like RMSNorm, GEMM, convolutions
+   - ✅ Enables high-performance AI/ML kernels
+   - ✅ Simplifies GPU programming complexity
+
+Master TileDistribution, and you're ready to understand how it connects to actual data access through TileWindow in the next section! 

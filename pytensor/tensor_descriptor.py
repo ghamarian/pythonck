@@ -141,6 +141,18 @@ class EmbedTransform(Transform):
         self.strides = strides
         self.ndim = len(lengths)
     
+    def get_num_of_lower_dimension(self) -> int:
+        """Get number of lower dimensions (1)."""
+        return 1
+    
+    def get_num_of_upper_dimension(self) -> int:
+        """Get number of upper dimensions."""
+        return self.ndim
+    
+    def get_upper_lengths(self) -> List[int]:
+        """Get upper dimension lengths."""
+        return self.lengths
+    
     def calculate_lower_index(self, idx_upper: MultiIndex) -> MultiIndex:
         """Calculate linear offset from multi-dimensional index."""
         if len(idx_upper) != self.ndim:
@@ -252,6 +264,18 @@ class UnmergeTransform(Transform):
         self.strides = [1]
         for i in range(self.ndim - 1, 0, -1):
             self.strides.insert(0, self.strides[0] * self.lengths[i])
+    
+    def get_num_of_lower_dimension(self) -> int:
+        """Get number of lower dimensions (1)."""
+        return 1
+    
+    def get_num_of_upper_dimension(self) -> int:
+        """Get number of upper dimensions."""
+        return self.ndim
+    
+    def get_upper_lengths(self) -> List[int]:
+        """Get upper dimension lengths."""
+        return self.lengths
     
     def calculate_lower_index(self, idx_upper: MultiIndex) -> MultiIndex:
         """Calculate linear offset from multi-dimensional index."""

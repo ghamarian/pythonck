@@ -1,0 +1,402 @@
+---
+title: "Tensor Adaptors - Chaining Transformations"
+format: live-html
+---
+
+## Overview
+
+While individual transforms are powerful, TensorAdaptors let us chain multiple transforms together to create complex coordinate transformations. Think of adaptors as transformation pipelines that can reshape, reorder, and restructure tensors in sophisticated ways.
+
+TensorAdaptors are the bridge between individual transforms and the high-level tensor operations you'll use in real applications.
+
+```{pyodide}
+#| echo: false
+#| output: false
+#| autorun: true
+
+# Auto-install pythonck package
+import micropip
+await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl")
+```
+
+## TensorAdaptor Basics
+
+Let's start by understanding what a TensorAdaptor is and how it works:
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+# Import required modules
+from pytensor.tensor_adaptor import (
+    make_single_stage_tensor_adaptor,
+    transform_tensor_adaptor,
+    chain_tensor_adaptors,
+    chain_tensor_adaptors_multi,
+    make_identity_adaptor,
+    make_transpose_adaptor
+)
+from pytensor.tensor_descriptor import (
+    TensorAdaptor,
+    PassThroughTransform,
+    PadTransform,
+    MergeTransform,
+    ReplicateTransform,
+    EmbedTransform,
+    UnmergeTransform
+)
+from pytensor.tensor_coordinate import MultiIndex
+import numpy as np
+
+print("🔗 TensorAdaptor Overview")
+print("--" * 40)
+print("  TensorAdaptor chains multiple transforms together")
+print("  Each adaptor has:")
+print("    • transforms: List of individual transforms")
+print("    • lower_dimension_hidden_idss: How transforms connect")
+print("    • upper_dimension_hidden_idss: Hidden dimension mappings")
+print("    • bottom_dimension_hidden_ids: Input dimensions")
+print("    • top_dimension_hidden_ids: Output dimensions")
+```
+
+## Identity Adaptor: The Starting Point
+
+The identity adaptor is the simplest case - it passes coordinates through unchanged. This is often used as a starting point for building more complex adaptors.
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+print("1️⃣ Identity Adaptor")
+print("--" * 40)
+
+# Create 3D identity adaptor
+identity_adaptor = make_identity_adaptor(3)
+
+print(f"  Number of transforms: {identity_adaptor.get_num_of_transform()}")
+print(f"  Bottom dimensions: {identity_adaptor.get_num_of_bottom_dimension()}")
+print(f"  Top dimensions: {identity_adaptor.get_num_of_top_dimension()}")
+print(f"  Bottom hidden IDs: {identity_adaptor.bottom_dimension_hidden_ids}")
+print(f"  Top hidden IDs: {identity_adaptor.top_dimension_hidden_ids}")
+
+# Test coordinate transformation (should be identity)
+test_coords = [[0, 1, 2], [1, 0, 2], [2, 1, 0]]
+print("\n  Identity transformation test:")
+for coord_list in test_coords:
+    top_coord = MultiIndex(3, coord_list)
+    bottom_coord = identity_adaptor.calculate_bottom_index(top_coord)
+    print(f"    {coord_list} → {bottom_coord.to_list()} (unchanged)")
+```
+
+## Transpose Adaptor: Dimension Reordering
+
+The transpose adaptor reorders tensor dimensions according to a permutation pattern.
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+print("2️⃣ Transpose Adaptor")
+print("--" * 40)
+
+# Create transpose adaptor: [0, 1, 2] → [2, 0, 1]
+transpose_adaptor = make_transpose_adaptor(3, [2, 0, 1])
+
+print(f"  Permutation: [2, 0, 1] (dimension 0→2, 1→0, 2→1)")
+print(f"  Number of transforms: {transpose_adaptor.get_num_of_transform()}")
+print(f"  Bottom dimensions: {transpose_adaptor.get_num_of_bottom_dimension()}")
+print(f"  Top dimensions: {transpose_adaptor.get_num_of_top_dimension()}")
+
+# Test coordinate transformation
+test_coords = [[0, 1, 2], [1, 0, 2], [2, 1, 0]]
+print("\n  Transpose transformation test:")
+for coord_list in test_coords:
+    top_coord = MultiIndex(3, coord_list)
+    bottom_coord = transpose_adaptor.calculate_bottom_index(top_coord)
+    print(f"    {coord_list} → {bottom_coord.to_list()}")
+```
+
+## Single-Stage Adaptors: Custom Transform Chains
+
+You can create custom adaptors by specifying exactly which transforms to use and how they connect:
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+print("3️⃣ Single-Stage Custom Adaptor")
+print("--" * 40)
+
+# Create adaptor that merges 2D coordinates to 1D
+merge_adaptor = make_single_stage_tensor_adaptor(
+    transforms=[MergeTransform([2, 3])],
+    lower_dimension_old_top_idss=[[0, 1]],  # Take dimensions 0 and 1
+    upper_dimension_new_top_idss=[[0]]       # Output to dimension 0
+)
+
+print(f"  Transform: MergeTransform([2, 3])")
+print(f"  Bottom dimensions: {merge_adaptor.get_num_of_bottom_dimension()}")
+print(f"  Top dimensions: {merge_adaptor.get_num_of_top_dimension()}")
+
+# Test merge transformation
+test_coords = [[0, 0], [0, 2], [1, 0], [1, 2]]
+print("\n  Merge transformation test:")
+for coord_list in test_coords:
+    top_coord = MultiIndex(2, coord_list)
+    bottom_coord = merge_adaptor.calculate_bottom_index(top_coord)
+    expected = coord_list[0] * 3 + coord_list[1]
+    print(f"    {coord_list} → {bottom_coord.to_list()} (expected: [{expected}])")
+```
+
+## Chaining Adaptors: Building Complex Transformations
+
+The real power comes from chaining multiple adaptors together to create sophisticated transformations:
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+print("4️⃣ Chaining Adaptors")
+print("--" * 40)
+
+# Create first adaptor: 2D → 1D (merge)
+adaptor_merge = make_single_stage_tensor_adaptor(
+    transforms=[MergeTransform([2, 3])],
+    lower_dimension_old_top_idss=[[0, 1]],
+    upper_dimension_new_top_idss=[[0]]
+)
+
+# Create second adaptor: 1D → 2D (unmerge)
+adaptor_unmerge = make_single_stage_tensor_adaptor(
+    transforms=[UnmergeTransform([2, 3])],
+    lower_dimension_old_top_idss=[[0]],
+    upper_dimension_new_top_idss=[[0, 1]]
+)
+
+# Chain them together (should be identity overall)
+chained_adaptor = chain_tensor_adaptors(adaptor_merge, adaptor_unmerge)
+
+print(f"  Chain: 2D → 1D → 2D")
+print(f"  Number of transforms: {chained_adaptor.get_num_of_transform()}")
+print(f"  Bottom dimensions: {chained_adaptor.get_num_of_bottom_dimension()}")
+print(f"  Top dimensions: {chained_adaptor.get_num_of_top_dimension()}")
+
+# Test the chained transformation (should be identity)
+test_coords = [[0, 1], [1, 0], [1, 2]]
+print("\n  Chained transformation test (should be identity):")
+for coord_list in test_coords:
+    top_coord = MultiIndex(2, coord_list)
+    bottom_coord = chained_adaptor.calculate_bottom_index(top_coord)
+    print(f"    {coord_list} → {bottom_coord.to_list()}")
+```
+
+## Multi-Stage Chaining: Complex Pipelines
+
+For more complex transformations, you can chain multiple adaptors in sequence:
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+print("5️⃣ Multi-Stage Chaining")
+print("--" * 40)
+
+# Create a complex pipeline: identity → merge → identity
+identity_2d = make_identity_adaptor(2)
+merge_2d_to_1d = make_single_stage_tensor_adaptor(
+    transforms=[MergeTransform([2, 2])],
+    lower_dimension_old_top_idss=[[0, 1]],
+    upper_dimension_new_top_idss=[[0]]
+)
+identity_1d = make_identity_adaptor(1)
+
+# Chain all three together
+pipeline = chain_tensor_adaptors_multi(identity_2d, merge_2d_to_1d, identity_1d)
+
+print(f"  Pipeline: 2D identity → merge → 1D identity")
+print(f"  Total transforms: {pipeline.get_num_of_transform()}")
+print(f"  Bottom dimensions: {pipeline.get_num_of_bottom_dimension()}")
+print(f"  Top dimensions: {pipeline.get_num_of_top_dimension()}")
+
+# Test the pipeline
+test_coords = [[0, 0], [0, 1], [1, 0], [1, 1]]
+print("\n  Pipeline transformation test:")
+for coord_list in test_coords:
+    top_coord = MultiIndex(2, coord_list)
+    bottom_coord = pipeline.calculate_bottom_index(top_coord)
+    expected = coord_list[0] * 2 + coord_list[1]
+    print(f"    {coord_list} → {bottom_coord.to_list()} (expected: [{expected}])")
+```
+
+## Transform Addition: Extending Existing Adaptors
+
+You can add new transforms to existing adaptors using `transform_tensor_adaptor`:
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+print("6️⃣ Transform Addition")
+print("--" * 40)
+
+# Start with identity adaptor
+base_adaptor = make_identity_adaptor(2)
+print(f"  Base adaptor: {base_adaptor.get_num_of_transform()} transforms")
+
+# Add a merge transform
+extended_adaptor = transform_tensor_adaptor(
+    old_adaptor=base_adaptor,
+    new_transforms=[MergeTransform([2, 2])],
+    new_lower_dimension_old_top_idss=[[0, 1]],
+    new_upper_dimension_new_top_idss=[[0]]
+)
+
+print(f"  Extended adaptor: {extended_adaptor.get_num_of_transform()} transforms")
+print(f"  Bottom dimensions: {extended_adaptor.get_num_of_bottom_dimension()}")
+print(f"  Top dimensions: {extended_adaptor.get_num_of_top_dimension()}")
+
+# Test the extended adaptor
+test_coords = [[0, 0], [0, 1], [1, 0], [1, 1]]
+print("\n  Extended transformation test:")
+for coord_list in test_coords:
+    top_coord = MultiIndex(2, coord_list)
+    bottom_coord = extended_adaptor.calculate_bottom_index(top_coord)
+    expected = coord_list[0] * 2 + coord_list[1]
+    print(f"    {coord_list} → {bottom_coord.to_list()} (expected: [{expected}])")
+```
+
+## Practical Example: Matrix Transpose with Padding
+
+Let's create a practical example that combines multiple transforms:
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+print("7️⃣ Practical Example: Matrix Operations")
+print("--" * 40)
+
+# Create a matrix transpose adaptor
+matrix_transpose = make_transpose_adaptor(2, [1, 0])
+
+# Add padding to the transposed matrix
+padded_transpose = transform_tensor_adaptor(
+    old_adaptor=matrix_transpose,
+    new_transforms=[PadTransform(lower_length=6, left_pad=1, right_pad=1)],
+    new_lower_dimension_old_top_idss=[[0]],  # Apply to first dimension
+    new_upper_dimension_new_top_idss=[[0]]
+)
+
+print(f"  Operation: 2D transpose → 1D padding on first dimension")
+print(f"  Total transforms: {padded_transpose.get_num_of_transform()}")
+print(f"  Bottom dimensions: {padded_transpose.get_num_of_bottom_dimension()}")
+print(f"  Top dimensions: {padded_transpose.get_num_of_top_dimension()}")
+
+# Test with a 3x4 matrix conceptually
+test_coords = [[0, 0], [0, 3], [2, 0], [2, 3]]
+print("\n  Matrix transpose with padding test:")
+for coord_list in test_coords:
+    top_coord = MultiIndex(2, coord_list)
+    bottom_coord = padded_transpose.calculate_bottom_index(top_coord)
+    print(f"    {coord_list} → {bottom_coord.to_list()}")
+```
+
+## Testing Your Understanding
+
+Let's verify that our adaptor operations work correctly:
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+print("🧪 Testing Adaptor Operations")
+print("--" * 40)
+
+def test_identity_adaptor():
+    """Test that identity adaptor preserves coordinates."""
+    adaptor = make_identity_adaptor(2)
+    coord = MultiIndex(2, [1, 2])
+    result = adaptor.calculate_bottom_index(coord)
+    return result.to_list() == [1, 2]
+
+def test_transpose_adaptor():
+    """Test transpose adaptor dimension count."""
+    adaptor = make_transpose_adaptor(3, [2, 0, 1])
+    return (adaptor.get_num_of_bottom_dimension() == 3 and 
+            adaptor.get_num_of_top_dimension() == 3)
+
+def test_merge_adaptor():
+    """Test merge adaptor reduces dimensions."""
+    adaptor = make_single_stage_tensor_adaptor(
+        transforms=[MergeTransform([2, 2])],
+        lower_dimension_old_top_idss=[[0, 1]],
+        upper_dimension_new_top_idss=[[0]]
+    )
+    return (adaptor.get_num_of_bottom_dimension() == 2 and
+            adaptor.get_num_of_top_dimension() == 1)
+
+def test_chain_adaptors():
+    """Test chaining adaptors."""
+    adaptor1 = make_identity_adaptor(2)
+    adaptor2 = make_single_stage_tensor_adaptor(
+        transforms=[MergeTransform([2, 2])],
+        lower_dimension_old_top_idss=[[0, 1]],
+        upper_dimension_new_top_idss=[[0]]
+    )
+    chained = chain_tensor_adaptors(adaptor1, adaptor2)
+    return (chained.get_num_of_bottom_dimension() == 2 and
+            chained.get_num_of_top_dimension() == 1)
+
+def test_transform_addition():
+    """Test adding transforms to existing adaptor."""
+    base = make_identity_adaptor(2)
+    extended = transform_tensor_adaptor(
+        old_adaptor=base,
+        new_transforms=[MergeTransform([2, 2])],
+        new_lower_dimension_old_top_idss=[[0, 1]],
+        new_upper_dimension_new_top_idss=[[0]]
+    )
+    return extended.get_num_of_transform() == 3  # 2 identity + 1 merge
+
+tests = [
+    ("Identity adaptor", test_identity_adaptor),
+    ("Transpose adaptor", test_transpose_adaptor),
+    ("Merge adaptor", test_merge_adaptor),
+    ("Chain adaptors", test_chain_adaptors),
+    ("Transform addition", test_transform_addition)
+]
+
+all_tests_passed = True
+for test_name, test_func in tests:
+    try:
+        result = test_func()
+        status = "✅ PASS" if result else "❌ FAIL"
+        print(f"  {status}: {test_name}")
+        if not result:
+            all_tests_passed = False
+    except Exception as e:
+        print(f"  ❌ ERROR: {test_name} - {e}")
+        all_tests_passed = False
+
+print(f"\n🎯 All tests passed: {all_tests_passed}")
+```
+
+## Summary
+
+TensorAdaptors are the coordination layer that makes complex tensor operations possible:
+
+- **Identity Adaptor**: Starting point for building transformations
+- **Transpose Adaptor**: Dimension reordering with permutation patterns
+- **Single-Stage Adaptors**: Custom transform chains with precise control
+- **Chained Adaptors**: Complex multi-stage transformation pipelines
+- **Transform Addition**: Extending existing adaptors with new transforms
+
+Key concepts:
+- **Bottom/Top Dimensions**: Input and output coordinate spaces
+- **Hidden Dimensions**: Internal coordinate mappings between transforms
+- **Transform Chains**: Sequential application of multiple transforms
+- **Coordinate Transformation**: Bidirectional mapping between coordinate spaces
+
+TensorAdaptors bridge the gap between low-level transforms and high-level tensor operations, providing the flexibility to create sophisticated data layouts and access patterns that are essential for efficient GPU computing.
+
+Next, we'll see how TensorAdaptors are combined with element space information to create complete **TensorDescriptors**. 

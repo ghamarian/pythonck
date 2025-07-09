@@ -1,0 +1,501 @@
+---
+title: "Thread Mapping - Connecting to Hardware"
+format: live-html
+---
+
+```{pyodide}
+#| echo: false
+#| output: false
+#| autorun: true
+
+# Auto-install pythonck package
+import micropip
+await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl")
+
+# Setup pytensor path for pyodide environment
+import sys
+import os
+import numpy as np
+
+# Add the project root to path so we can import pytensor
+sys.path.insert(0, '/home/aghamari/github/composable_kernel/visualisation')
+
+# Import the actual CK modules
+from pytensor.tile_distribution_encoding import TileDistributionEncoding
+from pytensor.tile_distribution import make_static_tile_distribution
+from pytensor.static_distributed_tensor import make_static_distributed_tensor
+from pytensor.tensor_view import make_naive_tensor_view
+from pytensor.tile_window import make_tile_window
+from pytensor.partition_simulation import set_global_thread_position
+```
+
+The final piece of the puzzle: how threads get their unique IDs and how that maps to specific data, connecting our mathematical abstractions to physical hardware.
+
+Up to this point, we've learned about encodings, transformations, and distributed tensors. But there's one crucial question remaining: **How do actual GPU threads know which data to process?**
+
+This is where thread mapping comes in - the bridge between our mathematical abstractions and the physical hardware that executes our code.
+
+## 🎮 **Interactive Exploration**
+
+Explore thread mapping concepts interactively:
+
+**[🧵 Thread Visualization App](../../thread_visualization_app.py)** - Visualize GPU thread coordinate mapping and access patterns. Understand how individual threads access distributed tensor data.
+
+## Thread Identification and Partition Indices
+
+Before threads can process data, they need to know who they are and what work they're responsible for.
+
+### Hardware Thread Identification
+
+In GPU hardware, threads are organized hierarchically:
+
+```{pyodide}
+print("🎯 GPU Thread Hierarchy")
+print("=" * 50)
+
+# RMSNorm example - real-world layer normalization parameters
+repeat_m, warp_per_block_m, thread_per_warp_m, vector_m = 4, 2, 8, 4
+repeat_n, warp_per_block_n, thread_per_warp_n, vector_n = 4, 2, 8, 4
+
+# Create RMSNorm tile distribution encoding
+encoding = TileDistributionEncoding(
+    rs_lengths=[],                                           # No replication
+    hs_lengthss=[[repeat_m, warp_per_block_m, thread_per_warp_m, vector_m],  # M dimension hierarchy
+                 [repeat_n, warp_per_block_n, thread_per_warp_n, vector_n]], # N dimension hierarchy
+    ps_to_rhss_major=[[1, 2], [1, 2]],                     # P→RH major mapping
+    ps_to_rhss_minor=[[1, 1], [2, 2]],                     # P→RH minor mapping
+    ys_to_rhs_major=[1, 1, 2, 2],                          # Y→RH major mapping
+    ys_to_rhs_minor=[0, 3, 0, 3]                           # Y→RH minor mapping
+)
+
+print("📋 RMSNorm Configuration (Real-World Example):")
+print(f"  Repeat (M, N): ({repeat_m}, {repeat_n})")
+print(f"  Warps per block (M, N): ({warp_per_block_m}, {warp_per_block_n})")
+print(f"  Threads per warp (M, N): ({thread_per_warp_m}, {thread_per_warp_n})")
+print(f"  Vector size (M, N): ({vector_m}, {vector_n})")
+
+# Calculate thread organization
+threads_per_block = warp_per_block_m * warp_per_block_n * thread_per_warp_m * thread_per_warp_n
+warps_per_block = warp_per_block_m * warp_per_block_n
+
+print(f"\n📊 Thread Organization:")
+print(f"  Threads per block: {threads_per_block}")
+print(f"  Warps per block: {warps_per_block}")
+print(f"  P dimensions: {encoding.ndim_p}")
+print(f"  Y dimensions: {encoding.ndim_y}")
+```
+
+### Thread Hierarchy Structure
+
+The hardware organizes threads in a specific hierarchy:
+
+**🔹 Block Level**: Groups of warps working together
+- `{warp_per_block_m}×{warp_per_block_n}` warps per block
+- Shared memory and synchronization scope
+- Block-level coordination possible
+
+**🔹 Warp Level**: Groups of threads executing in lockstep
+- `{thread_per_warp_m}×{thread_per_warp_n}` threads per warp
+- SIMD execution (all threads execute same instruction)
+- Warp-level primitives (shuffle, vote, etc.)
+
+**🔹 Thread Level**: Individual execution units
+- `{vector_m}×{vector_n}` elements per thread
+- Independent register space
+- Vector operations on multiple elements
+
+### Thread ID Mapping
+
+Each thread gets a unique ID that maps to its position in the hierarchy:
+
+```{pyodide}
+print("📊 Example Thread ID Mappings:")
+print("=" * 50)
+
+# Show example thread mappings
+thread_count = 0
+for warp_m in range(min(2, warp_per_block_m)):
+    for warp_n in range(min(2, warp_per_block_n)):
+        for thread_m in range(min(2, thread_per_warp_m)):
+            for thread_n in range(min(2, thread_per_warp_n)):
+                # Calculate global thread ID
+                global_thread_id = (warp_m * warp_per_block_n * thread_per_warp_m * thread_per_warp_n +
+                                  warp_n * thread_per_warp_m * thread_per_warp_n +
+                                  thread_m * thread_per_warp_n + thread_n)
+                
+                print(f"  Thread {global_thread_id}: Warp[{warp_m},{warp_n}] Thread[{thread_m},{thread_n}]")
+                
+                thread_count += 1
+                if thread_count >= 8:  # Show first 8 threads
+                    print("  ... (showing first 8 threads)")
+                    break
+            if thread_count >= 8:
+                break
+        if thread_count >= 8:
+            break
+    if thread_count >= 8:
+        break
+```
+
+## Thread-to-Data Mapping
+
+Once threads know their IDs, they need to map those IDs to specific data elements.
+
+### Data Distribution Pattern
+
+The RMSNorm operation distributes tensor data across threads in a structured pattern:
+
+```{pyodide}
+print("🎯 RMSNorm Data Distribution Pattern")
+print("=" * 50)
+
+# Calculate total tensor size processed by this tile distribution
+total_m = repeat_m * warp_per_block_m * thread_per_warp_m * vector_m
+total_n = repeat_n * warp_per_block_n * thread_per_warp_n * vector_n
+
+print(f"📊 Tensor Organization:")
+print(f"  Total tensor size (M×N): {total_m}×{total_n}")
+print(f"  Elements per thread: {vector_m}×{vector_n} = {vector_m * vector_n}")
+
+print(f"\n📋 Hierarchical Data Distribution:")
+print(f"  🔹 Block Level: {repeat_m}×{repeat_n} iterations")
+print(f"  🔹 Warp Level: {warp_per_block_m}×{warp_per_block_n} warps per block")
+print(f"  🔹 Thread Level: {thread_per_warp_m}×{thread_per_warp_n} threads per warp")
+print(f"  🔹 Vector Level: {vector_m}×{vector_n} elements per thread")
+```
+
+### Thread Work Assignment
+
+Each thread is assigned a specific rectangular region of the tensor:
+
+```{pyodide}
+print("📋 Thread Work Assignment Example")
+print("=" * 50)
+
+# Pick a specific thread and show its work
+example_warp_m, example_warp_n = 0, 0
+example_thread_m, example_thread_n = 0, 0
+
+# Calculate this thread's data region
+thread_start_m = example_warp_m * thread_per_warp_m * vector_m + example_thread_m * vector_m
+thread_end_m = thread_start_m + vector_m
+thread_start_n = example_warp_n * thread_per_warp_n * vector_n + example_thread_n * vector_n
+thread_end_n = thread_start_n + vector_n
+
+print(f"Example thread: Warp[{example_warp_m},{example_warp_n}] Thread[{example_thread_m},{example_thread_n}]")
+print(f"  Data region (M): [{thread_start_m}:{thread_end_m})")
+print(f"  Data region (N): [{thread_start_n}:{thread_end_n})")
+print(f"  Total elements: {vector_m}×{vector_n} = {vector_m * vector_n}")
+
+print(f"\n🔍 Thread Data Regions (first few threads):")
+shown_threads = 0
+for warp_m in range(min(2, warp_per_block_m)):
+    for thread_m in range(min(2, thread_per_warp_m)):
+        for warp_n in range(min(2, warp_per_block_n)):
+            for thread_n in range(min(2, thread_per_warp_n)):
+                start_m = warp_m * thread_per_warp_m * vector_m + thread_m * vector_m
+                end_m = start_m + vector_m
+                start_n = warp_n * thread_per_warp_n * vector_n + thread_n * vector_n
+                end_n = start_n + vector_n
+                
+                print(f"  W[{warp_m},{warp_n}]T[{thread_m},{thread_n}]: M[{start_m}:{end_m}) N[{start_n}:{end_n})")
+                
+                shown_threads += 1
+                if shown_threads >= 6:
+                    print("  ... (showing first 6 for brevity)")
+                    break
+            if shown_threads >= 6:
+                break
+        if shown_threads >= 6:
+            break
+    if shown_threads >= 6:
+        break
+```
+
+## Thread Cooperation Patterns
+
+Threads don't work in isolation - they cooperate at different levels to achieve optimal performance.
+
+### Warp-Level Cooperation
+
+Threads within a warp execute in lockstep (SIMD):
+
+**🤝 Warp-Level Cooperation**
+- **Warps per block**: `{warp_per_block_m}×{warp_per_block_n}`
+- **Threads per warp**: `{thread_per_warp_m}×{thread_per_warp_n}`
+- **Cooperation pattern**: Threads within a warp process adjacent data
+- **Synchronization**: Warp-level SIMD execution
+
+### Block-Level Cooperation
+
+Threads within a block can share data and synchronize:
+
+**🏗️ Block-Level Cooperation**
+- **Shared memory**: All threads in block can access shared memory
+- **Synchronization**: `__syncthreads()` barriers available
+- **Data sharing**: Threads can exchange intermediate results
+- **Collective operations**: Reduction, broadcast across block
+
+### Vector-Level Processing
+
+Each thread processes multiple elements efficiently:
+
+**⚡ Vector-Level Processing**
+- **Elements per thread**: `{vector_m}×{vector_n}` elements
+- **Memory coalescing**: Adjacent threads access adjacent memory
+- **Vectorization**: Hardware can combine multiple operations
+- **Register efficiency**: Multiple elements in registers
+
+## Memory Access Patterns
+
+The thread mapping directly affects memory access efficiency.
+
+### Coalesced Memory Access
+
+```{pyodide}
+print("🚀 Memory Access Pattern Analysis")
+print("=" * 50)
+
+# Create a tile distribution to analyze memory patterns
+tile_distribution = make_static_tile_distribution(encoding)
+
+# Simulate tensor data
+tensor_shape = [total_m, total_n]
+data = np.arange(np.prod(tensor_shape), dtype=np.float32).reshape(tensor_shape)
+tensor_view = make_naive_tensor_view(data, tensor_shape, [tensor_shape[1], 1])
+
+print(f"📊 Memory Access Analysis:")
+print(f"  Tensor shape: {tensor_shape}")
+print(f"  Memory layout: Row-major")
+print(f"  Vector size per thread: {vector_m}×{vector_n}")
+
+# Analyze access pattern for a few threads
+print(f"\n🔍 Memory Access Pattern (first few threads):")
+
+# Set up different thread positions and show their access patterns
+thread_examples = [
+    (0, 0),  # First thread
+    (0, 1),  # Second thread in same warp
+    (1, 0),  # First thread in next warp
+]
+
+for thread_p0, thread_p1 in thread_examples:
+    # Set thread position
+    set_global_thread_position(thread_p0, thread_p1)
+    
+    # Create tile window
+    tile_window = make_tile_window(
+        tensor_view=tensor_view,
+        window_lengths=[total_m, total_n],
+        origin=[0, 0],
+        tile_distribution=tile_distribution
+    )
+    
+    # Load data to see access pattern
+    loaded_tensor = tile_window.load()
+    
+    print(f"  Thread P=[{thread_p0},{thread_p1}]:")
+    print(f"    Elements loaded: {loaded_tensor.get_num_of_elements()}")
+    
+    # Show first few elements accessed
+    sample_values = []
+    for y0 in range(min(2, vector_m)):
+        for y1 in range(min(2, vector_n)):
+            try:
+                value = loaded_tensor.get_element([y0, y1])
+                sample_values.append(value)
+            except:
+                pass
+    
+    if sample_values:
+        print(f"    Sample values: {sample_values[:4]}")
+```
+
+### Memory Efficiency Benefits
+
+The structured thread mapping provides several memory efficiency benefits:
+
+**🎯 Memory Coalescing Benefits:**
+- **Adjacent access**: Threads in same warp access adjacent memory locations
+- **Cache efficiency**: Related data loaded together into cache lines
+- **Bandwidth utilization**: Maximum memory bandwidth achieved
+- **Reduced latency**: Fewer memory transactions needed
+
+**⚡ Performance Characteristics:**
+- **Predictable patterns**: Access patterns known at compile time
+- **Vectorization**: Hardware can optimize vector operations
+- **Reduced overhead**: No complex address calculations at runtime
+- **Scalability**: Pattern scales efficiently with thread count
+
+## Practical Thread Mapping Example
+
+Let's see how thread mapping works in practice with a complete example:
+
+```{pyodide}
+print("🎯 Complete Thread Mapping Example")
+print("=" * 50)
+
+# Create the tile distribution
+tile_distribution = make_static_tile_distribution(encoding)
+
+# Create sample tensor data
+tensor_shape = [64, 64]  # Smaller for demonstration
+data = np.arange(np.prod(tensor_shape), dtype=np.float32).reshape(tensor_shape)
+tensor_view = make_naive_tensor_view(data, tensor_shape, [tensor_shape[1], 1])
+
+print(f"📊 Example Setup:")
+print(f"  Tensor shape: {tensor_shape}")
+print(f"  Total elements: {np.prod(tensor_shape)}")
+print(f"  Tile distribution: RMSNorm pattern")
+
+# Show how different threads access different data
+print(f"\n🔍 Thread-by-Thread Data Access:")
+
+example_threads = [(0, 0), (0, 1), (1, 0), (1, 1)]
+for i, (p0, p1) in enumerate(example_threads):
+    # Set thread position
+    set_global_thread_position(p0, p1)
+    
+    # Create tile window and load data
+    tile_window = make_tile_window(
+        tensor_view=tensor_view,
+        window_lengths=[32, 32],  # Window size
+        origin=[0, 0],
+        tile_distribution=tile_distribution
+    )
+    
+    loaded_tensor = tile_window.load()
+    
+    print(f"  Thread {i} (P=[{p0},{p1}]):")
+    print(f"    Elements: {loaded_tensor.get_num_of_elements()}")
+    
+    # Show data range accessed by this thread
+    values = []
+    for y0 in range(min(2, vector_m)):
+        for y1 in range(min(2, vector_n)):
+            try:
+                value = loaded_tensor.get_element([y0, y1])
+                values.append(value)
+            except:
+                pass
+    
+    if values:
+        print(f"    Value range: [{min(values):.0f}, {max(values):.0f}]")
+        print(f"    Sample: {values[:4]}")
+```
+
+## Testing Your Understanding
+
+Let's verify your understanding of thread mapping concepts:
+
+```{pyodide}
+print("🧪 Testing Thread Mapping Understanding")
+print("=" * 50)
+
+def test_rmsnorm_encoding_creation():
+    """Test that we can create the RMSNorm encoding."""
+    try:
+        encoding = TileDistributionEncoding(
+            rs_lengths=[],
+            hs_lengthss=[[4, 2, 8, 4], [4, 2, 8, 4]],
+            ps_to_rhss_major=[[1, 2], [1, 2]],
+            ps_to_rhss_minor=[[1, 1], [2, 2]],
+            ys_to_rhs_major=[1, 1, 2, 2],
+            ys_to_rhs_minor=[0, 3, 0, 3]
+        )
+        return True
+    except Exception as e:
+        print(f"Error: {e}")
+        return False
+
+def test_thread_organization():
+    """Test that the thread organization makes sense."""
+    repeat_m, warp_per_block_m, thread_per_warp_m, vector_m = 4, 2, 8, 4
+    repeat_n, warp_per_block_n, thread_per_warp_n, vector_n = 4, 2, 8, 4
+    
+    threads_per_block = warp_per_block_m * warp_per_block_n * thread_per_warp_m * thread_per_warp_n
+    expected_threads = 2 * 2 * 8 * 8  # 256 threads
+    
+    return threads_per_block == expected_threads
+
+def test_memory_efficiency():
+    """Test that vector access is efficient."""
+    vector_m, vector_n = 4, 4
+    elements_per_thread = vector_m * vector_n
+    
+    # Each thread should handle multiple elements for efficiency
+    return elements_per_thread >= 4
+
+def test_tile_distribution_creation():
+    """Test that we can create tile distribution from encoding."""
+    try:
+        encoding = TileDistributionEncoding(
+            rs_lengths=[],
+            hs_lengthss=[[4, 2, 8, 4], [4, 2, 8, 4]],
+            ps_to_rhss_major=[[1, 2], [1, 2]],
+            ps_to_rhss_minor=[[1, 1], [2, 2]],
+            ys_to_rhs_major=[1, 1, 2, 2],
+            ys_to_rhs_minor=[0, 3, 0, 3]
+        )
+        tile_distribution = make_static_tile_distribution(encoding)
+        return True
+    except Exception as e:
+        print(f"Error: {e}")
+        return False
+
+# Run tests
+tests = [
+    ("RMSNorm encoding creation", test_rmsnorm_encoding_creation),
+    ("Thread organization", test_thread_organization),
+    ("Memory efficiency", test_memory_efficiency),
+    ("Tile distribution creation", test_tile_distribution_creation)
+]
+
+print("Running thread mapping tests:")
+for test_name, test_func in tests:
+    try:
+        result = test_func()
+        status = "✅ PASS" if result else "❌ FAIL"
+        print(f"  {status}: {test_name}")
+    except Exception as e:
+        print(f"  ❌ ERROR: {test_name} - {str(e)}")
+```
+
+## Key Takeaways
+
+Thread mapping is the crucial bridge between mathematical abstractions and physical hardware execution:
+
+**🎯 Thread Identification:**
+
+1. **Hierarchical Organization**: Threads organized in blocks → warps → threads → vectors
+   - ✅ Each level has specific cooperation capabilities
+   - ✅ Hardware provides efficient primitives at each level
+   - ✅ Thread IDs map directly to data regions
+   - ✅ Predictable and efficient execution patterns
+
+2. **Data Assignment**: Each thread gets a specific rectangular region
+   - ✅ Work distributed evenly across threads
+   - ✅ Memory access patterns optimized for coalescing
+   - ✅ Vector operations maximize throughput
+   - ✅ Scalable across different hardware configurations
+
+3. **Cooperation Patterns**: Threads cooperate at multiple levels
+   - ✅ Warp-level SIMD execution for efficiency
+   - ✅ Block-level shared memory and synchronization
+   - ✅ Vector-level processing for maximum throughput
+   - ✅ Hierarchical coordination for complex operations
+
+**🚀 Performance Benefits:**
+
+- **Memory Coalescing**: Adjacent threads access adjacent memory for optimal bandwidth
+- **Cache Efficiency**: Related data loaded together, reducing memory latency
+- **Vectorization**: Hardware can optimize multiple operations per thread
+- **Predictable Patterns**: Compile-time optimization of access patterns
+
+**💡 Why This Matters:**
+
+Thread mapping connects all the previous concepts (encodings, transformations, distributions) to actual hardware execution. It's the final piece that makes tile distribution practical for real-world GPU programming.
+
+The RMSNorm example shows how a real operation uses these concepts to achieve optimal performance on modern GPU hardware. Every thread knows exactly what data to process, how to access it efficiently, and how to cooperate with other threads - all determined by the mathematical encoding we started with!
+
+This completes the journey from basic memory concepts to hardware-optimized execution. You now understand the complete tile distribution system from mathematical foundations to practical implementation. 

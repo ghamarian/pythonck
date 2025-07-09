@@ -1,0 +1,236 @@
+---
+title: "Buffer Views - Raw Memory Access"
+format: live-html
+---
+
+## Overview
+
+BufferView is the foundation of all tensor operations in Composable Kernels. It provides a structured way to access raw memory regions that can be used by GPU kernels. Think of it as a smart pointer that knows about memory layout, address spaces, and coherence requirements.
+
+```{pyodide}
+#| echo: false
+#| output: false
+#| autorun: true
+
+# Setup pytensor path for pyodide environment
+import sys
+import os
+
+# Add the project root to path so we can import pytensor
+sys.path.insert(0, '/home/aghamari/github/composable_kernel/visualisation')
+```
+
+## BufferView Creation
+
+Let's start by creating and examining BufferView objects:
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+# Import required modules
+from pytensor.buffer_view import (
+    BufferView, 
+    AddressSpaceEnum, 
+    MemoryOperationEnum,
+    AmdBufferCoherenceEnum,
+    make_buffer_view
+)
+import numpy as np
+
+print("1️⃣ Creating BufferView objects")
+print("--" * 25)
+
+# Create a data buffer
+data = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype=np.float32)
+print(f"  Data buffer: {data}")
+
+# Create basic buffer view
+buffer_view = make_buffer_view(
+    data=data,
+    buffer_size=len(data),
+    address_space=AddressSpaceEnum.GLOBAL
+)
+
+print(f"  BufferView created: {type(buffer_view).__name__}")
+print(f"  Buffer size: {buffer_view.buffer_size}")
+print(f"  Buffer element type: {buffer_view.dtype}")
+```
+
+## BufferView Properties
+
+Now let's explore the properties and methods available on BufferView objects:
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+print("2️⃣ BufferView properties")
+print("--" * 25)
+
+data = np.array([10, 20, 30, 40, 50, 60], dtype=np.float32)
+buffer_view = make_buffer_view(data, len(data))
+
+print(f"  Size: {buffer_view.buffer_size}")
+print(f"  Data type: {buffer_view.dtype}")
+print(f"  Address space: {buffer_view.address_space}")
+print(f"  Coherence: {buffer_view.coherence}")
+print(f"  Is static buffer: {buffer_view.is_static_buffer()}")
+print(f"  Invalid element value: {buffer_view.invalid_element_value}")
+```
+
+## Data Access
+
+BufferView provides structured access to the underlying memory:
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+print("3️⃣ BufferView data access")
+print("--" * 25)
+
+data = np.array([100, 200, 300, 400], dtype=np.float32)
+buffer_view = make_buffer_view(data, len(data))
+
+# Show buffer properties
+print(f"  Buffer data: {buffer_view.data}")
+print(f"  Buffer size: {buffer_view.buffer_size}")
+print(f"  Is static buffer: {buffer_view.is_static_buffer()}")
+
+# Access underlying data directly (the buffer view wraps this data)
+print(f"  Original data: {data}")
+print(f"  Data through buffer view: {buffer_view.data}")
+```
+
+## Address Spaces
+
+GPU memory is organized into different address spaces, each with different characteristics:
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+print("4️⃣ Address space configurations")
+print("--" * 25)
+
+data = np.array([1, 2, 3, 4], dtype=np.float32)
+
+address_spaces = [
+    AddressSpaceEnum.GLOBAL,
+    AddressSpaceEnum.LDS,
+    AddressSpaceEnum.VGPR,
+    AddressSpaceEnum.GENERIC
+]
+
+for addr_space in address_spaces:
+    buffer_view = make_buffer_view(
+        data=data,
+        buffer_size=len(data),
+        address_space=addr_space
+    )
+    print(f"  Address space {addr_space.name}: {buffer_view.address_space.name}")
+```
+
+### Address Space Characteristics
+
+- **GLOBAL**: Main GPU memory, high capacity but higher latency
+- **LDS**: Local Data Share, low capacity but very fast access
+- **VGPR**: Vector registers, fastest access but very limited capacity
+- **GENERIC**: Generic addressing, allows flexibility but may have overhead
+
+## Buffer Coherence
+
+Memory coherence is crucial for multi-threaded GPU operations:
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+print("5️⃣ Buffer coherence modes")
+print("--" * 25)
+
+data = np.array([1, 2, 3, 4], dtype=np.float32)
+
+# Create buffer view with coherence
+buffer_view = make_buffer_view(
+    data=data,
+    buffer_size=len(data),
+    coherence=AmdBufferCoherenceEnum.COHERENCE_DEFAULT
+)
+print(f"  Coherence mode: {buffer_view.coherence.name}")
+```
+
+## Testing Your Understanding
+
+Let's verify that BufferView operations work correctly:
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+print("6️⃣ Testing BufferView operations")
+print("--" * 25)
+
+def test_creation():
+    data = np.array([1, 2, 3], dtype=np.float32)
+    buffer_view = make_buffer_view(data, len(data))
+    return buffer_view.buffer_size == 3
+
+def test_access():
+    data = np.array([10, 20, 30], dtype=np.float32)
+    buffer_view = make_buffer_view(data, len(data))
+    return buffer_view.buffer_size == 3 and buffer_view.dtype == np.float32
+
+def test_modification():
+    data = np.array([1, 2, 3], dtype=np.float32)
+    buffer_view = make_buffer_view(data, len(data))
+    return buffer_view.data[0] == 1.0
+
+tests = [
+    ("BufferView creation", test_creation),
+    ("BufferView properties", test_access),
+    ("BufferView data access", test_modification)
+]
+
+all_tests_passed = True
+for test_name, test_func in tests:
+    try:
+        result = test_func()
+        status = "✅ PASS" if result else "❌ FAIL"
+        print(f"  {status}: {test_name}")
+        if not result:
+            all_tests_passed = False
+    except Exception as e:
+        print(f"  ❌ ERROR: {test_name} - {e}")
+        all_tests_passed = False
+
+print(f"\n{'🎉 All tests passed!' if all_tests_passed else '⚠️ Some tests failed.'}")
+```
+
+## Common Use Cases
+
+BufferView is used throughout Composable Kernels for:
+
+1. **Global Memory Access**: Reading input tensors from GPU global memory
+2. **Shared Memory Management**: Organizing data in fast shared memory
+3. **Register Management**: Handling data in GPU registers (VGPR)
+4. **Inter-thread Communication**: Coordinating data between GPU threads
+
+## Key Takeaways
+
+- **Raw Memory Foundation**: BufferView provides the base layer for all tensor operations
+- **Address Space Awareness**: Different memory types (global, shared, register) require different handling
+- **Coherence Management**: GPU memory coherence is handled automatically
+- **Zero-Copy Operations**: BufferView wraps existing memory without copying
+- **GPU-Optimized**: Designed specifically for GPU memory access patterns
+
+## What's Next
+
+Now that you understand raw memory access through BufferView, you're ready to learn about **structured multi-dimensional views** with TensorView.
+
+BufferView handles the "where" (memory location and layout), while TensorView will handle the "what" (tensor structure and coordinates).
+
+## Next Steps
+
+Continue to [Tensor Views](01_tensor_view.qmd) to learn about multi-dimensional tensor structures built on BufferView. 

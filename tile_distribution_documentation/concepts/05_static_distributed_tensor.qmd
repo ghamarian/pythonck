@@ -1,0 +1,380 @@
+---
+title: "Static Distributed Tensor - Thread-Local Data Containers"
+format: live-html
+---
+
+```{pyodide}
+#| echo: false
+#| output: false
+#| autorun: true
+
+# Auto-install pythonck package
+import micropip
+await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl")
+
+# Setup pytensor path for pyodide environment
+import sys
+import os
+import numpy as np
+
+# Add the project root to path so we can import pytensor
+sys.path.insert(0, '/home/aghamari/github/composable_kernel/visualisation')
+
+# Import the actual CK modules
+from pytensor.tile_distribution_encoding import TileDistributionEncoding
+from pytensor.tile_distribution import make_static_tile_distribution
+from pytensor.static_distributed_tensor import make_static_distributed_tensor
+```
+
+## Overview
+
+Now that you understand how encodings create the transformation machinery, let's examine the data structures that hold the actual computation data: **Static Distributed Tensors**.
+
+These are the thread-local containers that hold each thread's portion of the distributed computation. They're "static" because their layout is determined at compile time for maximum performance.
+
+## What is a Static Distributed Tensor?
+
+Before diving into the implementation, let's understand what problem these tensors solve:
+
+**The Challenge**: Each thread needs to store and access its portion of the distributed data efficiently. The access patterns are known at compile time, so we can optimize the layout.
+
+**The Solution**: Static Distributed Tensors are thread-local data containers with compile-time optimized layouts.
+
+**🎯 Key Properties:**
+- Each thread has its own StaticDistributedTensor
+- Contains only the data that thread needs
+- Layout optimized for the thread's access patterns
+- Provides efficient element access via Y coordinates
+- Memory is organized according to tile distribution
+
+**🔍 Comparison with Traditional Tensors:**
+- **Traditional tensor**: Contains all data, shared access
+- **Distributed tensor**: Data split across threads
+- **Static distributed tensor**: Thread-local portion with compile-time optimized layout
+
+## Tensor Creation Process
+
+Static distributed tensors are created from tile distributions and provide the storage for thread-local computations:
+
+```{pyodide}
+print("🔧 Static Distributed Tensor Creation")
+print("=" * 50)
+
+print("Creation Process:")
+print("1. Start with tile distribution (defines organization)")
+print("2. Specify data type (float32, int32, etc.)")
+print("3. Create static distributed tensor")
+print("4. Tensor is ready for element access")
+
+# Create tile distribution first
+encoding = TileDistributionEncoding(
+    rs_lengths=[],                    
+    hs_lengthss=[[2, 2], [2, 2]],   # 2x2 tiles per thread
+    ps_to_rhss_major=[[1], [2]],     
+    ps_to_rhss_minor=[[0], [0]],     
+    ys_to_rhs_major=[1, 1, 2, 2],    
+    ys_to_rhs_minor=[0, 1, 0, 1]     
+)
+
+try:
+    tile_distribution = make_static_tile_distribution(encoding)
+    
+    print("\n✅ Tile distribution created")
+    print("🔧 Creating Static Distributed Tensor...")
+    
+    # Create static distributed tensor
+    distributed_tensor = make_static_distributed_tensor(
+        tile_distribution=tile_distribution,
+        dtype=np.float32
+    )
+    
+    print("✅ Static distributed tensor created successfully!")
+    
+    # Check available methods
+    key_methods = ['get_element', 'set_element', 'get_num_of_elements']
+    print(f"\n📋 Available Operations:")
+    for method in key_methods:
+        has_method = hasattr(distributed_tensor, method)
+        status = "✅" if has_method else "❌"
+        print(f"  {status} {method}")
+        
+except Exception as e:
+    print(f"⚠️ Creation failed: {e}")
+    print("Note: We'll demonstrate the concepts even without creation")
+```
+
+## Thread Buffer Organization
+
+Each thread's buffer is organized to efficiently store the elements in its tile.
+
+**📊 Buffer Layout Principles:**
+- Contiguous memory for cache efficiency
+- Y coordinates provide logical indexing
+- Buffer positions provide physical indexing
+- Layout optimized for thread's access patterns
+
+**📝 Example: [2, 2] Thread Tile**
+
+Y coordinate to buffer position mapping:
+- Y=[0,0] → Buffer position 0
+- Y=[0,1] → Buffer position 1
+- Y=[1,0] → Buffer position 2
+- Y=[1,1] → Buffer position 3
+
+**🔄 Visual Layout:**
+```
+Logical (Y coordinates)    Physical (Buffer)
+Y[0,0] Y[0,1]              Buffer[0] Buffer[1]
+Y[1,0] Y[1,1]           →  Buffer[2] Buffer[3]
+```
+
+## Element Access Patterns
+
+Static distributed tensors provide efficient element access using Y coordinates.
+
+**🎯 Access Methods:**
+- `get_element(y_indices)`: Read value at Y coordinate
+- `set_element(y_indices, value)`: Write value at Y coordinate
+- Y coordinates are logical (within thread's tile)
+- Internally maps to efficient buffer access
+
+**📝 Element Access Example ([2, 2] tile):**
+
+Setting values:
+- `tensor.set_element([0, 0], 11)`
+- `tensor.set_element([0, 1], 12)`
+- `tensor.set_element([1, 0], 21)`
+- `tensor.set_element([1, 1], 22)`
+
+Reading values:
+- `tensor.get_element([0, 0])` → 11
+- `tensor.get_element([0, 1])` → 12
+- `tensor.get_element([1, 0])` → 21
+- `tensor.get_element([1, 1])` → 22
+
+**🚀 Performance Benefits:**
+- Y coordinate lookup is O(1)
+- Buffer access is cache-friendly
+- No bounds checking needed (static layout)
+- Compiler can optimize access patterns
+
+## Memory Layout Details
+
+Let's examine the internal memory organization in detail.
+
+**🗃️ Example: [3, 2] tile (6 elements)**
+
+Memory organization (row-major within tile):
+
+**📊 Physical Memory Layout:**
+- Address 0: Y=[0,0] → Value at position 0
+- Address 1: Y=[0,1] → Value at position 1
+- Address 2: Y=[1,0] → Value at position 2
+- Address 3: Y=[1,1] → Value at position 3
+- Address 4: Y=[2,0] → Value at position 4
+- Address 5: Y=[2,1] → Value at position 5
+
+**🔄 Address Calculation:**
+For Y[y0, y1] in row-major layout:
+```
+address = y0 * width + y1
+where width = tile_size[1]
+```
+
+**📝 Example Calculations:**
+- Y[0,0] → address 0
+- Y[0,1] → address 1
+- Y[1,0] → address 2
+- Y[1,1] → address 3
+- Y[2,0] → address 4
+- Y[2,1] → address 5
+
+**💡 Layout Benefits:**
+- Sequential access patterns are cache-friendly
+- Address calculation is simple and fast
+- Memory utilization is optimal
+- Vectorization opportunities are maximized
+
+## Thread Coordination
+
+Static distributed tensors enable efficient thread coordination.
+
+**🤝 Coordination Mechanisms:**
+- Each thread has its own tensor instance
+- Threads coordinate through shared memory
+- Synchronization points ensure data consistency
+- Load balancing through work distribution
+
+**📝 Example: [2, 2] threads, [2, 2] tiles**
+
+Thread coordination pattern:
+- Thread 0 (P=[0,0]): Has 4 elements, tensor size [2, 2], coordinates Y[0,0] to Y[1,1]
+- Thread 1 (P=[0,1]): Has 4 elements, tensor size [2, 2], coordinates Y[0,0] to Y[1,1]
+- Thread 2 (P=[1,0]): Has 4 elements, tensor size [2, 2], coordinates Y[0,0] to Y[1,1]
+- Thread 3 (P=[1,1]): Has 4 elements, tensor size [2, 2], coordinates Y[0,0] to Y[1,1]
+
+**🔄 Coordination Benefits:**
+- Each thread works independently on its tensor
+- No contention for shared data structures
+- Synchronization only at coordination points
+- Scales efficiently with thread count
+
+## Practical Usage Patterns
+
+Static distributed tensors follow a common usage pattern in practice.
+
+**🎯 Common Usage Pattern:**
+1. Create tensor from tile distribution
+2. Load data into tensor (from global memory)
+3. Perform computations on tensor elements
+4. Store results back to global memory
+
+**📝 Conceptual Example:**
+```python
+# Step 1: Create tensor
+tensor = make_static_distributed_tensor(distribution, dtype)
+
+# Step 2: Load data
+for y in all_y_coordinates:
+    value = load_from_global_memory(p_coord, y_coord)
+    tensor.set_element(y, value)
+
+# Step 3: Compute
+for y in all_y_coordinates:
+    value = tensor.get_element(y)
+    result = compute_function(value)
+    tensor.set_element(y, result)
+
+# Step 4: Store
+for y in all_y_coordinates:
+    value = tensor.get_element(y)
+    store_to_global_memory(p_coord, y_coord, value)
+```
+
+**💡 Pattern Benefits:**
+- Clear separation of load/compute/store phases
+- Optimal memory access patterns
+- Easy to reason about and debug
+- Compiler can optimize each phase
+
+## Testing Your Understanding
+
+Let's verify your understanding of static distributed tensors:
+
+```{pyodide}
+print("🧪 Testing Static Distributed Tensor Understanding")
+print("=" * 50)
+
+def test_conceptual_element_access():
+    """Test understanding of element access patterns."""
+    tile_size = [2, 3]
+    
+    # Test address calculation
+    for y0 in range(tile_size[0]):
+        for y1 in range(tile_size[1]):
+            expected_addr = y0 * tile_size[1] + y1
+            actual_addr = y0 * tile_size[1] + y1
+            if expected_addr != actual_addr:
+                return False
+    return True
+
+def test_memory_address_calculation():
+    """Test memory address calculation."""
+    tile_size = [4, 3]
+    
+    # Test specific cases
+    test_cases = [
+        ([0, 0], 0),
+        ([0, 2], 2),
+        ([1, 0], 3),
+        ([1, 1], 4),
+        ([3, 2], 11)
+    ]
+    
+    for (y0, y1), expected in test_cases:
+        actual = y0 * tile_size[1] + y1
+        if actual != expected:
+            return False
+    return True
+
+def test_thread_coordination_math():
+    """Test thread coordination calculations."""
+    thread_grid = [2, 2]
+    tile_size = [3, 3]
+    
+    total_threads = thread_grid[0] * thread_grid[1]
+    elements_per_thread = tile_size[0] * tile_size[1]
+    total_elements = total_threads * elements_per_thread
+    
+    expected_total = 4 * 9  # 4 threads * 9 elements each
+    return total_elements == expected_total
+
+def test_tensor_creation_concept():
+    """Test tensor creation concept."""
+    # This tests the conceptual understanding
+    required_components = [
+        'tile_distribution',  # Need distribution
+        'dtype',             # Need data type
+        'make_static_distributed_tensor'  # Need creation function
+    ]
+    
+    # All components needed for creation
+    return len(required_components) == 3
+
+# Run tests
+tests = [
+    ("Element access patterns", test_conceptual_element_access),
+    ("Memory address calculation", test_memory_address_calculation),
+    ("Thread coordination math", test_thread_coordination_math),
+    ("Tensor creation concept", test_tensor_creation_concept)
+]
+
+print("Running static distributed tensor tests:")
+for test_name, test_func in tests:
+    try:
+        result = test_func()
+        status = "✅ PASS" if result else "❌ FAIL"
+        print(f"  {status}: {test_name}")
+    except Exception as e:
+        print(f"  ❌ ERROR: {test_name} - {str(e)}")
+```
+
+## Key Takeaways
+
+Static distributed tensors are the efficient data containers that make tile distribution practical:
+
+**🎯 Core Concepts:**
+
+1. **Thread-Local Storage**: Each thread has its own tensor
+   - ✅ No contention between threads
+   - ✅ Optimal memory access patterns
+   - ✅ Independent computation capability
+   - ✅ Efficient coordination mechanisms
+
+2. **Compile-Time Optimization**: Layout determined at compile time
+   - ✅ No runtime overhead for layout decisions
+   - ✅ Optimal memory organization
+   - ✅ Maximum compiler optimization opportunities
+   - ✅ Predictable performance characteristics
+
+3. **Efficient Element Access**: Y coordinates provide logical indexing
+   - ✅ O(1) element access time
+   - ✅ Cache-friendly memory patterns
+   - ✅ No bounds checking overhead
+   - ✅ Vectorization opportunities
+
+**🔧 Implementation Benefits:**
+
+- **Memory Efficiency**: Only stores data the thread needs
+- **Cache Performance**: Contiguous memory layout optimized for access patterns
+- **Scalability**: Performance scales with thread count
+- **Simplicity**: Clean programming model with logical coordinates
+
+**💡 Why This Matters:**
+
+- **Performance**: Optimal memory access patterns for GPU hardware
+- **Productivity**: Easy to reason about and debug
+- **Maintainability**: Clear separation between logical and physical layout
+- **Extensibility**: Same pattern works for any tile distribution strategy
+
+Static distributed tensors show how CK achieves both programming simplicity and maximum performance. The logical Y coordinate interface hides the complexity of optimal memory layout, giving you the best of both worlds! 

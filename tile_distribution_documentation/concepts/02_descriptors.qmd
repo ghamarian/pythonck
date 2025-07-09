@@ -1,0 +1,378 @@
+---
+title: "Tensor Descriptors - Complete Tensor Specifications"
+format: live-html
+---
+
+## Overview
+
+TensorDescriptor is the complete specification for a tensor in memory. It combines TensorAdaptor (the transformation pipeline) with element space information (how much memory is needed). Think of it as the complete blueprint that tells you everything about how a tensor is laid out in memory.
+
+TensorDescriptor is what you'll actually use in real applications - it provides the complete interface for creating, accessing, and manipulating tensors.
+
+```{pyodide}
+#| echo: false
+#| output: false
+#| autorun: true
+
+# Auto-install pythonck package
+import micropip
+await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl")
+```
+
+## TensorDescriptor vs TensorAdaptor
+
+Let's start by understanding how TensorDescriptor extends TensorAdaptor:
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+# Import required modules
+from pytensor.tensor_descriptor import (
+    TensorDescriptor,
+    TensorAdaptor,
+    make_naive_tensor_descriptor,
+    make_naive_tensor_descriptor_packed,
+    make_naive_tensor_descriptor_aligned,
+    transform_tensor_descriptor,
+    EmbedTransform,
+    UnmergeTransform
+)
+from pytensor.tensor_coordinate import MultiIndex
+import numpy as np
+
+print("📋 TensorDescriptor vs TensorAdaptor")
+print("--" * 50)
+print("  TensorAdaptor:")
+print("    • Defines coordinate transformations")
+print("    • Specifies how dimensions map and transform")
+print("    • No memory size information")
+print("")
+print("  TensorDescriptor:")
+print("    • Extends TensorAdaptor")
+print("    • Adds element_space_size (total memory needed)")
+print("    • Adds guaranteed vector lengths/strides")
+print("    • Complete tensor memory specification")
+```
+
+## Naive Tensor Descriptor: Custom Strides
+
+The most flexible way to create tensors is with custom strides, allowing you to control exactly how data is laid out in memory:
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+print("1️⃣ Naive Tensor Descriptor: Custom Strides")
+print("--" * 50)
+
+# Create 2D tensor with custom strides
+lengths = [3, 4]
+strides = [8, 1]  # Row-major with padding
+descriptor = make_naive_tensor_descriptor(lengths, strides)
+
+print(f"  Tensor shape: {lengths}")
+print(f"  Custom strides: {strides}")
+print(f"  Number of dimensions: {descriptor.get_num_of_dimension()}")
+print(f"  Dimension lengths: {descriptor.get_lengths()}")
+print(f"  Element space size: {descriptor.get_element_space_size()}")
+print(f"  Number of transforms: {descriptor.get_num_of_transform()}")
+
+# Calculate offsets for different positions
+test_coords = [[0, 0], [0, 3], [1, 0], [2, 3]]
+print("\n  Memory offset calculations:")
+for coord_list in test_coords:
+    offset = descriptor.calculate_offset(coord_list)
+    expected = coord_list[0] * strides[0] + coord_list[1] * strides[1]
+    print(f"    {coord_list} → offset {offset} (expected: {expected})")
+```
+
+## Packed Tensor Descriptor: Row-Major Layout
+
+For most applications, packed (row-major) layout is what you want - it's memory efficient with no padding:
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+print("2️⃣ Packed Tensor Descriptor: Row-Major Layout")
+print("--" * 50)
+
+# Create 2D tensor with packed layout
+lengths = [3, 4]
+descriptor_packed = make_naive_tensor_descriptor_packed(lengths)
+
+print(f"  Tensor shape: {lengths}")
+print(f"  Layout: packed (row-major)")
+print(f"  Number of dimensions: {descriptor_packed.get_num_of_dimension()}")
+print(f"  Dimension lengths: {descriptor_packed.get_lengths()}")
+print(f"  Element space size: {descriptor_packed.get_element_space_size()}")
+print(f"  Expected size: {3 * 4} = {3 * 4}")
+
+# Calculate offsets for packed layout
+test_coords = [[0, 0], [0, 3], [1, 0], [2, 3]]
+print("\n  Memory offset calculations (packed):")
+for coord_list in test_coords:
+    offset = descriptor_packed.calculate_offset(coord_list)
+    expected = coord_list[0] * 4 + coord_list[1]  # Row-major calculation
+    print(f"    {coord_list} → offset {offset} (expected: {expected})")
+```
+
+## Multi-Dimensional Descriptors
+
+TensorDescriptor works with any number of dimensions:
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+print("3️⃣ Multi-Dimensional Descriptors")
+print("--" * 50)
+
+# Create 3D tensor
+tensor_3d = make_naive_tensor_descriptor_packed([2, 3, 4])
+print(f"  3D tensor shape: {tensor_3d.get_lengths()}")
+print(f"  3D element space size: {tensor_3d.get_element_space_size()}")
+
+# Create 4D tensor  
+tensor_4d = make_naive_tensor_descriptor_packed([2, 2, 3, 2])
+print(f"  4D tensor shape: {tensor_4d.get_lengths()}")
+print(f"  4D element space size: {tensor_4d.get_element_space_size()}")
+
+# Test multi-dimensional offset calculation
+coord_3d = [1, 2, 1]
+offset_3d = tensor_3d.calculate_offset(coord_3d)
+expected_3d = 1 * (3 * 4) + 2 * 4 + 1  # 1*12 + 2*4 + 1 = 21
+print(f"\n  3D offset [{1}, {2}, {1}] → {offset_3d} (expected: {expected_3d})")
+
+coord_4d = [1, 1, 2, 1]  
+offset_4d = tensor_4d.calculate_offset(coord_4d)
+expected_4d = 1 * (2 * 3 * 2) + 1 * (3 * 2) + 2 * 2 + 1  # 1*12 + 1*6 + 2*2 + 1 = 23
+print(f"  4D offset [{1}, {1}, {2}, {1}] → {offset_4d} (expected: {expected_4d})")
+```
+
+## Aligned Tensor Descriptor: Memory Alignment
+
+For GPU performance, you often need memory-aligned layouts:
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+print("4️⃣ Aligned Tensor Descriptor: Memory Alignment")
+print("--" * 50)
+
+# Create tensor with 8-byte alignment
+lengths = [4, 5]
+align = 8
+descriptor_aligned = make_naive_tensor_descriptor_aligned(lengths, align)
+
+print(f"  Tensor shape: {lengths}")
+print(f"  Alignment: {align} bytes")
+print(f"  Dimension lengths: {descriptor_aligned.get_lengths()}")
+print(f"  Element space size: {descriptor_aligned.get_element_space_size()}")
+
+# Show how alignment affects memory layout
+print(f"\n  Without alignment: {4 * 5} = {4 * 5} elements")
+print(f"  With alignment: {descriptor_aligned.get_element_space_size()} elements")
+print(f"  Padding added for alignment efficiency")
+```
+
+## Transform Tensor Descriptor: Adding Transformations
+
+You can add transformations to existing descriptors to create more complex layouts:
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+print("5️⃣ Transform Tensor Descriptor: Adding Transformations")
+print("--" * 50)
+
+# Start with a basic 2D descriptor
+base_descriptor = make_naive_tensor_descriptor_packed([2, 6])
+print(f"  Base descriptor: {base_descriptor.get_lengths()}")
+print(f"  Base element space size: {base_descriptor.get_element_space_size()}")
+
+# Add an unmerge transform to split the second dimension
+transforms = [UnmergeTransform([2, 3])]
+lower_dimension_hidden_idss = [[2]]  # Apply to the second dimension (hidden ID 2)
+upper_dimension_hidden_idss = [[3, 4]]  # Output to new hidden IDs 3 and 4
+
+transformed_descriptor = transform_tensor_descriptor(
+    input_descriptor=base_descriptor,
+    transforms=transforms,
+    lower_dimension_hidden_idss=lower_dimension_hidden_idss,
+    upper_dimension_hidden_idss=upper_dimension_hidden_idss
+)
+
+print(f"  Transformed descriptor: {transformed_descriptor.get_lengths()}")
+print(f"  Transformed element space size: {transformed_descriptor.get_element_space_size()}")
+print(f"  Total transforms: {transformed_descriptor.get_num_of_transform()}")
+print(f"  Layout changed from [2, 6] to [2, 2, 3]")
+```
+
+## Descriptor Properties and Methods
+
+Let's explore the key properties and methods available on TensorDescriptor:
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+print("6️⃣ Descriptor Properties and Methods")
+print("--" * 50)
+
+# Create a sample descriptor
+desc = make_naive_tensor_descriptor_packed([3, 4, 5])
+
+print("  Core Properties:")
+print(f"    Number of dimensions: {desc.get_num_of_dimension()}")
+print(f"    Dimension lengths: {desc.get_lengths()}")
+print(f"    Individual lengths: {[desc.get_length(i) for i in range(desc.get_num_of_dimension())]}")
+print(f"    Element space size: {desc.get_element_space_size()}")
+print(f"    Is static: {desc.is_static()}")
+
+print("\n  Transform Properties:")
+print(f"    Number of transforms: {desc.get_num_of_transform()}")
+print(f"    Number of hidden dimensions: {desc.get_num_of_hidden_dimension()}")
+print(f"    Bottom dimensions: {desc.get_num_of_bottom_dimension()}")
+print(f"    Top dimensions: {desc.get_num_of_top_dimension()}")
+
+print("\n  Memory Access:")
+coords = [1, 2, 3]
+offset = desc.calculate_offset(coords)
+print(f"    Coordinate {coords} → linear offset {offset}")
+```
+
+## Performance Considerations
+
+Different descriptor types have different performance characteristics:
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+print("7️⃣ Performance Considerations")
+print("--" * 50)
+
+# Compare different layouts for the same logical tensor
+lengths = [4, 8]
+
+# Packed layout (most memory efficient)
+packed = make_naive_tensor_descriptor_packed(lengths)
+print(f"  Packed layout:")
+print(f"    Shape: {packed.get_lengths()}")
+print(f"    Memory size: {packed.get_element_space_size()} elements")
+
+# Custom stride layout (with padding)
+padded = make_naive_tensor_descriptor(lengths, [16, 1])  # Add padding to rows
+print(f"\n  Padded layout (stride 16):")
+print(f"    Shape: {padded.get_lengths()}")  
+print(f"    Memory size: {padded.get_element_space_size()} elements")
+print(f"    Extra memory: {padded.get_element_space_size() - packed.get_element_space_size()} elements")
+
+# Aligned layout
+aligned = make_naive_tensor_descriptor_aligned(lengths, 8)
+print(f"\n  Aligned layout (8-byte alignment):")
+print(f"    Shape: {aligned.get_lengths()}")
+print(f"    Memory size: {aligned.get_element_space_size()} elements")
+
+print(f"\n  Memory efficiency comparison:")
+print(f"    Packed: {packed.get_element_space_size()} elements (100%)")
+print(f"    Padded: {padded.get_element_space_size()} elements ({100 * packed.get_element_space_size() / padded.get_element_space_size():.1f}%)")
+print(f"    Aligned: {aligned.get_element_space_size()} elements ({100 * packed.get_element_space_size() / aligned.get_element_space_size():.1f}%)")
+```
+
+## Testing Your Understanding
+
+Let's verify that tensor descriptors work correctly:
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+print("🧪 Testing Tensor Descriptor Operations")
+print("--" * 50)
+
+def test_packed_descriptor():
+    """Test packed descriptor creation and properties."""
+    desc = make_naive_tensor_descriptor_packed([2, 3])
+    return (desc.get_num_of_dimension() == 2 and 
+            desc.get_lengths() == [2, 3] and
+            desc.get_element_space_size() == 6)
+
+def test_strided_descriptor():
+    """Test strided descriptor with custom strides."""
+    desc = make_naive_tensor_descriptor([2, 3], [6, 1])
+    expected_size = (2-1) * 6 + (3-1) * 1 + 1  # 6 + 2 + 1 = 9
+    return (desc.get_element_space_size() == expected_size and
+            desc.get_lengths() == [2, 3])
+
+def test_offset_calculation():
+    """Test linear offset calculation."""
+    desc = make_naive_tensor_descriptor_packed([3, 4])
+    offset = desc.calculate_offset([1, 2])
+    expected = 1 * 4 + 2  # Row-major: 6
+    return offset == expected
+
+def test_multi_dimensional():
+    """Test multi-dimensional descriptors."""
+    desc = make_naive_tensor_descriptor_packed([2, 3, 4])
+    return (desc.get_num_of_dimension() == 3 and
+            desc.get_element_space_size() == 24)
+
+def test_aligned_descriptor():
+    """Test aligned descriptor creation."""
+    desc = make_naive_tensor_descriptor_aligned([3, 5], 8)
+    # Should have alignment padding
+    return desc.get_element_space_size() > 15  # More than 3*5
+
+tests = [
+    ("Packed descriptor", test_packed_descriptor),
+    ("Strided descriptor", test_strided_descriptor),
+    ("Offset calculation", test_offset_calculation),
+    ("Multi-dimensional", test_multi_dimensional),
+    ("Aligned descriptor", test_aligned_descriptor)
+]
+
+all_tests_passed = True
+for test_name, test_func in tests:
+    try:
+        result = test_func()
+        status = "✅ PASS" if result else "❌ FAIL"
+        print(f"  {status}: {test_name}")
+        if not result:
+            all_tests_passed = False
+    except Exception as e:
+        print(f"  ❌ ERROR: {test_name} - {e}")
+        all_tests_passed = False
+
+print(f"\n🎯 All tests passed: {all_tests_passed}")
+```
+
+## Summary
+
+TensorDescriptor is the complete tensor specification that you'll use in real applications:
+
+**Creation Functions**:
+- **`make_naive_tensor_descriptor`**: Custom strides for maximum flexibility
+- **`make_naive_tensor_descriptor_packed`**: Row-major layout for memory efficiency  
+- **`make_naive_tensor_descriptor_aligned`**: Memory-aligned layouts for GPU performance
+- **`transform_tensor_descriptor`**: Add transformations to existing descriptors
+
+**Key Properties**:
+- **Dimension Information**: `get_lengths()`, `get_num_of_dimension()`
+- **Memory Layout**: `get_element_space_size()`, `calculate_offset()`
+- **Transform Pipeline**: Inherits all TensorAdaptor functionality
+- **Performance Hints**: Guaranteed vector lengths and strides
+
+**Memory Layout Types**:
+- **Packed**: Most memory efficient, contiguous data
+- **Strided**: Custom layouts with padding for alignment or performance
+- **Aligned**: GPU-optimized layouts with memory alignment
+- **Transformed**: Complex layouts created by chaining transformations
+
+TensorDescriptor combines the flexibility of TensorAdaptor transformations with the practicality of complete memory specifications. It's the bridge between the mathematical abstractions of coordinate transforms and the physical reality of memory layouts.
+
+Next, we'll see how TensorDescriptors are used in the high-level **Tile Distribution API** to create efficient GPU data access patterns. 

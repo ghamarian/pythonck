@@ -1,0 +1,124 @@
+---
+title: "Introduction and Motivation - Why Tile Distribution Matters"
+---
+
+## Overview
+
+Before diving into any code, let's establish the fundamental problem tile distribution solves and why it's essential for GPU programming. Understanding the "why" will make all the subsequent concepts much clearer.
+
+**Learning Objectives:**
+- Understand the GPU memory coalescing challenge
+- See how tile distribution enables efficient thread cooperation
+- Get intuition for coordinate mapping concepts
+- Appreciate the performance benefits of structured data access
+
+## The GPU Memory Problem
+
+### Why Random Memory Access is Slow
+
+Modern GPUs have incredible computational power, but they're fundamentally limited by memory bandwidth. When thousands of threads try to access memory randomly, several problems occur:
+
+1. **Memory Coalescing**: GPU memory controllers work most efficiently when adjacent threads access adjacent memory locations. Random access patterns prevent this optimization.
+
+2. **Cache Efficiency**: Random access patterns don't benefit from cache locality, leading to frequent cache misses.
+
+3. **Thread Divergence**: When threads in a warp access memory in unpredictable patterns, the hardware can't optimize the memory requests.
+
+### The Thread Cooperation Challenge
+
+Consider a simple matrix multiplication where 256 threads need to cooperate:
+
+```python
+# Inefficient: Random access pattern
+def naive_matrix_multiply():
+    thread_id = get_thread_id()
+    # Each thread randomly accesses matrix elements
+    # No coordination between threads
+    # Poor memory coalescing
+    pass
+```
+
+Problems with this approach:
+- **Unpredictable Memory Access**: Threads access memory randomly
+- **No Cooperation**: Threads don't coordinate their memory accesses
+- **Poor Cache Utilization**: No locality of reference
+- **Inefficient Bandwidth Usage**: Memory controllers can't optimize
+
+## The Tile Distribution Solution
+
+### Structured Mapping from Logical to Physical Coordinates
+
+Tile distribution solves these problems by providing a **structured mapping** from logical coordinates (what data does each thread need?) to physical coordinates (where is that data in memory?).
+
+```python
+# Efficient: Tile-based distribution
+def tile_distributed_matrix_multiply():
+    # 1. Each thread gets a unique tile of data
+    tile_distribution = make_static_tile_distribution(encoding)
+    
+    # 2. Threads cooperate to access memory efficiently
+    tile_window = make_tile_window(tensor_view, window_lengths, origin, tile_distribution)
+    
+    # 3. Memory accesses are coalesced and predictable
+    loaded_tensor = tile_window.load()
+    
+    # 4. Process tile data efficiently
+    def process_element(y_indices):
+        value = loaded_tensor.get_element(y_indices)
+        # ... efficient computation
+    
+    sweep_tile(loaded_tensor, process_element)
+```
+
+### Key Benefits
+
+1. **Predictable Memory Access Patterns**: Threads access memory in structured, predictable ways
+2. **Efficient Thread Cooperation**: Threads coordinate their memory accesses for optimal coalescing
+3. **Cache-Friendly Access**: Spatial and temporal locality improve cache utilization
+4. **Scalable Performance**: Patterns work across different GPU architectures and problem sizes
+
+## The Coordinate Mapping Insight
+
+The key insight is that tile distribution provides a **mathematical framework** for mapping between different coordinate spaces:
+
+- **P-space**: Where is each thread? (thread_x, thread_y, warp_id, block_id)
+- **Y-space**: What data does each thread need? (y0, y1, y2, y3)
+- **X-space**: Where is that data physically located? (x0, x1)
+- **D-space**: What's the actual memory address? (linearized coordinates)
+
+The magic happens in the transformations: **P + Y → X → D**
+
+## What's Coming Next
+
+Now that you understand **why** tile distribution matters, we'll build up the complete system:
+
+1. **Foundation**: Start with raw memory and build up to structured tensors
+2. **Transformation Engine**: Learn the coordinate transformation engine
+3. **Distribution API**: Master the high-level tile distribution APIs
+4. **Coordinate Systems**: Understand the complete coordinate system
+5. **Implementation**: Dive into the internal implementation
+6. **Thread Mapping**: See how it all connects to hardware threads
+7. **Advanced Topics**: Learn advanced optimization techniques
+
+## 🎮 **Interactive Learning Tools**
+
+Enhance your learning with interactive applications:
+
+- **[📊 Tile Distribution Visualizer](../../app.py)** - See memory access pattern comparisons, thread cooperation visualization, and performance impact demonstrations
+- **[🔄 Tensor Transform Visualizer](../../tensor_transform_app.py)** - Explore coordinate transformations with visual graphs  
+- **[🧵 Thread Visualization App](../../thread_visualization_app.py)** - Visualize how threads map to data elements
+
+## Summary
+
+Tile distribution isn't just a technical detail—it's the foundation that makes GPU computing efficient. By providing structured, predictable mappings between logical and physical coordinates, it enables:
+
+- **Efficient Memory Access**: Coalesced, cache-friendly patterns
+- **Thread Cooperation**: Coordinated work distribution
+- **Scalable Performance**: Patterns that work across different hardware
+- **Predictable Optimization**: Mathematical framework for performance tuning
+
+Ready to see how it all works? Let's start building from the foundation: **From Raw Memory to Structured Tensors**.
+
+## Next Steps
+
+Continue to [Buffer Views](01_buffer_view.qmd) to start building your understanding from the ground up. 

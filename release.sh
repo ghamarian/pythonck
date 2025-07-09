@@ -45,7 +45,7 @@ check_directory() {
     fi
 }
 
-# Check git status and branch
+# Check git repository status
 check_git_status() {
     # Check if we're in a git repository
     if ! git rev-parse --git-dir > /dev/null 2>&1; then
@@ -53,34 +53,20 @@ check_git_status() {
         exit 1
     fi
     
-    # Check if there are uncommitted changes (excluding files we'll modify and temporary files)
-    if ! git diff --quiet HEAD -- . ':!documentation/' ':!pyproject.toml' ':!requirements.txt' ':!.gitignore' ':!release.sh'; then
-        log_warning "You have uncommitted changes. Please commit or stash them before releasing."
-        log_warning "Note: Temporary files (.quarto_ipynb) are automatically ignored"
-        log_warning "Note: Documentation site (_site/) will be built and committed during release"
-        git status --porcelain | grep -v "\.quarto_ipynb$" | grep -v "\.md\.bak$"
-        read -p "Continue anyway? (y/N): " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            log_info "Release cancelled"
-            exit 0
-        fi
-    fi
-    
     # Show current branch
     CURRENT_BRANCH=$(git branch --show-current)
     log_info "Current branch: $CURRENT_BRANCH"
     
-    # Check if we're on the main/master branch
-    if [[ "$CURRENT_BRANCH" != "main" && "$CURRENT_BRANCH" != "master" ]]; then
-        log_warning "You're not on the main/master branch"
-        read -p "Continue with release from '$CURRENT_BRANCH'? (y/N): " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            log_info "Release cancelled"
-            exit 0
-        fi
+    # Check if there are uncommitted changes
+    if ! git diff --quiet HEAD; then
+        log_warning "⚠️  You have uncommitted changes:"
+        git status --porcelain | head -10
+        log_warning "Please commit all changes before running release."
+        log_warning "This ensures a clean release process."
+        exit 1
     fi
+    
+    log_success "Working directory is clean"
 }
 
 # Check GitHub CLI availability
@@ -152,6 +138,11 @@ build_wheel() {
 # Update wheel in documentation folder
 update_documentation_wheel() {
     log_info "Updating wheel file in documentation folder..."
+    
+    # Remove any old wheel files that might conflict
+    log_info "Cleaning up old wheel files..."
+    find documentation/ -name "${PACKAGE_NAME}-*.whl" ! -name "${PACKAGE_NAME}-${VERSION}-py3-none-any.whl" -delete
+    
     cp "$WHEEL_FILE" "documentation/"
     log_success "Wheel copied to documentation folder"
 }
@@ -229,91 +220,7 @@ update_documentation_urls() {
     log_success "Documentation URLs updated"
 }
 
-# Commit and push changes
-commit_and_push() {
-    log_info "Committing changes..."
-    
-    # Show what files have been modified
-    log_info "Files modified during release:"
-    git status --porcelain
-    
-    # Add all release-related files
-    log_info "Adding release-related files..."
-    
-    # Add the new wheel file
-    git add "documentation/${PACKAGE_NAME}-${VERSION}-py3-none-any.whl"
-    
-    # Add only modified tracked files in documentation (safe)
-    git add -u documentation/
-    
-    # Add documentation site (built output for deployment)
-    git add documentation/_site/
-    
-    # Add configuration files that might have been updated (only if they exist and are tracked)
-    if git ls-files --error-unmatch pyproject.toml >/dev/null 2>&1; then
-        git add pyproject.toml
-    fi
-    if git ls-files --error-unmatch requirements.txt >/dev/null 2>&1; then
-        git add requirements.txt
-    fi
-    
-    # Add release script itself if it was modified
-    if git ls-files --error-unmatch release.sh >/dev/null 2>&1; then
-        git add release.sh
-    fi
-    
-    # Add .gitignore if it was modified
-    if git ls-files --error-unmatch .gitignore >/dev/null 2>&1; then
-        git add .gitignore
-    fi
-    
-    # Remove any old wheel files that might conflict
-    log_info "Cleaning up old wheel files..."
-    find documentation/ -name "${PACKAGE_NAME}-*.whl" ! -name "${PACKAGE_NAME}-${VERSION}-py3-none-any.whl" -delete
-    
-    # Show what will be committed
-    log_info "Files staged for commit:"
-    git diff --cached --name-only
-    
-    # Check if there are changes to commit
-    if git diff --staged --quiet; then
-        log_warning "No changes to commit"
-        return
-    fi
-    
-    # Show a summary of what will be committed
-    echo
-    log_info "Summary of changes to be committed:"
-    git diff --cached --stat
-    echo
-    
-    # Ask for confirmation
-    read -p "Proceed with commit and push? (y/N): " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        log_info "Commit cancelled by user"
-        log_info "You can manually commit these changes later with:"
-        echo "  git commit -m 'Release v$VERSION'"
-        return
-    fi
-    
-    # Commit
-    git commit -m "Release v$VERSION: Update documentation and wheel file
 
-- Built new wheel package for v$VERSION
-- Updated documentation URLs to use new version
-- Built documentation site (_site/) for deployment
-- Updated GitHub release with new assets
-- Updated project dependencies (build tools)
-- Cleaned up old wheel files"
-    
-    # Detect default branch
-    DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo "master")
-    
-    # Push
-    git push origin "$DEFAULT_BRANCH"
-    log_success "Changes committed and pushed to $DEFAULT_BRANCH"
-}
 
 # Create and push git tag
 create_git_tag() {
@@ -361,7 +268,6 @@ main() {
     build_documentation_site
     create_github_release
     update_documentation_urls
-    commit_and_push
     create_git_tag
     
     log_success "Release process completed successfully!"
@@ -374,6 +280,13 @@ main() {
     echo "  https://raw.githubusercontent.com/$GITHUB_REPO/$DEFAULT_BRANCH/documentation/${PACKAGE_NAME}-${VERSION}-py3-none-any.whl"
     log_info "Documentation site ready for deployment from:"
     echo "  documentation/_site/"
+    
+    echo
+    log_info "📝 Note: Documentation files and wheel have been updated locally."
+    log_info "    You may want to commit these changes:"
+    echo "    git add documentation/"
+    echo "    git commit -m 'Update documentation for release v$VERSION'"
+    echo "    git push"
     
     test_documentation
 }
@@ -389,7 +302,7 @@ show_help() {
     echo "  2. Updates documentation with new wheel"
     echo "  3. Builds documentation site (_site/) for deployment"
     echo "  4. Creates/updates GitHub release"
-    echo "  5. Commits and pushes changes"
+    echo "  5. Creates git tag"
     echo ""
     echo "Options:"
     echo "  -h, --help     Show this help message"
@@ -399,6 +312,7 @@ show_help() {
     echo "  - GitHub CLI (gh) installed and authenticated"
     echo "  - Python build tools (will be installed automatically if missing)"
     echo "  - Git repository with remote origin set"
+    echo "  - All changes committed (clean working directory)"
     echo ""
     echo "Examples:"
     echo "  $0                 # Run full release process"
