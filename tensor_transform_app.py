@@ -1089,7 +1089,7 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                     final_upper_idss = all_upper_idss[-final_stage_transform_count:]
                     
                     # Build the final descriptor using the pytensor library
-                    from pytensor.tensor_descriptor import transform_tensor_descriptor
+                    from pytensor.tensor_descriptor import transform_tensor_descriptor_for_visualization as transform_tensor_descriptor
                     
                     # Use the previous stage's descriptor as input
                     if len(pytensor_descriptors) > 1:

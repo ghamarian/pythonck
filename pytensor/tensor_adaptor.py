@@ -97,50 +97,103 @@ def transform_tensor_adaptor(
     Returns:
         New TensorAdaptor with combined transformations
     """
-    # Convert old top IDs to hidden IDs
+    # Input validation to match C++ static_assert behavior
+    if not (len(new_transforms) == len(new_lower_dimension_old_top_idss) == len(new_upper_dimension_new_top_idss)):
+        raise ValueError("Inconsistent number of transforms")
+    
+    # Validate sequence mappings (simplified validation)
+    # Check for duplicate IDs within individual mappings (not across mappings)
+    for i, ids in enumerate(new_lower_dimension_old_top_idss):
+        if len(ids) != len(set(ids)):
+            raise ValueError(f"Invalid sequence map: duplicate IDs in lower mapping {i}")
+    
+    for i, ids in enumerate(new_upper_dimension_new_top_idss):
+        if len(ids) != len(set(ids)):
+            raise ValueError(f"Invalid sequence map: duplicate IDs in upper mapping {i}")
+    
+    # Check that all new top IDs are unique across all mappings (they define the final output)
+    all_new_top_ids = []
+    for ids in new_upper_dimension_new_top_idss:
+        all_new_top_ids.extend(ids)
+    
+    if len(all_new_top_ids) != len(set(all_new_top_ids)):
+        raise ValueError("Invalid sequence map: duplicate new top IDs across mappings")
+    
     old_top_hidden_ids = old_adaptor.top_dimension_hidden_ids
-    
-    # Convert lower dimension top IDs to hidden IDs
-    lower_hidden_idss = []
-    for top_ids in new_lower_dimension_old_top_idss:
-        hidden_ids = [old_top_hidden_ids[id] for id in top_ids]
-        lower_hidden_idss.append(hidden_ids)
-    
-    # Calculate new hidden dimension offset
     old_num_hidden = old_adaptor.get_num_of_hidden_dimension()
     
-    # Create upper dimension hidden IDs
+    # Lower dimension's hidden idss - convert lower dimension top IDs to hidden IDs
+    # This matches C++ transform_tuples/transform_sequences logic
+    lower_hidden_idss = []
+    for top_ids in new_lower_dimension_old_top_idss:
+        hidden_ids = [old_top_hidden_ids[i] for i in top_ids]
+        lower_hidden_idss.append(hidden_ids)
+    
+    # Upper dimension's hidden idss - match C++ cumulative scanning approach
+    num_new_transform = len(new_transforms)
+    
+    # Get number of upper dimensions for each transform (matches lambda_get_up_dim_num)
+    up_dim_numbers = []
+    for i, ids in enumerate(new_upper_dimension_new_top_idss):
+        up_dim_numbers.append(len(ids))
+    
+    # Create cumulative scan (matches inclusive_scan_sequence)
+    up_dim_numbers_scan = [0]
+    cumulative = 0
+    for count in up_dim_numbers:
+        cumulative += count
+        up_dim_numbers_scan.append(cumulative)
+    
+    # Generate upper dimension hidden IDs using arithmetic sequence generation
     upper_hidden_idss = []
-    offset = old_num_hidden
-    for i, transform in enumerate(new_transforms):
-        num_upper = transform.get_num_of_upper_dimension()
-        upper_ids = list(range(offset, offset + num_upper))
-        upper_hidden_idss.append(upper_ids)
-        offset += num_upper
+    for i in range(num_new_transform):
+        start_id = old_num_hidden + up_dim_numbers_scan[i]
+        end_id = old_num_hidden + up_dim_numbers_scan[i + 1]
+        hidden_ids = list(range(start_id, end_id))
+        upper_hidden_idss.append(hidden_ids)
     
-    # Combine transforms
+    # New top dimension's hidden ids - match C++ reorder_old_to_new logic
+    # First, create unordered list of all upper dimension hidden IDs
+    unordered_new_top_dim_hidden_ids = []
+    for ids in upper_hidden_idss:
+        unordered_new_top_dim_hidden_ids.extend(ids)
+    
+    # Create reordering mapping from new_upper_dimension_new_top_idss
+    # The target dimension IDs need to be sequential starting from 0
+    all_new_top_ids = []
+    for ids in new_upper_dimension_new_top_idss:
+        all_new_top_ids.extend(ids)
+    
+    # Sort the dimension IDs to get the order
+    sorted_dim_ids = sorted(all_new_top_ids)
+    
+    # Create mapping from dimension ID to position in the sorted list
+    dim_id_to_position = {dim_id: i for i, dim_id in enumerate(sorted_dim_ids)}
+    
+    # Apply the reordering to get the final top dimension hidden IDs
+    new_top_dim_hidden_ids = [None] * len(unordered_new_top_dim_hidden_ids)
+    
+    hidden_id_index = 0
+    for ids in new_upper_dimension_new_top_idss:
+        for dim_id in ids:
+            position = dim_id_to_position[dim_id]
+            new_top_dim_hidden_ids[position] = unordered_new_top_dim_hidden_ids[hidden_id_index]
+            hidden_id_index += 1
+    
+    # Combine everything together (matches C++ final assembly)
     all_transforms = old_adaptor.transforms + new_transforms
-    
-    # Combine dimension mappings
     all_lower_hidden_idss = old_adaptor.lower_dimension_hidden_idss + lower_hidden_idss
     all_upper_hidden_idss = old_adaptor.upper_dimension_hidden_idss + upper_hidden_idss
     
     # Bottom dimensions remain the same
     bottom_hidden_ids = old_adaptor.bottom_dimension_hidden_ids
     
-    # Create new top dimension hidden IDs
-    new_top_hidden_ids = []
-    for i, ids in enumerate(new_upper_dimension_new_top_idss):
-        for id in ids:
-            if id not in new_top_hidden_ids:
-                new_top_hidden_ids.append(upper_hidden_idss[i][ids.index(id)])
-    
     return TensorAdaptor(
         transforms=all_transforms,
         lower_dimension_hidden_idss=all_lower_hidden_idss,
         upper_dimension_hidden_idss=all_upper_hidden_idss,
         bottom_dimension_hidden_ids=bottom_hidden_ids,
-        top_dimension_hidden_ids=sorted(new_top_hidden_ids)
+        top_dimension_hidden_ids=new_top_dim_hidden_ids
     )
 
 

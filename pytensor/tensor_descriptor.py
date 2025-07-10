@@ -119,6 +119,288 @@ class Transform(ABC):
         return self.sympy_calculate_upper(lower_symbols)
 
 
+# Nested transform classes for recursive handling
+class NestedTransform(Transform):
+    """Base class for nested transforms that contain other transforms."""
+    
+    def __init__(self, nested_content):
+        self.nested_content = nested_content
+        self.is_nested = True
+        
+    def expand_to_stages(self, input_dimensions, output_dimensions):
+        """Expand this nested transform into multiple stages."""
+        raise NotImplementedError("Subclasses must implement expand_to_stages")
+        
+    # Required Transform methods (placeholder implementations)
+    def calculate_lower_index(self, idx_upper: MultiIndex) -> MultiIndex:
+        """This should not be called directly - nested transforms are expanded first."""
+        raise NotImplementedError("Nested transforms must be expanded before use")
+    
+    def calculate_upper_index(self, idx_lower: MultiIndex) -> MultiIndex:
+        """This should not be called directly - nested transforms are expanded first."""
+        raise NotImplementedError("Nested transforms must be expanded before use")
+    
+    def is_valid_upper_index_always_mapped_to_valid_lower_index(self) -> bool:
+        """This should not be called directly - nested transforms are expanded first."""
+        raise NotImplementedError("Nested transforms must be expanded before use")
+    
+    def is_valid_upper_index_mapped_to_valid_lower_index(self, idx_upper: MultiIndex) -> bool:
+        """This should not be called directly - nested transforms are expanded first."""
+        raise NotImplementedError("Nested transforms must be expanded before use")
+    
+    def sympy_calculate_lower(self, upper_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """This should not be called directly - nested transforms are expanded first."""
+        raise NotImplementedError("Nested transforms must be expanded before use")
+    
+    def sympy_calculate_upper(self, lower_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """This should not be called directly - nested transforms are expanded first."""
+        raise NotImplementedError("Nested transforms must be expanded before use")
+    
+    def update_lower_index(self, idx_upper_diff: MultiIndex, idx_lower_current: MultiIndex, 
+                          idx_upper_new: MultiIndex) -> Tuple[MultiIndex, MultiIndex]:
+        """This should not be called directly - nested transforms are expanded first."""
+        raise NotImplementedError("Nested transforms must be expanded before use")
+
+class NestedMergeTransform(NestedTransform):
+    """A merge transform that contains nested transforms - handles expansion internally."""
+    
+    def __init__(self, nested_content):
+        super().__init__(nested_content)
+        self.is_nested = True
+        
+        # Calculate the effective dimensions this transform expects/produces
+        self._calculate_dimensions()
+    
+    def _calculate_dimensions(self):
+        """Calculate input/output dimensions based on nested content."""
+        self.input_count = 0
+        self.lengths = []
+        
+        for item in self.nested_content:
+            if isinstance(item, PassThroughTransform):
+                self.input_count += 1
+                self.lengths.append(item.length)
+            elif isinstance(item, MergeTransform):
+                self.input_count += len(item.lengths)
+                self.lengths.append(math.prod(item.lengths))
+            elif isinstance(item, int):
+                self.input_count += 1
+                self.lengths.append(item)
+            else:
+                self.input_count += 1
+                self.lengths.append(1)
+    
+    def get_num_of_lower_dimension(self) -> int:
+        """Get number of lower dimensions (inputs)."""
+        return self.input_count
+    
+    def get_num_of_upper_dimension(self) -> int:
+        """Get number of upper dimensions (always 1 for merge)."""
+        return 1
+    
+    def get_upper_lengths(self) -> List[int]:
+        """Get upper dimension lengths (product of all inputs)."""
+        return [math.prod(self.lengths)]
+    
+    def calculate_lower_index(self, idx_upper: MultiIndex) -> MultiIndex:
+        """Calculate lower indices from merged index."""
+        if len(idx_upper) != 1:
+            raise ValueError("NestedMergeTransform expects 1D upper index")
+        
+        merged_idx = idx_upper[0]
+        
+        # Decompose the merged index using the same logic as sympy_calculate_lower
+        # but with integer arithmetic instead of symbolic
+        
+        # Calculate strides for each nested component
+        strides = [1]
+        for i in range(len(self.lengths) - 1, 0, -1):
+            strides.insert(0, strides[0] * self.lengths[i])
+        
+        # Decompose into components
+        lower_indices = []
+        remaining = merged_idx
+        
+        for i, length in enumerate(self.lengths):
+            if i < len(self.lengths) - 1:
+                component = remaining // strides[i]
+                remaining = remaining % strides[i]
+            else:
+                component = remaining
+            
+            # Further decompose if this component came from a nested merge
+            item = self.nested_content[i]
+            if isinstance(item, MergeTransform):
+                # Decompose this component further using the nested merge
+                nested_strides = [1]
+                for j in range(len(item.lengths) - 1, 0, -1):
+                    nested_strides.insert(0, nested_strides[0] * item.lengths[j])
+                
+                nested_remaining = component
+                for j, nested_length in enumerate(item.lengths):
+                    if j < len(item.lengths) - 1:
+                        nested_idx = nested_remaining // nested_strides[j]
+                        nested_remaining = nested_remaining % nested_strides[j]
+                    else:
+                        nested_idx = nested_remaining
+                    lower_indices.append(nested_idx)
+            else:
+                # PassThrough or integer - just add the component
+                lower_indices.append(component)
+        
+        return MultiIndex(len(lower_indices), lower_indices)
+    
+    def calculate_upper_index(self, idx_lower: MultiIndex) -> MultiIndex:
+        """Calculate merged index from lower indices."""
+        if len(idx_lower) != self.input_count:
+            raise ValueError(f"Expected {self.input_count} lower indices, got {len(idx_lower)}")
+        
+        # Process each item in the nested content, similar to sympy_calculate_upper
+        # but with integer arithmetic
+        input_idx = 0
+        intermediate_results = []
+        
+        for item in self.nested_content:
+            if isinstance(item, PassThroughTransform):
+                # Pass through one input
+                intermediate_results.append(idx_lower[input_idx])
+                input_idx += 1
+                
+            elif isinstance(item, MergeTransform):
+                # Merge multiple inputs
+                num_inputs = len(item.lengths)
+                merge_inputs = idx_lower[input_idx:input_idx + num_inputs]
+                
+                # Apply the nested merge transform using integer arithmetic
+                merge_result = 0
+                stride = 1
+                for i in range(len(item.lengths) - 1, -1, -1):
+                    merge_result += merge_inputs[i] * stride
+                    stride *= item.lengths[i]
+                
+                intermediate_results.append(merge_result)
+                input_idx += num_inputs
+                
+            else:
+                # Integer or other - pass through
+                intermediate_results.append(idx_lower[input_idx])
+                input_idx += 1
+        
+        # Now merge all intermediate results into final result
+        if len(intermediate_results) == 1:
+            final_result = intermediate_results[0]
+        else:
+            # Create final merge: sum with appropriate strides
+            final_result = 0
+            stride = 1
+            for i in range(len(intermediate_results) - 1, -1, -1):
+                final_result += intermediate_results[i] * stride
+                stride *= self.lengths[i]
+        
+        return MultiIndex(1, [final_result])
+    
+    def is_valid_upper_index_always_mapped_to_valid_lower_index(self) -> bool:
+        """Nested merge always maps valid indices."""
+        return True
+    
+    def is_valid_upper_index_mapped_to_valid_lower_index(self, idx_upper: MultiIndex) -> bool:
+        """Check if index is within bounds."""
+        return 0 <= idx_upper[0] < self.get_upper_lengths()[0]
+    
+    def sympy_calculate_lower(self, upper_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Decompose upper symbol using the nested structure."""
+        if len(upper_symbols) != 1:
+            raise ValueError("NestedMergeTransform expects 1 upper symbol")
+        
+        # For now, implement a simple decomposition - could be enhanced later
+        merged_symbol = upper_symbols[0]
+        
+        # Calculate strides for each nested component
+        strides = [1]
+        for i in range(len(self.lengths) - 1, 0, -1):
+            strides.insert(0, strides[0] * self.lengths[i])
+        
+        # Decompose into components
+        lower_symbols = []
+        remaining = merged_symbol
+        
+        for i, length in enumerate(self.lengths):
+            if i < len(self.lengths) - 1:
+                component = remaining // strides[i]
+                remaining = remaining % strides[i]
+            else:
+                component = remaining
+            
+            # Further decompose if this component came from a nested merge
+            item = self.nested_content[i]
+            if isinstance(item, MergeTransform):
+                # Decompose this component further using the nested merge
+                nested_strides = [1]
+                for j in range(len(item.lengths) - 1, 0, -1):
+                    nested_strides.insert(0, nested_strides[0] * item.lengths[j])
+                
+                nested_remaining = component
+                for j, nested_length in enumerate(item.lengths):
+                    if j < len(item.lengths) - 1:
+                        lower_symbols.append(nested_remaining // nested_strides[j])
+                        nested_remaining = nested_remaining % nested_strides[j]
+                    else:
+                        lower_symbols.append(nested_remaining)
+            else:
+                # PassThrough or integer - just add the component
+                lower_symbols.append(component)
+        
+        return lower_symbols
+    
+    def sympy_calculate_upper(self, lower_symbols: List[sp.Expr]) -> List[sp.Expr]:
+        """Merge lower symbols using the nested structure - THIS IS KEY!"""
+        if len(lower_symbols) != self.input_count:
+            raise ValueError(f"Expected {self.input_count} lower symbols, got {len(lower_symbols)}")
+        
+        # Process each item in the nested content
+        input_idx = 0
+        intermediate_results = []
+        
+        for item in self.nested_content:
+            if isinstance(item, PassThroughTransform):
+                # Pass through one input
+                intermediate_results.append(lower_symbols[input_idx])
+                input_idx += 1
+                
+            elif isinstance(item, MergeTransform):
+                # Merge multiple inputs
+                num_inputs = len(item.lengths)
+                merge_inputs = lower_symbols[input_idx:input_idx + num_inputs]
+                
+                # Apply the nested merge transform
+                merge_result = item.sympy_calculate_upper(merge_inputs)[0]
+                intermediate_results.append(merge_result)
+                input_idx += num_inputs
+                
+            else:
+                # Integer or other - pass through
+                intermediate_results.append(lower_symbols[input_idx])
+                input_idx += 1
+        
+        # Now merge all intermediate results into final result
+        if len(intermediate_results) == 1:
+            final_result = intermediate_results[0]
+        else:
+            # Create final merge: sum with appropriate strides
+            final_result = 0
+            stride = 1
+            for i in range(len(intermediate_results) - 1, -1, -1):
+                final_result += intermediate_results[i] * stride
+                stride *= self.lengths[i]
+        
+        return [final_result]
+    
+    def update_lower_index(self, idx_upper_diff: MultiIndex, idx_lower_current: MultiIndex, 
+                          idx_upper_new: MultiIndex) -> Tuple[MultiIndex, MultiIndex]:
+        """Update lower index - implement later if needed."""
+        raise NotImplementedError("NestedMergeTransform update_lower_index not implemented")
+
+
 class EmbedTransform(Transform):
     """
     Embed transform that maps multi-dimensional indices to linear offset.
@@ -1287,7 +1569,8 @@ class TensorDescriptor(TensorAdaptor):
                 
                 # Get length from transform
                 if hasattr(transform, 'get_upper_lengths'):
-                    return transform.get_upper_lengths()[local_idx]
+                    lengths = transform.get_upper_lengths()
+                    return lengths[local_idx]
                 elif hasattr(transform, 'lengths'):
                     return transform.lengths[local_idx]
                 elif hasattr(transform, 'upper_lengths'):
@@ -1462,30 +1745,267 @@ def make_naive_tensor_descriptor_aligned(lengths: List[int], align: int) -> Tens
     return make_naive_tensor_descriptor(lengths, strides)
 
 
+# Helper function to flatten nested transforms
+def flatten_nested_transforms(transforms):
+    """
+    Flatten nested transforms to match C++ behavior.
+    
+    C++ template system automatically flattens nested make_merge_transform calls.
+    For example: make_merge_transform(make_tuple(A, make_merge_transform(make_tuple(B, C))))
+    becomes: make_merge_transform([A, B*C])
+    """
+    flattened = []
+    
+    for transform in transforms:
+        if isinstance(transform, NestedMergeTransform):
+            # Flatten nested merge transforms
+            flattened_lengths = []
+            for item in transform.nested_content:
+                if isinstance(item, Transform):
+                    if isinstance(item, MergeTransform):
+                        # Nested merge: multiply lengths
+                        flattened_lengths.append(math.prod(item.lengths))
+                    elif isinstance(item, PassThroughTransform):
+                        # Pass-through: use its length
+                        flattened_lengths.append(item.length)
+                    else:
+                        raise ValueError(f"Unsupported nested transform: {type(item)}")
+                else:
+                    # Direct integer length
+                    flattened_lengths.append(item)
+            
+            # Replace with flattened merge transform
+            flattened_transform = MergeTransform(flattened_lengths)
+            
+            # IMPORTANT: Preserve hierarchical information for visualization
+            if hasattr(transform, '_hierarchy_info'):
+                flattened_transform._hierarchy_info = transform._hierarchy_info
+                # Also preserve debug ID
+                if hasattr(transform, '_debug_id'):
+                    flattened_transform._debug_id = transform._debug_id
+                debug_id = getattr(transform, '_debug_id', 'no_id')
+                print(f"DEBUG FLATTEN: Preserved hierarchy info during flattening (ID: {debug_id}): {transform._hierarchy_info}")
+            
+            flattened.append(flattened_transform)
+        else:
+            # Regular transform - keep as is
+            flattened.append(transform)
+    
+    return flattened
+
+
+def create_single_stage_descriptor(input_desc, transforms, lower_dimension_old_top_idss, upper_dimension_new_top_idss):
+    """
+    Create a single-stage tensor descriptor using C++-like simple approach.
+    
+    This matches the C++ make_single_stage_tensor_adaptor implementation:
+    - Simple sequential ID assignment
+    - No complex collision avoidance
+    - Direct dimension mapping
+    - Automatic flattening of nested transforms
+    - Combines old and new transforms (does not replace)
+    """
+    # Flatten nested transforms first (match C++ template behavior)
+    flattened_transforms = flatten_nested_transforms(transforms)
+    
+    # Convert tuples to lists for consistency
+    if isinstance(lower_dimension_old_top_idss, tuple):
+        lower_dimension_old_top_idss = list(lower_dimension_old_top_idss)
+    if isinstance(upper_dimension_new_top_idss, tuple):
+        upper_dimension_new_top_idss = list(upper_dimension_new_top_idss)
+    
+    # Get input dimension count
+    ndim_old_top = input_desc.get_num_of_top_dimension()
+    
+    # Calculate new dimension count
+    all_new_top_ids = []
+    for ids in upper_dimension_new_top_idss:
+        all_new_top_ids.extend(ids)
+    ndim_new_top = len(all_new_top_ids)
+    
+    # IMPORTANT: Combine old and new transforms (don't replace)
+    # This matches C++ transform_tensor_descriptor behavior
+    combined_transforms = input_desc.get_transforms() + flattened_transforms
+    
+    # Combine lower dimension mappings
+    old_lower_idss = input_desc.get_lower_dimension_hidden_idss()
+    combined_lower_idss = old_lower_idss + lower_dimension_old_top_idss
+    
+    # Combine upper dimension mappings (offset new ones by total hidden dimensions)
+    old_upper_idss = input_desc.get_upper_dimension_hidden_idss()
+    old_num_hidden = input_desc.get_num_of_hidden_dimension()
+    new_upper_idss = []
+    for ids in upper_dimension_new_top_idss:
+        new_upper_idss.append([id + old_num_hidden for id in ids])
+    combined_upper_idss = old_upper_idss + new_upper_idss
+    
+    # Bottom dimension stays the same
+    bottom_dim_hidden_ids = [0]
+    
+    # Top dimension IDs: sequential from old_num_hidden
+    top_dim_hidden_ids = list(range(old_num_hidden, old_num_hidden + ndim_new_top))
+    
+    # Create new tensor descriptor with combined transforms
+    return TensorDescriptor(
+        transforms=combined_transforms,
+        lower_dimension_hidden_idss=combined_lower_idss,
+        upper_dimension_hidden_idss=combined_upper_idss,
+        top_dimension_hidden_ids=top_dim_hidden_ids,
+        element_space_size=input_desc.get_element_space_size()
+    )
+
+
+def make_merge_transform(lengths: Union[List[int], Tuple]) -> Transform:
+    """
+    Create a merge transform - C++ equivalent with immediate flattening.
+    
+    Args:
+        lengths: List or tuple of integers (dimension lengths) or Transform objects
+        
+    Returns:
+        MergeTransform with flattened lengths (C++ equivalent behavior)
+    """
+    # Convert tuple to list if needed (for make_tuple compatibility)
+    if isinstance(lengths, tuple):
+        lengths = list(lengths)
+    
+    # Check if this contains nested Transform objects
+    if any(isinstance(item, Transform) for item in lengths):
+        # This is a nested case - flatten it immediately (match C++ behavior)
+        flattened_lengths = []
+        for item in lengths:
+            if isinstance(item, Transform):
+                if isinstance(item, MergeTransform):
+                    # Nested merge: multiply lengths
+                    flattened_lengths.append(math.prod(item.lengths))
+                elif isinstance(item, PassThroughTransform):
+                    # Pass-through: use its length
+                    flattened_lengths.append(item.length)
+                else:
+                    raise ValueError(f"Unsupported nested transform in make_merge_transform: {type(item)}")
+            else:
+                # Direct integer length
+                flattened_lengths.append(item)
+        
+        # Return flattened merge transform
+        return MergeTransform(flattened_lengths)
+    else:
+        # Simple case - create normal MergeTransform
+        return MergeTransform(lengths)
+
+
+def make_merge_transform_for_visualization(lengths: Union[List[int], Tuple]) -> Transform:
+    """
+    Create a merge transform - VISUALIZATION VERSION.
+    
+    This version creates NestedMergeTransform objects to preserve hierarchical 
+    structure for proper graph visualization and merge node creation.
+    
+    Used by: tensor_transform_app.py, parser, and other visualization components.
+    
+    Args:
+        lengths: List or tuple of integers (dimension lengths) or Transform objects
+        
+    Returns:
+        MergeTransform or NestedMergeTransform (preserves nested structure)
+    """
+    # Convert tuple to list if needed (for make_tuple compatibility)
+    if isinstance(lengths, tuple):
+        lengths = list(lengths)
+    
+    # Check if this contains nested Transform objects
+    if any(isinstance(item, Transform) for item in lengths):
+        # This is a nested case - return a NestedMergeTransform.
+        # This object will be flattened later by flatten_nested_transforms,
+        # which will correctly preserve hierarchy info for visualization.
+        return NestedMergeTransform(lengths)
+    else:
+        # Simple case - create normal MergeTransform
+        return MergeTransform(lengths)
+
+
 def transform_tensor_descriptor(
     input_descriptor: TensorDescriptor,
-    transforms: List[Transform],
-    lower_dimension_hidden_idss: List[List[int]],
-    upper_dimension_hidden_idss: List[List[int]]
+    transforms: Union[List[Transform], Tuple[Transform, ...]],
+    lower_dimension_hidden_idss: Union[List[List[int]], Tuple],
+    upper_dimension_hidden_idss: Union[List[List[int]], Tuple]
 ) -> TensorDescriptor:
     """
-    Create a new tensor descriptor by applying a sequence of transforms to an input descriptor.
+    Create a new tensor descriptor by applying transforms - C++ EQUIVALENT VERSION.
+    
+    This version matches C++ transform_tensor_adaptor behavior:
+    - Automatic flattening of nested transforms (NestedMergeTransform → MergeTransform)
+    - Single-stage approach with simple sequential ID management
+    - Direct application of new transforms to input
+    
+    Used by: Normal Python API, tests, and C++ equivalent code.
     
     Args:
         input_descriptor: The input tensor descriptor
-        transforms: List of transforms to apply
+        transforms: List or tuple of transforms to apply (supports automatic flattening)
         lower_dimension_hidden_idss: Lower dimension indices for each transform
         upper_dimension_hidden_idss: Upper dimension indices for each transform
         
     Returns:
-        A new TensorDescriptor with the transforms applied
+        A new TensorDescriptor with the transforms applied (C++ equivalent behavior)
     """
+    # Convert tuples to lists for consistency
+    if isinstance(transforms, tuple):
+        transforms = list(transforms)
+    if isinstance(lower_dimension_hidden_idss, tuple):
+        lower_dimension_hidden_idss = list(lower_dimension_hidden_idss)
+    if isinstance(upper_dimension_hidden_idss, tuple):
+        upper_dimension_hidden_idss = list(upper_dimension_hidden_idss)
+    
+    # Apply transforms using single-stage approach with automatic flattening (C++ equivalent)
+    return create_single_stage_descriptor(
+        input_descriptor,
+        transforms,
+        lower_dimension_hidden_idss,
+        upper_dimension_hidden_idss
+    )
+
+
+def transform_tensor_descriptor_for_visualization(
+    input_descriptor: TensorDescriptor,
+    transforms: Union[List[Transform], Tuple[Transform, ...]],
+    lower_dimension_hidden_idss: Union[List[List[int]], Tuple],
+    upper_dimension_hidden_idss: Union[List[List[int]], Tuple]
+) -> TensorDescriptor:
+    """
+    Create a new tensor descriptor by applying transforms - VISUALIZATION VERSION.
+    
+    This version preserves nested transform structures and uses multi-stage approach
+    to maintain hierarchical information needed for proper graph visualization.
+    
+    Used by: tensor_transform_app.py, parser, and other visualization components.
+    
+    Args:
+        input_descriptor: The input tensor descriptor
+        transforms: List or tuple of transforms to apply
+        lower_dimension_hidden_idss: Lower dimension indices for each transform
+        upper_dimension_hidden_idss: Upper dimension indices for each transform
+        
+    Returns:
+        A new TensorDescriptor with the transforms applied (preserving nested structures)
+    """
+    # Convert tuples to lists for consistency
+    if isinstance(transforms, tuple):
+        transforms = list(transforms)
+    if isinstance(lower_dimension_hidden_idss, tuple):
+        lower_dimension_hidden_idss = list(lower_dimension_hidden_idss)
+    if isinstance(upper_dimension_hidden_idss, tuple):
+        upper_dimension_hidden_idss = list(upper_dimension_hidden_idss)
+    
     # Validate input
     if len(transforms) != len(lower_dimension_hidden_idss) or len(transforms) != len(upper_dimension_hidden_idss):
         raise ValueError("Number of transforms must match number of dimension index lists")
     
+    # Flatten nested transforms while preserving hierarchy information for visualization
+    flattened_transforms = flatten_nested_transforms(transforms)
+    
     # Combine transforms from input descriptor and new transforms
-    all_transforms = input_descriptor.get_transforms() + transforms
+    all_transforms = input_descriptor.get_transforms() + flattened_transforms
     
     # Combine dimension mappings
     all_lower_idss = input_descriptor.get_lower_dimension_hidden_idss() + lower_dimension_hidden_idss
@@ -1508,4 +2028,141 @@ def transform_tensor_descriptor(
         element_space_size=input_descriptor.get_element_space_size(),
         guaranteed_vector_lengths=input_descriptor.guaranteed_vector_lengths,
         guaranteed_vector_strides=input_descriptor.guaranteed_vector_strides
-    ) 
+    )
+
+
+def make_pass_through_transform(length: int) -> PassThroughTransform:
+    """
+    Create a pass-through transform.
+    
+    Args:
+        length: Dimension length
+        
+    Returns:
+        PassThroughTransform
+    """
+    return PassThroughTransform(length)
+
+
+def make_unmerge_transform(lengths: List[int]) -> UnmergeTransform:
+    """
+    Create an unmerge transform.
+    
+    Args:
+        lengths: Dimension lengths
+        
+    Returns:
+        UnmergeTransform
+    """
+    return UnmergeTransform(lengths)
+
+
+def make_embed_transform(lengths: List[int], strides: List[int]) -> EmbedTransform:
+    """
+    Create an embed transform.
+    
+    Args:
+        lengths: Dimension lengths
+        strides: Dimension strides
+        
+    Returns:
+        EmbedTransform
+    """
+    return EmbedTransform(lengths, strides)
+
+
+def make_pad_transform(lower_length: int, left_pad: int, right_pad: int) -> PadTransform:
+    """
+    Create a pad transform.
+    
+    Args:
+        lower_length: Original dimension length
+        left_pad: Left padding size
+        right_pad: Right padding size
+        
+    Returns:
+        PadTransform
+    """
+    return PadTransform(lower_length, left_pad, right_pad)
+
+
+def make_replicate_transform(lengths: List[int]) -> ReplicateTransform:
+    """
+    Create a replicate transform.
+    
+    Args:
+        lengths: Dimension lengths for replication
+        
+    Returns:
+        ReplicateTransform
+    """
+    return ReplicateTransform(lengths)
+
+
+def make_xor_transform(lengths: List[int], apply_modulo: bool = True) -> XorTransform:
+    """
+    Create an XOR transform.
+    
+    Args:
+        lengths: Dimension lengths (must be exactly 2)
+        apply_modulo: Whether to apply modulo operation
+        
+    Returns:
+        XorTransform
+    """
+    return XorTransform(lengths, apply_modulo)
+
+
+def make_offset_transform(element_space_size: int, offset: int) -> OffsetTransform:
+    """
+    Create an offset transform.
+    
+    Args:
+        element_space_size: Size of element space
+        offset: Constant offset to add
+        
+    Returns:
+        OffsetTransform
+    """
+    return OffsetTransform(element_space_size, offset)
+
+
+# Utility functions for C++ compatibility
+
+def make_tuple(*args):
+    """
+    Create a tuple from arguments (C++ compatibility).
+    
+    Args:
+        *args: Variable arguments
+        
+    Returns:
+        Tuple of arguments
+    """
+    return tuple(args)
+
+
+def number(value: int):
+    """
+    Create a number wrapper (C++ number<> compatibility).
+    
+    Args:
+        value: Integer value
+        
+    Returns:
+        The integer value (no wrapper needed in Python)
+    """
+    return value
+
+
+def sequence(*values):
+    """
+    Create a sequence (C++ sequence<> compatibility).
+    
+    Args:
+        *values: Variable arguments
+        
+    Returns:
+        List of values
+    """
+    return list(values) 

@@ -611,7 +611,8 @@ class TensorTransformParser:
         """Convert a parsed transform dictionary to a pytensor Transform object."""
         from pytensor.tensor_descriptor import (
             PassThroughTransform, MergeTransform, UnmergeTransform,
-            PadTransform, OffsetTransform, ReplicateTransform, XorTransform
+            PadTransform, OffsetTransform, ReplicateTransform, XorTransform,
+            make_merge_transform_for_visualization
         )
         
         if variables is None:
@@ -652,21 +653,42 @@ class TensorTransformParser:
             has_nested_merge = any(isinstance(val, dict) and val.get('type') == 'merge' for val in values)
             
             if has_nested_merge:
-                # Create a hierarchical transform representation
-                # Store the hierarchy information for the graph builder
+                # Create a hierarchical transform representation using visualization version
+                # This will create NestedMergeTransform objects that preserve hierarchy
                 hierarchical_info = {
                     'type': 'hierarchical_merge',
                     'structure': values,
                     'is_hierarchical': True
                 }
                 
-                # For now, still create a single MergeTransform but with hierarchy metadata
-                # The graph builder will use this information to create proper nodes
-                lengths = []
+                # Convert the values to transform objects for the visualization version
+                transform_objects = []
                 for val in values:
-                    lengths.extend(self._flatten_merge_lengths(val, variables))
+                    if isinstance(val, dict):
+                        if val.get('type') == 'pass_through':
+                            value = val.get('value', 1)
+                            if isinstance(value, sp.Basic):
+                                safe_variables = {k: v for k, v in variables.items() if not isinstance(v, list)}
+                                value = int(value.subs(safe_variables))
+                            transform_objects.append(PassThroughTransform(length=value))
+                        elif val.get('type') == 'merge':
+                            # Recursively create nested merge
+                            nested_merge = self.create_pytensor_transform(val, variables)
+                            transform_objects.append(nested_merge)
+                        else:
+                            # Create appropriate transform
+                            nested_transform = self.create_pytensor_transform(val, variables)
+                            transform_objects.append(nested_transform)
+                    else:
+                        # Direct integer value - create PassThroughTransform
+                        if isinstance(val, sp.Basic):
+                            safe_variables = {k: v for k, v in variables.items() if not isinstance(v, list)}
+                            val = int(val.subs(safe_variables))
+                        transform_objects.append(PassThroughTransform(length=int(val)))
                 
-                merge_transform = MergeTransform(lengths=lengths)
+                # Use the visualization version to create NestedMergeTransform
+                merge_transform = make_merge_transform_for_visualization(transform_objects)
+                
                 # Add hierarchy information as an attribute
                 merge_transform._hierarchy_info = hierarchical_info
                 return merge_transform
@@ -869,7 +891,7 @@ class TensorTransformParser:
     def create_pytensor_descriptor(self, descriptor_str: str, variables: Dict[str, int] = None) -> 'TensorDescriptor':
         """Parse a tensor descriptor string and create a pytensor TensorDescriptor object."""
         from pytensor.tensor_descriptor import (
-            make_naive_tensor_descriptor_packed, make_naive_tensor_descriptor, transform_tensor_descriptor
+            make_naive_tensor_descriptor_packed, make_naive_tensor_descriptor, transform_tensor_descriptor_for_visualization
         )
         
         if variables is None:
@@ -1072,7 +1094,7 @@ class TensorTransformParser:
                             f"{suggestion}."
                         )
             
-            return transform_tensor_descriptor(
+            return transform_tensor_descriptor_for_visualization(
                 input_descriptor=input_descriptor,
                 transforms=transforms,
                 lower_dimension_hidden_idss=lower_dims,
