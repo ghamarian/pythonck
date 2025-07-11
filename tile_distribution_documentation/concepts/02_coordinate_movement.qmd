@@ -9,11 +9,19 @@ pyodide:
 
 # Advanced Coordinate Operations
 
-Now that you understand transforms, adaptors, and descriptors, it's time to learn advanced coordinate operations. These enable navigation through complex tensor layouts and are essential for tile operations.
+Now that you understand transforms, adaptors, and descriptors, it's time to learn advanced coordinate operations, and how they are used to navigate through complex tensor layouts. Basically, there are two main operations:
+
+- `make_tensor_coordinate`: Create a tensor coordinate from a descriptor and an index
+- `make_tensor_adaptor_coordinate`: Create a tensor adaptor coordinate from an adaptor and an index
+- `move_tensor_coordinate`: Move a tensor coordinate through a descriptor with a given offset
+- `move_tensor_adaptor_coordinate`: Move a tensor adaptor coordinate through an adaptor with a given offset
+
+These operations are basically applying the transforms to the coordinates, that are top dimensions of the descriptor or adaptor, and return the new coordinates. `tensor_coordinate` and `tensor_adaptor_coordinate` are the classes that are used to cache the applications of the transforms to the top dimensions coordinates. It stores the results of the applications of the transforms to the top dimensions coordinates. 
 
 ## Prerequisites
 
 This builds on everything we've learned:
+
 - **MultiIndex**: Basic coordinates
 - **Transforms**: Individual coordinate mappings  
 - **Adaptors**: Transform chains
@@ -62,7 +70,7 @@ print("1️⃣ TensorCoordinate: Descriptor Integration")
 print("-" * 45)
 
 # Create a tensor descriptor first
-tensor_desc = make_naive_tensor_descriptor([4, 3])  # 4x3 matrix
+tensor_desc = make_naive_tensor_descriptor([4, 3], [3, 1])  # 4x3 matrix
 print(f"Tensor descriptor: {tensor_desc.get_lengths()} shape")
 
 # Create tensor coordinate from descriptor + index
@@ -113,7 +121,7 @@ print(f"  Transformation: dimensions swapped as expected")
 
 ## The Power of move_tensor_coordinate
 
-`move_tensor_coordinate` is the key function for navigating tensor layouts. It updates coordinates efficiently through descriptor-defined transformations:
+`move_tensor_coordinate` is the key function for navigating tensor layouts. It updates coordinates efficiently through descriptor-defined transformations by applying the transforms to the top dimensions coordinates if necessary. It recrusively checks and updates the coordinates that are affected by the higher level transforms. If they are unchanged, no transform operation is propagated to the lower level coordinates.
 
 ```{pyodide}
 print("3️⃣ move_tensor_coordinate: Efficient Navigation")
@@ -210,7 +218,7 @@ print("6️⃣ Movement Efficiency")
 print("-" * 25)
 
 # Demonstrate why movement is efficient
-desc = make_naive_tensor_descriptor([100, 100])  # Large tensor
+desc = make_naive_tensor_descriptor([100, 100], [100, 1])  # Large tensor
 coord = make_tensor_coordinate(desc, [50, 50])   # Middle position
 
 print("❌ Inefficient approach:")
@@ -238,7 +246,7 @@ print("7️⃣ Advanced Movement Patterns")
 print("-" * 35)
 
 # Create a coordinate for demonstration
-desc = make_naive_tensor_descriptor([8, 8])
+desc = make_naive_tensor_descriptor([8, 8], [8, 1])
 coord = make_tensor_coordinate(desc, [0, 0])
 
 print("🌟 Pattern 1: Row-wise scan")
@@ -274,13 +282,13 @@ print("-" * 35)
 
 def test_tensor_coordinate_creation():
     """Test creating tensor coordinates from descriptors."""
-    desc = make_naive_tensor_descriptor([3, 4])
+    desc = make_naive_tensor_descriptor([3, 4], [4, 1])
     coord = make_tensor_coordinate(desc, [1, 2])
     return coord.get_index().to_list() == [1, 2] and coord.get_offset() == 6
 
 def test_coordinate_movement():
     """Test basic coordinate movement."""
-    desc = make_naive_tensor_descriptor([5, 5])
+    desc = make_naive_tensor_descriptor([5, 5], [5, 1])
     coord = make_tensor_coordinate(desc, [1, 1])
     initial_offset = coord.get_offset()
     move_tensor_coordinate(desc, coord, [1, 1])
@@ -327,26 +335,26 @@ Advanced coordinate operations are the bridge between mathematical transforms an
 
 **1. TensorCoordinate: Descriptor-aware navigation**
 
-   - ✅ Combines MultiIndex with descriptor context
-   - ✅ Provides linear offset for memory access  
-   - ✅ Enables descriptor-validated operations
+   -  Tracks the position of a tensor in a descriptor
+   -  Provides linear offset for memory access (bottom index) 
+   -  Enables descriptor-validated operations
 
 **2. TensorAdaptorCoordinate: Adaptor-aware tracking**
 
-   - ✅ Tracks coordinates through transformation chains
-   - ✅ Handles complex multi-stage transformations
-   - ✅ Enables efficient pipeline navigation
+   -  Tracks coordinates through transformation chains
+   -  Handles complex multi-stage transformations
+   -  Enables efficient pipeline navigation
 
 **3. move_tensor_coordinate: Efficient navigation**
 
-   - ✅ Updates coordinates without full recalculation
-   - ✅ Essential for high-performance operations
-   - ✅ Used by all tile and distribution operations
+   -  Updates coordinates without full recalculation
+   -  Essential for high-performance operations
+   -  Used by all tile and distribution operations
 
 **4. Real-world applications:**
 
-   - ✅ Tile window positioning and traversal
-   - ✅ Thread coordinate mapping and distribution
-   - ✅ Memory layout navigation and optimization
+   -  Tile window positioning and traversal
+   -  Thread coordinate mapping and distribution
+   -  Memory layout navigation and optimization
 
 These operations form the foundation for all advanced tensor operations in the system. Master them, and you're ready for the Distribution API! 

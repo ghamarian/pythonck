@@ -505,12 +505,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#complete-learning-journey" id="toc-complete-learning-journey" class="nav-link active" data-scroll-target="#complete-learning-journey">🎓 <strong>Complete Learning Journey</strong></a>
   <ul class="collapse">
   <li><a href="#introduction-and-motivation" id="toc-introduction-and-motivation" class="nav-link" data-scroll-target="#introduction-and-motivation"><strong>Introduction and Motivation</strong></a></li>
-  <li><a href="#foundation" id="toc-foundation" class="nav-link" data-scroll-target="#foundation"><strong>Foundation</strong> ✅</a></li>
-  <li><a href="#transformation-engine" id="toc-transformation-engine" class="nav-link" data-scroll-target="#transformation-engine"><strong>Transformation Engine</strong> ✅</a></li>
-  <li><a href="#distribution-api" id="toc-distribution-api" class="nav-link" data-scroll-target="#distribution-api"><strong>Distribution API</strong> ✅</a></li>
-  <li><a href="#coordinate-systems" id="toc-coordinate-systems" class="nav-link" data-scroll-target="#coordinate-systems"><strong>Coordinate Systems</strong> ✅</a></li>
-  <li><a href="#implementation-deep-dive" id="toc-implementation-deep-dive" class="nav-link" data-scroll-target="#implementation-deep-dive"><strong>Implementation Deep Dive</strong> ✅</a></li>
-  <li><a href="#thread-mapping" id="toc-thread-mapping" class="nav-link" data-scroll-target="#thread-mapping"><strong>Thread Mapping</strong> ✅</a></li>
+  <li><a href="#foundation" id="toc-foundation" class="nav-link" data-scroll-target="#foundation"><strong>Foundation</strong></a></li>
+  <li><a href="#transformation-engine" id="toc-transformation-engine" class="nav-link" data-scroll-target="#transformation-engine"><strong>Transformation Engine</strong></a></li>
+  <li><a href="#distribution-api" id="toc-distribution-api" class="nav-link" data-scroll-target="#distribution-api"><strong>Distribution API</strong></a></li>
+  <li><a href="#coordinate-systems" id="toc-coordinate-systems" class="nav-link" data-scroll-target="#coordinate-systems"><strong>Coordinate Systems</strong></a></li>
+  <li><a href="#implementation-deep-dive" id="toc-implementation-deep-dive" class="nav-link" data-scroll-target="#implementation-deep-dive"><strong>Implementation Deep Dive</strong></a></li>
+  <li><a href="#thread-mapping" id="toc-thread-mapping" class="nav-link" data-scroll-target="#thread-mapping"><strong>Thread Mapping</strong></a></li>
   <li><a href="#coming-soon" id="toc-coming-soon" class="nav-link" data-scroll-target="#coming-soon"><strong>Coming Soon</strong></a></li>
   </ul></li>
   <li><a href="#interactive-applications" id="toc-interactive-applications" class="nav-link" data-scroll-target="#interactive-applications">🎮 <strong>Interactive Applications</strong></a>
@@ -566,24 +566,25 @@ eyJhdHRyIjp7ImF1dG9ydW4iOnRydWUsImVjaG8iOmZhbHNlLCJlZGl0IjpmYWxzZSwiZXZhbCI6dHJ1
 </ul>
 </section>
 <section id="foundation" class="level3">
-<h3 class="anchored" data-anchor-id="foundation"><strong>Foundation</strong> ✅</h3>
+<h3 class="anchored" data-anchor-id="foundation"><strong>Foundation</strong></h3>
 <ul>
 <li><strong><a href="./concepts/01_buffer_view.html">Buffer Views</a></strong> - Raw memory access</li>
 <li><strong><a href="./concepts/01_tensor_view.html">Tensor Views</a></strong> - Multi-dimensional structure</li>
 </ul>
 </section>
 <section id="transformation-engine" class="level3">
-<h3 class="anchored" data-anchor-id="transformation-engine"><strong>Transformation Engine</strong> ✅</h3>
+<h3 class="anchored" data-anchor-id="transformation-engine"><strong>Transformation Engine</strong></h3>
 <ul>
 <li><strong><a href="./concepts/02_tensor_coordinates.html">Basic Coordinates</a></strong> - MultiIndex fundamentals</li>
 <li><strong><a href="./concepts/02_transforms.html">Individual Transforms</a></strong> - Building blocks (EmbedTransform, UnmergeTransform, etc.)</li>
 <li><strong><a href="./concepts/02_adaptors.html">Chaining Adaptors</a></strong> - Combining transforms into complex operations</li>
 <li><strong><a href="./concepts/02_descriptors.html">Complete Descriptors</a></strong> - Full tensor specifications with layouts</li>
+<li><strong><a href="./concepts/02_convolution_example.html">Convolution Example</a></strong> - Practical tensor descriptor usage with convolution operations</li>
 <li><strong><a href="./concepts/02_coordinate_movement.html">Advanced Coordinates</a></strong> - TensorCoordinate and movement operations</li>
 </ul>
 </section>
 <section id="distribution-api" class="level3">
-<h3 class="anchored" data-anchor-id="distribution-api"><strong>Distribution API</strong> ✅</h3>
+<h3 class="anchored" data-anchor-id="distribution-api"><strong>Distribution API</strong></h3>
 <ul>
 <li><strong><a href="./concepts/03_tile_distribution.html">Tile Distribution</a></strong> - The core API for work assignment</li>
 <li><strong><a href="./concepts/03_tile_window.html">Tile Window</a></strong> - Data access gateway with windowing</li>
@@ -591,20 +592,20 @@ eyJhdHRyIjp7ImF1dG9ydW4iOnRydWUsImVjaG8iOmZhbHNlLCJlZGl0IjpmYWxzZSwiZXZhbCI6dHJ1
 </ul>
 </section>
 <section id="coordinate-systems" class="level3">
-<h3 class="anchored" data-anchor-id="coordinate-systems"><strong>Coordinate Systems</strong> ✅</h3>
+<h3 class="anchored" data-anchor-id="coordinate-systems"><strong>Coordinate Systems</strong></h3>
 <ul>
 <li><strong><a href="./concepts/04_coordinate_systems.html">Coordinate Systems</a></strong> - The mathematical foundation (P, Y, X, R, D spaces)</li>
 </ul>
 </section>
 <section id="implementation-deep-dive" class="level3">
-<h3 class="anchored" data-anchor-id="implementation-deep-dive"><strong>Implementation Deep Dive</strong> ✅</h3>
+<h3 class="anchored" data-anchor-id="implementation-deep-dive"><strong>Implementation Deep Dive</strong></h3>
 <ul>
 <li><strong><a href="./concepts/05_encoding_internals.html">Encoding Internals</a></strong> - How mathematical encoding creates transformation components</li>
 <li><strong><a href="./concepts/05_static_distributed_tensor.html">Static Distributed Tensor</a></strong> - Thread-local data containers and organization</li>
 </ul>
 </section>
 <section id="thread-mapping" class="level3">
-<h3 class="anchored" data-anchor-id="thread-mapping"><strong>Thread Mapping</strong> ✅</h3>
+<h3 class="anchored" data-anchor-id="thread-mapping"><strong>Thread Mapping</strong></h3>
 <ul>
 <li><strong><a href="./concepts/06_thread_mapping.html">Thread Mapping</a></strong> - Connecting to hardware, thread cooperation patterns</li>
 </ul>
@@ -1180,77 +1181,78 @@ window._ojs.runtime.interpretFromScriptTags();
 <span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a><span class="fu">### **Introduction and Motivation**</span></span>
 <span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Introduction and Motivation](concepts/00_introduction_motivation.qmd)** - Why tile distribution matters, GPU memory challenges, and the solution overview</span>
 <span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a><span class="fu">### **Foundation** ✅</span></span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a><span class="fu">### **Foundation** </span></span>
 <span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Buffer Views](concepts/01_buffer_view.qmd)** - Raw memory access</span>
 <span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Tensor Views](concepts/01_tensor_view.qmd)** - Multi-dimensional structure</span>
 <span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a><span class="fu">### **Transformation Engine** ✅</span></span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a><span class="fu">### **Transformation Engine** </span></span>
 <span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Basic Coordinates](concepts/02_tensor_coordinates.qmd)** - MultiIndex fundamentals</span>
 <span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Individual Transforms](concepts/02_transforms.qmd)** - Building blocks (EmbedTransform, UnmergeTransform, etc.)</span>
 <span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Chaining Adaptors](concepts/02_adaptors.qmd)** - Combining transforms into complex operations</span>
 <span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Complete Descriptors](concepts/02_descriptors.qmd)** - Full tensor specifications with layouts</span>
-<span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Advanced Coordinates](concepts/02_coordinate_movement.qmd)** - TensorCoordinate and movement operations</span>
-<span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-38"><a href="#cb1-38" aria-hidden="true" tabindex="-1"></a><span class="fu">### **Distribution API** ✅</span></span>
-<span id="cb1-39"><a href="#cb1-39" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Tile Distribution](concepts/03_tile_distribution.qmd)** - The core API for work assignment</span>
-<span id="cb1-40"><a href="#cb1-40" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Tile Window](concepts/03_tile_window.qmd)** - Data access gateway with windowing</span>
-<span id="cb1-41"><a href="#cb1-41" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Sweep Tile](concepts/03_sweep_tile.qmd)** - Elegant iteration patterns</span>
-<span id="cb1-42"><a href="#cb1-42" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-43"><a href="#cb1-43" aria-hidden="true" tabindex="-1"></a><span class="fu">### **Coordinate Systems** ✅</span></span>
-<span id="cb1-44"><a href="#cb1-44" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Coordinate Systems](concepts/04_coordinate_systems.qmd)** - The mathematical foundation (P, Y, X, R, D spaces)</span>
-<span id="cb1-45"><a href="#cb1-45" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-46"><a href="#cb1-46" aria-hidden="true" tabindex="-1"></a><span class="fu">### **Implementation Deep Dive** ✅</span></span>
-<span id="cb1-47"><a href="#cb1-47" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Encoding Internals](concepts/05_encoding_internals.qmd)** - How mathematical encoding creates transformation components</span>
-<span id="cb1-48"><a href="#cb1-48" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Static Distributed Tensor](concepts/05_static_distributed_tensor.qmd)** - Thread-local data containers and organization</span>
-<span id="cb1-49"><a href="#cb1-49" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-50"><a href="#cb1-50" aria-hidden="true" tabindex="-1"></a><span class="fu">### **Thread Mapping** ✅</span></span>
-<span id="cb1-51"><a href="#cb1-51" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Thread Mapping](concepts/06_thread_mapping.qmd)** - Connecting to hardware, thread cooperation patterns</span>
-<span id="cb1-52"><a href="#cb1-52" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-53"><a href="#cb1-53" aria-hidden="true" tabindex="-1"></a><span class="fu">### **Coming Soon**</span></span>
-<span id="cb1-54"><a href="#cb1-54" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Advanced Topics** - Performance optimization and debugging</span>
-<span id="cb1-55"><a href="#cb1-55" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-56"><a href="#cb1-56" aria-hidden="true" tabindex="-1"></a><span class="fu">## 🎮 **Interactive Applications**</span></span>
-<span id="cb1-57"><a href="#cb1-57" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-58"><a href="#cb1-58" aria-hidden="true" tabindex="-1"></a>Explore tile distribution concepts through interactive web applications:</span>
-<span id="cb1-59"><a href="#cb1-59" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-60"><a href="#cb1-60" aria-hidden="true" tabindex="-1"></a><span class="fu">### **[📊 Tile Distribution Visualizer](../app.py)**</span></span>
-<span id="cb1-61"><a href="#cb1-61" aria-hidden="true" tabindex="-1"></a>Interactive visualization of tile distribution structures and GPU memory layouts. Perfect for understanding how data is distributed across parallel processing elements.</span>
-<span id="cb1-62"><a href="#cb1-62" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-63"><a href="#cb1-63" aria-hidden="true" tabindex="-1"></a><span class="fu">### **[🔄 Tensor Transform Visualizer](../tensor_transform_app.py)**  </span></span>
-<span id="cb1-64"><a href="#cb1-64" aria-hidden="true" tabindex="-1"></a>Explore tensor descriptor transformations with visual graphs and mathematical formulas. See how data layouts change through various transformations.</span>
-<span id="cb1-65"><a href="#cb1-65" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-66"><a href="#cb1-66" aria-hidden="true" tabindex="-1"></a><span class="fu">### **[🧵 Thread Visualization App](../thread_visualization_app.py)**</span></span>
-<span id="cb1-67"><a href="#cb1-67" aria-hidden="true" tabindex="-1"></a>Visualize GPU thread coordinate mapping and access patterns. Understand how individual threads access distributed tensor data.</span>
-<span id="cb1-68"><a href="#cb1-68" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-69"><a href="#cb1-69" aria-hidden="true" tabindex="-1"></a><span class="fu">## 🚀 **Quick Test**</span></span>
-<span id="cb1-70"><a href="#cb1-70" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-71"><a href="#cb1-71" aria-hidden="true" tabindex="-1"></a>Let's verify everything is working:</span>
-<span id="cb1-72"><a href="#cb1-72" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-75"><a href="#cb1-75" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
-<span id="cb1-76"><a href="#cb1-76" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
-<span id="cb1-77"><a href="#cb1-77" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
-<span id="cb1-78"><a href="#cb1-78" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-79"><a href="#cb1-79" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
-<span id="cb1-80"><a href="#cb1-80" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.buffer_view <span class="im">import</span> make_buffer_view, AddressSpaceEnum</span>
-<span id="cb1-81"><a href="#cb1-81" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-82"><a href="#cb1-82" aria-hidden="true" tabindex="-1"></a><span class="co"># Quick test</span></span>
-<span id="cb1-83"><a href="#cb1-83" aria-hidden="true" tabindex="-1"></a>data <span class="op">=</span> np.array([<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">4</span>], dtype<span class="op">=</span>np.float32)</span>
-<span id="cb1-84"><a href="#cb1-84" aria-hidden="true" tabindex="-1"></a>buffer_view <span class="op">=</span> make_buffer_view(data, <span class="bu">len</span>(data), AddressSpaceEnum.GLOBAL)</span>
-<span id="cb1-85"><a href="#cb1-85" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-86"><a href="#cb1-86" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"✅ PythonCK loaded successfully!"</span>)</span>
-<span id="cb1-87"><a href="#cb1-87" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"✅ Buffer view created: size = </span><span class="sc">{</span>buffer_view<span class="sc">.</span>buffer_size<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb1-88"><a href="#cb1-88" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"✅ Data type: </span><span class="sc">{</span>buffer_view<span class="sc">.</span>dtype<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb1-89"><a href="#cb1-89" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"🎉 Ready to explore tile distribution!"</span>)</span>
-<span id="cb1-90"><a href="#cb1-90" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb1-91"><a href="#cb1-91" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-92"><a href="#cb1-92" aria-hidden="true" tabindex="-1"></a><span class="fu">## 📖 **How to Use This Documentation**</span></span>
-<span id="cb1-93"><a href="#cb1-93" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-94"><a href="#cb1-94" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>**Follow the learning path** - Each part builds on the previous ones</span>
-<span id="cb1-95"><a href="#cb1-95" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>**Run the code** - All examples are interactive and executable</span>
-<span id="cb1-96"><a href="#cb1-96" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>**Experiment** - Modify the code to deepen your understanding</span>
-<span id="cb1-97"><a href="#cb1-97" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>**Test yourself** - Each section includes validation exercises</span>
-<span id="cb1-98"><a href="#cb1-98" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-99"><a href="#cb1-99" aria-hidden="true" tabindex="-1"></a>Ready to start? Begin with <span class="co">[</span><span class="ot">Part 0: Introduction and Motivation</span><span class="co">](concepts/00_introduction_motivation.qmd)</span>! </span>
+<span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Convolution Example](concepts/02_convolution_example.qmd)** - Practical tensor descriptor usage with convolution operations</span>
+<span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Advanced Coordinates](concepts/02_coordinate_movement.qmd)** - TensorCoordinate and movement operations</span>
+<span id="cb1-38"><a href="#cb1-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-39"><a href="#cb1-39" aria-hidden="true" tabindex="-1"></a><span class="fu">### **Distribution API** </span></span>
+<span id="cb1-40"><a href="#cb1-40" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Tile Distribution](concepts/03_tile_distribution.qmd)** - The core API for work assignment</span>
+<span id="cb1-41"><a href="#cb1-41" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Tile Window](concepts/03_tile_window.qmd)** - Data access gateway with windowing</span>
+<span id="cb1-42"><a href="#cb1-42" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Sweep Tile](concepts/03_sweep_tile.qmd)** - Elegant iteration patterns</span>
+<span id="cb1-43"><a href="#cb1-43" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-44"><a href="#cb1-44" aria-hidden="true" tabindex="-1"></a><span class="fu">### **Coordinate Systems** </span></span>
+<span id="cb1-45"><a href="#cb1-45" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Coordinate Systems](concepts/04_coordinate_systems.qmd)** - The mathematical foundation (P, Y, X, R, D spaces)</span>
+<span id="cb1-46"><a href="#cb1-46" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-47"><a href="#cb1-47" aria-hidden="true" tabindex="-1"></a><span class="fu">### **Implementation Deep Dive** </span></span>
+<span id="cb1-48"><a href="#cb1-48" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Encoding Internals](concepts/05_encoding_internals.qmd)** - How mathematical encoding creates transformation components</span>
+<span id="cb1-49"><a href="#cb1-49" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Static Distributed Tensor](concepts/05_static_distributed_tensor.qmd)** - Thread-local data containers and organization</span>
+<span id="cb1-50"><a href="#cb1-50" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-51"><a href="#cb1-51" aria-hidden="true" tabindex="-1"></a><span class="fu">### **Thread Mapping** </span></span>
+<span id="cb1-52"><a href="#cb1-52" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Thread Mapping](concepts/06_thread_mapping.qmd)** - Connecting to hardware, thread cooperation patterns</span>
+<span id="cb1-53"><a href="#cb1-53" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-54"><a href="#cb1-54" aria-hidden="true" tabindex="-1"></a><span class="fu">### **Coming Soon**</span></span>
+<span id="cb1-55"><a href="#cb1-55" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Advanced Topics** - Performance optimization and debugging</span>
+<span id="cb1-56"><a href="#cb1-56" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-57"><a href="#cb1-57" aria-hidden="true" tabindex="-1"></a><span class="fu">## 🎮 **Interactive Applications**</span></span>
+<span id="cb1-58"><a href="#cb1-58" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-59"><a href="#cb1-59" aria-hidden="true" tabindex="-1"></a>Explore tile distribution concepts through interactive web applications:</span>
+<span id="cb1-60"><a href="#cb1-60" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-61"><a href="#cb1-61" aria-hidden="true" tabindex="-1"></a><span class="fu">### **[📊 Tile Distribution Visualizer](../app.py)**</span></span>
+<span id="cb1-62"><a href="#cb1-62" aria-hidden="true" tabindex="-1"></a>Interactive visualization of tile distribution structures and GPU memory layouts. Perfect for understanding how data is distributed across parallel processing elements.</span>
+<span id="cb1-63"><a href="#cb1-63" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-64"><a href="#cb1-64" aria-hidden="true" tabindex="-1"></a><span class="fu">### **[🔄 Tensor Transform Visualizer](../tensor_transform_app.py)**  </span></span>
+<span id="cb1-65"><a href="#cb1-65" aria-hidden="true" tabindex="-1"></a>Explore tensor descriptor transformations with visual graphs and mathematical formulas. See how data layouts change through various transformations.</span>
+<span id="cb1-66"><a href="#cb1-66" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-67"><a href="#cb1-67" aria-hidden="true" tabindex="-1"></a><span class="fu">### **[🧵 Thread Visualization App](../thread_visualization_app.py)**</span></span>
+<span id="cb1-68"><a href="#cb1-68" aria-hidden="true" tabindex="-1"></a>Visualize GPU thread coordinate mapping and access patterns. Understand how individual threads access distributed tensor data.</span>
+<span id="cb1-69"><a href="#cb1-69" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-70"><a href="#cb1-70" aria-hidden="true" tabindex="-1"></a><span class="fu">## 🚀 **Quick Test**</span></span>
+<span id="cb1-71"><a href="#cb1-71" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-72"><a href="#cb1-72" aria-hidden="true" tabindex="-1"></a>Let's verify everything is working:</span>
+<span id="cb1-73"><a href="#cb1-73" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-76"><a href="#cb1-76" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb1-77"><a href="#cb1-77" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: true</span></span>
+<span id="cb1-78"><a href="#cb1-78" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: true</span></span>
+<span id="cb1-79"><a href="#cb1-79" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-80"><a href="#cb1-80" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb1-81"><a href="#cb1-81" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.buffer_view <span class="im">import</span> make_buffer_view, AddressSpaceEnum</span>
+<span id="cb1-82"><a href="#cb1-82" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-83"><a href="#cb1-83" aria-hidden="true" tabindex="-1"></a><span class="co"># Quick test</span></span>
+<span id="cb1-84"><a href="#cb1-84" aria-hidden="true" tabindex="-1"></a>data <span class="op">=</span> np.array([<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">4</span>], dtype<span class="op">=</span>np.float32)</span>
+<span id="cb1-85"><a href="#cb1-85" aria-hidden="true" tabindex="-1"></a>buffer_view <span class="op">=</span> make_buffer_view(data, <span class="bu">len</span>(data), AddressSpaceEnum.GLOBAL)</span>
+<span id="cb1-86"><a href="#cb1-86" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-87"><a href="#cb1-87" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"✅ PythonCK loaded successfully!"</span>)</span>
+<span id="cb1-88"><a href="#cb1-88" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"✅ Buffer view created: size = </span><span class="sc">{</span>buffer_view<span class="sc">.</span>buffer_size<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-89"><a href="#cb1-89" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"✅ Data type: </span><span class="sc">{</span>buffer_view<span class="sc">.</span>dtype<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-90"><a href="#cb1-90" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"🎉 Ready to explore tile distribution!"</span>)</span>
+<span id="cb1-91"><a href="#cb1-91" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb1-92"><a href="#cb1-92" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-93"><a href="#cb1-93" aria-hidden="true" tabindex="-1"></a><span class="fu">## 📖 **How to Use This Documentation**</span></span>
+<span id="cb1-94"><a href="#cb1-94" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-95"><a href="#cb1-95" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>**Follow the learning path** - Each part builds on the previous ones</span>
+<span id="cb1-96"><a href="#cb1-96" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>**Run the code** - All examples are interactive and executable</span>
+<span id="cb1-97"><a href="#cb1-97" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>**Experiment** - Modify the code to deepen your understanding</span>
+<span id="cb1-98"><a href="#cb1-98" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>**Test yourself** - Each section includes validation exercises</span>
+<span id="cb1-99"><a href="#cb1-99" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-100"><a href="#cb1-100" aria-hidden="true" tabindex="-1"></a>Ready to start? Begin with <span class="co">[</span><span class="ot">Part 0: Introduction and Motivation</span><span class="co">](concepts/00_introduction_motivation.qmd)</span>! </span>
 </code><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></pre></div>
 </div></div></div></div></div>
 </div> <!-- /content -->

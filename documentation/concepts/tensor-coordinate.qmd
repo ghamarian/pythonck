@@ -36,6 +36,7 @@ Input Index → Transforms → TensorCoordinate (Index + Offset)
 ```
 
 **Key characteristics:**
+
 - **Stores the final index**: The transformed multi-dimensional coordinate
 - **Stores the linear offset**: The final memory location after all transformations
 - **Extends TensorAdaptorCoordinate**: Inherits transformation tracking but focuses on the final result
@@ -44,6 +45,7 @@ Input Index → Transforms → TensorCoordinate (Index + Offset)
 ## Why TensorCoordinate Matters
 
 After complex transformations (embedding, merging, unmerging, etc.), you need:
+
 1. **The final index**: Where you are in the logical tensor space
 2. **The linear offset**: Where to actually access memory
 

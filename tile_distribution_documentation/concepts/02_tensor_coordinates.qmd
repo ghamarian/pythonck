@@ -25,17 +25,10 @@ MultiIndex represents a position in N-dimensional space - think of it as GPS coo
 # Auto-install pythonck package
 import micropip
 await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl")
-```
-
-```{pyodide}
 from pytensor.tensor_coordinate import MultiIndex
 import numpy as np
-
-print("🧭 Basic Coordinate System")
-print("=" * 30)
-print("MultiIndex: The foundation of all tensor operations")
-print("Used by: Transforms, Adaptors, Descriptors, and Tensors")
 ```
+
 
 ## MultiIndex: Basic Multi-Dimensional Coordinates
 
@@ -65,7 +58,7 @@ print(f"  After modification: {coord_3d.to_list()}")
 
 ## Why MultiIndex Matters
 
-MultiIndex is a simple but essential compile-time templated container in the C++ codebase. In the Python implementation, it serves as a runtime equivalent that provides:
+MultiIndex is a simple but essential compile-time templated container in the C++ codebase. In the Python implementation, it serves as a runtime equivalent.
 
 ### What MultiIndex Actually Is
 

@@ -338,6 +338,7 @@ Transforms are used throughout PythonCK:
 ## ✅ **Next Steps**
 
 Now that you understand the individual transforms, you can explore:
+
 - [**Tensor Descriptors**](tensor-descriptor.qmd) - How transforms are combined into layout definitions
 - [**Tensor Coordinates**](tensor-coordinate.qmd) - How transforms create final memory-mapped coordinates
 - [**Tensor Adaptors**](tensor-adaptor.qmd) - How transforms are executed as transformation engines

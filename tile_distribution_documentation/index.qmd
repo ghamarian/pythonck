@@ -22,30 +22,31 @@ Follow our structured 8-part learning path:
 ### **Introduction and Motivation**
 - **[Introduction and Motivation](concepts/00_introduction_motivation.qmd)** - Why tile distribution matters, GPU memory challenges, and the solution overview
 
-### **Foundation** ✅
+### **Foundation** 
 - **[Buffer Views](concepts/01_buffer_view.qmd)** - Raw memory access
 - **[Tensor Views](concepts/01_tensor_view.qmd)** - Multi-dimensional structure
 
-### **Transformation Engine** ✅
+### **Transformation Engine** 
 - **[Basic Coordinates](concepts/02_tensor_coordinates.qmd)** - MultiIndex fundamentals
 - **[Individual Transforms](concepts/02_transforms.qmd)** - Building blocks (EmbedTransform, UnmergeTransform, etc.)
 - **[Chaining Adaptors](concepts/02_adaptors.qmd)** - Combining transforms into complex operations
 - **[Complete Descriptors](concepts/02_descriptors.qmd)** - Full tensor specifications with layouts
+- **[Convolution Example](concepts/02_convolution_example.qmd)** - Practical tensor descriptor usage with convolution operations
 - **[Advanced Coordinates](concepts/02_coordinate_movement.qmd)** - TensorCoordinate and movement operations
 
-### **Distribution API** ✅
+### **Distribution API** 
 - **[Tile Distribution](concepts/03_tile_distribution.qmd)** - The core API for work assignment
 - **[Tile Window](concepts/03_tile_window.qmd)** - Data access gateway with windowing
 - **[Sweep Tile](concepts/03_sweep_tile.qmd)** - Elegant iteration patterns
 
-### **Coordinate Systems** ✅
+### **Coordinate Systems** 
 - **[Coordinate Systems](concepts/04_coordinate_systems.qmd)** - The mathematical foundation (P, Y, X, R, D spaces)
 
-### **Implementation Deep Dive** ✅
+### **Implementation Deep Dive** 
 - **[Encoding Internals](concepts/05_encoding_internals.qmd)** - How mathematical encoding creates transformation components
 - **[Static Distributed Tensor](concepts/05_static_distributed_tensor.qmd)** - Thread-local data containers and organization
 
-### **Thread Mapping** ✅
+### **Thread Mapping** 
 - **[Thread Mapping](concepts/06_thread_mapping.qmd)** - Connecting to hardware, thread cooperation patterns
 
 ### **Coming Soon**

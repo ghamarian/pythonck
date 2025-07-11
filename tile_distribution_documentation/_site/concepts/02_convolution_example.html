@@ -360,7 +360,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </ol>
 <section id="setup-and-test-data" class="level2">
 <h2 class="anchored" data-anchor-id="setup-and-test-data">Setup and Test Data</h2>
-<div id="c14fff10" class="cell" data-execution_count="1">
+<div id="403873e8" class="cell" data-execution_count="1">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> sys</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>sys.path.append(<span class="st">'../..'</span>)</span>
@@ -449,7 +449,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="understanding-as_strided-simple-tiling-first" class="level2">
 <h2 class="anchored" data-anchor-id="understanding-as_strided-simple-tiling-first">Understanding as_strided: Simple Tiling First</h2>
 <p>Before diving into convolution, let’s understand how <code>as_strided</code> works with a simple example. We’ll start by tiling our matrix into non-overlapping blocks.</p>
-<div id="e561c36c" class="cell" data-execution_count="2">
+<div id="37e1d207" class="cell" data-execution_count="2">
 <div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> demonstrate_simple_tiling():</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Demonstrate simple tiling with as_strided (no overlap)."""</span></span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    <span class="im">from</span> numpy.lib.stride_tricks <span class="im">import</span> as_strided</span>
@@ -543,7 +543,7 @@ All 2×2 Tiles in Tiled Layout:
 <section id="overlapping-windows-with-as_strided" class="level2">
 <h2 class="anchored" data-anchor-id="overlapping-windows-with-as_strided">Overlapping Windows with as_strided</h2>
 <p>Now let’s see how to create overlapping windows - the foundation of convolution:</p>
-<div id="420a0728" class="cell" data-execution_count="3">
+<div id="e6f775dc" class="cell" data-execution_count="3">
 <div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> demonstrate_overlapping_windows():</span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Demonstrate overlapping windows with as_strided."""</span></span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    <span class="im">from</span> numpy.lib.stride_tricks <span class="im">import</span> as_strided</span>
@@ -640,7 +640,7 @@ Notice the overlap - adjacent windows share columns and rows!</code></pre>
 <section id="naive-convolution-reference" class="level2">
 <h2 class="anchored" data-anchor-id="naive-convolution-reference">1. Naive Convolution Reference</h2>
 <p>Let’s start with the most straightforward implementation using nested loops:</p>
-<div id="9b852d83" class="cell" data-execution_count="4">
+<div id="2d640441" class="cell" data-execution_count="4">
 <div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> naive_convolution_2d(image, kernel):</span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Reference implementation: naive 2D convolution with nested loops."""</span></span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    H, W <span class="op">=</span> image.shape</span>
@@ -682,7 +682,7 @@ Naive Convolution Output:
 <section id="window-extraction-with-numpy-as_strided" class="level2">
 <h2 class="anchored" data-anchor-id="window-extraction-with-numpy-as_strided">2. Window Extraction with NumPy as_strided</h2>
 <p>Now let’s apply what we learned about overlapping windows to convolution. We need to extract all 3×3 windows for convolution:</p>
-<div id="928dd042" class="cell" data-execution_count="5">
+<div id="1cf23fab" class="cell" data-execution_count="5">
 <div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> extract_windows_numpy(image, kernel_size<span class="op">=</span><span class="dv">3</span>):</span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Extract convolution windows using numpy as_strided."""</span></span>
 <span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>    <span class="im">from</span> numpy.lib.stride_tricks <span class="im">import</span> as_strided</span>
@@ -738,7 +738,7 @@ All Windows in Tiled Layout:
 <section id="window-extraction-with-tensor-descriptors" class="level2">
 <h2 class="anchored" data-anchor-id="window-extraction-with-tensor-descriptors">3. Window Extraction with Tensor Descriptors</h2>
 <p>Now let’s achieve the same result using tensor descriptors:</p>
-<div id="83c7d977" class="cell" data-execution_count="6">
+<div id="44bff06d" class="cell" data-execution_count="6">
 <div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> extract_windows_tensor_descriptor(image, kernel_size<span class="op">=</span><span class="dv">3</span>):</span>
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Extract convolution windows using Tensor Descriptors."""</span></span>
 <span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>    H, W <span class="op">=</span> image.shape</span>
@@ -805,7 +805,7 @@ All Windows in Tiled Layout (Tensor Descriptor):
 </ul>
 <section id="verification-numpy-vs-tensor-descriptor-windows" class="level3">
 <h3 class="anchored" data-anchor-id="verification-numpy-vs-tensor-descriptor-windows">Verification: NumPy vs Tensor Descriptor Windows</h3>
-<div id="db2473db" class="cell" data-execution_count="7">
+<div id="34cd447e" class="cell" data-execution_count="7">
 <div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Compare the two approaches</span></span>
 <span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>difference <span class="op">=</span> np.linalg.norm(windows_numpy <span class="op">-</span> windows_td)</span>
 <span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"L2 norm of difference: </span><span class="sc">{</span>difference<span class="sc">}</span><span class="ss">"</span>)</span>
@@ -825,7 +825,7 @@ All Windows in Tiled Layout (Tensor Descriptor):
 <section id="im2col-transformation-with-numpy" class="level2">
 <h2 class="anchored" data-anchor-id="im2col-transformation-with-numpy">4. Im2col Transformation with NumPy</h2>
 <p>The next step is converting our 4D windows to a 2D matrix format suitable for matrix multiplication. This is called the “im2col” (image to column) transformation:</p>
-<div id="c372b2a8" class="cell" data-execution_count="8">
+<div id="0ecbba53" class="cell" data-execution_count="8">
 <div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> im2col_numpy(windows):</span>
 <span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Convert 4D windows to 2D im2col matrix using NumPy."""</span></span>
 <span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>    out_h, out_w, K, K <span class="op">=</span> windows.shape</span>
@@ -879,7 +879,7 @@ Row 15 (window [3,3]):  22  23  24  28  29  30  34  35  36</code></pre>
 <section id="im2col-with-tensor-descriptors" class="level2">
 <h2 class="anchored" data-anchor-id="im2col-with-tensor-descriptors">5. Im2col with Tensor Descriptors</h2>
 <p>Great question! Since we already extracted windows using tensor descriptors, we can simply reshape them just like the NumPy version:</p>
-<div id="733d6bde" class="cell" data-execution_count="9">
+<div id="6bc208e1" class="cell" data-execution_count="9">
 <div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Use the windows we already extracted with tensor descriptors</span></span>
 <span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>im2col_td_simple <span class="op">=</span> windows_td.reshape(<span class="dv">16</span>, <span class="dv">9</span>)</span>
 <span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -907,7 +907,7 @@ Row 2 (window [0,2]):   3   4   5   9  10  11  15  16  17</code></pre>
 <section id="advanced-direct-2d-tensor-descriptor" class="level3">
 <h3 class="anchored" data-anchor-id="advanced-direct-2d-tensor-descriptor">Advanced: Direct 2D Tensor Descriptor</h3>
 <p>However, tensor descriptors can also create the im2col layout directly without intermediate 4D windows. This is useful for GPU implementations:</p>
-<div id="80d91055" class="cell" data-execution_count="10">
+<div id="6d4fef2e" class="cell" data-execution_count="10">
 <div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> create_direct_im2col_descriptor(image, kernel_size<span class="op">=</span><span class="dv">3</span>):</span>
 <span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Create im2col matrix directly using tensor descriptors."""</span></span>
 <span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>    H, W <span class="op">=</span> image.shape</span>
@@ -944,8 +944,8 @@ Row 2 (window [0,2]):   3   4   5   9  10  11  15  16  17</code></pre>
 <pre><code>Direct im2col descriptor shape: [16, 9]
 
 Example: offset for window 0, patch element 0: 0
-Example: offset for window 0, patch element 4: 7
-Example: offset for window 1, patch element 0: 1</code></pre>
+Example: offset for window 0, patch element 4: 0
+Example: offset for window 1, patch element 0: 0</code></pre>
 </div>
 </div>
 </section>
@@ -960,7 +960,7 @@ Example: offset for window 1, patch element 0: 1</code></pre>
 </section>
 <section id="verification-numpy-vs-tensor-descriptor-im2col" class="level3">
 <h3 class="anchored" data-anchor-id="verification-numpy-vs-tensor-descriptor-im2col">Verification: NumPy vs Tensor Descriptor Im2col</h3>
-<div id="22b175c0" class="cell" data-execution_count="11">
+<div id="7e2afe8c" class="cell" data-execution_count="11">
 <div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Compare the simple reshape approaches</span></span>
 <span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>difference <span class="op">=</span> np.linalg.norm(im2col_numpy <span class="op">-</span> im2col_td_simple)</span>
 <span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"L2 norm of difference: </span><span class="sc">{</span>difference<span class="sc">}</span><span class="ss">"</span>)</span>
@@ -980,7 +980,7 @@ Example: offset for window 1, patch element 0: 1</code></pre>
 <section id="convolution-via-matrix-multiplication" class="level2">
 <h2 class="anchored" data-anchor-id="convolution-via-matrix-multiplication">6. Convolution via Matrix Multiplication</h2>
 <p>With our im2col matrix ready, we can now perform convolution using simple matrix multiplication:</p>
-<div id="c080b6f7" class="cell" data-execution_count="12">
+<div id="316399b1" class="cell" data-execution_count="12">
 <div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> convolution_with_im2col(im2col_matrix, kernel, out_shape):</span>
 <span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Perform convolution using im2col matrix multiplication."""</span></span>
 <span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Flatten kernel</span></span>
@@ -1020,7 +1020,7 @@ Convolution via Im2col:
 </div>
 <section id="final-verification-all-methods-equivalent" class="level3">
 <h3 class="anchored" data-anchor-id="final-verification-all-methods-equivalent">Final Verification: All Methods Equivalent</h3>
-<div id="b5116e70" class="cell" data-execution_count="13">
+<div id="0e649baa" class="cell" data-execution_count="13">
 <div class="sourceCode cell-code" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Verify that all methods produce the same result</span></span>
 <span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>difference <span class="op">=</span> np.linalg.norm(reference_output <span class="op">-</span> im2col_output)</span>
 <span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"L2 norm difference (naive vs im2col): </span><span class="sc">{</span>difference<span class="sc">}</span><span class="ss">"</span>)</span>
@@ -1040,7 +1040,7 @@ Convolution via Im2col:
 <section id="multi-channel-convolution" class="level2">
 <h2 class="anchored" data-anchor-id="multi-channel-convolution">7. Multi-Channel Convolution</h2>
 <p>Real-world deep learning scenarios involve multiple input and output channels. Let’s extend our approach:</p>
-<div id="f6e1c60c" class="cell" data-execution_count="14">
+<div id="78e98990" class="cell" data-execution_count="14">
 <div class="sourceCode cell-code" id="cb27"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> multi_channel_convolution():</span>
 <span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Demonstrate multi-channel convolution."""</span></span>
 <span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Create multi-channel input: 6x6x2 (2 input channels)</span></span>
@@ -1181,7 +1181,7 @@ L2 norm difference (reference vs im2col): 0.0
 <ul>
 <li><strong>Memory efficiency</strong>: Tensor descriptors avoid data duplication by creating views</li>
 <li><strong>Parallelization</strong>: Im2col enables massive parallelization through matrix multiplication</li>
-<li><strong>Generalization</strong>: The tensor descriptor approach extends naturally to complex memory patterns</li>
+<li><strong>Generalization</strong>: The tensor descriptor <strong>approach</strong> extends naturally to complex memory patterns</li>
 <li><strong>GPU acceleration</strong>: These transformations form the foundation for efficient GPU kernels</li>
 </ul>
 <p>The tensor descriptor system provides a unified framework for describing these transformations, making it possible to generate efficient code for various hardware architectures automatically. It is also important to note that the tensor descriptor machinary is implmented in compile time C++ code, therefore very efficient. This python implementation is just a simulator to demonstrate the concept.</p>

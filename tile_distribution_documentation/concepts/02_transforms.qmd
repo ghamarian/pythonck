@@ -33,19 +33,19 @@ Transforms are your coordinate conversion tools! They bridge the gap between:
 
 **In C++** (the actual implementation):
 
-- **`CalculateLowerIndex(upper)`**: Upper → Lower ✅ (the core method)
-- **`UpdateLowerIndex(...)`**: Super-fast incremental updates ✅ (performance magic ⚡)
+- **`CalculateLowerIndex(upper)`**: Upper → Lower (the core method)
+- **`UpdateLowerIndex(...)`**: Super-fast incremental updates (performance magic ⚡)
 - **`CalculateUpperIndex(lower)`**: ❌ **NOT IMPLEMENTED!**
 
 **In Python** (convenience wrapper):
 
-- **`calculate_lower_index(upper)`**: Upper → Lower ✅ (maps to C++)
-- **`calculate_upper_index(lower)`**: Lower → Upper ✅ (Python adds this for educational and visualization purposes!)
-- **`update_lower_index(...)`**: Efficient incremental updates, only applyes transforms if the relevant dimension of the lower index has changed ✅ (maps to C++)
+- **`calculate_lower_index(upper)`**: Upper → Lower (maps to C++)
+- **`calculate_upper_index(lower)`**: Lower → Upper (Python adds this for educational and visualization purposes!)
+- **`update_lower_index(...)`**: Efficient incremental updates, only applyes transforms if the relevant dimension of the lower index has changed (maps to C++)
 
 ### 🏷️ What's in a Name?
 
-Transform names describe **what they do**, not which direction they go:
+Transform names describe **what they do**, when going from lower to upper coordinates.
 
 - `EmbedTransform`: Embeds multi-dimensional coords into linear memory
 - `UnmergeTransform`: Unmerges linear offsets into multi-dimensional coords  
@@ -82,22 +82,8 @@ def show_transform_info(transform, name: str):
     print(f"  {name}:")
     print(f"    Type: {type(transform).__name__}")
     
-    # Handle transforms that might not have standard methods
-    if hasattr(transform, 'get_num_of_upper_dimension'):
-        print(f"    Upper dimensions: {transform.get_num_of_upper_dimension()}")
-    else:
-        print(f"    Upper dimensions: N/A")
-        
-    if hasattr(transform, 'get_num_of_lower_dimension'):
-        print(f"    Lower dimensions: {transform.get_num_of_lower_dimension()}")
-    else:
-        print(f"    Lower dimensions: N/A")
-        
-    # Handle is_static method that might not exist
-    if hasattr(transform, 'is_static'):
-        print(f"    Is static: {transform.is_static()}")
-    else:
-        print(f"    Is static: N/A (method not available)")
+    print(f"    Upper dimensions: {transform.get_num_of_upper_dimension()}")
+    print(f"    Lower dimensions: {transform.get_num_of_lower_dimension()}")
 
 print("✅ pytensor imported successfully")
 ```

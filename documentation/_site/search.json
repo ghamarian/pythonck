@@ -235,7 +235,7 @@
     "href": "concepts/tensor-coordinate.html#what-is-a-tensorcoordinate",
     "title": "Tensor Coordinates",
     "section": "What is a TensorCoordinate?",
-    "text": "What is a TensorCoordinate?\nA TensorCoordinate is the end product of the tensor transformation pipeline:\nInput Index → Transforms → TensorCoordinate (Index + Offset)\nKey characteristics: - Stores the final index: The transformed multi-dimensional coordinate - Stores the linear offset: The final memory location after all transformations - Extends TensorAdaptorCoordinate: Inherits transformation tracking but focuses on the final result - Always has a single bottom dimension: The linear offset is stored in hidden dimension [0]",
+    "text": "What is a TensorCoordinate?\nA TensorCoordinate is the end product of the tensor transformation pipeline:\nInput Index → Transforms → TensorCoordinate (Index + Offset)\nKey characteristics:\n\nStores the final index: The transformed multi-dimensional coordinate\nStores the linear offset: The final memory location after all transformations\nExtends TensorAdaptorCoordinate: Inherits transformation tracking but focuses on the final result\nAlways has a single bottom dimension: The linear offset is stored in hidden dimension [0]",
     "crumbs": [
       "Foundation",
       "Tensor Coordinates"
@@ -246,7 +246,7 @@
     "href": "concepts/tensor-coordinate.html#why-tensorcoordinate-matters",
     "title": "Tensor Coordinates",
     "section": "Why TensorCoordinate Matters",
-    "text": "Why TensorCoordinate Matters\nAfter complex transformations (embedding, merging, unmerging, etc.), you need: 1. The final index: Where you are in the logical tensor space 2. The linear offset: Where to actually access memory\nTensorCoordinate provides both pieces of information in a single, convenient container.",
+    "text": "Why TensorCoordinate Matters\nAfter complex transformations (embedding, merging, unmerging, etc.), you need:\n\nThe final index: Where you are in the logical tensor space\nThe linear offset: Where to actually access memory\n\nTensorCoordinate provides both pieces of information in a single, convenient container.",
     "crumbs": [
       "Foundation",
       "Tensor Coordinates"
@@ -1236,7 +1236,7 @@
     "href": "concepts/tensor-transforms.html#next-steps",
     "title": "Tensor Transforms: The Building Blocks",
     "section": "✅ Next Steps",
-    "text": "✅ Next Steps\nNow that you understand the individual transforms, you can explore: - Tensor Descriptors - How transforms are combined into layout definitions - Tensor Coordinates - How transforms create final memory-mapped coordinates - Tensor Adaptors - How transforms are executed as transformation engines\n\nTensor Transforms are the mathematical building blocks that make all coordinate operations possible. Master these four transform types to understand how PythonCK maps between different coordinate spaces.",
+    "text": "✅ Next Steps\nNow that you understand the individual transforms, you can explore:\n\nTensor Descriptors - How transforms are combined into layout definitions\nTensor Coordinates - How transforms create final memory-mapped coordinates\nTensor Adaptors - How transforms are executed as transformation engines\n\n\nTensor Transforms are the mathematical building blocks that make all coordinate operations possible. Master these four transform types to understand how PythonCK maps between different coordinate spaces.",
     "crumbs": [
       "Foundation",
       "Tensor Transforms: The Building Blocks"

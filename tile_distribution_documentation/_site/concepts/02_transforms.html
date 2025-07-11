@@ -568,20 +568,20 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h3 class="anchored" data-anchor-id="the-real-story-c-vs-python">🧭 The Real Story: C++ vs Python</h3>
 <p><strong>In C++</strong> (the actual implementation):</p>
 <ul>
-<li><strong><code>CalculateLowerIndex(upper)</code></strong>: Upper → Lower ✅ (the core method)</li>
-<li><strong><code>UpdateLowerIndex(...)</code></strong>: Super-fast incremental updates ✅ (performance magic ⚡)</li>
+<li><strong><code>CalculateLowerIndex(upper)</code></strong>: Upper → Lower (the core method)</li>
+<li><strong><code>UpdateLowerIndex(...)</code></strong>: Super-fast incremental updates (performance magic ⚡)</li>
 <li><strong><code>CalculateUpperIndex(lower)</code></strong>: ❌ <strong>NOT IMPLEMENTED!</strong></li>
 </ul>
 <p><strong>In Python</strong> (convenience wrapper):</p>
 <ul>
-<li><strong><code>calculate_lower_index(upper)</code></strong>: Upper → Lower ✅ (maps to C++)</li>
-<li><strong><code>calculate_upper_index(lower)</code></strong>: Lower → Upper ✅ (Python adds this for educational and visualization purposes!)</li>
-<li><strong><code>update_lower_index(...)</code></strong>: Efficient incremental updates, only applyes transforms if the relevant dimension of the lower index has changed ✅ (maps to C++)</li>
+<li><strong><code>calculate_lower_index(upper)</code></strong>: Upper → Lower (maps to C++)</li>
+<li><strong><code>calculate_upper_index(lower)</code></strong>: Lower → Upper (Python adds this for educational and visualization purposes!)</li>
+<li><strong><code>update_lower_index(...)</code></strong>: Efficient incremental updates, only applyes transforms if the relevant dimension of the lower index has changed (maps to C++)</li>
 </ul>
 </section>
 <section id="whats-in-a-name" class="level3">
 <h3 class="anchored" data-anchor-id="whats-in-a-name">🏷️ What’s in a Name?</h3>
-<p>Transform names describe <strong>what they do</strong>, not which direction they go:</p>
+<p>Transform names describe <strong>what they do</strong>, when going from lower to upper coordinates.</p>
 <ul>
 <li><code>EmbedTransform</code>: Embeds multi-dimensional coords into linear memory</li>
 <li><code>UnmergeTransform</code>: Unmerges linear offsets into multi-dimensional coords<br>
@@ -602,7 +602,7 @@ eyJhdHRyIjp7ImF1dG9ydW4iOnRydWUsImVjaG8iOmZhbHNlLCJlZGl0IjpmYWxzZSwiZXZhbCI6dHJ1
 
 </div>
 <script type="pyodide-2-contents">
-eyJhdHRyIjp7ImVkaXQiOnRydWUsImV2YWwiOnRydWV9LCJjb2RlIjoiZnJvbSBweXRlbnNvci50ZW5zb3JfZGVzY3JpcHRvciBpbXBvcnQgKFxuICAgIEVtYmVkVHJhbnNmb3JtLFxuICAgIFVubWVyZ2VUcmFuc2Zvcm0sXG4gICAgTWVyZ2VUcmFuc2Zvcm0sXG4gICAgUmVwbGljYXRlVHJhbnNmb3JtLFxuICAgIE9mZnNldFRyYW5zZm9ybSxcbiAgICBQYXNzVGhyb3VnaFRyYW5zZm9ybSxcbiAgICBQYWRUcmFuc2Zvcm1cbilcbmZyb20gcHl0ZW5zb3IudGVuc29yX2Nvb3JkaW5hdGUgaW1wb3J0IE11bHRpSW5kZXhcbmltcG9ydCBudW1weSBhcyBucFxuXG5kZWYgc2hvd190cmFuc2Zvcm1faW5mbyh0cmFuc2Zvcm0sIG5hbWU6IHN0cik6XG4gICAgXCJcIlwiU2hvdyB0cmFuc2Zvcm0gaW5mb3JtYXRpb24uXCJcIlwiXG4gICAgcHJpbnQoZlwiICB7bmFtZX06XCIpXG4gICAgcHJpbnQoZlwiICAgIFR5cGU6IHt0eXBlKHRyYW5zZm9ybSkuX19uYW1lX199XCIpXG4gICAgXG4gICAgIyBIYW5kbGUgdHJhbnNmb3JtcyB0aGF0IG1pZ2h0IG5vdCBoYXZlIHN0YW5kYXJkIG1ldGhvZHNcbiAgICBpZiBoYXNhdHRyKHRyYW5zZm9ybSwgJ2dldF9udW1fb2ZfdXBwZXJfZGltZW5zaW9uJyk6XG4gICAgICAgIHByaW50KGZcIiAgICBVcHBlciBkaW1lbnNpb25zOiB7dHJhbnNmb3JtLmdldF9udW1fb2ZfdXBwZXJfZGltZW5zaW9uKCl9XCIpXG4gICAgZWxzZTpcbiAgICAgICAgcHJpbnQoZlwiICAgIFVwcGVyIGRpbWVuc2lvbnM6IE4vQVwiKVxuICAgICAgICBcbiAgICBpZiBoYXNhdHRyKHRyYW5zZm9ybSwgJ2dldF9udW1fb2ZfbG93ZXJfZGltZW5zaW9uJyk6XG4gICAgICAgIHByaW50KGZcIiAgICBMb3dlciBkaW1lbnNpb25zOiB7dHJhbnNmb3JtLmdldF9udW1fb2ZfbG93ZXJfZGltZW5zaW9uKCl9XCIpXG4gICAgZWxzZTpcbiAgICAgICAgcHJpbnQoZlwiICAgIExvd2VyIGRpbWVuc2lvbnM6IE4vQVwiKVxuICAgICAgICBcbiAgICAjIEhhbmRsZSBpc19zdGF0aWMgbWV0aG9kIHRoYXQgbWlnaHQgbm90IGV4aXN0XG4gICAgaWYgaGFzYXR0cih0cmFuc2Zvcm0sICdpc19zdGF0aWMnKTpcbiAgICAgICAgcHJpbnQoZlwiICAgIElzIHN0YXRpYzoge3RyYW5zZm9ybS5pc19zdGF0aWMoKX1cIilcbiAgICBlbHNlOlxuICAgICAgICBwcmludChmXCIgICAgSXMgc3RhdGljOiBOL0EgKG1ldGhvZCBub3QgYXZhaWxhYmxlKVwiKVxuXG5wcmludChcIuKchSBweXRlbnNvciBpbXBvcnRlZCBzdWNjZXNzZnVsbHlcIikifQ==
+eyJhdHRyIjp7ImVkaXQiOnRydWUsImV2YWwiOnRydWV9LCJjb2RlIjoiZnJvbSBweXRlbnNvci50ZW5zb3JfZGVzY3JpcHRvciBpbXBvcnQgKFxuICAgIEVtYmVkVHJhbnNmb3JtLFxuICAgIFVubWVyZ2VUcmFuc2Zvcm0sXG4gICAgTWVyZ2VUcmFuc2Zvcm0sXG4gICAgUmVwbGljYXRlVHJhbnNmb3JtLFxuICAgIE9mZnNldFRyYW5zZm9ybSxcbiAgICBQYXNzVGhyb3VnaFRyYW5zZm9ybSxcbiAgICBQYWRUcmFuc2Zvcm1cbilcbmZyb20gcHl0ZW5zb3IudGVuc29yX2Nvb3JkaW5hdGUgaW1wb3J0IE11bHRpSW5kZXhcbmltcG9ydCBudW1weSBhcyBucFxuXG5kZWYgc2hvd190cmFuc2Zvcm1faW5mbyh0cmFuc2Zvcm0sIG5hbWU6IHN0cik6XG4gICAgXCJcIlwiU2hvdyB0cmFuc2Zvcm0gaW5mb3JtYXRpb24uXCJcIlwiXG4gICAgcHJpbnQoZlwiICB7bmFtZX06XCIpXG4gICAgcHJpbnQoZlwiICAgIFR5cGU6IHt0eXBlKHRyYW5zZm9ybSkuX19uYW1lX199XCIpXG4gICAgXG4gICAgcHJpbnQoZlwiICAgIFVwcGVyIGRpbWVuc2lvbnM6IHt0cmFuc2Zvcm0uZ2V0X251bV9vZl91cHBlcl9kaW1lbnNpb24oKX1cIilcbiAgICBwcmludChmXCIgICAgTG93ZXIgZGltZW5zaW9uczoge3RyYW5zZm9ybS5nZXRfbnVtX29mX2xvd2VyX2RpbWVuc2lvbigpfVwiKVxuXG5wcmludChcIuKchSBweXRlbnNvciBpbXBvcnRlZCBzdWNjZXNzZnVsbHlcIikifQ==
 </script>
 </div>
 </section>
@@ -1261,19 +1261,19 @@ window._ojs.runtime.interpretFromScriptTags();
 <span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a>**In C++** (the actual implementation):</span>
 <span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`CalculateLowerIndex(upper)`**: Upper → Lower ✅ (the core method)</span>
-<span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`UpdateLowerIndex(...)`**: Super-fast incremental updates ✅ (performance magic ⚡)</span>
+<span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`CalculateLowerIndex(upper)`**: Upper → Lower (the core method)</span>
+<span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`UpdateLowerIndex(...)`**: Super-fast incremental updates (performance magic ⚡)</span>
 <span id="cb1-38"><a href="#cb1-38" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`CalculateUpperIndex(lower)`**: ❌ **NOT IMPLEMENTED!**</span>
 <span id="cb1-39"><a href="#cb1-39" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-40"><a href="#cb1-40" aria-hidden="true" tabindex="-1"></a>**In Python** (convenience wrapper):</span>
 <span id="cb1-41"><a href="#cb1-41" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-42"><a href="#cb1-42" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`calculate_lower_index(upper)`**: Upper → Lower ✅ (maps to C++)</span>
-<span id="cb1-43"><a href="#cb1-43" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`calculate_upper_index(lower)`**: Lower → Upper ✅ (Python adds this for educational and visualization purposes!)</span>
-<span id="cb1-44"><a href="#cb1-44" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`update_lower_index(...)`**: Efficient incremental updates, only applyes transforms if the relevant dimension of the lower index has changed ✅ (maps to C++)</span>
+<span id="cb1-42"><a href="#cb1-42" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`calculate_lower_index(upper)`**: Upper → Lower (maps to C++)</span>
+<span id="cb1-43"><a href="#cb1-43" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`calculate_upper_index(lower)`**: Lower → Upper (Python adds this for educational and visualization purposes!)</span>
+<span id="cb1-44"><a href="#cb1-44" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`update_lower_index(...)`**: Efficient incremental updates, only applyes transforms if the relevant dimension of the lower index has changed (maps to C++)</span>
 <span id="cb1-45"><a href="#cb1-45" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-46"><a href="#cb1-46" aria-hidden="true" tabindex="-1"></a><span class="fu">### 🏷️ What's in a Name?</span></span>
 <span id="cb1-47"><a href="#cb1-47" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-48"><a href="#cb1-48" aria-hidden="true" tabindex="-1"></a>Transform names describe **what they do**, not which direction they go:</span>
+<span id="cb1-48"><a href="#cb1-48" aria-hidden="true" tabindex="-1"></a>Transform names describe **what they do**, when going from lower to upper coordinates.</span>
 <span id="cb1-49"><a href="#cb1-49" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-50"><a href="#cb1-50" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`EmbedTransform`</span>: Embeds multi-dimensional coords into linear memory</span>
 <span id="cb1-51"><a href="#cb1-51" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`UnmergeTransform`</span>: Unmerges linear offsets into multi-dimensional coords  </span>
@@ -1310,339 +1310,325 @@ window._ojs.runtime.interpretFromScriptTags();
 <span id="cb1-86"><a href="#cb1-86" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  </span><span class="sc">{</span>name<span class="sc">}</span><span class="ss">:"</span>)</span>
 <span id="cb1-87"><a href="#cb1-87" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"    Type: </span><span class="sc">{</span><span class="bu">type</span>(transform)<span class="sc">.</span><span class="va">__name__</span><span class="sc">}</span><span class="ss">"</span>)</span>
 <span id="cb1-88"><a href="#cb1-88" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb1-89"><a href="#cb1-89" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Handle transforms that might not have standard methods</span></span>
-<span id="cb1-90"><a href="#cb1-90" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="bu">hasattr</span>(transform, <span class="st">'get_num_of_upper_dimension'</span>):</span>
-<span id="cb1-91"><a href="#cb1-91" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"    Upper dimensions: </span><span class="sc">{</span>transform<span class="sc">.</span>get_num_of_upper_dimension()<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb1-92"><a href="#cb1-92" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span>:</span>
-<span id="cb1-93"><a href="#cb1-93" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"    Upper dimensions: N/A"</span>)</span>
-<span id="cb1-94"><a href="#cb1-94" aria-hidden="true" tabindex="-1"></a>        </span>
-<span id="cb1-95"><a href="#cb1-95" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="bu">hasattr</span>(transform, <span class="st">'get_num_of_lower_dimension'</span>):</span>
-<span id="cb1-96"><a href="#cb1-96" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"    Lower dimensions: </span><span class="sc">{</span>transform<span class="sc">.</span>get_num_of_lower_dimension()<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb1-97"><a href="#cb1-97" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span>:</span>
-<span id="cb1-98"><a href="#cb1-98" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"    Lower dimensions: N/A"</span>)</span>
-<span id="cb1-99"><a href="#cb1-99" aria-hidden="true" tabindex="-1"></a>        </span>
-<span id="cb1-100"><a href="#cb1-100" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Handle is_static method that might not exist</span></span>
-<span id="cb1-101"><a href="#cb1-101" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="bu">hasattr</span>(transform, <span class="st">'is_static'</span>):</span>
-<span id="cb1-102"><a href="#cb1-102" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"    Is static: </span><span class="sc">{</span>transform<span class="sc">.</span>is_static()<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb1-103"><a href="#cb1-103" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span>:</span>
-<span id="cb1-104"><a href="#cb1-104" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"    Is static: N/A (method not available)"</span>)</span>
+<span id="cb1-89"><a href="#cb1-89" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"    Upper dimensions: </span><span class="sc">{</span>transform<span class="sc">.</span>get_num_of_upper_dimension()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-90"><a href="#cb1-90" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"    Lower dimensions: </span><span class="sc">{</span>transform<span class="sc">.</span>get_num_of_lower_dimension()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-91"><a href="#cb1-91" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-92"><a href="#cb1-92" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"✅ pytensor imported successfully"</span>)</span>
+<span id="cb1-93"><a href="#cb1-93" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb1-94"><a href="#cb1-94" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-95"><a href="#cb1-95" aria-hidden="true" tabindex="-1"></a><span class="fu">## 1. EmbedTransform: Linear Memory → Multi-dimensional</span></span>
+<span id="cb1-96"><a href="#cb1-96" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-97"><a href="#cb1-97" aria-hidden="true" tabindex="-1"></a>EmbedTransform maps linear memory addresses to multi-dimensional coordinates using strides. Again the <span class="in">`calculate_lower_index`</span> method is the reverse of the semantics meaning it returns a one dimensional index.</span>
+<span id="cb1-98"><a href="#cb1-98" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-101"><a href="#cb1-101" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb1-102"><a href="#cb1-102" aria-hidden="true" tabindex="-1"></a><span class="co"># Create 2D → 1D embedding with strides [6, 1]</span></span>
+<span id="cb1-103"><a href="#cb1-103" aria-hidden="true" tabindex="-1"></a>embed <span class="op">=</span> EmbedTransform([<span class="dv">2</span>, <span class="dv">3</span>], [<span class="dv">6</span>, <span class="dv">1</span>])</span>
+<span id="cb1-104"><a href="#cb1-104" aria-hidden="true" tabindex="-1"></a>show_transform_info(embed, <span class="st">"EmbedTransform"</span>)</span>
 <span id="cb1-105"><a href="#cb1-105" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-106"><a href="#cb1-106" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"✅ pytensor imported successfully"</span>)</span>
-<span id="cb1-107"><a href="#cb1-107" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb1-108"><a href="#cb1-108" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-109"><a href="#cb1-109" aria-hidden="true" tabindex="-1"></a><span class="fu">## 1. EmbedTransform: Linear Memory → Multi-dimensional</span></span>
-<span id="cb1-110"><a href="#cb1-110" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-111"><a href="#cb1-111" aria-hidden="true" tabindex="-1"></a>EmbedTransform maps linear memory addresses to multi-dimensional coordinates using strides. Again the <span class="in">`calculate_lower_index`</span> method is the reverse of the semantics meaning it returns a one dimensional index.</span>
-<span id="cb1-112"><a href="#cb1-112" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-115"><a href="#cb1-115" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
-<span id="cb1-116"><a href="#cb1-116" aria-hidden="true" tabindex="-1"></a><span class="co"># Create 2D → 1D embedding with strides [6, 1]</span></span>
-<span id="cb1-117"><a href="#cb1-117" aria-hidden="true" tabindex="-1"></a>embed <span class="op">=</span> EmbedTransform([<span class="dv">2</span>, <span class="dv">3</span>], [<span class="dv">6</span>, <span class="dv">1</span>])</span>
-<span id="cb1-118"><a href="#cb1-118" aria-hidden="true" tabindex="-1"></a>show_transform_info(embed, <span class="st">"EmbedTransform"</span>)</span>
-<span id="cb1-119"><a href="#cb1-119" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-120"><a href="#cb1-120" aria-hidden="true" tabindex="-1"></a><span class="co"># Forward transformation: 2D → 1D</span></span>
-<span id="cb1-121"><a href="#cb1-121" aria-hidden="true" tabindex="-1"></a>test_coords <span class="op">=</span> [[<span class="dv">0</span>, <span class="dv">0</span>], [<span class="dv">0</span>, <span class="dv">2</span>], [<span class="dv">1</span>, <span class="dv">0</span>], [<span class="dv">1</span>, <span class="dv">2</span>]]</span>
-<span id="cb1-122"><a href="#cb1-122" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"  Forward (upper → lower):"</span>)</span>
-<span id="cb1-123"><a href="#cb1-123" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> coord_list <span class="kw">in</span> test_coords:</span>
-<span id="cb1-124"><a href="#cb1-124" aria-hidden="true" tabindex="-1"></a>    upper_coord <span class="op">=</span> MultiIndex(<span class="dv">2</span>, coord_list)</span>
-<span id="cb1-125"><a href="#cb1-125" aria-hidden="true" tabindex="-1"></a>    lower_coord <span class="op">=</span> embed.calculate_lower_index(upper_coord)</span>
-<span id="cb1-126"><a href="#cb1-126" aria-hidden="true" tabindex="-1"></a>    calculation <span class="op">=</span> coord_list[<span class="dv">0</span>] <span class="op">*</span> <span class="dv">6</span> <span class="op">+</span> coord_list[<span class="dv">1</span>] <span class="op">*</span> <span class="dv">1</span></span>
-<span id="cb1-127"><a href="#cb1-127" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"    </span><span class="sc">{</span>coord_list<span class="sc">}</span><span class="ss"> → </span><span class="sc">{</span>lower_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">: (</span><span class="sc">{</span>coord_list[<span class="dv">0</span>]<span class="sc">}</span><span class="ss">*6 + </span><span class="sc">{</span>coord_list[<span class="dv">1</span>]<span class="sc">}</span><span class="ss">*1 = </span><span class="sc">{</span>calculation<span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="cb1-106"><a href="#cb1-106" aria-hidden="true" tabindex="-1"></a><span class="co"># Forward transformation: 2D → 1D</span></span>
+<span id="cb1-107"><a href="#cb1-107" aria-hidden="true" tabindex="-1"></a>test_coords <span class="op">=</span> [[<span class="dv">0</span>, <span class="dv">0</span>], [<span class="dv">0</span>, <span class="dv">2</span>], [<span class="dv">1</span>, <span class="dv">0</span>], [<span class="dv">1</span>, <span class="dv">2</span>]]</span>
+<span id="cb1-108"><a href="#cb1-108" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"  Forward (upper → lower):"</span>)</span>
+<span id="cb1-109"><a href="#cb1-109" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> coord_list <span class="kw">in</span> test_coords:</span>
+<span id="cb1-110"><a href="#cb1-110" aria-hidden="true" tabindex="-1"></a>    upper_coord <span class="op">=</span> MultiIndex(<span class="dv">2</span>, coord_list)</span>
+<span id="cb1-111"><a href="#cb1-111" aria-hidden="true" tabindex="-1"></a>    lower_coord <span class="op">=</span> embed.calculate_lower_index(upper_coord)</span>
+<span id="cb1-112"><a href="#cb1-112" aria-hidden="true" tabindex="-1"></a>    calculation <span class="op">=</span> coord_list[<span class="dv">0</span>] <span class="op">*</span> <span class="dv">6</span> <span class="op">+</span> coord_list[<span class="dv">1</span>] <span class="op">*</span> <span class="dv">1</span></span>
+<span id="cb1-113"><a href="#cb1-113" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"    </span><span class="sc">{</span>coord_list<span class="sc">}</span><span class="ss"> → </span><span class="sc">{</span>lower_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">: (</span><span class="sc">{</span>coord_list[<span class="dv">0</span>]<span class="sc">}</span><span class="ss">*6 + </span><span class="sc">{</span>coord_list[<span class="dv">1</span>]<span class="sc">}</span><span class="ss">*1 = </span><span class="sc">{</span>calculation<span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="cb1-114"><a href="#cb1-114" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-115"><a href="#cb1-115" aria-hidden="true" tabindex="-1"></a><span class="co"># Backward transformation: 1D → 2D</span></span>
+<span id="cb1-116"><a href="#cb1-116" aria-hidden="true" tabindex="-1"></a>test_indices <span class="op">=</span> [<span class="dv">0</span>, <span class="dv">2</span>, <span class="dv">6</span>, <span class="dv">8</span>]</span>
+<span id="cb1-117"><a href="#cb1-117" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"  Backward (lower → upper):"</span>)</span>
+<span id="cb1-118"><a href="#cb1-118" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> idx <span class="kw">in</span> test_indices:</span>
+<span id="cb1-119"><a href="#cb1-119" aria-hidden="true" tabindex="-1"></a>    lower_coord <span class="op">=</span> MultiIndex(<span class="dv">1</span>, [idx])</span>
+<span id="cb1-120"><a href="#cb1-120" aria-hidden="true" tabindex="-1"></a>    upper_coord <span class="op">=</span> embed.calculate_upper_index(lower_coord)</span>
+<span id="cb1-121"><a href="#cb1-121" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"    [</span><span class="sc">{</span>idx<span class="sc">}</span><span class="ss">] → </span><span class="sc">{</span>upper_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-122"><a href="#cb1-122" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb1-123"><a href="#cb1-123" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-124"><a href="#cb1-124" aria-hidden="true" tabindex="-1"></a>**Key Points:**</span>
+<span id="cb1-125"><a href="#cb1-125" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Uses shape <span class="in">`[2, 3]`</span> and strides <span class="in">`[6, 1]`</span> for row-major layout</span>
+<span id="cb1-126"><a href="#cb1-126" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Each row advances by 6 elements, each column by 1 element</span>
+<span id="cb1-127"><a href="#cb1-127" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Essential for GPU memory coalescing</span>
 <span id="cb1-128"><a href="#cb1-128" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-129"><a href="#cb1-129" aria-hidden="true" tabindex="-1"></a><span class="co"># Backward transformation: 1D → 2D</span></span>
-<span id="cb1-130"><a href="#cb1-130" aria-hidden="true" tabindex="-1"></a>test_indices <span class="op">=</span> [<span class="dv">0</span>, <span class="dv">2</span>, <span class="dv">6</span>, <span class="dv">8</span>]</span>
-<span id="cb1-131"><a href="#cb1-131" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"  Backward (lower → upper):"</span>)</span>
-<span id="cb1-132"><a href="#cb1-132" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> idx <span class="kw">in</span> test_indices:</span>
-<span id="cb1-133"><a href="#cb1-133" aria-hidden="true" tabindex="-1"></a>    lower_coord <span class="op">=</span> MultiIndex(<span class="dv">1</span>, [idx])</span>
-<span id="cb1-134"><a href="#cb1-134" aria-hidden="true" tabindex="-1"></a>    upper_coord <span class="op">=</span> embed.calculate_upper_index(lower_coord)</span>
-<span id="cb1-135"><a href="#cb1-135" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"    [</span><span class="sc">{</span>idx<span class="sc">}</span><span class="ss">] → </span><span class="sc">{</span>upper_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb1-136"><a href="#cb1-136" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb1-137"><a href="#cb1-137" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-138"><a href="#cb1-138" aria-hidden="true" tabindex="-1"></a>**Key Points:**</span>
-<span id="cb1-139"><a href="#cb1-139" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Uses shape <span class="in">`[2, 3]`</span> and strides <span class="in">`[6, 1]`</span> for row-major layout</span>
-<span id="cb1-140"><a href="#cb1-140" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Each row advances by 6 elements, each column by 1 element</span>
-<span id="cb1-141"><a href="#cb1-141" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Essential for GPU memory coalescing</span>
-<span id="cb1-142"><a href="#cb1-142" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-143"><a href="#cb1-143" aria-hidden="true" tabindex="-1"></a><span class="fu">## 2. UnmergeTransform: Linear → Multi-dimensional</span></span>
-<span id="cb1-144"><a href="#cb1-144" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-145"><a href="#cb1-145" aria-hidden="true" tabindex="-1"></a>UnmergeTransform unpacks linear indices to multi-dimensional coordinates. However, <span class="in">`calculate_lower_index`</span> is the reverse of the semantics meaning it returns a one dimensional index. </span>
-<span id="cb1-146"><a href="#cb1-146" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-149"><a href="#cb1-149" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
-<span id="cb1-150"><a href="#cb1-150" aria-hidden="true" tabindex="-1"></a><span class="co"># Create 1D → 2D unmerge (2x3 matrix)</span></span>
-<span id="cb1-151"><a href="#cb1-151" aria-hidden="true" tabindex="-1"></a>unmerge <span class="op">=</span> UnmergeTransform([<span class="dv">2</span>, <span class="dv">3</span>])</span>
-<span id="cb1-152"><a href="#cb1-152" aria-hidden="true" tabindex="-1"></a>show_transform_info(unmerge, <span class="st">"UnmergeTransform"</span>)</span>
-<span id="cb1-153"><a href="#cb1-153" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-154"><a href="#cb1-154" aria-hidden="true" tabindex="-1"></a><span class="co"># Forward transformation: 2D → 1D (packing)</span></span>
-<span id="cb1-155"><a href="#cb1-155" aria-hidden="true" tabindex="-1"></a>test_coords <span class="op">=</span> [[<span class="dv">0</span>, <span class="dv">0</span>], [<span class="dv">0</span>, <span class="dv">2</span>], [<span class="dv">1</span>, <span class="dv">0</span>], [<span class="dv">1</span>, <span class="dv">2</span>]]</span>
-<span id="cb1-156"><a href="#cb1-156" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"  Forward (upper → lower):"</span>)</span>
-<span id="cb1-157"><a href="#cb1-157" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> coord_list <span class="kw">in</span> test_coords:</span>
-<span id="cb1-158"><a href="#cb1-158" aria-hidden="true" tabindex="-1"></a>    upper_coord <span class="op">=</span> MultiIndex(<span class="dv">2</span>, coord_list)</span>
-<span id="cb1-159"><a href="#cb1-159" aria-hidden="true" tabindex="-1"></a>    lower_coord <span class="op">=</span> unmerge.calculate_lower_index(upper_coord)</span>
-<span id="cb1-160"><a href="#cb1-160" aria-hidden="true" tabindex="-1"></a>    calculation <span class="op">=</span> coord_list[<span class="dv">0</span>] <span class="op">*</span> <span class="dv">3</span> <span class="op">+</span> coord_list[<span class="dv">1</span>]</span>
-<span id="cb1-161"><a href="#cb1-161" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"    </span><span class="sc">{</span>coord_list<span class="sc">}</span><span class="ss"> → </span><span class="sc">{</span>lower_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">: (</span><span class="sc">{</span>coord_list[<span class="dv">0</span>]<span class="sc">}</span><span class="ss">*3 + </span><span class="sc">{</span>coord_list[<span class="dv">1</span>]<span class="sc">}</span><span class="ss"> = </span><span class="sc">{</span>calculation<span class="sc">}</span><span class="ss">)"</span>)</span>
-<span id="cb1-162"><a href="#cb1-162" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-163"><a href="#cb1-163" aria-hidden="true" tabindex="-1"></a><span class="co"># Backward transformation: 1D → 2D (unpacking)</span></span>
-<span id="cb1-164"><a href="#cb1-164" aria-hidden="true" tabindex="-1"></a>test_indices <span class="op">=</span> [<span class="dv">0</span>, <span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">5</span>]</span>
-<span id="cb1-165"><a href="#cb1-165" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"  Backward (lower → upper):"</span>)</span>
-<span id="cb1-166"><a href="#cb1-166" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> idx <span class="kw">in</span> test_indices:</span>
-<span id="cb1-167"><a href="#cb1-167" aria-hidden="true" tabindex="-1"></a>    lower_coord <span class="op">=</span> MultiIndex(<span class="dv">1</span>, [idx])</span>
-<span id="cb1-168"><a href="#cb1-168" aria-hidden="true" tabindex="-1"></a>    upper_coord <span class="op">=</span> unmerge.calculate_upper_index(lower_coord)</span>
-<span id="cb1-169"><a href="#cb1-169" aria-hidden="true" tabindex="-1"></a>    row <span class="op">=</span> idx <span class="op">//</span> <span class="dv">3</span></span>
-<span id="cb1-170"><a href="#cb1-170" aria-hidden="true" tabindex="-1"></a>    col <span class="op">=</span> idx <span class="op">%</span> <span class="dv">3</span></span>
-<span id="cb1-171"><a href="#cb1-171" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"    [</span><span class="sc">{</span>idx<span class="sc">}</span><span class="ss">] → </span><span class="sc">{</span>upper_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">: (row=</span><span class="sc">{</span>row<span class="sc">}</span><span class="ss">, col=</span><span class="sc">{</span>col<span class="sc">}</span><span class="ss">)"</span>)</span>
-<span id="cb1-172"><a href="#cb1-172" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb1-173"><a href="#cb1-173" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-174"><a href="#cb1-174" aria-hidden="true" tabindex="-1"></a>The difference between <span class="in">`UnmergeTransoform`</span> and <span class="in">`EmbedTransform`</span> is that in <span class="in">`UnmergeTransform`</span> strides are calculated from the lengths of the dimensions whereas in <span class="in">`EmbedTransform`</span> strides are provided as an argument.</span>
-<span id="cb1-175"><a href="#cb1-175" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-176"><a href="#cb1-176" aria-hidden="true" tabindex="-1"></a>**Key Points:**</span>
-<span id="cb1-177"><a href="#cb1-177" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Converts packed linear indices to structured coordinates</span>
-<span id="cb1-178"><a href="#cb1-178" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Uses row-major ordering: <span class="in">`index = row * width + col`</span></span>
-<span id="cb1-179"><a href="#cb1-179" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Critical for tensor reshaping operations</span>
-<span id="cb1-180"><a href="#cb1-180" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-181"><a href="#cb1-181" aria-hidden="true" tabindex="-1"></a><span class="fu">## 3. MergeTransform: Multi-dimensional → Single Dimension</span></span>
-<span id="cb1-182"><a href="#cb1-182" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-183"><a href="#cb1-183" aria-hidden="true" tabindex="-1"></a>MergeTransform collapses multiple dimensions into a single dimension. Like other transforms, the name describes how it convers lower dimensions to the upper dimension. The name's semantic always come from when we go from physical to logical coordinates. In that sense, it merges the lower dimensions into the one upper dimension. However, <span class="in">`calculate_lower_index`</span> is the reverse of the semantics meaning it returns a multi-dimensional index.</span>
-<span id="cb1-184"><a href="#cb1-184" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-187"><a href="#cb1-187" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
-<span id="cb1-188"><a href="#cb1-188" aria-hidden="true" tabindex="-1"></a><span class="co"># Create 2D → 1D merge (collapse 2x3 into single dimension)</span></span>
-<span id="cb1-189"><a href="#cb1-189" aria-hidden="true" tabindex="-1"></a>merge <span class="op">=</span> MergeTransform([<span class="dv">2</span>, <span class="dv">3</span>])</span>
-<span id="cb1-190"><a href="#cb1-190" aria-hidden="true" tabindex="-1"></a>show_transform_info(merge, <span class="st">"MergeTransform"</span>)</span>
-<span id="cb1-191"><a href="#cb1-191" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-192"><a href="#cb1-192" aria-hidden="true" tabindex="-1"></a><span class="co"># Forward transformation: 1D → 2D (splitting)</span></span>
-<span id="cb1-193"><a href="#cb1-193" aria-hidden="true" tabindex="-1"></a>test_indices <span class="op">=</span> [<span class="dv">0</span>, <span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">5</span>]</span>
-<span id="cb1-194"><a href="#cb1-194" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"  Forward (upper → lower):"</span>)</span>
-<span id="cb1-195"><a href="#cb1-195" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> idx <span class="kw">in</span> test_indices:</span>
-<span id="cb1-196"><a href="#cb1-196" aria-hidden="true" tabindex="-1"></a>    upper_coord <span class="op">=</span> MultiIndex(<span class="dv">1</span>, [idx])</span>
-<span id="cb1-197"><a href="#cb1-197" aria-hidden="true" tabindex="-1"></a>    lower_coord <span class="op">=</span> merge.calculate_lower_index(upper_coord)</span>
-<span id="cb1-198"><a href="#cb1-198" aria-hidden="true" tabindex="-1"></a>    row <span class="op">=</span> idx <span class="op">//</span> <span class="dv">3</span></span>
-<span id="cb1-199"><a href="#cb1-199" aria-hidden="true" tabindex="-1"></a>    col <span class="op">=</span> idx <span class="op">%</span> <span class="dv">3</span></span>
-<span id="cb1-200"><a href="#cb1-200" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"    [</span><span class="sc">{</span>idx<span class="sc">}</span><span class="ss">] → </span><span class="sc">{</span>lower_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">: (split to row=</span><span class="sc">{</span>row<span class="sc">}</span><span class="ss">, col=</span><span class="sc">{</span>col<span class="sc">}</span><span class="ss">)"</span>)</span>
-<span id="cb1-201"><a href="#cb1-201" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-202"><a href="#cb1-202" aria-hidden="true" tabindex="-1"></a><span class="co"># Backward transformation: 2D → 1D (merging)</span></span>
-<span id="cb1-203"><a href="#cb1-203" aria-hidden="true" tabindex="-1"></a>test_coords <span class="op">=</span> [[<span class="dv">0</span>, <span class="dv">0</span>], [<span class="dv">0</span>, <span class="dv">2</span>], [<span class="dv">1</span>, <span class="dv">0</span>], [<span class="dv">1</span>, <span class="dv">2</span>]]</span>
-<span id="cb1-204"><a href="#cb1-204" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"  Backward (lower → upper):"</span>)</span>
-<span id="cb1-205"><a href="#cb1-205" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> coord_list <span class="kw">in</span> test_coords:</span>
-<span id="cb1-206"><a href="#cb1-206" aria-hidden="true" tabindex="-1"></a>    lower_coord <span class="op">=</span> MultiIndex(<span class="dv">2</span>, coord_list)</span>
-<span id="cb1-207"><a href="#cb1-207" aria-hidden="true" tabindex="-1"></a>    upper_coord <span class="op">=</span> merge.calculate_upper_index(lower_coord)</span>
-<span id="cb1-208"><a href="#cb1-208" aria-hidden="true" tabindex="-1"></a>    calculation <span class="op">=</span> coord_list[<span class="dv">0</span>] <span class="op">*</span> <span class="dv">3</span> <span class="op">+</span> coord_list[<span class="dv">1</span>]</span>
-<span id="cb1-209"><a href="#cb1-209" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"    </span><span class="sc">{</span>coord_list<span class="sc">}</span><span class="ss"> → </span><span class="sc">{</span>upper_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">: (</span><span class="sc">{</span>coord_list[<span class="dv">0</span>]<span class="sc">}</span><span class="ss">*3 + </span><span class="sc">{</span>coord_list[<span class="dv">1</span>]<span class="sc">}</span><span class="ss"> = </span><span class="sc">{</span>calculation<span class="sc">}</span><span class="ss">)"</span>)</span>
-<span id="cb1-210"><a href="#cb1-210" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb1-211"><a href="#cb1-211" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-212"><a href="#cb1-212" aria-hidden="true" tabindex="-1"></a>**Key Points:**</span>
-<span id="cb1-213"><a href="#cb1-213" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Opposite of UnmergeTransform</span>
-<span id="cb1-214"><a href="#cb1-214" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Useful for flattening multi-dimensional arrays</span>
-<span id="cb1-215"><a href="#cb1-215" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Maintains element ordering</span>
-<span id="cb1-216"><a href="#cb1-216" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-217"><a href="#cb1-217" aria-hidden="true" tabindex="-1"></a><span class="fu">## 4. ReplicateTransform: Data Replication</span></span>
-<span id="cb1-218"><a href="#cb1-218" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-219"><a href="#cb1-219" aria-hidden="true" tabindex="-1"></a>ReplicateTransform handles data replication across multiple processing elements. Basically, in C++ it is a no-op, meaning that it maps multiple upper coordinates to the same empty lower coordinate.</span>
-<span id="cb1-220"><a href="#cb1-220" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-223"><a href="#cb1-223" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
-<span id="cb1-224"><a href="#cb1-224" aria-hidden="true" tabindex="-1"></a><span class="co"># Create replication transform (4 replicas)</span></span>
-<span id="cb1-225"><a href="#cb1-225" aria-hidden="true" tabindex="-1"></a>replicate <span class="op">=</span> ReplicateTransform([<span class="dv">4</span>])</span>
-<span id="cb1-226"><a href="#cb1-226" aria-hidden="true" tabindex="-1"></a>show_transform_info(replicate, <span class="st">"ReplicateTransform"</span>)</span>
-<span id="cb1-227"><a href="#cb1-227" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-228"><a href="#cb1-228" aria-hidden="true" tabindex="-1"></a><span class="co"># Forward transformation: replica index → empty</span></span>
-<span id="cb1-229"><a href="#cb1-229" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"  Forward (upper → lower):"</span>)</span>
-<span id="cb1-230"><a href="#cb1-230" aria-hidden="true" tabindex="-1"></a>test_replicas <span class="op">=</span> [<span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>]</span>
-<span id="cb1-231"><a href="#cb1-231" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> replica <span class="kw">in</span> test_replicas:</span>
-<span id="cb1-232"><a href="#cb1-232" aria-hidden="true" tabindex="-1"></a>    upper_coord <span class="op">=</span> MultiIndex(<span class="dv">1</span>, [replica])  <span class="co"># 1D upper coordinate</span></span>
-<span id="cb1-233"><a href="#cb1-233" aria-hidden="true" tabindex="-1"></a>    lower_coord <span class="op">=</span> replicate.calculate_lower_index(upper_coord)</span>
-<span id="cb1-234"><a href="#cb1-234" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"    [replica </span><span class="sc">{</span>replica<span class="sc">}</span><span class="ss">] → </span><span class="sc">{</span>lower_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">: Replica maps to empty coord"</span>)</span>
+<span id="cb1-129"><a href="#cb1-129" aria-hidden="true" tabindex="-1"></a><span class="fu">## 2. UnmergeTransform: Linear → Multi-dimensional</span></span>
+<span id="cb1-130"><a href="#cb1-130" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-131"><a href="#cb1-131" aria-hidden="true" tabindex="-1"></a>UnmergeTransform unpacks linear indices to multi-dimensional coordinates. However, <span class="in">`calculate_lower_index`</span> is the reverse of the semantics meaning it returns a one dimensional index. </span>
+<span id="cb1-132"><a href="#cb1-132" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-135"><a href="#cb1-135" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb1-136"><a href="#cb1-136" aria-hidden="true" tabindex="-1"></a><span class="co"># Create 1D → 2D unmerge (2x3 matrix)</span></span>
+<span id="cb1-137"><a href="#cb1-137" aria-hidden="true" tabindex="-1"></a>unmerge <span class="op">=</span> UnmergeTransform([<span class="dv">2</span>, <span class="dv">3</span>])</span>
+<span id="cb1-138"><a href="#cb1-138" aria-hidden="true" tabindex="-1"></a>show_transform_info(unmerge, <span class="st">"UnmergeTransform"</span>)</span>
+<span id="cb1-139"><a href="#cb1-139" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-140"><a href="#cb1-140" aria-hidden="true" tabindex="-1"></a><span class="co"># Forward transformation: 2D → 1D (packing)</span></span>
+<span id="cb1-141"><a href="#cb1-141" aria-hidden="true" tabindex="-1"></a>test_coords <span class="op">=</span> [[<span class="dv">0</span>, <span class="dv">0</span>], [<span class="dv">0</span>, <span class="dv">2</span>], [<span class="dv">1</span>, <span class="dv">0</span>], [<span class="dv">1</span>, <span class="dv">2</span>]]</span>
+<span id="cb1-142"><a href="#cb1-142" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"  Forward (upper → lower):"</span>)</span>
+<span id="cb1-143"><a href="#cb1-143" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> coord_list <span class="kw">in</span> test_coords:</span>
+<span id="cb1-144"><a href="#cb1-144" aria-hidden="true" tabindex="-1"></a>    upper_coord <span class="op">=</span> MultiIndex(<span class="dv">2</span>, coord_list)</span>
+<span id="cb1-145"><a href="#cb1-145" aria-hidden="true" tabindex="-1"></a>    lower_coord <span class="op">=</span> unmerge.calculate_lower_index(upper_coord)</span>
+<span id="cb1-146"><a href="#cb1-146" aria-hidden="true" tabindex="-1"></a>    calculation <span class="op">=</span> coord_list[<span class="dv">0</span>] <span class="op">*</span> <span class="dv">3</span> <span class="op">+</span> coord_list[<span class="dv">1</span>]</span>
+<span id="cb1-147"><a href="#cb1-147" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"    </span><span class="sc">{</span>coord_list<span class="sc">}</span><span class="ss"> → </span><span class="sc">{</span>lower_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">: (</span><span class="sc">{</span>coord_list[<span class="dv">0</span>]<span class="sc">}</span><span class="ss">*3 + </span><span class="sc">{</span>coord_list[<span class="dv">1</span>]<span class="sc">}</span><span class="ss"> = </span><span class="sc">{</span>calculation<span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="cb1-148"><a href="#cb1-148" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-149"><a href="#cb1-149" aria-hidden="true" tabindex="-1"></a><span class="co"># Backward transformation: 1D → 2D (unpacking)</span></span>
+<span id="cb1-150"><a href="#cb1-150" aria-hidden="true" tabindex="-1"></a>test_indices <span class="op">=</span> [<span class="dv">0</span>, <span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">5</span>]</span>
+<span id="cb1-151"><a href="#cb1-151" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"  Backward (lower → upper):"</span>)</span>
+<span id="cb1-152"><a href="#cb1-152" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> idx <span class="kw">in</span> test_indices:</span>
+<span id="cb1-153"><a href="#cb1-153" aria-hidden="true" tabindex="-1"></a>    lower_coord <span class="op">=</span> MultiIndex(<span class="dv">1</span>, [idx])</span>
+<span id="cb1-154"><a href="#cb1-154" aria-hidden="true" tabindex="-1"></a>    upper_coord <span class="op">=</span> unmerge.calculate_upper_index(lower_coord)</span>
+<span id="cb1-155"><a href="#cb1-155" aria-hidden="true" tabindex="-1"></a>    row <span class="op">=</span> idx <span class="op">//</span> <span class="dv">3</span></span>
+<span id="cb1-156"><a href="#cb1-156" aria-hidden="true" tabindex="-1"></a>    col <span class="op">=</span> idx <span class="op">%</span> <span class="dv">3</span></span>
+<span id="cb1-157"><a href="#cb1-157" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"    [</span><span class="sc">{</span>idx<span class="sc">}</span><span class="ss">] → </span><span class="sc">{</span>upper_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">: (row=</span><span class="sc">{</span>row<span class="sc">}</span><span class="ss">, col=</span><span class="sc">{</span>col<span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="cb1-158"><a href="#cb1-158" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb1-159"><a href="#cb1-159" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-160"><a href="#cb1-160" aria-hidden="true" tabindex="-1"></a>The difference between <span class="in">`UnmergeTransoform`</span> and <span class="in">`EmbedTransform`</span> is that in <span class="in">`UnmergeTransform`</span> strides are calculated from the lengths of the dimensions whereas in <span class="in">`EmbedTransform`</span> strides are provided as an argument.</span>
+<span id="cb1-161"><a href="#cb1-161" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-162"><a href="#cb1-162" aria-hidden="true" tabindex="-1"></a>**Key Points:**</span>
+<span id="cb1-163"><a href="#cb1-163" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Converts packed linear indices to structured coordinates</span>
+<span id="cb1-164"><a href="#cb1-164" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Uses row-major ordering: <span class="in">`index = row * width + col`</span></span>
+<span id="cb1-165"><a href="#cb1-165" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Critical for tensor reshaping operations</span>
+<span id="cb1-166"><a href="#cb1-166" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-167"><a href="#cb1-167" aria-hidden="true" tabindex="-1"></a><span class="fu">## 3. MergeTransform: Multi-dimensional → Single Dimension</span></span>
+<span id="cb1-168"><a href="#cb1-168" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-169"><a href="#cb1-169" aria-hidden="true" tabindex="-1"></a>MergeTransform collapses multiple dimensions into a single dimension. Like other transforms, the name describes how it convers lower dimensions to the upper dimension. The name's semantic always come from when we go from physical to logical coordinates. In that sense, it merges the lower dimensions into the one upper dimension. However, <span class="in">`calculate_lower_index`</span> is the reverse of the semantics meaning it returns a multi-dimensional index.</span>
+<span id="cb1-170"><a href="#cb1-170" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-173"><a href="#cb1-173" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb1-174"><a href="#cb1-174" aria-hidden="true" tabindex="-1"></a><span class="co"># Create 2D → 1D merge (collapse 2x3 into single dimension)</span></span>
+<span id="cb1-175"><a href="#cb1-175" aria-hidden="true" tabindex="-1"></a>merge <span class="op">=</span> MergeTransform([<span class="dv">2</span>, <span class="dv">3</span>])</span>
+<span id="cb1-176"><a href="#cb1-176" aria-hidden="true" tabindex="-1"></a>show_transform_info(merge, <span class="st">"MergeTransform"</span>)</span>
+<span id="cb1-177"><a href="#cb1-177" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-178"><a href="#cb1-178" aria-hidden="true" tabindex="-1"></a><span class="co"># Forward transformation: 1D → 2D (splitting)</span></span>
+<span id="cb1-179"><a href="#cb1-179" aria-hidden="true" tabindex="-1"></a>test_indices <span class="op">=</span> [<span class="dv">0</span>, <span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">5</span>]</span>
+<span id="cb1-180"><a href="#cb1-180" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"  Forward (upper → lower):"</span>)</span>
+<span id="cb1-181"><a href="#cb1-181" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> idx <span class="kw">in</span> test_indices:</span>
+<span id="cb1-182"><a href="#cb1-182" aria-hidden="true" tabindex="-1"></a>    upper_coord <span class="op">=</span> MultiIndex(<span class="dv">1</span>, [idx])</span>
+<span id="cb1-183"><a href="#cb1-183" aria-hidden="true" tabindex="-1"></a>    lower_coord <span class="op">=</span> merge.calculate_lower_index(upper_coord)</span>
+<span id="cb1-184"><a href="#cb1-184" aria-hidden="true" tabindex="-1"></a>    row <span class="op">=</span> idx <span class="op">//</span> <span class="dv">3</span></span>
+<span id="cb1-185"><a href="#cb1-185" aria-hidden="true" tabindex="-1"></a>    col <span class="op">=</span> idx <span class="op">%</span> <span class="dv">3</span></span>
+<span id="cb1-186"><a href="#cb1-186" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"    [</span><span class="sc">{</span>idx<span class="sc">}</span><span class="ss">] → </span><span class="sc">{</span>lower_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">: (split to row=</span><span class="sc">{</span>row<span class="sc">}</span><span class="ss">, col=</span><span class="sc">{</span>col<span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="cb1-187"><a href="#cb1-187" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-188"><a href="#cb1-188" aria-hidden="true" tabindex="-1"></a><span class="co"># Backward transformation: 2D → 1D (merging)</span></span>
+<span id="cb1-189"><a href="#cb1-189" aria-hidden="true" tabindex="-1"></a>test_coords <span class="op">=</span> [[<span class="dv">0</span>, <span class="dv">0</span>], [<span class="dv">0</span>, <span class="dv">2</span>], [<span class="dv">1</span>, <span class="dv">0</span>], [<span class="dv">1</span>, <span class="dv">2</span>]]</span>
+<span id="cb1-190"><a href="#cb1-190" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"  Backward (lower → upper):"</span>)</span>
+<span id="cb1-191"><a href="#cb1-191" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> coord_list <span class="kw">in</span> test_coords:</span>
+<span id="cb1-192"><a href="#cb1-192" aria-hidden="true" tabindex="-1"></a>    lower_coord <span class="op">=</span> MultiIndex(<span class="dv">2</span>, coord_list)</span>
+<span id="cb1-193"><a href="#cb1-193" aria-hidden="true" tabindex="-1"></a>    upper_coord <span class="op">=</span> merge.calculate_upper_index(lower_coord)</span>
+<span id="cb1-194"><a href="#cb1-194" aria-hidden="true" tabindex="-1"></a>    calculation <span class="op">=</span> coord_list[<span class="dv">0</span>] <span class="op">*</span> <span class="dv">3</span> <span class="op">+</span> coord_list[<span class="dv">1</span>]</span>
+<span id="cb1-195"><a href="#cb1-195" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"    </span><span class="sc">{</span>coord_list<span class="sc">}</span><span class="ss"> → </span><span class="sc">{</span>upper_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">: (</span><span class="sc">{</span>coord_list[<span class="dv">0</span>]<span class="sc">}</span><span class="ss">*3 + </span><span class="sc">{</span>coord_list[<span class="dv">1</span>]<span class="sc">}</span><span class="ss"> = </span><span class="sc">{</span>calculation<span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="cb1-196"><a href="#cb1-196" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb1-197"><a href="#cb1-197" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-198"><a href="#cb1-198" aria-hidden="true" tabindex="-1"></a>**Key Points:**</span>
+<span id="cb1-199"><a href="#cb1-199" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Opposite of UnmergeTransform</span>
+<span id="cb1-200"><a href="#cb1-200" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Useful for flattening multi-dimensional arrays</span>
+<span id="cb1-201"><a href="#cb1-201" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Maintains element ordering</span>
+<span id="cb1-202"><a href="#cb1-202" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-203"><a href="#cb1-203" aria-hidden="true" tabindex="-1"></a><span class="fu">## 4. ReplicateTransform: Data Replication</span></span>
+<span id="cb1-204"><a href="#cb1-204" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-205"><a href="#cb1-205" aria-hidden="true" tabindex="-1"></a>ReplicateTransform handles data replication across multiple processing elements. Basically, in C++ it is a no-op, meaning that it maps multiple upper coordinates to the same empty lower coordinate.</span>
+<span id="cb1-206"><a href="#cb1-206" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-209"><a href="#cb1-209" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb1-210"><a href="#cb1-210" aria-hidden="true" tabindex="-1"></a><span class="co"># Create replication transform (4 replicas)</span></span>
+<span id="cb1-211"><a href="#cb1-211" aria-hidden="true" tabindex="-1"></a>replicate <span class="op">=</span> ReplicateTransform([<span class="dv">4</span>])</span>
+<span id="cb1-212"><a href="#cb1-212" aria-hidden="true" tabindex="-1"></a>show_transform_info(replicate, <span class="st">"ReplicateTransform"</span>)</span>
+<span id="cb1-213"><a href="#cb1-213" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-214"><a href="#cb1-214" aria-hidden="true" tabindex="-1"></a><span class="co"># Forward transformation: replica index → empty</span></span>
+<span id="cb1-215"><a href="#cb1-215" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"  Forward (upper → lower):"</span>)</span>
+<span id="cb1-216"><a href="#cb1-216" aria-hidden="true" tabindex="-1"></a>test_replicas <span class="op">=</span> [<span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>]</span>
+<span id="cb1-217"><a href="#cb1-217" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> replica <span class="kw">in</span> test_replicas:</span>
+<span id="cb1-218"><a href="#cb1-218" aria-hidden="true" tabindex="-1"></a>    upper_coord <span class="op">=</span> MultiIndex(<span class="dv">1</span>, [replica])  <span class="co"># 1D upper coordinate</span></span>
+<span id="cb1-219"><a href="#cb1-219" aria-hidden="true" tabindex="-1"></a>    lower_coord <span class="op">=</span> replicate.calculate_lower_index(upper_coord)</span>
+<span id="cb1-220"><a href="#cb1-220" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"    [replica </span><span class="sc">{</span>replica<span class="sc">}</span><span class="ss">] → </span><span class="sc">{</span>lower_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">: Replica maps to empty coord"</span>)</span>
+<span id="cb1-221"><a href="#cb1-221" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-222"><a href="#cb1-222" aria-hidden="true" tabindex="-1"></a><span class="co"># Backward transformation: empty → replica index</span></span>
+<span id="cb1-223"><a href="#cb1-223" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"  Backward (lower → upper):"</span>)</span>
+<span id="cb1-224"><a href="#cb1-224" aria-hidden="true" tabindex="-1"></a>lower_coord <span class="op">=</span> MultiIndex(<span class="dv">0</span>, [])  <span class="co"># Empty coordinate</span></span>
+<span id="cb1-225"><a href="#cb1-225" aria-hidden="true" tabindex="-1"></a>upper_coord <span class="op">=</span> replicate.calculate_upper_index(lower_coord)</span>
+<span id="cb1-226"><a href="#cb1-226" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"    [] → </span><span class="sc">{</span>upper_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">: Empty coord maps to zero coordinates"</span>)</span>
+<span id="cb1-227"><a href="#cb1-227" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb1-228"><a href="#cb1-228" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-229"><a href="#cb1-229" aria-hidden="true" tabindex="-1"></a>**Key Points:**</span>
+<span id="cb1-230"><a href="#cb1-230" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Maps replica indices to empty coordinates</span>
+<span id="cb1-231"><a href="#cb1-231" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Used for broadcast operations</span>
+<span id="cb1-232"><a href="#cb1-232" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Essential for thread cooperation patterns</span>
+<span id="cb1-233"><a href="#cb1-233" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-234"><a href="#cb1-234" aria-hidden="true" tabindex="-1"></a><span class="fu">## 5. OffsetTransform: Coordinate Offsetting</span></span>
 <span id="cb1-235"><a href="#cb1-235" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-236"><a href="#cb1-236" aria-hidden="true" tabindex="-1"></a><span class="co"># Backward transformation: empty → replica index</span></span>
-<span id="cb1-237"><a href="#cb1-237" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"  Backward (lower → upper):"</span>)</span>
-<span id="cb1-238"><a href="#cb1-238" aria-hidden="true" tabindex="-1"></a>lower_coord <span class="op">=</span> MultiIndex(<span class="dv">0</span>, [])  <span class="co"># Empty coordinate</span></span>
-<span id="cb1-239"><a href="#cb1-239" aria-hidden="true" tabindex="-1"></a>upper_coord <span class="op">=</span> replicate.calculate_upper_index(lower_coord)</span>
-<span id="cb1-240"><a href="#cb1-240" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"    [] → </span><span class="sc">{</span>upper_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">: Empty coord maps to zero coordinates"</span>)</span>
-<span id="cb1-241"><a href="#cb1-241" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb1-242"><a href="#cb1-242" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-243"><a href="#cb1-243" aria-hidden="true" tabindex="-1"></a>**Key Points:**</span>
-<span id="cb1-244"><a href="#cb1-244" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Maps replica indices to empty coordinates</span>
-<span id="cb1-245"><a href="#cb1-245" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Used for broadcast operations</span>
-<span id="cb1-246"><a href="#cb1-246" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Essential for thread cooperation patterns</span>
-<span id="cb1-247"><a href="#cb1-247" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-248"><a href="#cb1-248" aria-hidden="true" tabindex="-1"></a><span class="fu">## 5. OffsetTransform: Coordinate Offsetting</span></span>
-<span id="cb1-249"><a href="#cb1-249" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-250"><a href="#cb1-250" aria-hidden="true" tabindex="-1"></a>OffsetTransform adds a constant offset to coordinates.</span>
-<span id="cb1-251"><a href="#cb1-251" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-254"><a href="#cb1-254" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
-<span id="cb1-255"><a href="#cb1-255" aria-hidden="true" tabindex="-1"></a><span class="co"># Create offset transform (element_space_size=4, offset=2)</span></span>
-<span id="cb1-256"><a href="#cb1-256" aria-hidden="true" tabindex="-1"></a>offset <span class="op">=</span> OffsetTransform(<span class="dv">4</span>, <span class="dv">2</span>)</span>
-<span id="cb1-257"><a href="#cb1-257" aria-hidden="true" tabindex="-1"></a>show_transform_info(offset, <span class="st">"OffsetTransform"</span>)</span>
-<span id="cb1-258"><a href="#cb1-258" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-259"><a href="#cb1-259" aria-hidden="true" tabindex="-1"></a><span class="co"># Forward transformation: add offset (1D → 1D)</span></span>
-<span id="cb1-260"><a href="#cb1-260" aria-hidden="true" tabindex="-1"></a>test_coords <span class="op">=</span> [<span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>]</span>
-<span id="cb1-261"><a href="#cb1-261" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"  Forward (upper → lower):"</span>)</span>
-<span id="cb1-262"><a href="#cb1-262" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> coord <span class="kw">in</span> test_coords:</span>
-<span id="cb1-263"><a href="#cb1-263" aria-hidden="true" tabindex="-1"></a>    upper_coord <span class="op">=</span> MultiIndex(<span class="dv">1</span>, [coord])</span>
-<span id="cb1-264"><a href="#cb1-264" aria-hidden="true" tabindex="-1"></a>    lower_coord <span class="op">=</span> offset.calculate_lower_index(upper_coord)</span>
-<span id="cb1-265"><a href="#cb1-265" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> coord <span class="op">+</span> <span class="dv">2</span></span>
-<span id="cb1-266"><a href="#cb1-266" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"    [</span><span class="sc">{</span>coord<span class="sc">}</span><span class="ss">] → </span><span class="sc">{</span>lower_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">: Add offset 2 = [</span><span class="sc">{</span>result<span class="sc">}</span><span class="ss">]"</span>)</span>
-<span id="cb1-267"><a href="#cb1-267" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-268"><a href="#cb1-268" aria-hidden="true" tabindex="-1"></a><span class="co"># Backward transformation: subtract offset (1D → 1D)</span></span>
-<span id="cb1-269"><a href="#cb1-269" aria-hidden="true" tabindex="-1"></a>test_coords <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">4</span>, <span class="dv">5</span>]</span>
-<span id="cb1-270"><a href="#cb1-270" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"  Backward (lower → upper):"</span>)</span>
-<span id="cb1-271"><a href="#cb1-271" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> coord <span class="kw">in</span> test_coords:</span>
-<span id="cb1-272"><a href="#cb1-272" aria-hidden="true" tabindex="-1"></a>    lower_coord <span class="op">=</span> MultiIndex(<span class="dv">1</span>, [coord])</span>
-<span id="cb1-273"><a href="#cb1-273" aria-hidden="true" tabindex="-1"></a>    upper_coord <span class="op">=</span> offset.calculate_upper_index(lower_coord)</span>
-<span id="cb1-274"><a href="#cb1-274" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> coord <span class="op">-</span> <span class="dv">2</span></span>
-<span id="cb1-275"><a href="#cb1-275" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"    [</span><span class="sc">{</span>coord<span class="sc">}</span><span class="ss">] → </span><span class="sc">{</span>upper_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">: Subtract offset 2 = [</span><span class="sc">{</span>result<span class="sc">}</span><span class="ss">]"</span>)</span>
-<span id="cb1-276"><a href="#cb1-276" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb1-277"><a href="#cb1-277" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-278"><a href="#cb1-278" aria-hidden="true" tabindex="-1"></a>**Key Points:**</span>
-<span id="cb1-279"><a href="#cb1-279" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Simple coordinate translation</span>
-<span id="cb1-280"><a href="#cb1-280" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Used for memory alignment and padding</span>
-<span id="cb1-281"><a href="#cb1-281" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Bidirectional operation (add/subtract)</span>
-<span id="cb1-282"><a href="#cb1-282" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-283"><a href="#cb1-283" aria-hidden="true" tabindex="-1"></a><span class="fu">## 6. PassThroughTransform: Identity Transformation</span></span>
-<span id="cb1-284"><a href="#cb1-284" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-285"><a href="#cb1-285" aria-hidden="true" tabindex="-1"></a>PassThroughTransform performs no transformation (identity function).</span>
-<span id="cb1-286"><a href="#cb1-286" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-289"><a href="#cb1-289" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
-<span id="cb1-290"><a href="#cb1-290" aria-hidden="true" tabindex="-1"></a><span class="co"># Create passthrough transform</span></span>
-<span id="cb1-291"><a href="#cb1-291" aria-hidden="true" tabindex="-1"></a>passthrough <span class="op">=</span> PassThroughTransform([<span class="dv">3</span>, <span class="dv">4</span>])</span>
-<span id="cb1-292"><a href="#cb1-292" aria-hidden="true" tabindex="-1"></a>show_transform_info(passthrough, <span class="st">"PassThroughTransform"</span>)</span>
-<span id="cb1-293"><a href="#cb1-293" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-294"><a href="#cb1-294" aria-hidden="true" tabindex="-1"></a><span class="co"># Forward transformation: no change</span></span>
-<span id="cb1-295"><a href="#cb1-295" aria-hidden="true" tabindex="-1"></a>test_coords <span class="op">=</span> [[<span class="dv">0</span>, <span class="dv">0</span>], [<span class="dv">1</span>, <span class="dv">2</span>], [<span class="dv">2</span>, <span class="dv">3</span>]]</span>
-<span id="cb1-296"><a href="#cb1-296" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"  Forward (upper → lower):"</span>)</span>
-<span id="cb1-297"><a href="#cb1-297" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> coord_list <span class="kw">in</span> test_coords:</span>
-<span id="cb1-298"><a href="#cb1-298" aria-hidden="true" tabindex="-1"></a>    upper_coord <span class="op">=</span> MultiIndex(<span class="dv">2</span>, coord_list)</span>
-<span id="cb1-299"><a href="#cb1-299" aria-hidden="true" tabindex="-1"></a>    lower_coord <span class="op">=</span> passthrough.calculate_lower_index(upper_coord)</span>
-<span id="cb1-300"><a href="#cb1-300" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"    </span><span class="sc">{</span>coord_list<span class="sc">}</span><span class="ss"> → </span><span class="sc">{</span>lower_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">: No change"</span>)</span>
-<span id="cb1-301"><a href="#cb1-301" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-302"><a href="#cb1-302" aria-hidden="true" tabindex="-1"></a><span class="co"># Backward transformation: no change</span></span>
-<span id="cb1-303"><a href="#cb1-303" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"  Backward (lower → upper):"</span>)</span>
-<span id="cb1-304"><a href="#cb1-304" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> coord_list <span class="kw">in</span> test_coords:</span>
-<span id="cb1-305"><a href="#cb1-305" aria-hidden="true" tabindex="-1"></a>    lower_coord <span class="op">=</span> MultiIndex(<span class="dv">2</span>, coord_list)</span>
-<span id="cb1-306"><a href="#cb1-306" aria-hidden="true" tabindex="-1"></a>    upper_coord <span class="op">=</span> passthrough.calculate_upper_index(lower_coord)</span>
-<span id="cb1-307"><a href="#cb1-307" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"    </span><span class="sc">{</span>coord_list<span class="sc">}</span><span class="ss"> → </span><span class="sc">{</span>upper_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">: No change"</span>)</span>
-<span id="cb1-308"><a href="#cb1-308" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb1-309"><a href="#cb1-309" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-310"><a href="#cb1-310" aria-hidden="true" tabindex="-1"></a>**Key Points:**</span>
-<span id="cb1-311"><a href="#cb1-311" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Identity transformation (no coordinate change)</span>
-<span id="cb1-312"><a href="#cb1-312" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Used as placeholder in transformation chains</span>
-<span id="cb1-313"><a href="#cb1-313" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Maintains dimension structure</span>
-<span id="cb1-314"><a href="#cb1-314" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-315"><a href="#cb1-315" aria-hidden="true" tabindex="-1"></a><span class="fu">## 7. PadTransform: Tensor Padding</span></span>
-<span id="cb1-316"><a href="#cb1-316" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-317"><a href="#cb1-317" aria-hidden="true" tabindex="-1"></a>PadTransform adds padding to tensor dimensions.</span>
-<span id="cb1-318"><a href="#cb1-318" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-321"><a href="#cb1-321" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
-<span id="cb1-322"><a href="#cb1-322" aria-hidden="true" tabindex="-1"></a><span class="co"># Create pad transform (lower_length=5, left_pad=1, right_pad=1)</span></span>
-<span id="cb1-323"><a href="#cb1-323" aria-hidden="true" tabindex="-1"></a>pad <span class="op">=</span> PadTransform(lower_length<span class="op">=</span><span class="dv">5</span>, left_pad<span class="op">=</span><span class="dv">1</span>, right_pad<span class="op">=</span><span class="dv">1</span>)</span>
-<span id="cb1-324"><a href="#cb1-324" aria-hidden="true" tabindex="-1"></a>show_transform_info(pad, <span class="st">"PadTransform"</span>)</span>
-<span id="cb1-325"><a href="#cb1-325" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-326"><a href="#cb1-326" aria-hidden="true" tabindex="-1"></a><span class="co"># Forward transformation: add padding offset</span></span>
-<span id="cb1-327"><a href="#cb1-327" aria-hidden="true" tabindex="-1"></a>test_coords <span class="op">=</span> [<span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">4</span>]</span>
-<span id="cb1-328"><a href="#cb1-328" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"  Forward (upper → lower):"</span>)</span>
-<span id="cb1-329"><a href="#cb1-329" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> coord <span class="kw">in</span> test_coords:</span>
-<span id="cb1-330"><a href="#cb1-330" aria-hidden="true" tabindex="-1"></a>    upper_coord <span class="op">=</span> MultiIndex(<span class="dv">1</span>, [coord])</span>
-<span id="cb1-331"><a href="#cb1-331" aria-hidden="true" tabindex="-1"></a>    lower_coord <span class="op">=</span> pad.calculate_lower_index(upper_coord)</span>
-<span id="cb1-332"><a href="#cb1-332" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> coord <span class="op">-</span> <span class="dv">1</span>  <span class="co"># Subtract left_pad</span></span>
-<span id="cb1-333"><a href="#cb1-333" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"    [</span><span class="sc">{</span>coord<span class="sc">}</span><span class="ss">] → </span><span class="sc">{</span>lower_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">: Subtract left_pad 1 = [</span><span class="sc">{</span>result<span class="sc">}</span><span class="ss">]"</span>)</span>
-<span id="cb1-334"><a href="#cb1-334" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-335"><a href="#cb1-335" aria-hidden="true" tabindex="-1"></a><span class="co"># Backward transformation: remove padding offset</span></span>
-<span id="cb1-336"><a href="#cb1-336" aria-hidden="true" tabindex="-1"></a>test_coords <span class="op">=</span> [<span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>]</span>
-<span id="cb1-337"><a href="#cb1-337" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"  Backward (lower → upper):"</span>)</span>
-<span id="cb1-338"><a href="#cb1-338" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> coord <span class="kw">in</span> test_coords:</span>
-<span id="cb1-339"><a href="#cb1-339" aria-hidden="true" tabindex="-1"></a>    lower_coord <span class="op">=</span> MultiIndex(<span class="dv">1</span>, [coord])</span>
-<span id="cb1-340"><a href="#cb1-340" aria-hidden="true" tabindex="-1"></a>    upper_coord <span class="op">=</span> pad.calculate_upper_index(lower_coord)</span>
-<span id="cb1-341"><a href="#cb1-341" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> coord <span class="op">+</span> <span class="dv">1</span>  <span class="co"># Add left_pad</span></span>
-<span id="cb1-342"><a href="#cb1-342" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"    [</span><span class="sc">{</span>coord<span class="sc">}</span><span class="ss">] → </span><span class="sc">{</span>upper_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">: Add left_pad 1 = [</span><span class="sc">{</span>result<span class="sc">}</span><span class="ss">]"</span>)</span>
-<span id="cb1-343"><a href="#cb1-343" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb1-344"><a href="#cb1-344" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-345"><a href="#cb1-345" aria-hidden="true" tabindex="-1"></a>**Key Points:**</span>
-<span id="cb1-346"><a href="#cb1-346" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Handles tensor padding for convolution operations</span>
-<span id="cb1-347"><a href="#cb1-347" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Manages boundary conditions</span>
-<span id="cb1-348"><a href="#cb1-348" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Critical for maintaining tensor shapes</span>
-<span id="cb1-349"><a href="#cb1-349" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-350"><a href="#cb1-350" aria-hidden="true" tabindex="-1"></a><span class="fu">## Testing Transform Operations</span></span>
-<span id="cb1-351"><a href="#cb1-351" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-354"><a href="#cb1-354" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
-<span id="cb1-355"><a href="#cb1-355" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> test_transform_operations():</span>
-<span id="cb1-356"><a href="#cb1-356" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Test all transform operations."""</span></span>
-<span id="cb1-357"><a href="#cb1-357" aria-hidden="true" tabindex="-1"></a>    tests_passed <span class="op">=</span> <span class="dv">0</span></span>
-<span id="cb1-358"><a href="#cb1-358" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb1-359"><a href="#cb1-359" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Test EmbedTransform</span></span>
-<span id="cb1-360"><a href="#cb1-360" aria-hidden="true" tabindex="-1"></a>    <span class="cf">try</span>:</span>
-<span id="cb1-361"><a href="#cb1-361" aria-hidden="true" tabindex="-1"></a>        embed <span class="op">=</span> EmbedTransform([<span class="dv">2</span>, <span class="dv">3</span>], [<span class="dv">6</span>, <span class="dv">1</span>])</span>
-<span id="cb1-362"><a href="#cb1-362" aria-hidden="true" tabindex="-1"></a>        upper_coord <span class="op">=</span> MultiIndex(<span class="dv">2</span>, [<span class="dv">1</span>, <span class="dv">2</span>])</span>
-<span id="cb1-363"><a href="#cb1-363" aria-hidden="true" tabindex="-1"></a>        lower_coord <span class="op">=</span> embed.calculate_lower_index(upper_coord)</span>
-<span id="cb1-364"><a href="#cb1-364" aria-hidden="true" tabindex="-1"></a>        expected <span class="op">=</span> <span class="dv">1</span> <span class="op">*</span> <span class="dv">6</span> <span class="op">+</span> <span class="dv">2</span> <span class="op">*</span> <span class="dv">1</span>  <span class="co"># 8</span></span>
-<span id="cb1-365"><a href="#cb1-365" aria-hidden="true" tabindex="-1"></a>        <span class="cf">assert</span> lower_coord.to_list() <span class="op">==</span> [expected], <span class="ss">f"Expected [8], got </span><span class="sc">{</span>lower_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span></span>
-<span id="cb1-366"><a href="#cb1-366" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="st">"✅ EmbedTransform test passed"</span>)</span>
-<span id="cb1-367"><a href="#cb1-367" aria-hidden="true" tabindex="-1"></a>        tests_passed <span class="op">+=</span> <span class="dv">1</span></span>
-<span id="cb1-368"><a href="#cb1-368" aria-hidden="true" tabindex="-1"></a>    <span class="cf">except</span> <span class="pp">Exception</span> <span class="im">as</span> e:</span>
-<span id="cb1-369"><a href="#cb1-369" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"❌ EmbedTransform test failed: </span><span class="sc">{</span>e<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb1-370"><a href="#cb1-370" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb1-371"><a href="#cb1-371" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Test UnmergeTransform</span></span>
-<span id="cb1-372"><a href="#cb1-372" aria-hidden="true" tabindex="-1"></a>    <span class="cf">try</span>:</span>
-<span id="cb1-373"><a href="#cb1-373" aria-hidden="true" tabindex="-1"></a>        unmerge <span class="op">=</span> UnmergeTransform([<span class="dv">2</span>, <span class="dv">3</span>])</span>
-<span id="cb1-374"><a href="#cb1-374" aria-hidden="true" tabindex="-1"></a>        upper_coord <span class="op">=</span> MultiIndex(<span class="dv">2</span>, [<span class="dv">1</span>, <span class="dv">2</span>])</span>
-<span id="cb1-375"><a href="#cb1-375" aria-hidden="true" tabindex="-1"></a>        lower_coord <span class="op">=</span> unmerge.calculate_lower_index(upper_coord)</span>
-<span id="cb1-376"><a href="#cb1-376" aria-hidden="true" tabindex="-1"></a>        expected <span class="op">=</span> <span class="dv">1</span> <span class="op">*</span> <span class="dv">3</span> <span class="op">+</span> <span class="dv">2</span>  <span class="co"># 5</span></span>
-<span id="cb1-377"><a href="#cb1-377" aria-hidden="true" tabindex="-1"></a>        <span class="cf">assert</span> lower_coord.to_list() <span class="op">==</span> [expected], <span class="ss">f"Expected [5], got </span><span class="sc">{</span>lower_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span></span>
-<span id="cb1-378"><a href="#cb1-378" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="st">"✅ UnmergeTransform test passed"</span>)</span>
-<span id="cb1-379"><a href="#cb1-379" aria-hidden="true" tabindex="-1"></a>        tests_passed <span class="op">+=</span> <span class="dv">1</span></span>
-<span id="cb1-380"><a href="#cb1-380" aria-hidden="true" tabindex="-1"></a>    <span class="cf">except</span> <span class="pp">Exception</span> <span class="im">as</span> e:</span>
-<span id="cb1-381"><a href="#cb1-381" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"❌ UnmergeTransform test failed: </span><span class="sc">{</span>e<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb1-382"><a href="#cb1-382" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb1-383"><a href="#cb1-383" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Test MergeTransform</span></span>
-<span id="cb1-384"><a href="#cb1-384" aria-hidden="true" tabindex="-1"></a>    <span class="cf">try</span>:</span>
-<span id="cb1-385"><a href="#cb1-385" aria-hidden="true" tabindex="-1"></a>        merge <span class="op">=</span> MergeTransform([<span class="dv">2</span>, <span class="dv">3</span>])</span>
-<span id="cb1-386"><a href="#cb1-386" aria-hidden="true" tabindex="-1"></a>        upper_coord <span class="op">=</span> MultiIndex(<span class="dv">1</span>, [<span class="dv">5</span>])</span>
-<span id="cb1-387"><a href="#cb1-387" aria-hidden="true" tabindex="-1"></a>        lower_coord <span class="op">=</span> merge.calculate_lower_index(upper_coord)</span>
-<span id="cb1-388"><a href="#cb1-388" aria-hidden="true" tabindex="-1"></a>        expected <span class="op">=</span> [<span class="dv">1</span>, <span class="dv">2</span>]  <span class="co"># 5 = 1*3 + 2</span></span>
-<span id="cb1-389"><a href="#cb1-389" aria-hidden="true" tabindex="-1"></a>        <span class="cf">assert</span> lower_coord.to_list() <span class="op">==</span> expected, <span class="ss">f"Expected [1, 2], got </span><span class="sc">{</span>lower_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span></span>
-<span id="cb1-390"><a href="#cb1-390" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="st">"✅ MergeTransform test passed"</span>)</span>
-<span id="cb1-391"><a href="#cb1-391" aria-hidden="true" tabindex="-1"></a>        tests_passed <span class="op">+=</span> <span class="dv">1</span></span>
-<span id="cb1-392"><a href="#cb1-392" aria-hidden="true" tabindex="-1"></a>    <span class="cf">except</span> <span class="pp">Exception</span> <span class="im">as</span> e:</span>
-<span id="cb1-393"><a href="#cb1-393" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"❌ MergeTransform test failed: </span><span class="sc">{</span>e<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb1-394"><a href="#cb1-394" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb1-395"><a href="#cb1-395" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Test ReplicateTransform</span></span>
-<span id="cb1-396"><a href="#cb1-396" aria-hidden="true" tabindex="-1"></a>    <span class="cf">try</span>:</span>
-<span id="cb1-397"><a href="#cb1-397" aria-hidden="true" tabindex="-1"></a>        replicate <span class="op">=</span> ReplicateTransform([<span class="dv">4</span>])</span>
-<span id="cb1-398"><a href="#cb1-398" aria-hidden="true" tabindex="-1"></a>        upper_coord <span class="op">=</span> MultiIndex(<span class="dv">1</span>, [<span class="dv">2</span>])</span>
-<span id="cb1-399"><a href="#cb1-399" aria-hidden="true" tabindex="-1"></a>        lower_coord <span class="op">=</span> replicate.calculate_lower_index(upper_coord)</span>
-<span id="cb1-400"><a href="#cb1-400" aria-hidden="true" tabindex="-1"></a>        <span class="cf">assert</span> lower_coord.to_list() <span class="op">==</span> [], <span class="ss">f"Expected [], got </span><span class="sc">{</span>lower_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span></span>
-<span id="cb1-401"><a href="#cb1-401" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="st">"✅ ReplicateTransform test passed"</span>)</span>
-<span id="cb1-402"><a href="#cb1-402" aria-hidden="true" tabindex="-1"></a>        tests_passed <span class="op">+=</span> <span class="dv">1</span></span>
-<span id="cb1-403"><a href="#cb1-403" aria-hidden="true" tabindex="-1"></a>    <span class="cf">except</span> <span class="pp">Exception</span> <span class="im">as</span> e:</span>
-<span id="cb1-404"><a href="#cb1-404" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"❌ ReplicateTransform test failed: </span><span class="sc">{</span>e<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb1-405"><a href="#cb1-405" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb1-406"><a href="#cb1-406" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Test OffsetTransform</span></span>
-<span id="cb1-407"><a href="#cb1-407" aria-hidden="true" tabindex="-1"></a>    <span class="cf">try</span>:</span>
-<span id="cb1-408"><a href="#cb1-408" aria-hidden="true" tabindex="-1"></a>        offset <span class="op">=</span> OffsetTransform(<span class="dv">4</span>, <span class="dv">2</span>)</span>
-<span id="cb1-409"><a href="#cb1-409" aria-hidden="true" tabindex="-1"></a>        upper_coord <span class="op">=</span> MultiIndex(<span class="dv">1</span>, [<span class="dv">1</span>])</span>
-<span id="cb1-410"><a href="#cb1-410" aria-hidden="true" tabindex="-1"></a>        lower_coord <span class="op">=</span> offset.calculate_lower_index(upper_coord)</span>
-<span id="cb1-411"><a href="#cb1-411" aria-hidden="true" tabindex="-1"></a>        expected <span class="op">=</span> <span class="dv">1</span> <span class="op">+</span> <span class="dv">2</span>  <span class="co"># 3</span></span>
-<span id="cb1-412"><a href="#cb1-412" aria-hidden="true" tabindex="-1"></a>        <span class="cf">assert</span> lower_coord.to_list() <span class="op">==</span> [expected], <span class="ss">f"Expected [3], got </span><span class="sc">{</span>lower_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span></span>
-<span id="cb1-413"><a href="#cb1-413" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="st">"✅ OffsetTransform test passed"</span>)</span>
-<span id="cb1-414"><a href="#cb1-414" aria-hidden="true" tabindex="-1"></a>        tests_passed <span class="op">+=</span> <span class="dv">1</span></span>
-<span id="cb1-415"><a href="#cb1-415" aria-hidden="true" tabindex="-1"></a>    <span class="cf">except</span> <span class="pp">Exception</span> <span class="im">as</span> e:</span>
-<span id="cb1-416"><a href="#cb1-416" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"❌ OffsetTransform test failed: </span><span class="sc">{</span>e<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb1-417"><a href="#cb1-417" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb1-418"><a href="#cb1-418" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">🎉 </span><span class="sc">{</span>tests_passed<span class="sc">}</span><span class="ss">/5 transform tests passed!"</span>)</span>
-<span id="cb1-419"><a href="#cb1-419" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> tests_passed <span class="op">==</span> <span class="dv">5</span></span>
+<span id="cb1-236"><a href="#cb1-236" aria-hidden="true" tabindex="-1"></a>OffsetTransform adds a constant offset to coordinates.</span>
+<span id="cb1-237"><a href="#cb1-237" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-240"><a href="#cb1-240" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb1-241"><a href="#cb1-241" aria-hidden="true" tabindex="-1"></a><span class="co"># Create offset transform (element_space_size=4, offset=2)</span></span>
+<span id="cb1-242"><a href="#cb1-242" aria-hidden="true" tabindex="-1"></a>offset <span class="op">=</span> OffsetTransform(<span class="dv">4</span>, <span class="dv">2</span>)</span>
+<span id="cb1-243"><a href="#cb1-243" aria-hidden="true" tabindex="-1"></a>show_transform_info(offset, <span class="st">"OffsetTransform"</span>)</span>
+<span id="cb1-244"><a href="#cb1-244" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-245"><a href="#cb1-245" aria-hidden="true" tabindex="-1"></a><span class="co"># Forward transformation: add offset (1D → 1D)</span></span>
+<span id="cb1-246"><a href="#cb1-246" aria-hidden="true" tabindex="-1"></a>test_coords <span class="op">=</span> [<span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>]</span>
+<span id="cb1-247"><a href="#cb1-247" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"  Forward (upper → lower):"</span>)</span>
+<span id="cb1-248"><a href="#cb1-248" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> coord <span class="kw">in</span> test_coords:</span>
+<span id="cb1-249"><a href="#cb1-249" aria-hidden="true" tabindex="-1"></a>    upper_coord <span class="op">=</span> MultiIndex(<span class="dv">1</span>, [coord])</span>
+<span id="cb1-250"><a href="#cb1-250" aria-hidden="true" tabindex="-1"></a>    lower_coord <span class="op">=</span> offset.calculate_lower_index(upper_coord)</span>
+<span id="cb1-251"><a href="#cb1-251" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> coord <span class="op">+</span> <span class="dv">2</span></span>
+<span id="cb1-252"><a href="#cb1-252" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"    [</span><span class="sc">{</span>coord<span class="sc">}</span><span class="ss">] → </span><span class="sc">{</span>lower_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">: Add offset 2 = [</span><span class="sc">{</span>result<span class="sc">}</span><span class="ss">]"</span>)</span>
+<span id="cb1-253"><a href="#cb1-253" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-254"><a href="#cb1-254" aria-hidden="true" tabindex="-1"></a><span class="co"># Backward transformation: subtract offset (1D → 1D)</span></span>
+<span id="cb1-255"><a href="#cb1-255" aria-hidden="true" tabindex="-1"></a>test_coords <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">4</span>, <span class="dv">5</span>]</span>
+<span id="cb1-256"><a href="#cb1-256" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"  Backward (lower → upper):"</span>)</span>
+<span id="cb1-257"><a href="#cb1-257" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> coord <span class="kw">in</span> test_coords:</span>
+<span id="cb1-258"><a href="#cb1-258" aria-hidden="true" tabindex="-1"></a>    lower_coord <span class="op">=</span> MultiIndex(<span class="dv">1</span>, [coord])</span>
+<span id="cb1-259"><a href="#cb1-259" aria-hidden="true" tabindex="-1"></a>    upper_coord <span class="op">=</span> offset.calculate_upper_index(lower_coord)</span>
+<span id="cb1-260"><a href="#cb1-260" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> coord <span class="op">-</span> <span class="dv">2</span></span>
+<span id="cb1-261"><a href="#cb1-261" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"    [</span><span class="sc">{</span>coord<span class="sc">}</span><span class="ss">] → </span><span class="sc">{</span>upper_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">: Subtract offset 2 = [</span><span class="sc">{</span>result<span class="sc">}</span><span class="ss">]"</span>)</span>
+<span id="cb1-262"><a href="#cb1-262" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb1-263"><a href="#cb1-263" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-264"><a href="#cb1-264" aria-hidden="true" tabindex="-1"></a>**Key Points:**</span>
+<span id="cb1-265"><a href="#cb1-265" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Simple coordinate translation</span>
+<span id="cb1-266"><a href="#cb1-266" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Used for memory alignment and padding</span>
+<span id="cb1-267"><a href="#cb1-267" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Bidirectional operation (add/subtract)</span>
+<span id="cb1-268"><a href="#cb1-268" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-269"><a href="#cb1-269" aria-hidden="true" tabindex="-1"></a><span class="fu">## 6. PassThroughTransform: Identity Transformation</span></span>
+<span id="cb1-270"><a href="#cb1-270" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-271"><a href="#cb1-271" aria-hidden="true" tabindex="-1"></a>PassThroughTransform performs no transformation (identity function).</span>
+<span id="cb1-272"><a href="#cb1-272" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-275"><a href="#cb1-275" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb1-276"><a href="#cb1-276" aria-hidden="true" tabindex="-1"></a><span class="co"># Create passthrough transform</span></span>
+<span id="cb1-277"><a href="#cb1-277" aria-hidden="true" tabindex="-1"></a>passthrough <span class="op">=</span> PassThroughTransform([<span class="dv">3</span>, <span class="dv">4</span>])</span>
+<span id="cb1-278"><a href="#cb1-278" aria-hidden="true" tabindex="-1"></a>show_transform_info(passthrough, <span class="st">"PassThroughTransform"</span>)</span>
+<span id="cb1-279"><a href="#cb1-279" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-280"><a href="#cb1-280" aria-hidden="true" tabindex="-1"></a><span class="co"># Forward transformation: no change</span></span>
+<span id="cb1-281"><a href="#cb1-281" aria-hidden="true" tabindex="-1"></a>test_coords <span class="op">=</span> [[<span class="dv">0</span>, <span class="dv">0</span>], [<span class="dv">1</span>, <span class="dv">2</span>], [<span class="dv">2</span>, <span class="dv">3</span>]]</span>
+<span id="cb1-282"><a href="#cb1-282" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"  Forward (upper → lower):"</span>)</span>
+<span id="cb1-283"><a href="#cb1-283" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> coord_list <span class="kw">in</span> test_coords:</span>
+<span id="cb1-284"><a href="#cb1-284" aria-hidden="true" tabindex="-1"></a>    upper_coord <span class="op">=</span> MultiIndex(<span class="dv">2</span>, coord_list)</span>
+<span id="cb1-285"><a href="#cb1-285" aria-hidden="true" tabindex="-1"></a>    lower_coord <span class="op">=</span> passthrough.calculate_lower_index(upper_coord)</span>
+<span id="cb1-286"><a href="#cb1-286" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"    </span><span class="sc">{</span>coord_list<span class="sc">}</span><span class="ss"> → </span><span class="sc">{</span>lower_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">: No change"</span>)</span>
+<span id="cb1-287"><a href="#cb1-287" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-288"><a href="#cb1-288" aria-hidden="true" tabindex="-1"></a><span class="co"># Backward transformation: no change</span></span>
+<span id="cb1-289"><a href="#cb1-289" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"  Backward (lower → upper):"</span>)</span>
+<span id="cb1-290"><a href="#cb1-290" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> coord_list <span class="kw">in</span> test_coords:</span>
+<span id="cb1-291"><a href="#cb1-291" aria-hidden="true" tabindex="-1"></a>    lower_coord <span class="op">=</span> MultiIndex(<span class="dv">2</span>, coord_list)</span>
+<span id="cb1-292"><a href="#cb1-292" aria-hidden="true" tabindex="-1"></a>    upper_coord <span class="op">=</span> passthrough.calculate_upper_index(lower_coord)</span>
+<span id="cb1-293"><a href="#cb1-293" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"    </span><span class="sc">{</span>coord_list<span class="sc">}</span><span class="ss"> → </span><span class="sc">{</span>upper_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">: No change"</span>)</span>
+<span id="cb1-294"><a href="#cb1-294" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb1-295"><a href="#cb1-295" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-296"><a href="#cb1-296" aria-hidden="true" tabindex="-1"></a>**Key Points:**</span>
+<span id="cb1-297"><a href="#cb1-297" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Identity transformation (no coordinate change)</span>
+<span id="cb1-298"><a href="#cb1-298" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Used as placeholder in transformation chains</span>
+<span id="cb1-299"><a href="#cb1-299" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Maintains dimension structure</span>
+<span id="cb1-300"><a href="#cb1-300" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-301"><a href="#cb1-301" aria-hidden="true" tabindex="-1"></a><span class="fu">## 7. PadTransform: Tensor Padding</span></span>
+<span id="cb1-302"><a href="#cb1-302" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-303"><a href="#cb1-303" aria-hidden="true" tabindex="-1"></a>PadTransform adds padding to tensor dimensions.</span>
+<span id="cb1-304"><a href="#cb1-304" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-307"><a href="#cb1-307" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb1-308"><a href="#cb1-308" aria-hidden="true" tabindex="-1"></a><span class="co"># Create pad transform (lower_length=5, left_pad=1, right_pad=1)</span></span>
+<span id="cb1-309"><a href="#cb1-309" aria-hidden="true" tabindex="-1"></a>pad <span class="op">=</span> PadTransform(lower_length<span class="op">=</span><span class="dv">5</span>, left_pad<span class="op">=</span><span class="dv">1</span>, right_pad<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb1-310"><a href="#cb1-310" aria-hidden="true" tabindex="-1"></a>show_transform_info(pad, <span class="st">"PadTransform"</span>)</span>
+<span id="cb1-311"><a href="#cb1-311" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-312"><a href="#cb1-312" aria-hidden="true" tabindex="-1"></a><span class="co"># Forward transformation: add padding offset</span></span>
+<span id="cb1-313"><a href="#cb1-313" aria-hidden="true" tabindex="-1"></a>test_coords <span class="op">=</span> [<span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">4</span>]</span>
+<span id="cb1-314"><a href="#cb1-314" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"  Forward (upper → lower):"</span>)</span>
+<span id="cb1-315"><a href="#cb1-315" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> coord <span class="kw">in</span> test_coords:</span>
+<span id="cb1-316"><a href="#cb1-316" aria-hidden="true" tabindex="-1"></a>    upper_coord <span class="op">=</span> MultiIndex(<span class="dv">1</span>, [coord])</span>
+<span id="cb1-317"><a href="#cb1-317" aria-hidden="true" tabindex="-1"></a>    lower_coord <span class="op">=</span> pad.calculate_lower_index(upper_coord)</span>
+<span id="cb1-318"><a href="#cb1-318" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> coord <span class="op">-</span> <span class="dv">1</span>  <span class="co"># Subtract left_pad</span></span>
+<span id="cb1-319"><a href="#cb1-319" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"    [</span><span class="sc">{</span>coord<span class="sc">}</span><span class="ss">] → </span><span class="sc">{</span>lower_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">: Subtract left_pad 1 = [</span><span class="sc">{</span>result<span class="sc">}</span><span class="ss">]"</span>)</span>
+<span id="cb1-320"><a href="#cb1-320" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-321"><a href="#cb1-321" aria-hidden="true" tabindex="-1"></a><span class="co"># Backward transformation: remove padding offset</span></span>
+<span id="cb1-322"><a href="#cb1-322" aria-hidden="true" tabindex="-1"></a>test_coords <span class="op">=</span> [<span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>]</span>
+<span id="cb1-323"><a href="#cb1-323" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"  Backward (lower → upper):"</span>)</span>
+<span id="cb1-324"><a href="#cb1-324" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> coord <span class="kw">in</span> test_coords:</span>
+<span id="cb1-325"><a href="#cb1-325" aria-hidden="true" tabindex="-1"></a>    lower_coord <span class="op">=</span> MultiIndex(<span class="dv">1</span>, [coord])</span>
+<span id="cb1-326"><a href="#cb1-326" aria-hidden="true" tabindex="-1"></a>    upper_coord <span class="op">=</span> pad.calculate_upper_index(lower_coord)</span>
+<span id="cb1-327"><a href="#cb1-327" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> coord <span class="op">+</span> <span class="dv">1</span>  <span class="co"># Add left_pad</span></span>
+<span id="cb1-328"><a href="#cb1-328" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"    [</span><span class="sc">{</span>coord<span class="sc">}</span><span class="ss">] → </span><span class="sc">{</span>upper_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">: Add left_pad 1 = [</span><span class="sc">{</span>result<span class="sc">}</span><span class="ss">]"</span>)</span>
+<span id="cb1-329"><a href="#cb1-329" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb1-330"><a href="#cb1-330" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-331"><a href="#cb1-331" aria-hidden="true" tabindex="-1"></a>**Key Points:**</span>
+<span id="cb1-332"><a href="#cb1-332" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Handles tensor padding for convolution operations</span>
+<span id="cb1-333"><a href="#cb1-333" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Manages boundary conditions</span>
+<span id="cb1-334"><a href="#cb1-334" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Critical for maintaining tensor shapes</span>
+<span id="cb1-335"><a href="#cb1-335" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-336"><a href="#cb1-336" aria-hidden="true" tabindex="-1"></a><span class="fu">## Testing Transform Operations</span></span>
+<span id="cb1-337"><a href="#cb1-337" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-340"><a href="#cb1-340" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb1-341"><a href="#cb1-341" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> test_transform_operations():</span>
+<span id="cb1-342"><a href="#cb1-342" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Test all transform operations."""</span></span>
+<span id="cb1-343"><a href="#cb1-343" aria-hidden="true" tabindex="-1"></a>    tests_passed <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb1-344"><a href="#cb1-344" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb1-345"><a href="#cb1-345" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Test EmbedTransform</span></span>
+<span id="cb1-346"><a href="#cb1-346" aria-hidden="true" tabindex="-1"></a>    <span class="cf">try</span>:</span>
+<span id="cb1-347"><a href="#cb1-347" aria-hidden="true" tabindex="-1"></a>        embed <span class="op">=</span> EmbedTransform([<span class="dv">2</span>, <span class="dv">3</span>], [<span class="dv">6</span>, <span class="dv">1</span>])</span>
+<span id="cb1-348"><a href="#cb1-348" aria-hidden="true" tabindex="-1"></a>        upper_coord <span class="op">=</span> MultiIndex(<span class="dv">2</span>, [<span class="dv">1</span>, <span class="dv">2</span>])</span>
+<span id="cb1-349"><a href="#cb1-349" aria-hidden="true" tabindex="-1"></a>        lower_coord <span class="op">=</span> embed.calculate_lower_index(upper_coord)</span>
+<span id="cb1-350"><a href="#cb1-350" aria-hidden="true" tabindex="-1"></a>        expected <span class="op">=</span> <span class="dv">1</span> <span class="op">*</span> <span class="dv">6</span> <span class="op">+</span> <span class="dv">2</span> <span class="op">*</span> <span class="dv">1</span>  <span class="co"># 8</span></span>
+<span id="cb1-351"><a href="#cb1-351" aria-hidden="true" tabindex="-1"></a>        <span class="cf">assert</span> lower_coord.to_list() <span class="op">==</span> [expected], <span class="ss">f"Expected [8], got </span><span class="sc">{</span>lower_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb1-352"><a href="#cb1-352" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="st">"✅ EmbedTransform test passed"</span>)</span>
+<span id="cb1-353"><a href="#cb1-353" aria-hidden="true" tabindex="-1"></a>        tests_passed <span class="op">+=</span> <span class="dv">1</span></span>
+<span id="cb1-354"><a href="#cb1-354" aria-hidden="true" tabindex="-1"></a>    <span class="cf">except</span> <span class="pp">Exception</span> <span class="im">as</span> e:</span>
+<span id="cb1-355"><a href="#cb1-355" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"❌ EmbedTransform test failed: </span><span class="sc">{</span>e<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-356"><a href="#cb1-356" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb1-357"><a href="#cb1-357" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Test UnmergeTransform</span></span>
+<span id="cb1-358"><a href="#cb1-358" aria-hidden="true" tabindex="-1"></a>    <span class="cf">try</span>:</span>
+<span id="cb1-359"><a href="#cb1-359" aria-hidden="true" tabindex="-1"></a>        unmerge <span class="op">=</span> UnmergeTransform([<span class="dv">2</span>, <span class="dv">3</span>])</span>
+<span id="cb1-360"><a href="#cb1-360" aria-hidden="true" tabindex="-1"></a>        upper_coord <span class="op">=</span> MultiIndex(<span class="dv">2</span>, [<span class="dv">1</span>, <span class="dv">2</span>])</span>
+<span id="cb1-361"><a href="#cb1-361" aria-hidden="true" tabindex="-1"></a>        lower_coord <span class="op">=</span> unmerge.calculate_lower_index(upper_coord)</span>
+<span id="cb1-362"><a href="#cb1-362" aria-hidden="true" tabindex="-1"></a>        expected <span class="op">=</span> <span class="dv">1</span> <span class="op">*</span> <span class="dv">3</span> <span class="op">+</span> <span class="dv">2</span>  <span class="co"># 5</span></span>
+<span id="cb1-363"><a href="#cb1-363" aria-hidden="true" tabindex="-1"></a>        <span class="cf">assert</span> lower_coord.to_list() <span class="op">==</span> [expected], <span class="ss">f"Expected [5], got </span><span class="sc">{</span>lower_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb1-364"><a href="#cb1-364" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="st">"✅ UnmergeTransform test passed"</span>)</span>
+<span id="cb1-365"><a href="#cb1-365" aria-hidden="true" tabindex="-1"></a>        tests_passed <span class="op">+=</span> <span class="dv">1</span></span>
+<span id="cb1-366"><a href="#cb1-366" aria-hidden="true" tabindex="-1"></a>    <span class="cf">except</span> <span class="pp">Exception</span> <span class="im">as</span> e:</span>
+<span id="cb1-367"><a href="#cb1-367" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"❌ UnmergeTransform test failed: </span><span class="sc">{</span>e<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-368"><a href="#cb1-368" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb1-369"><a href="#cb1-369" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Test MergeTransform</span></span>
+<span id="cb1-370"><a href="#cb1-370" aria-hidden="true" tabindex="-1"></a>    <span class="cf">try</span>:</span>
+<span id="cb1-371"><a href="#cb1-371" aria-hidden="true" tabindex="-1"></a>        merge <span class="op">=</span> MergeTransform([<span class="dv">2</span>, <span class="dv">3</span>])</span>
+<span id="cb1-372"><a href="#cb1-372" aria-hidden="true" tabindex="-1"></a>        upper_coord <span class="op">=</span> MultiIndex(<span class="dv">1</span>, [<span class="dv">5</span>])</span>
+<span id="cb1-373"><a href="#cb1-373" aria-hidden="true" tabindex="-1"></a>        lower_coord <span class="op">=</span> merge.calculate_lower_index(upper_coord)</span>
+<span id="cb1-374"><a href="#cb1-374" aria-hidden="true" tabindex="-1"></a>        expected <span class="op">=</span> [<span class="dv">1</span>, <span class="dv">2</span>]  <span class="co"># 5 = 1*3 + 2</span></span>
+<span id="cb1-375"><a href="#cb1-375" aria-hidden="true" tabindex="-1"></a>        <span class="cf">assert</span> lower_coord.to_list() <span class="op">==</span> expected, <span class="ss">f"Expected [1, 2], got </span><span class="sc">{</span>lower_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb1-376"><a href="#cb1-376" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="st">"✅ MergeTransform test passed"</span>)</span>
+<span id="cb1-377"><a href="#cb1-377" aria-hidden="true" tabindex="-1"></a>        tests_passed <span class="op">+=</span> <span class="dv">1</span></span>
+<span id="cb1-378"><a href="#cb1-378" aria-hidden="true" tabindex="-1"></a>    <span class="cf">except</span> <span class="pp">Exception</span> <span class="im">as</span> e:</span>
+<span id="cb1-379"><a href="#cb1-379" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"❌ MergeTransform test failed: </span><span class="sc">{</span>e<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-380"><a href="#cb1-380" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb1-381"><a href="#cb1-381" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Test ReplicateTransform</span></span>
+<span id="cb1-382"><a href="#cb1-382" aria-hidden="true" tabindex="-1"></a>    <span class="cf">try</span>:</span>
+<span id="cb1-383"><a href="#cb1-383" aria-hidden="true" tabindex="-1"></a>        replicate <span class="op">=</span> ReplicateTransform([<span class="dv">4</span>])</span>
+<span id="cb1-384"><a href="#cb1-384" aria-hidden="true" tabindex="-1"></a>        upper_coord <span class="op">=</span> MultiIndex(<span class="dv">1</span>, [<span class="dv">2</span>])</span>
+<span id="cb1-385"><a href="#cb1-385" aria-hidden="true" tabindex="-1"></a>        lower_coord <span class="op">=</span> replicate.calculate_lower_index(upper_coord)</span>
+<span id="cb1-386"><a href="#cb1-386" aria-hidden="true" tabindex="-1"></a>        <span class="cf">assert</span> lower_coord.to_list() <span class="op">==</span> [], <span class="ss">f"Expected [], got </span><span class="sc">{</span>lower_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb1-387"><a href="#cb1-387" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="st">"✅ ReplicateTransform test passed"</span>)</span>
+<span id="cb1-388"><a href="#cb1-388" aria-hidden="true" tabindex="-1"></a>        tests_passed <span class="op">+=</span> <span class="dv">1</span></span>
+<span id="cb1-389"><a href="#cb1-389" aria-hidden="true" tabindex="-1"></a>    <span class="cf">except</span> <span class="pp">Exception</span> <span class="im">as</span> e:</span>
+<span id="cb1-390"><a href="#cb1-390" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"❌ ReplicateTransform test failed: </span><span class="sc">{</span>e<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-391"><a href="#cb1-391" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb1-392"><a href="#cb1-392" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Test OffsetTransform</span></span>
+<span id="cb1-393"><a href="#cb1-393" aria-hidden="true" tabindex="-1"></a>    <span class="cf">try</span>:</span>
+<span id="cb1-394"><a href="#cb1-394" aria-hidden="true" tabindex="-1"></a>        offset <span class="op">=</span> OffsetTransform(<span class="dv">4</span>, <span class="dv">2</span>)</span>
+<span id="cb1-395"><a href="#cb1-395" aria-hidden="true" tabindex="-1"></a>        upper_coord <span class="op">=</span> MultiIndex(<span class="dv">1</span>, [<span class="dv">1</span>])</span>
+<span id="cb1-396"><a href="#cb1-396" aria-hidden="true" tabindex="-1"></a>        lower_coord <span class="op">=</span> offset.calculate_lower_index(upper_coord)</span>
+<span id="cb1-397"><a href="#cb1-397" aria-hidden="true" tabindex="-1"></a>        expected <span class="op">=</span> <span class="dv">1</span> <span class="op">+</span> <span class="dv">2</span>  <span class="co"># 3</span></span>
+<span id="cb1-398"><a href="#cb1-398" aria-hidden="true" tabindex="-1"></a>        <span class="cf">assert</span> lower_coord.to_list() <span class="op">==</span> [expected], <span class="ss">f"Expected [3], got </span><span class="sc">{</span>lower_coord<span class="sc">.</span>to_list()<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb1-399"><a href="#cb1-399" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="st">"✅ OffsetTransform test passed"</span>)</span>
+<span id="cb1-400"><a href="#cb1-400" aria-hidden="true" tabindex="-1"></a>        tests_passed <span class="op">+=</span> <span class="dv">1</span></span>
+<span id="cb1-401"><a href="#cb1-401" aria-hidden="true" tabindex="-1"></a>    <span class="cf">except</span> <span class="pp">Exception</span> <span class="im">as</span> e:</span>
+<span id="cb1-402"><a href="#cb1-402" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"❌ OffsetTransform test failed: </span><span class="sc">{</span>e<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-403"><a href="#cb1-403" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb1-404"><a href="#cb1-404" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">🎉 </span><span class="sc">{</span>tests_passed<span class="sc">}</span><span class="ss">/5 transform tests passed!"</span>)</span>
+<span id="cb1-405"><a href="#cb1-405" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> tests_passed <span class="op">==</span> <span class="dv">5</span></span>
+<span id="cb1-406"><a href="#cb1-406" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-407"><a href="#cb1-407" aria-hidden="true" tabindex="-1"></a><span class="co"># Run the tests</span></span>
+<span id="cb1-408"><a href="#cb1-408" aria-hidden="true" tabindex="-1"></a>test_transform_operations()</span>
+<span id="cb1-409"><a href="#cb1-409" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb1-410"><a href="#cb1-410" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-411"><a href="#cb1-411" aria-hidden="true" tabindex="-1"></a><span class="fu">## Key Takeaways</span></span>
+<span id="cb1-412"><a href="#cb1-412" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-413"><a href="#cb1-413" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>**EmbedTransform**: Multi-dimensional → Linear (with strides)</span>
+<span id="cb1-414"><a href="#cb1-414" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>**UnmergeTransform**: Linear → Multi-dimensional (packed)</span>
+<span id="cb1-415"><a href="#cb1-415" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>**MergeTransform**: Multi-dimensional → Single dimension</span>
+<span id="cb1-416"><a href="#cb1-416" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>**ReplicateTransform**: Handles data replication</span>
+<span id="cb1-417"><a href="#cb1-417" aria-hidden="true" tabindex="-1"></a><span class="ss">5. </span>**OffsetTransform**: Adds constant offsets</span>
+<span id="cb1-418"><a href="#cb1-418" aria-hidden="true" tabindex="-1"></a><span class="ss">6. </span>**PassThroughTransform**: Identity transformation</span>
+<span id="cb1-419"><a href="#cb1-419" aria-hidden="true" tabindex="-1"></a><span class="ss">7. </span>**PadTransform**: Tensor padding operations</span>
 <span id="cb1-420"><a href="#cb1-420" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-421"><a href="#cb1-421" aria-hidden="true" tabindex="-1"></a><span class="co"># Run the tests</span></span>
-<span id="cb1-422"><a href="#cb1-422" aria-hidden="true" tabindex="-1"></a>test_transform_operations()</span>
-<span id="cb1-423"><a href="#cb1-423" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb1-424"><a href="#cb1-424" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-425"><a href="#cb1-425" aria-hidden="true" tabindex="-1"></a><span class="fu">## Key Takeaways</span></span>
-<span id="cb1-426"><a href="#cb1-426" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-427"><a href="#cb1-427" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>**EmbedTransform**: Multi-dimensional → Linear (with strides)</span>
-<span id="cb1-428"><a href="#cb1-428" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>**UnmergeTransform**: Linear → Multi-dimensional (packed)</span>
-<span id="cb1-429"><a href="#cb1-429" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>**MergeTransform**: Multi-dimensional → Single dimension</span>
-<span id="cb1-430"><a href="#cb1-430" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>**ReplicateTransform**: Handles data replication</span>
-<span id="cb1-431"><a href="#cb1-431" aria-hidden="true" tabindex="-1"></a><span class="ss">5. </span>**OffsetTransform**: Adds constant offsets</span>
-<span id="cb1-432"><a href="#cb1-432" aria-hidden="true" tabindex="-1"></a><span class="ss">6. </span>**PassThroughTransform**: Identity transformation</span>
-<span id="cb1-433"><a href="#cb1-433" aria-hidden="true" tabindex="-1"></a><span class="ss">7. </span>**PadTransform**: Tensor padding operations</span>
-<span id="cb1-434"><a href="#cb1-434" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-435"><a href="#cb1-435" aria-hidden="true" tabindex="-1"></a>Each transform has forward and backward operations, making them composable building blocks for complex tensor operations.</span>
-<span id="cb1-436"><a href="#cb1-436" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-437"><a href="#cb1-437" aria-hidden="true" tabindex="-1"></a>**Next**: Learn how to chain these transforms using adaptors! </span>
+<span id="cb1-421"><a href="#cb1-421" aria-hidden="true" tabindex="-1"></a>Each transform has forward and backward operations, making them composable building blocks for complex tensor operations.</span>
+<span id="cb1-422"><a href="#cb1-422" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-423"><a href="#cb1-423" aria-hidden="true" tabindex="-1"></a>**Next**: Learn how to chain these transforms using adaptors! </span>
 </code><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></pre></div>
 </div></div></div></div></div>
 </div> <!-- /content -->

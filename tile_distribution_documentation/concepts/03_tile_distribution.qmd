@@ -11,7 +11,7 @@ TileDistribution is the heart of Composable Kernels' efficient GPU computation. 
 
 Explore tile distribution concepts interactively:
 
-**[📊 Tile Distribution Visualizer](../../app.py)** - Interactive visualization of tile distribution structures and GPU memory layouts. Perfect for understanding how data is distributed across parallel processing elements.
+**[📊 Tile Distribution Visualizer](https://ck.silobrain.com/tile-distribution)** - Interactive visualization of tile distribution structures and GPU memory layouts. Perfect for understanding how data is distributed across parallel processing elements.
 
 ```{pyodide}
 #| echo: false
@@ -41,37 +41,37 @@ from pytensor.tensor_descriptor import make_naive_tensor_descriptor_packed
 
 Before diving into code, let's understand the fundamental problem TileDistribution solves:
 
-**The Challenge**: You have a 64×64 matrix multiplication and 32 GPU threads. How do you divide the work efficiently?
+**The Challenge**: You have a 256×256 matrix multiplication and 64 GPU threads. How do you divide the work efficiently?
 
 **The Solution**: TileDistribution automatically maps logical coordinates (like matrix position [i,j]) to physical threads and memory locations.
 
 **🎯 Without TileDistribution:**
 
-- Manual thread ID calculations
+- Manual global memory address calculations
 - Complex index arithmetic 
 - Error-prone memory access patterns
 - Different code for different matrix sizes
 
 **🎯 With TileDistribution:**
 
-- Automatic work assignment
-- Optimized memory access patterns
+- Automatic work assignment and memory access patterns
 - Same code works for any size
-- Hardware-aware thread cooperation
+- Hardware-aware thread cooperation by copying data to the correct threads registers
+- No manual global memory address calculations
 
-**Key Insight**: TileDistribution is like a smart GPS for GPU threads. Give it your logical coordinates [i,j], and it tells each thread exactly where to go in memory and what to compute.
+**Key Insight**: TileDistribution basically provides two functions, that given the `warp id` and `thread id`, it returns the `global memory address` and the `access pattern` for the thread. 
 
 ## Creating Real-World Distributions
 
-Let's create a real tile distribution from RMSNorm, a common GPU operation:
+Let's create a real tile distribution that is used for many operations including RMSNorm, a common GPU operation, for the sake of naming let's call it RMSNorm Distribution.
 
 ```{pyodide}
-print("📊 Creating RMSNorm Distribution")
+print("📊 Creating a common distribution")
 print("=" * 40)
 
 # RMSNorm distribution parameters
-# S::Repeat_M=4, S::WarpPerBlock_M=2, S::ThreadPerWarp_M=8, S::Vector_M=4
-# S::Repeat_N=4, S::WarpPerBlock_N=2, S::ThreadPerWarp_N=8, S::Vector_N=4
+# Repeat_M=4, WarpPerBlock_M=2, ThreadPerWarp_M=8, Vector_M=4
+# Repeat_N=4, WarpPerBlock_N=2, ThreadPerWarp_N=8, Vector_N=4
 encoding = make_tile_distribution_encoding(
     rs_lengths=[],  # Empty R sequence
     hs_lengthss=[
@@ -104,6 +104,7 @@ The hierarchical structure breaks down as:
 - **Total tile size**: 256×256
 - **P dimensions**: 2 (warp + thread within warp)
 - **Y dimensions**: 4 (access pattern)
+- **R dimensions**: 0 (no replication)
 
 **🔄 P + Y → X Magic:**
 P dimensions (thread partitioning) + Y dimensions (access patterns) = X dimensions (logical data)
@@ -146,39 +147,17 @@ for i, (thread_m, thread_n) in enumerate(thread_positions):
 ```
 
 **2D Thread Cooperation**: Notice how threads in different positions (M,N) get different X coordinates. Thread[0,0] handles different data than Thread[1,0] or Thread[0,1]. This creates a 2D grid of work distribution where:
+
 - **M dimension changes**: Thread[0,0] vs Thread[1,0] - different M positions
 - **N dimension changes**: Thread[0,0] vs Thread[0,1] - different N positions
 
-Each thread gets a unique partition index and automatically calculates which data elements to process. No conflicts, perfect cooperation!
-
-## Real-World GPU Kernel Pattern
-
-Here's how this looks in actual GPU kernel code:
-
-**🔥 Typical CK Kernel Structure:**
-
-```cpp
-__global__ void my_kernel() {
-    // 1. Get thread's partition index (automatic)
-    auto partition_idx = distribution.get_partition_index();
-    
-    // 2. Calculate this thread's coordinates (automatic)  
-    auto x_coords = distribution.calculate_index(partition_idx);
-    
-    // 3. Do the actual work
-    for (auto y_idx : y_access_pattern) {
-        auto data = load_from_memory(x_coords, y_idx);
-        auto result = compute(data);
-        store_to_memory(result, x_coords, y_idx);
-    }
-}
-```
+Each thread gets a unique partition index and automatically calculates which data elements to process. This calculation works usually by utility functions in `tile_window` and `sweep_tile`.
 
 **The Magic**: Notice what you DON'T see: manual thread ID arithmetic, complex index calculations, or memory offset computations. TileDistribution handles all of that automatically!
 
 ## Comparing Distribution Patterns
 
-Let's create and compare different distribution patterns:
+Let's start simple and only focus on the `Y` dimension.
 
 ```{pyodide}
 # Create a simpler 2x2 distribution
@@ -322,26 +301,26 @@ TileDistribution is the foundation of efficient GPU computation in Composable Ke
 
 **1. Automatic Work Assignment**
 
-   - ✅ Maps logical coordinates to physical threads
-   - ✅ Eliminates manual thread ID calculations
-   - ✅ Ensures optimal work distribution
+   -  Maps logical coordinates to physical threads
+   -  Eliminates manual thread ID calculations
+   -  Ensures optimal work distribution
 
 **2. Hardware-Aware Optimization**
 
-   - ✅ Optimizes memory access patterns
-   - ✅ Enables efficient thread cooperation
-   - ✅ Adapts to different GPU architectures
+   -  Optimizes memory access patterns
+   -  Enables efficient thread cooperation
+   -  Adapts to different GPU architectures
 
 **3. Scalable Design**
 
-   - ✅ Same code works for any tensor size
-   - ✅ Handles complex hierarchical patterns
-   - ✅ Supports replication for broadcast operations
+   -  Same code works for any tensor size
+   -  Handles complex hierarchical patterns
+   -  Supports replication for broadcast operations
 
 **4. Real-World Applications**
 
-   - ✅ Powers operations like RMSNorm, GEMM, convolutions
-   - ✅ Enables high-performance AI/ML kernels
-   - ✅ Simplifies GPU programming complexity
+   -  Powers operations like RMSNorm, GEMM, convolutions
+   -  Enables high-performance AI/ML kernels
+   -  Simplifies GPU programming complexity
 
 Master TileDistribution, and you're ready to understand how it connects to actual data access through TileWindow in the next section! 

@@ -591,7 +591,7 @@ We've demonstrated the complete evolution from naive convolution to optimized te
 
 - **Memory efficiency**: Tensor descriptors avoid data duplication by creating views
 - **Parallelization**: Im2col enables massive parallelization through matrix multiplication
-- **Generalization**: The tensor descriptor approach extends naturally to complex memory patterns
+- **Generalization**: The tensor descriptor **approach** extends naturally to complex memory patterns
 - **GPU acceleration**: These transformations form the foundation for efficient GPU kernels
 
 The tensor descriptor system provides a unified framework for describing these transformations, making it possible to generate efficient code for various hardware architectures automatically. It is also important to note that the tensor descriptor machinary is implmented in compile time C++ code, therefore very efficient. This python implementation is just a simulator to demonstrate the concept.
