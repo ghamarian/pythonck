@@ -5,232 +5,210 @@ format: live-html
 
 ## Overview
 
-BufferView is the foundation of all tensor operations in Composable Kernels. It provides a structured way to access raw memory regions that can be used by GPU kernels. Think of it as a smart pointer that knows about memory layout, address spaces, and coherence requirements.
+BufferView provides structured access to raw memory regions for GPU kernels. It handles different memory address spaces (global, shared, register) with support for vectorized operations.
 
 ```{pyodide}
 #| echo: false
 #| output: false
 #| autorun: true
 
-# Setup pytensor path for pyodide environment
-import sys
-import os
-
-# Add the project root to path so we can import pytensor
-sys.path.insert(0, '/home/aghamari/github/composable_kernel/visualisation')
+# Auto-install pythonck package
+import micropip
+await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl")
 ```
 
-## BufferView Creation
-
-Let's start by creating and examining BufferView objects:
+## Basic Creation
 
 ```{pyodide}
 #| echo: true
 #| output: true
 
-# Import required modules
 from pytensor.buffer_view import (
-    BufferView, 
-    AddressSpaceEnum, 
-    MemoryOperationEnum,
-    AmdBufferCoherenceEnum,
-    make_buffer_view
+    BufferView, AddressSpaceEnum, MemoryOperationEnum, make_buffer_view
 )
 import numpy as np
 
-print("1️⃣ Creating BufferView objects")
-print("--" * 25)
-
-# Create a data buffer
+# Create data and buffer view
 data = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype=np.float32)
-print(f"  Data buffer: {data}")
+buffer_view = make_buffer_view(data, len(data), AddressSpaceEnum.GLOBAL)
 
-# Create basic buffer view
-buffer_view = make_buffer_view(
-    data=data,
-    buffer_size=len(data),
-    address_space=AddressSpaceEnum.GLOBAL
-)
-
-print(f"  BufferView created: {type(buffer_view).__name__}")
-print(f"  Buffer size: {buffer_view.buffer_size}")
-print(f"  Buffer element type: {buffer_view.dtype}")
+print(f"Buffer size: {buffer_view.buffer_size}")
+print(f"Address space: {buffer_view.address_space.name}")
+print(f"Data: {data}")
 ```
 
-## BufferView Properties
+## Get Operations
 
-Now let's explore the properties and methods available on BufferView objects:
+### Scalar Access
 
 ```{pyodide}
 #| echo: true
 #| output: true
 
-print("2️⃣ BufferView properties")
-print("--" * 25)
+print("🔍 Scalar Get Operations")
 
-data = np.array([10, 20, 30, 40, 50, 60], dtype=np.float32)
-buffer_view = make_buffer_view(data, len(data))
+# Basic get: get(index, linear_offset, is_valid_element)
+value = buffer_view.get(0, 2, True)  # Gets element at position 0+2=2
+print(f"Element at index 2: {value}")
 
-print(f"  Size: {buffer_view.buffer_size}")
-print(f"  Data type: {buffer_view.dtype}")
-print(f"  Address space: {buffer_view.address_space}")
-print(f"  Coherence: {buffer_view.coherence}")
-print(f"  Is static buffer: {buffer_view.is_static_buffer()}")
-print(f"  Invalid element value: {buffer_view.invalid_element_value}")
+# Invalid element access
+invalid_value = buffer_view.get(0, 0, False)  # Invalid access returns 0
+print(f"Invalid element: {invalid_value}")
+
+# Out of bounds access
+oob_value = buffer_view.get(0, 100, True)  # Beyond buffer size
+print(f"Out of bounds: {oob_value}")
 ```
 
-## Data Access
-
-BufferView provides structured access to the underlying memory:
+### Vector Access
 
 ```{pyodide}
 #| echo: true
 #| output: true
 
-print("3️⃣ BufferView data access")
-print("--" * 25)
+print("🔍 Vector Get Operations")
 
-data = np.array([100, 200, 300, 400], dtype=np.float32)
-buffer_view = make_buffer_view(data, len(data))
+# Vector get: specify vector_size > 1
+vector = buffer_view.get(0, 1, True, vector_size=3)  # Gets 3 elements starting at index 1
+print(f"Vector read (3 elements from index 1): {vector}")
 
-# Show buffer properties
-print(f"  Buffer data: {buffer_view.data}")
-print(f"  Buffer size: {buffer_view.buffer_size}")
-print(f"  Is static buffer: {buffer_view.is_static_buffer()}")
+# Vector read at boundary
+boundary_vector = buffer_view.get(0, 6, True, vector_size=4)  # Partially out of bounds
+print(f"Boundary vector read: {boundary_vector}")
+```
 
-# Access underlying data directly (the buffer view wraps this data)
-print(f"  Original data: {data}")
-print(f"  Data through buffer view: {buffer_view.data}")
+## Set Operations
+
+### Scalar Writes
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+print("✏️ Scalar Set Operations")
+
+# Create a copy for modification
+data_copy = data.copy()
+write_buffer = make_buffer_view(data_copy, len(data_copy))
+
+print(f"Original: {data_copy}")
+
+# Basic set: set(index, linear_offset, is_valid_element, value)
+write_buffer.set(0, 2, True, 99.0)  # Set element at position 2
+print(f"After setting index 2 to 99: {data_copy}")
+
+# Invalid write (ignored)
+write_buffer.set(0, 3, False, 777.0)  # Invalid write - ignored
+print(f"After invalid write: {data_copy}")
+```
+
+### Vector Writes
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+print("✏️ Vector Set Operations")
+
+# Reset data
+data_copy = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype=np.float32)
+write_buffer = make_buffer_view(data_copy, len(data_copy))
+
+print(f"Original: {data_copy}")
+
+# Vector set: set with vector_size > 1
+new_values = np.array([10, 20, 30], dtype=np.float32)
+write_buffer.set(0, 1, True, new_values, vector_size=3)
+print(f"After vector write: {data_copy}")
+```
+
+## Update Operations
+
+### Memory Operation Types
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+print("🔄 Update Operations")
+
+# Reset data
+data_copy = np.array([1, 2, 3, 4, 5], dtype=np.float32)
+update_buffer = make_buffer_view(data_copy, len(data_copy))
+
+print(f"Original: {data_copy}")
+
+# ADD operation
+update_buffer.update(MemoryOperationEnum.ADD, 0, 0, True, 10.0)
+print(f"After ADD 10 to index 0: {data_copy}")
+
+# ATOMIC_MAX operation  
+update_buffer.update(MemoryOperationEnum.ATOMIC_MAX, 0, 1, True, 15.0)
+print(f"After ATOMIC_MAX with 15 at index 1: {data_copy}")
+
+# SET operation (same as set method)
+update_buffer.update(MemoryOperationEnum.SET, 0, 2, True, 100.0)
+print(f"After SET 100 at index 2: {data_copy}")
+```
+
+### Vector Updates
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+print("🔄 Vector Update Operations")
+
+# Reset data
+data_copy = np.array([1, 2, 3, 4, 5, 6], dtype=np.float32)
+update_buffer = make_buffer_view(data_copy, len(data_copy))
+
+print(f"Original: {data_copy}")
+
+# Vector ADD
+add_values = np.array([10, 20, 30], dtype=np.float32)
+update_buffer.update(MemoryOperationEnum.ADD, 0, 1, True, add_values, vector_size=3)
+print(f"After vector ADD: {data_copy}")
+
+# Vector ATOMIC_MAX
+max_values = np.array([15, 25, 5], dtype=np.float32) 
+update_buffer.update(MemoryOperationEnum.ATOMIC_MAX, 0, 1, True, max_values, vector_size=3)
+print(f"After vector ATOMIC_MAX: {data_copy}")
 ```
 
 ## Address Spaces
 
-GPU memory is organized into different address spaces, each with different characteristics:
+Different memory types have different performance characteristics:
 
 ```{pyodide}
 #| echo: true
 #| output: true
 
-print("4️⃣ Address space configurations")
-print("--" * 25)
+print("🏠 Address Space Examples")
 
 data = np.array([1, 2, 3, 4], dtype=np.float32)
 
-address_spaces = [
-    AddressSpaceEnum.GLOBAL,
-    AddressSpaceEnum.LDS,
-    AddressSpaceEnum.VGPR,
-    AddressSpaceEnum.GENERIC
+# Different address spaces
+spaces = [
+    (AddressSpaceEnum.GLOBAL, "Main GPU memory"),
+    (AddressSpaceEnum.LDS, "Local Data Share (fast)"),
+    (AddressSpaceEnum.VGPR, "Vector registers (fastest)"),
+    (AddressSpaceEnum.GENERIC, "Generic addressing")
 ]
 
-for addr_space in address_spaces:
-    buffer_view = make_buffer_view(
-        data=data,
-        buffer_size=len(data),
-        address_space=addr_space
-    )
-    print(f"  Address space {addr_space.name}: {buffer_view.address_space.name}")
+for space, description in spaces:
+    buffer_view = make_buffer_view(data, len(data), space)
+    print(f"  {space.name}: {description}")
 ```
 
-### Address Space Characteristics
+## Key Features
 
-- **GLOBAL**: Main GPU memory, high capacity but higher latency
-- **LDS**: Local Data Share, low capacity but very fast access
-- **VGPR**: Vector registers, fastest access but very limited capacity
-- **GENERIC**: Generic addressing, allows flexibility but may have overhead
-
-## Buffer Coherence
-
-Memory coherence is crucial for multi-threaded GPU operations:
-
-```{pyodide}
-#| echo: true
-#| output: true
-
-print("5️⃣ Buffer coherence modes")
-print("--" * 25)
-
-data = np.array([1, 2, 3, 4], dtype=np.float32)
-
-# Create buffer view with coherence
-buffer_view = make_buffer_view(
-    data=data,
-    buffer_size=len(data),
-    coherence=AmdBufferCoherenceEnum.COHERENCE_DEFAULT
-)
-print(f"  Coherence mode: {buffer_view.coherence.name}")
-```
-
-## Testing Your Understanding
-
-Let's verify that BufferView operations work correctly:
-
-```{pyodide}
-#| echo: true
-#| output: true
-
-print("6️⃣ Testing BufferView operations")
-print("--" * 25)
-
-def test_creation():
-    data = np.array([1, 2, 3], dtype=np.float32)
-    buffer_view = make_buffer_view(data, len(data))
-    return buffer_view.buffer_size == 3
-
-def test_access():
-    data = np.array([10, 20, 30], dtype=np.float32)
-    buffer_view = make_buffer_view(data, len(data))
-    return buffer_view.buffer_size == 3 and buffer_view.dtype == np.float32
-
-def test_modification():
-    data = np.array([1, 2, 3], dtype=np.float32)
-    buffer_view = make_buffer_view(data, len(data))
-    return buffer_view.data[0] == 1.0
-
-tests = [
-    ("BufferView creation", test_creation),
-    ("BufferView properties", test_access),
-    ("BufferView data access", test_modification)
-]
-
-all_tests_passed = True
-for test_name, test_func in tests:
-    try:
-        result = test_func()
-        status = "✅ PASS" if result else "❌ FAIL"
-        print(f"  {status}: {test_name}")
-        if not result:
-            all_tests_passed = False
-    except Exception as e:
-        print(f"  ❌ ERROR: {test_name} - {e}")
-        all_tests_passed = False
-
-print(f"\n{'🎉 All tests passed!' if all_tests_passed else '⚠️ Some tests failed.'}")
-```
-
-## Common Use Cases
-
-BufferView is used throughout Composable Kernels for:
-
-1. **Global Memory Access**: Reading input tensors from GPU global memory
-2. **Shared Memory Management**: Organizing data in fast shared memory
-3. **Register Management**: Handling data in GPU registers (VGPR)
-4. **Inter-thread Communication**: Coordinating data between GPU threads
-
-## Key Takeaways
-
-- **Raw Memory Foundation**: BufferView provides the base layer for all tensor operations
-- **Address Space Awareness**: Different memory types (global, shared, register) require different handling
-- **Coherence Management**: GPU memory coherence is handled automatically
-- **Zero-Copy Operations**: BufferView wraps existing memory without copying
-- **GPU-Optimized**: Designed specifically for GPU memory access patterns
+- **Vectorized Operations**: Read/write multiple elements with `vector_size` parameter
+- **Validity Checking**: `is_valid_element` controls whether operations execute
+- **Bounds Checking**: Automatic handling of out-of-bounds access
+- **Multiple Operations**: SET, ADD, ATOMIC_ADD, ATOMIC_MAX support
+- **Address Space Aware**: Optimized for different GPU memory types
 
 ## What's Next
 
-Now that you understand raw memory access through BufferView, you're ready to learn about **structured multi-dimensional views** with TensorView.
-
-BufferView handles the "where" (memory location and layout), while TensorView will handle the "what" (tensor structure and coordinates).
-
-## Next Steps
-
-Continue to [Tensor Views](01_tensor_view.qmd) to learn about multi-dimensional tensor structures built on BufferView. 
+BufferView provides the foundation for raw memory access. Next, learn about [TensorView](01_tensor_view.qmd) which adds multi-dimensional structure and coordinate systems on top of BufferView. 

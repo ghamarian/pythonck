@@ -13,7 +13,7 @@ The transformation engine is built from individual transform types that each han
 
 Explore transformation concepts interactively:
 
-**[🔄 Tensor Transform Visualizer](../../tensor_transform_app.py)** - Explore tensor descriptor transformations with visual graphs and mathematical formulas. See how data layouts change through various transformations.
+**[🔄 Tensor Transform Visualizer](https://ck.silobrain.com/tensor-transform/)** - Explore tensor descriptor transformations with visual graphs and mathematical formulas. See how data layouts change through various transformations.
 
 ## What Are Transforms?
 
@@ -45,10 +45,10 @@ Transforms are your coordinate conversion tools! They bridge the gap between:
 
 ### 🏷️ What's in a Name?
 
-Transform names describe **what they do**, when going from lower to upper coordinates.
+Transform names describe **what they do**, when we go from lower dimension to upper dimension. For example:
 
-- `EmbedTransform`: Embeds multi-dimensional coords into linear memory
-- `UnmergeTransform`: Unmerges linear offsets into multi-dimensional coords  
+- `EmbedTransform`: Embeds converts a linear offset into multi-dimensional coords while considering `strides`
+- `UnmergeTransform`: Unmerges linear offsets into multi-dimensional coords, `strides` in this transformation are calculated automatically based on `lengths`
 - `MergeTransform`: Merges multiple dimensions into fewer dimensions
 
 **Reality check**: C++ transforms are **unidirectional** - only upper → lower. Python makes them feel bidirectional, for educational and visualization purposes. 
@@ -315,78 +315,6 @@ for coord in test_coords:
 - Manages boundary conditions
 - Critical for maintaining tensor shapes
 
-## Testing Transform Operations
-
-```{pyodide}
-def test_transform_operations():
-    """Test all transform operations."""
-    tests_passed = 0
-    
-    # Test EmbedTransform
-    try:
-        embed = EmbedTransform([2, 3], [6, 1])
-        upper_coord = MultiIndex(2, [1, 2])
-        lower_coord = embed.calculate_lower_index(upper_coord)
-        expected = 1 * 6 + 2 * 1  # 8
-        assert lower_coord.to_list() == [expected], f"Expected [8], got {lower_coord.to_list()}"
-        print("✅ EmbedTransform test passed")
-        tests_passed += 1
-    except Exception as e:
-        print(f"❌ EmbedTransform test failed: {e}")
-    
-    # Test UnmergeTransform
-    try:
-        unmerge = UnmergeTransform([2, 3])
-        upper_coord = MultiIndex(2, [1, 2])
-        lower_coord = unmerge.calculate_lower_index(upper_coord)
-        expected = 1 * 3 + 2  # 5
-        assert lower_coord.to_list() == [expected], f"Expected [5], got {lower_coord.to_list()}"
-        print("✅ UnmergeTransform test passed")
-        tests_passed += 1
-    except Exception as e:
-        print(f"❌ UnmergeTransform test failed: {e}")
-    
-    # Test MergeTransform
-    try:
-        merge = MergeTransform([2, 3])
-        upper_coord = MultiIndex(1, [5])
-        lower_coord = merge.calculate_lower_index(upper_coord)
-        expected = [1, 2]  # 5 = 1*3 + 2
-        assert lower_coord.to_list() == expected, f"Expected [1, 2], got {lower_coord.to_list()}"
-        print("✅ MergeTransform test passed")
-        tests_passed += 1
-    except Exception as e:
-        print(f"❌ MergeTransform test failed: {e}")
-    
-    # Test ReplicateTransform
-    try:
-        replicate = ReplicateTransform([4])
-        upper_coord = MultiIndex(1, [2])
-        lower_coord = replicate.calculate_lower_index(upper_coord)
-        assert lower_coord.to_list() == [], f"Expected [], got {lower_coord.to_list()}"
-        print("✅ ReplicateTransform test passed")
-        tests_passed += 1
-    except Exception as e:
-        print(f"❌ ReplicateTransform test failed: {e}")
-    
-    # Test OffsetTransform
-    try:
-        offset = OffsetTransform(4, 2)
-        upper_coord = MultiIndex(1, [1])
-        lower_coord = offset.calculate_lower_index(upper_coord)
-        expected = 1 + 2  # 3
-        assert lower_coord.to_list() == [expected], f"Expected [3], got {lower_coord.to_list()}"
-        print("✅ OffsetTransform test passed")
-        tests_passed += 1
-    except Exception as e:
-        print(f"❌ OffsetTransform test failed: {e}")
-    
-    print(f"\n🎉 {tests_passed}/5 transform tests passed!")
-    return tests_passed == 5
-
-# Run the tests
-test_transform_operations()
-```
 
 ## Key Takeaways
 
