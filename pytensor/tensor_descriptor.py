@@ -1931,24 +1931,26 @@ def transform_tensor_descriptor(
     upper_dimension_hidden_idss: Union[List[List[int]], Tuple]
 ) -> TensorDescriptor:
     """
-    Create a new tensor descriptor by applying transforms - C++ EQUIVALENT VERSION.
+    Create a new tensor descriptor by applying transforms - TRUE C++ EQUIVALENT VERSION.
     
-    This version matches C++ transform_tensor_adaptor behavior:
-    - Automatic flattening of nested transforms (NestedMergeTransform → MergeTransform)
-    - Single-stage approach with simple sequential ID management
-    - Direct application of new transforms to input
+    This version properly matches C++ transform_tensor_descriptor behavior:
+    1. First use transform_tensor_adaptor to create new adaptor
+    2. Then combine adaptor with element space size to create descriptor
     
     Used by: Normal Python API, tests, and C++ equivalent code.
     
     Args:
         input_descriptor: The input tensor descriptor
-        transforms: List or tuple of transforms to apply (supports automatic flattening)
+        transforms: List or tuple of transforms to apply
         lower_dimension_hidden_idss: Lower dimension indices for each transform
         upper_dimension_hidden_idss: Upper dimension indices for each transform
         
     Returns:
-        A new TensorDescriptor with the transforms applied (C++ equivalent behavior)
+        A new TensorDescriptor with the transforms applied (true C++ equivalent behavior)
     """
+    # Import here to avoid circular imports
+    from .tensor_adaptor import transform_tensor_adaptor
+    
     # Convert tuples to lists for consistency
     if isinstance(transforms, tuple):
         transforms = list(transforms)
@@ -1957,12 +1959,22 @@ def transform_tensor_descriptor(
     if isinstance(upper_dimension_hidden_idss, tuple):
         upper_dimension_hidden_idss = list(upper_dimension_hidden_idss)
     
-    # Apply transforms using single-stage approach with automatic flattening (C++ equivalent)
-    return create_single_stage_descriptor(
-        input_descriptor,
-        transforms,
-        lower_dimension_hidden_idss,
-        upper_dimension_hidden_idss
+    # Step 1: Use transform_tensor_adaptor to create new adaptor (C++ equivalent)
+    new_adaptor = transform_tensor_adaptor(
+        old_adaptor=input_descriptor,  # TensorDescriptor inherits from TensorAdaptor
+        new_transforms=transforms,
+        new_lower_dimension_old_top_idss=lower_dimension_hidden_idss,
+        new_upper_dimension_new_top_idss=upper_dimension_hidden_idss
+    )
+    
+    # Step 2: Create descriptor from adaptor + element space size (C++ equivalent)
+    # Element space size remains the same - transforms don't change memory layout
+    return TensorDescriptor(
+        transforms=new_adaptor.transforms,
+        lower_dimension_hidden_idss=new_adaptor.lower_dimension_hidden_idss,
+        upper_dimension_hidden_idss=new_adaptor.upper_dimension_hidden_idss,
+        top_dimension_hidden_ids=new_adaptor.top_dimension_hidden_ids,
+        element_space_size=input_descriptor.get_element_space_size()
     )
 
 

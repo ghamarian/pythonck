@@ -71,7 +71,7 @@ def make_single_stage_tensor_adaptor(
     top_dimension_hidden_ids = list(range(ndim_old_top, ndim_old_top + ndim_new_top))
     
     return TensorAdaptor(
-        transforms=transforms,
+        transforms=transforms,  # type: ignore
         lower_dimension_hidden_idss=lower_dimension_hidden_idss,
         upper_dimension_hidden_idss=upper_dimension_hidden_idss,
         bottom_dimension_hidden_ids=bottom_dimension_hidden_ids,
@@ -110,6 +110,20 @@ def transform_tensor_adaptor(
     for i, ids in enumerate(new_upper_dimension_new_top_idss):
         if len(ids) != len(set(ids)):
             raise ValueError(f"Invalid sequence map: duplicate IDs in upper mapping {i}")
+    
+    # Check that all old top IDs are valid and unique (matches C++ all_old_top_ids validation)
+    all_old_top_ids = []
+    for ids in new_lower_dimension_old_top_idss:
+        all_old_top_ids.extend(ids)
+    
+    if len(all_old_top_ids) != len(set(all_old_top_ids)):
+        raise ValueError("Invalid sequence map: duplicate old top IDs across mappings")
+    
+    # Validate that old top IDs are valid indices into the old adaptor
+    old_num_top = old_adaptor.get_num_of_top_dimension()
+    for old_id in all_old_top_ids:
+        if old_id < 0 or old_id >= old_num_top:
+            raise ValueError(f"Invalid old top ID {old_id}: must be in range [0, {old_num_top})")
     
     # Check that all new top IDs are unique across all mappings (they define the final output)
     all_new_top_ids = []
@@ -159,25 +173,23 @@ def transform_tensor_adaptor(
         unordered_new_top_dim_hidden_ids.extend(ids)
     
     # Create reordering mapping from new_upper_dimension_new_top_idss
-    # The target dimension IDs need to be sequential starting from 0
+    # The C++ reorder_old_to_new method reorders based on the target indices
     all_new_top_ids = []
     for ids in new_upper_dimension_new_top_idss:
         all_new_top_ids.extend(ids)
     
-    # Sort the dimension IDs to get the order
-    sorted_dim_ids = sorted(all_new_top_ids)
-    
-    # Create mapping from dimension ID to position in the sorted list
-    dim_id_to_position = {dim_id: i for i, dim_id in enumerate(sorted_dim_ids)}
-    
     # Apply the reordering to get the final top dimension hidden IDs
-    new_top_dim_hidden_ids = [None] * len(unordered_new_top_dim_hidden_ids)
+    # FIXED: Properly implement C++ reorder_old_to_new behavior
+    # The dimension IDs represent logical positions, not array indices
+    max_dim_id = max(all_new_top_ids) if all_new_top_ids else -1
+    new_top_dim_hidden_ids = [0] * (max_dim_id + 1)
     
+    # Build a mapping from logical dimension IDs to hidden IDs
     hidden_id_index = 0
     for ids in new_upper_dimension_new_top_idss:
         for dim_id in ids:
-            position = dim_id_to_position[dim_id]
-            new_top_dim_hidden_ids[position] = unordered_new_top_dim_hidden_ids[hidden_id_index]
+            # Map logical dimension ID to corresponding hidden ID
+            new_top_dim_hidden_ids[dim_id] = unordered_new_top_dim_hidden_ids[hidden_id_index]
             hidden_id_index += 1
     
     # Combine everything together (matches C++ final assembly)
@@ -234,7 +246,8 @@ def chain_tensor_adaptors(adaptor0: TensorAdaptor, adaptor1: TensorAdaptor) -> T
     if adaptor1_min_hidden == float('inf'):
         adaptor1_min_hidden = 0
     
-    hidden_id_shift = adaptor0_max_hidden + 1 - adaptor1_min_hidden
+    # Ensure we get an integer result for hidden_id_shift
+    hidden_id_shift = int(adaptor0_max_hidden + 1 - adaptor1_min_hidden)
     
     # Shift and match adaptor1's lower dimension hidden IDs
     lower_hidden_idss_1 = []
@@ -316,7 +329,7 @@ def make_identity_adaptor(ndim: int) -> TensorAdaptor:
     upper_idss = [[i] for i in range(ndim)]
     
     return TensorAdaptor(
-        transforms=transforms,
+        transforms=transforms,  # type: ignore
         lower_dimension_hidden_idss=lower_idss,
         upper_dimension_hidden_idss=upper_idss,
         bottom_dimension_hidden_ids=list(range(ndim)),
@@ -349,7 +362,7 @@ def make_transpose_adaptor(ndim: int, permutation: List[int]) -> TensorAdaptor:
     top_ids = [permutation[i] + ndim for i in range(ndim)]
     
     return TensorAdaptor(
-        transforms=transforms,
+        transforms=transforms,  # type: ignore
         lower_dimension_hidden_idss=lower_idss,
         upper_dimension_hidden_idss=upper_idss,
         bottom_dimension_hidden_ids=bottom_ids,
