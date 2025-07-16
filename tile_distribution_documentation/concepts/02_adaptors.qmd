@@ -67,69 +67,9 @@ print("    • bottom_dimension_hidden_ids: Input dimensions")
 print("    • top_dimension_hidden_ids: Output dimensions")
 ```
 
-The most important method of a TensorAdaptor is `calculate_bottom_index`, which calculates the lower index from the upper index. The behavior in python (psudocode) can be described as:
+The most important method of a TensorAdaptor is `calculate_bottom_index`, which calculates the lower index from the upper index. It achives this by applying the transforms in reverse order and calling `calculate_lower_index` on each transform. 
 
-```python
-    def calculate_bottom_index(self, idx_top: MultiIndex) -> MultiIndex:
-        """Calculate bottom index from top index."""
-        # Initialize hidden index
-        idx_hidden = MultiIndex(self.ndim_hidden)
-        
-        # Set top dimensions
-        for i, hid in enumerate(self.top_dimension_hidden_ids):
-            idx_hidden[hid] = idx_top[i]
-        
-        # Apply transforms in reverse order
-        for itran in range(len(self.transforms) - 1, -1, -1):
-            transform = self.transforms[itran]
-            dims_low = self.lower_dimension_hidden_idss[itran]
-            dims_up = self.upper_dimension_hidden_idss[itran]
-            
-            # Get upper index
-            idx_up = MultiIndex(len(dims_up), [idx_hidden[hid] for hid in dims_up])
-            
-            # Calculate lower index
-            idx_low = transform.calculate_lower_index(idx_up)
-            
-            # Set lower dimensions
-            for i, hid in enumerate(dims_low):
-                idx_hidden[hid] = idx_low[i]
-        
-        # Extract bottom index
-        return MultiIndex(len(self.bottom_dimension_hidden_ids),
-                         [idx_hidden[hid] for hid in self.bottom_dimension_hidden_ids])
-```
-
-As you can see, the `calculate_bottom_index` takes a top index and returns a lower index, by applying the transforms in reverse order and calling `calculate_lower_index` on each transform.
-
-## Identity Adaptor: The Starting Point
-
-The identity adaptor is the simplest case - it passes coordinates through unchanged. This is often used as a starting point for building more complex adaptors.
-
-```{pyodide}
-#| echo: true
-#| output: true
-
-print("1️⃣ Identity Adaptor")
-print("--" * 40)
-
-# Create 3D identity adaptor
-identity_adaptor = make_identity_adaptor(3)
-
-print(f"  Number of transforms: {identity_adaptor.get_num_of_transform()}")
-print(f"  Bottom dimensions: {identity_adaptor.get_num_of_bottom_dimension()}")
-print(f"  Top dimensions: {identity_adaptor.get_num_of_top_dimension()}")
-print(f"  Bottom hidden IDs: {identity_adaptor.bottom_dimension_hidden_ids}")
-print(f"  Top hidden IDs: {identity_adaptor.top_dimension_hidden_ids}")
-
-# Test coordinate transformation (should be identity)
-test_coords = [[0, 1, 2], [1, 0, 2], [2, 1, 0]]
-print("\n  Identity transformation test:")
-for coord_list in test_coords:
-    top_coord = MultiIndex(3, coord_list)
-    bottom_coord = identity_adaptor.calculate_bottom_index(top_coord)
-    print(f"    {coord_list} → {bottom_coord.to_list()} (unchanged)")
-```
+Let's go over some of the utility functions for creating tensor adaptors and see how they work in real life. We start with one of the simplest one.
 
 ## Transpose Adaptor: Dimension Reordering
 
@@ -161,7 +101,7 @@ for coord_list in test_coords:
 
 ## Single-Stage Adaptors: Custom Transform Chains
 
-You can create custom adaptors by specifying exactly which transforms to use and how they connect:
+You can create custom adaptors by specifying exactly which transforms to use and how they connect, the API for that is called `make_single_stage_tensor_adaptor`:
 
 ```{pyodide}
 #| echo: true
@@ -193,9 +133,11 @@ for idx in test_indices:
     print(f"    [{idx}] → {bottom_coord.to_list()} (expected: [{expected_row}, {expected_col}])")
 ```
 
+Now that we saw how we can create an adaptor, let's see how we can combine a few of them together.
+
 ## Chaining Adaptors: Building Complex Transformations
 
-The real power comes from chaining multiple adaptors together to create sophisticated transformations:
+The real power comes from chaining multiple adaptors together to create sophisticated transformations. Below we try some trivial example of combining merge and unmerge just to show how these transformations combine.
 
 ```{pyodide}
 #| echo: true
@@ -235,536 +177,48 @@ for coord_list in test_coords:
     print(f"    {coord_list} → {bottom_coord.to_list()}")
 ```
 
-## Multi-Stage Chaining: Complex Pipelines
-
-For more complex transformations, you can chain multiple adaptors in sequence:
-
-```{pyodide}
-#| echo: true
-#| output: true
-
-print("5️⃣ Multi-Stage Chaining")
-print("--" * 40)
-
-# Create adaptors for a 1D → 2D → 1D pipeline
-merge_1d_to_2d = make_single_stage_tensor_adaptor(
-    transforms=[MergeTransform([2, 2])],
-    lower_dimension_old_top_idss=[[0, 1]],
-    upper_dimension_new_top_idss=[[0]]
-)
-unmerge_2d_to_1d = make_single_stage_tensor_adaptor(
-    transforms=[UnmergeTransform([2, 2])],
-    lower_dimension_old_top_idss=[[0]],
-    upper_dimension_new_top_idss=[[0, 1]]
-)
-
-print(f"  Individual adaptors:")
-print(f"    merge_1d_to_2d: {merge_1d_to_2d.get_num_of_top_dimension()}D → {merge_1d_to_2d.get_num_of_bottom_dimension()}D")
-print(f"    unmerge_2d_to_1d: {unmerge_2d_to_1d.get_num_of_top_dimension()}D → {unmerge_2d_to_1d.get_num_of_bottom_dimension()}D")
-
-# Chain them in the correct order for 1D → 2D → 1D
-pipeline = chain_tensor_adaptors_multi(unmerge_2d_to_1d, merge_1d_to_2d)
-
-print(f"  Chained pipeline: {pipeline.get_num_of_top_dimension()}D → {pipeline.get_num_of_bottom_dimension()}D")
-print(f"  Total transforms: {pipeline.get_num_of_transform()}")
-
-# Test the pipeline with 1D input (correct!)
-test_indices = [0, 1, 2, 3]
-print("\n  Pipeline transformation test (1D input, should be identity):")
-for idx in test_indices:
-    top_coord = MultiIndex(1, [idx])  # 1D input
-    bottom_coord = pipeline.calculate_bottom_index(top_coord)
-    print(f"    [{idx}] → {bottom_coord.to_list()} (should be [{idx}])")
-```
-
 ## Transform Addition: Extending Existing Adaptors
 
-You can add new transforms to existing adaptors using `transform_tensor_adaptor`:
+You can add new transforms to existing adaptors using `transform_tensor_adaptor`. **Important**: The `new_upper_dimension_new_top_idss` parameter controls the **final output dimensions** of the adaptor.
 
 ```{pyodide}
 #| echo: true
 #| output: true
 
-print("6️⃣ Transform Addition")
-print("--" * 40)
-
-# Start with identity adaptor
-base_adaptor = make_identity_adaptor(2)
-print(f"  Base adaptor: {base_adaptor.get_num_of_transform()} transforms")
-
-# Add a merge transform
-extended_adaptor = transform_tensor_adaptor(
-    old_adaptor=base_adaptor,
-    new_transforms=[MergeTransform([2, 2])],
-    new_lower_dimension_old_top_idss=[[0, 1]],
-    new_upper_dimension_new_top_idss=[[0]]
-)
-
-print(f"  Extended adaptor: {extended_adaptor.get_num_of_transform()} transforms")
-print(f"  Bottom dimensions: {extended_adaptor.get_num_of_bottom_dimension()}")
-print(f"  Top dimensions: {extended_adaptor.get_num_of_top_dimension()}")
-
-# Test the extended adaptor
-test_indices = [0, 1, 2, 3]
-print("\n  Extended transformation test:")
-for idx in test_indices:
-    top_coord = MultiIndex(1, [idx])  # 1D input
-    bottom_coord = extended_adaptor.calculate_bottom_index(top_coord)
-    expected_row = idx // 2
-    expected_col = idx % 2
-    print(f"    [{idx}] → {bottom_coord.to_list()} (expected: [{expected_row}, {expected_col}])")
-```
-
-## Practical Example: Matrix Transpose with Padding
-
-Let's create a practical example that combines multiple transforms:
-
-```{pyodide}
-#| echo: true
-#| output: true
-
-print("7️⃣ Practical Example: Matrix Operations")
+print("7️⃣ Practical Example: Matrix Transpose + Padding")
 print("--" * 40)
 
 # Create a matrix transpose adaptor
 matrix_transpose = make_transpose_adaptor(2, [1, 0])
 
-# Add padding to the transposed matrix
-padded_transpose = transform_tensor_adaptor(
+padded_transpose_2d = transform_tensor_adaptor(
     old_adaptor=matrix_transpose,
-    new_transforms=[PadTransform(lower_length=6, left_pad=1, right_pad=1)],
-    new_lower_dimension_old_top_idss=[[0]],  # Apply to first dimension
-    new_upper_dimension_new_top_idss=[[0]]
+    new_transforms=[
+        PadTransform(lower_length=4, left_pad=1, right_pad=1),  # Pad first dimension
+        PassThroughTransform(3)                                 # Keep second dimension
+    ],
+    new_lower_dimension_old_top_idss=[[0], [1]],  # Apply to both dimensions
+    new_upper_dimension_new_top_idss=[[0], [1]]   # Keep both in final output
 )
 
-print(f"  Operation: 2D transpose → 1D padding on first dimension")
-print(f"  Total transforms: {padded_transpose.get_num_of_transform()}")
-print(f"  Bottom dimensions: {padded_transpose.get_num_of_bottom_dimension()}")
-print(f"  Top dimensions: {padded_transpose.get_num_of_top_dimension()}")
+print(f"  Operation: 2D transpose → 2D (pad first dim, pass second)")
+print(f"  Total transforms: {padded_transpose_2d.get_num_of_transform()}")
+print(f"  Bottom dimensions: {padded_transpose_2d.get_num_of_bottom_dimension()}")
+print(f"  Top dimensions: {padded_transpose_2d.get_num_of_top_dimension()}")
 
 # Test with a 3x4 matrix conceptually
-test_coords = [[0, 0], [0, 3], [2, 0], [2, 3]]
+test_coords = [[0, 0], [0, 2], [3, 0], [3, 2]]
 print("\n  Matrix transpose with padding test:")
 for coord_list in test_coords:
     top_coord = MultiIndex(2, coord_list)
-    bottom_coord = padded_transpose.calculate_bottom_index(top_coord)
-    print(f"    {coord_list} → {bottom_coord.to_list()}")
+    bottom_coord = padded_transpose_2d.calculate_bottom_index(top_coord)
+    # Manual verification: [i,j] → transpose → [j,i] → pad first → [j-1,i]
+    expected = [coord_list[1] - 1, coord_list[0]]
+    print(f"    {coord_list} → {bottom_coord.to_list()} (expected: {expected})")
+
+print("\n  ⚠️  Common mistake: Using [[0]] for new_upper_dimension_new_top_idss")
+print("     This creates 1D output, losing the second dimension!")
 ```
-
-## Testing Your Understanding
-
-Let's verify that our adaptor operations work correctly:
-
-```{pyodide}
-#| echo: true
-#| output: true
-
-print("🧪 Testing Adaptor Operations")
-print("--" * 40)
-
-def test_identity_adaptor():
-    """Test that identity adaptor preserves coordinates."""
-    adaptor = make_identity_adaptor(2)
-    coord = MultiIndex(2, [1, 2])
-    result = adaptor.calculate_bottom_index(coord)
-    return result.to_list() == [1, 2]
-
-def test_transpose_adaptor():
-    """Test transpose adaptor dimension count."""
-    adaptor = make_transpose_adaptor(3, [2, 0, 1])
-    return (adaptor.get_num_of_bottom_dimension() == 3 and 
-            adaptor.get_num_of_top_dimension() == 3)
-
-def test_merge_adaptor():
-    """Test merge adaptor reduces dimensions."""
-    adaptor = make_single_stage_tensor_adaptor(
-        transforms=[MergeTransform([2, 2])],
-        lower_dimension_old_top_idss=[[0, 1]],
-        upper_dimension_new_top_idss=[[0]]
-    )
-    return (adaptor.get_num_of_bottom_dimension() == 2 and
-            adaptor.get_num_of_top_dimension() == 1)
-
-def test_chain_adaptors():
-    """Test chaining adaptors."""
-    adaptor1 = make_single_stage_tensor_adaptor(
-        transforms=[UnmergeTransform([2, 2])],
-        lower_dimension_old_top_idss=[[0]],
-        upper_dimension_new_top_idss=[[0, 1]]
-    )
-    adaptor2 = make_single_stage_tensor_adaptor(
-        transforms=[MergeTransform([2, 2])],
-        lower_dimension_old_top_idss=[[0, 1]],
-        upper_dimension_new_top_idss=[[0]]
-    )
-    chained = chain_tensor_adaptors(adaptor1, adaptor2)
-    return (chained.get_num_of_bottom_dimension() == 1 and
-            chained.get_num_of_top_dimension() == 1)
-
-def test_transform_addition():
-    """Test adding transforms to existing adaptor."""
-    base = make_identity_adaptor(2)
-    extended = transform_tensor_adaptor(
-        old_adaptor=base,
-        new_transforms=[MergeTransform([2, 2])],
-        new_lower_dimension_old_top_idss=[[0, 1]],
-        new_upper_dimension_new_top_idss=[[0]]
-    )
-    return (extended.get_num_of_transform() == 3 and  # 2 identity + 1 merge
-            extended.get_num_of_top_dimension() == 1 and
-            extended.get_num_of_bottom_dimension() == 2)
-
-tests = [
-    ("Identity adaptor", test_identity_adaptor),
-    ("Transpose adaptor", test_transpose_adaptor),
-    ("Merge adaptor", test_merge_adaptor),
-    ("Chain adaptors", test_chain_adaptors),
-    ("Transform addition", test_transform_addition)
-]
-
-all_tests_passed = True
-for test_name, test_func in tests:
-    try:
-        result = test_func()
-        status = "✅ PASS" if result else "❌ FAIL"
-        print(f"  {status}: {test_name}")
-        if not result:
-            all_tests_passed = False
-    except Exception as e:
-        print(f"  ❌ ERROR: {test_name} - {e}")
-        all_tests_passed = False
-
-print(f"\n🎯 All tests passed: {all_tests_passed}")
-```
-
-## Advanced Examples: Complex Nested Transforms
-
-Now let's explore more sophisticated examples that demonstrate the real power of TensorAdaptors in complex scenarios:
-
-```{pyodide}
-#| echo: true
-#| output: true
-
-print("🔗 Complex Nested Merge Example")
-print("=" * 50)
-
-# Parameters from real GPU computing scenarios
-A, B, C, D = 3, 2, 4, 5
-
-print(f"Transform dimensions: A={A}, B={B}, C={C}, D={D}")
-print("Goal: Flatten nested merge structure")
-
-# Create input descriptor
-input_desc = make_naive_tensor_descriptor_packed([A, B*C, D, 1])
-print(f"Input descriptor: {input_desc.get_lengths()}")
-
-# Create nested transforms - this demonstrates the key capability
-print("\n🔧 Creating nested merge transforms:")
-print("  Inner merge: merge(B, C)")
-print("  Outer merge: merge(pass_through(A), inner_merge)")
-print("  Pass-through: pass_through(D)")
-
-transforms = make_tuple(
-    make_merge_transform(
-        make_tuple(
-            make_pass_through_transform(number(A)),
-            make_merge_transform(make_tuple(number(B), number(C)))
-        )
-    ),
-    make_pass_through_transform(number(D))
-)
-
-# Apply transformation
-result = transform_tensor_descriptor(
-    input_desc,
-    transforms,
-    make_tuple(sequence(0, 1, 2), sequence(3)),
-    make_tuple(sequence(0), sequence(1))
-)
-
-print(f"\n✅ Result:")
-print(f"  Input: {input_desc.get_lengths()}")
-print(f"  Output: {result.get_lengths()}")
-print(f"  Expected: [{A * B * C}, {D}] = [{A * B * C}, {D}]")
-
-# Verify the result has the expected dimensions
-expected_lengths = [A * B * C, D]
-actual_lengths = result.get_lengths()
-
-print(f"\n🎯 Verification:")
-print(f"  Expected lengths: {expected_lengths}")
-print(f"  Actual lengths: {actual_lengths}")
-print(f"  Match: {expected_lengths == actual_lengths}")
-
-# Check that the nested merge was flattened properly
-print(f"\n🔍 Transform Analysis:")
-print(f"  Number of transforms: {len(result.transforms)}")
-print(f"  Transform types: {[type(t).__name__ for t in result.transforms]}")
-
-merge_found = False
-for i, transform in enumerate(result.transforms):
-    if isinstance(transform, MergeTransform):
-        print(f"  Transform {i}: MergeTransform with lengths {transform.lengths}")
-        if transform.lengths == [A, B * C]:
-            merge_found = True
-            print(f"    ✅ Found flattened merge: A={A}, B*C={B*C}")
-
-if not merge_found:
-    print(f"    ⚠️  Nested structure may not have been flattened as expected")
-```
-
-## Real-World GPU Examples: Specialized Block Descriptors
-
-These examples show how TensorAdaptors are used in real GPU computing scenarios with complex memory layouts:
-
-```{pyodide}
-#| echo: true
-#| output: true
-
-print("🔗 K LDS Block Descriptor Example")
-print("=" * 50)
-
-# Parameters from real GPU kernel implementations - Local Data Store block for K dimension
-NumKLdsBuffers = 2
-kNPerBlock = 128
-kKPerBlock = 32
-kKVector = 8
-kKPack = 4
-
-print(f"GPU Memory Layout Parameters:")
-print(f"  NumKLdsBuffers={NumKLdsBuffers} (double buffering)")
-print(f"  kNPerBlock={kNPerBlock} (N dimension per block)")
-print(f"  kKPerBlock={kKPerBlock} (K dimension per block)")
-print(f"  kKVector={kKVector} (vectorization factor)")
-print(f"  kKPack={kKPack} (packing factor)")
-
-# Create input descriptor - represents the raw memory layout
-input_desc = make_naive_tensor_descriptor_packed([
-    NumKLdsBuffers, kNPerBlock, kKPerBlock // kKVector, kKVector, kKPack
-])
-
-print(f"\nInput descriptor (raw memory layout): {input_desc.get_lengths()}")
-print(f"  Dimensions: [buffers, N, K_blocks, K_vector, K_pack]")
-
-# Create transforms - merge related dimensions for efficient access
-print("\n🔧 Creating specialized transforms:")
-print("  Merge buffers and N dimension (for block-level access)")
-print("  Merge K-related dimensions (K_blocks, K_vector, K_pack)")
-
-transforms = make_tuple(
-    make_merge_transform(make_tuple(number(NumKLdsBuffers), number(kNPerBlock))),
-    make_merge_transform(make_tuple(
-        number(kKPerBlock // kKVector),
-        number(kKVector // kKPack),
-        number(kKPack)
-    ))
-)
-
-# Apply transformation
-result = transform_tensor_descriptor(
-    input_desc,
-    transforms,
-    make_tuple(sequence(0, 1), sequence(2, 3, 4)),
-    make_tuple(sequence(0), sequence(1))
-)
-
-print(f"\n✅ Result:")
-print(f"  Input: {input_desc.get_lengths()}")
-print(f"  Output: {result.get_lengths()}")
-
-# Verify dimensions
-expected_lengths = [
-    NumKLdsBuffers * kNPerBlock,
-    (kKPerBlock // kKVector) * (kKVector // kKPack) * kKPack
-]
-actual_lengths = result.get_lengths()
-
-print(f"\n🎯 Verification:")
-print(f"  Expected lengths: {expected_lengths}")
-print(f"  Actual lengths: {actual_lengths}")
-print(f"  Match: {expected_lengths == actual_lengths}")
-
-# Verify calculation
-print(f"\n🔍 Calculation Verification:")
-print(f"  Merged N dimension: {NumKLdsBuffers} * {kNPerBlock} = {NumKLdsBuffers * kNPerBlock}")
-print(f"  Merged K dimension: ({kKPerBlock}//{kKVector}) * ({kKVector}//{kKPack}) * {kKPack}")
-print(f"                    = {kKPerBlock // kKVector} * {kKVector // kKPack} * {kKPack}")
-print(f"                    = {(kKPerBlock // kKVector) * (kKVector // kKPack) * kKPack}")
-```
-
-```{pyodide}
-#| echo: true
-#| output: true
-
-print("🔗 Arithmetic Sequence Transform Example")
-print("=" * 50)
-
-# Parameters from examples - demonstrate unmerging
-lengths = [2, 4, 8]
-total_length = lengths[0] * lengths[1] * lengths[2]
-
-print(f"Sequence parameters:")
-print(f"  Target lengths: {lengths}")
-print(f"  Total elements: {total_length}")
-
-# Create input descriptor - single flat dimension
-input_desc = make_naive_tensor_descriptor_packed([total_length])
-print(f"\nInput descriptor (flat): {input_desc.get_lengths()}")
-
-# Create unmerge transform - split into multiple dimensions
-print("\n🔧 Creating unmerge transform:")
-print(f"  Split {total_length} elements into {lengths}")
-
-transforms = make_tuple(
-    make_unmerge_transform(make_tuple(number(lengths[0]), number(lengths[1]), number(lengths[2])))
-)
-
-# Apply transformation
-result = transform_tensor_descriptor(
-    input_desc,
-    transforms,
-    make_tuple(sequence(0)),
-    make_tuple(sequence(0, 1, 2))
-)
-
-print(f"\n✅ Result:")
-print(f"  Input: {input_desc.get_lengths()}")
-print(f"  Output: {result.get_lengths()}")
-
-# Verify dimensions
-expected_lengths = lengths
-actual_lengths = result.get_lengths()
-
-print(f"\n🎯 Verification:")
-print(f"  Expected lengths: {expected_lengths}")
-print(f"  Actual lengths: {actual_lengths}")
-print(f"  Match: {expected_lengths == actual_lengths}")
-
-# Verify calculation
-print(f"\n🔍 Calculation Verification:")
-print(f"  Original: {total_length} elements")
-print(f"  Split into: {lengths[0]} × {lengths[1]} × {lengths[2]} = {lengths[0] * lengths[1] * lengths[2]}")
-print(f"  Conservation: {total_length} = {lengths[0] * lengths[1] * lengths[2]} ✅")
-```
-
-### Advanced Concepts Summary
-
-The examples above demonstrate several key advanced concepts:
-
-**Complex Nested Transforms**: The nested merge example shows how sophisticated hierarchical transformations are automatically flattened by the tensor descriptor system. This is crucial for GPU kernels that need to combine multiple levels of data organization.
-
-**Real-World GPU Memory Layouts**: The K LDS (Local Data Store) block descriptor example demonstrates how TensorAdaptors handle the complex memory hierarchies found in actual GPU computing:
-- **Double buffering** for overlapping computation and memory access
-- **Vectorization factors** for efficient SIMD operations  
-- **Packing factors** for optimal memory bandwidth utilization
-- **Block-level organization** for thread cooperation patterns
-
-**Dimension Conservation**: The arithmetic sequence transform shows how dimensions can be split and merged while preserving the total number of elements - a fundamental requirement for correct tensor operations.
-
-These patterns are essential for:
-- **GEMM operations** (matrix multiplication kernels)
-- **Convolution implementations** (deep learning kernels)
-- **Memory coalescing** (efficient GPU memory access)
-- **Thread block coordination** (cooperative GPU algorithms)
-
-## C++ Equivalent: Complex Nested Transforms
-
-The real power of TensorAdaptors becomes clear when we see how they correspond to complex C++ tensor operations. Here's the **true working equivalent** of complex nested C++ transforms:
-
-```{pyodide}
-#| echo: true
-#| output: true
-
-print("🎯 C++ Equivalent: TRUE WORKING IMPLEMENTATION")
-print("--" * 50)
-
-# Show the original C++ pattern
-print("Original C++ transform_tensor_descriptor call:")
-print("  transform_tensor_descriptor(")
-print("    input_desc,")
-print("    make_tuple(")
-print("      make_merge_transform(")
-print("        make_tuple(")
-print("          make_pass_through_transform(number<A>{}),")
-print("          make_merge_transform(make_tuple(number<B>{}, number<C>{}))") 
-print("        )")
-print("      ),")
-print("      make_pass_through_transform(number<D>{})")
-print("    ),")
-print("    make_tuple(sequence<0, 1, 2>{}, sequence<3>{}),")
-print("    make_tuple(sequence<0>{}, sequence<1>{})")
-print("  )")
-
-print("\nC++ Goal: 4D input [A, B, C, D] → 2D output [merged_ABC, D]")
-print("where merged_ABC = A*(B*C) + B*C + C")
-
-# Create the TRUE working Python equivalent
-A, B, C, D = 3, 2, 4, 5
-print(f"\nWith dimensions: A={A}, B={B}, C={C}, D={D}")
-
-# This is the WORKING configuration discovered through systematic testing
-cpp_equivalent = make_single_stage_tensor_adaptor(
-    transforms=[
-        UnmergeTransform([A, B, C]),  # Merge A,B,C dimensions
-        PassThroughTransform(D)       # Pass-through D dimension
-    ],
-    lower_dimension_old_top_idss=[
-        [0],        # First transform takes top dim 0
-        [1]         # Second transform takes top dim 1
-    ],
-    upper_dimension_new_top_idss=[
-        [0, 1, 2],  # First transform outputs to bottom dims 0,1,2
-        [3]         # Second transform outputs to bottom dim 3
-    ]
-)
-
-print(f"\n🎯 Python Equivalent Result:")
-print(f"  Adaptor: {cpp_equivalent.get_num_of_top_dimension()}D → {cpp_equivalent.get_num_of_bottom_dimension()}D")
-print(f"  ✅ Perfect! We have the correct 4D → 2D transformation")
-
-# Test the coordinate transformations
-test_coordinates = [
-    [0, 0, 0, 0],  # Origin
-    [1, 0, 0, 1],  # A=1, D=1
-    [0, 1, 0, 2],  # B=1, D=2
-    [0, 0, 1, 3],  # C=1, D=3
-    [2, 1, 3, 4],  # Complex example
-]
-
-print("\n📊 Testing Coordinate Transformations:")
-print("Input 4D [A, B, C, D] → Output 2D [merged_ABC, D]")
-
-for coord_list in test_coordinates:
-    top_coord = MultiIndex(4, coord_list)
-    bottom_coord = cpp_equivalent.calculate_bottom_index(top_coord)
-    
-    # Expected calculation matches C++ nested structure
-    a, b, c, d = coord_list
-    expected_abc = a * (B * C) + b * C + c
-    expected_d = d
-    expected = [expected_abc, expected_d]
-    
-    result = bottom_coord.to_list()
-    status = "✅" if result == expected else "❌"
-    
-    print(f"  {coord_list} → {result} (expected: {expected}) {status}")
-
-print("\n🔍 Mathematical Verification:")
-print("C++ nested calculation: merge(pass_through(A), merge(B,C))")
-print("For example [2,1,3,4]:")
-print("  Step 1: merge(B,C) = 1*4 + 3 = 7")
-print("  Step 2: merge(A, BC) = 2*8 + 7 = 23")
-print("  Step 3: pass_through(D) = 4")
-print("  Result: [23, 4] ✅")
-
-print("\n🎊 SUCCESS: True C++ equivalent achieved!")
-print("Key insights:")
-print("  • UnmergeTransform.calculate_lower_index() performs merging")
-print("  • Parameter mapping determines coordinate flow")
-print("  • Complex nested C++ transforms → Simple Python adaptors")
-```
-
-This implementation successfully creates the exact Python equivalent of the complex nested C++ transform pattern, with full mathematical equivalence and working coordinate transformations.
 
 ## Summary
 

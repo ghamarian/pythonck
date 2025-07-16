@@ -50,7 +50,7 @@ class TestCppEquivalentExamples:
         result = transform_tensor_descriptor(
             input_desc,
             transforms,
-            make_tuple(sequence(1), sequence(0, 2)),
+            make_tuple(sequence(0), sequence(1)),
             make_tuple(sequence(0), sequence(1))
         )
         
@@ -257,7 +257,7 @@ class TestCppEquivalentExamples:
         result = transform_tensor_descriptor(
             input_desc,
             transforms,
-            make_tuple(sequence(1), sequence(0, 2)),
+            make_tuple(sequence(0), sequence(1)),
             make_tuple(sequence(0), sequence(1))
         )
         
