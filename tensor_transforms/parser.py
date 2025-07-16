@@ -649,55 +649,12 @@ class TensorTransformParser:
         elif transform_type == 'merge':
             values = transform_dict.get('values', [])
             
-            # Check if any values contain nested merges
-            has_nested_merge = any(isinstance(val, dict) and val.get('type') == 'merge' for val in values)
-            
-            if has_nested_merge:
-                # Create a hierarchical transform representation using visualization version
-                # This will create NestedMergeTransform objects that preserve hierarchy
-                hierarchical_info = {
-                    'type': 'hierarchical_merge',
-                    'structure': values,
-                    'is_hierarchical': True
-                }
-                
-                # Convert the values to transform objects for the visualization version
-                transform_objects = []
-                for val in values:
-                    if isinstance(val, dict):
-                        if val.get('type') == 'pass_through':
-                            value = val.get('value', 1)
-                            if isinstance(value, sp.Basic):
-                                safe_variables = {k: v for k, v in variables.items() if not isinstance(v, list)}
-                                value = int(value.subs(safe_variables))
-                            transform_objects.append(PassThroughTransform(length=value))
-                        elif val.get('type') == 'merge':
-                            # Recursively create nested merge
-                            nested_merge = self.create_pytensor_transform(val, variables)
-                            transform_objects.append(nested_merge)
-                        else:
-                            # Create appropriate transform
-                            nested_transform = self.create_pytensor_transform(val, variables)
-                            transform_objects.append(nested_transform)
-                    else:
-                        # Direct integer value - create PassThroughTransform
-                        if isinstance(val, sp.Basic):
-                            safe_variables = {k: v for k, v in variables.items() if not isinstance(v, list)}
-                            val = int(val.subs(safe_variables))
-                        transform_objects.append(PassThroughTransform(length=int(val)))
-                
-                # Use the visualization version to create NestedMergeTransform
-                merge_transform = make_merge_transform_for_visualization(transform_objects)
-                
-                # Add hierarchy information as an attribute
-                merge_transform._hierarchy_info = hierarchical_info
-                return merge_transform
-            else:
-                # Regular flat merge - use existing logic
-                lengths = []
-                for val in values:
-                    lengths.extend(self._flatten_merge_lengths(val, variables))
-                return MergeTransform(lengths=lengths)
+            # Simplified merge handling - always flatten nested merges
+            # The previous hierarchical logic was based on invalid C++ syntax patterns
+            lengths = []
+            for val in values:
+                lengths.extend(self._flatten_merge_lengths(val, variables))
+            return MergeTransform(lengths=lengths)
         
         elif transform_type == 'unmerge':
             values = transform_dict.get('values', [])

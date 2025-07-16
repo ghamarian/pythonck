@@ -277,198 +277,6 @@ def substitute_descriptor(descriptor, user_vars):
     else:
         return descriptor
 
-def create_hierarchical_merge_nodes(transform, input_symbols, lower_indices, upper_indices,
-                                   structure, variables, dot, stage_idx, transform_idx, 
-                                   actual_stage_num, prev_stage_output_nodes):
-    """
-    Create separate nodes for hierarchical merge structures.
-    
-    This function processes nested merge structures by creating intermediate nodes
-    for each level of the hierarchy.
-    
-    Returns:
-        tuple: (output_formulas, intermediate_node_ids) where intermediate_node_ids 
-               contains information about which intermediate nodes were created
-    """
-    import sympy as sp
-    from pytensor.tensor_descriptor import MergeTransform, PassThroughTransform
-    from tensor_transforms import TensorTransformParser
-    
-    print(f"DEBUG: Creating hierarchical merge nodes for structure: {structure}")
-    
-    parser = TensorTransformParser()
-    intermediate_nodes = {}
-    intermediate_formulas = {}
-    symbol_to_input_idx = {}
-    created_intermediate_nodes = []  # Track created intermediate nodes for edge connections
-    
-    # Map input symbols to their indices for tracking
-    for idx, symbol in zip(lower_indices, input_symbols):
-        symbol_to_input_idx[symbol] = idx
-    
-    def process_structure_recursive(struct, current_inputs, depth=0):
-        """Recursively process the hierarchical structure."""
-        indent = "  " * depth
-        print(f"DEBUG: {indent}Processing structure at depth {depth}: {struct}")
-        
-        result_symbols = []
-        
-        for i, item in enumerate(struct):
-            if isinstance(item, dict):
-                if item.get('type') == 'pass_through':
-                    # Simple pass-through - use corresponding input symbol
-                    if i < len(current_inputs):
-                        result_symbols.append(current_inputs[i])
-                        print(f"DEBUG: {indent}Pass-through: {current_inputs[i]}")
-                    else:
-                        # Fallback symbol
-                        fallback_symbol = sp.Symbol(f"pt_{depth}_{i}")
-                        result_symbols.append(fallback_symbol)
-                        print(f"DEBUG: {indent}Pass-through fallback: {fallback_symbol}")
-                
-                elif item.get('type') == 'merge':
-                    # Nested merge - create intermediate node
-                    nested_values = item.get('values', [])
-                    print(f"DEBUG: {indent}Processing nested merge with {len(nested_values)} values")
-                    
-                    # For the nested merge, we need to take the next available inputs
-                    # Based on the structure: [A, merge(B, C)] - the nested merge should get B and C
-                    nested_inputs = []
-                    needed_inputs = len(nested_values)  # Each value in the nested merge needs one input
-                    
-                    # Take the next 'needed_inputs' symbols from the remaining current_inputs
-                    start_idx = len(result_symbols)  # Skip inputs already consumed by previous items
-                    for j in range(needed_inputs):
-                        if start_idx + j < len(input_symbols):
-                            nested_inputs.append(input_symbols[start_idx + j])
-                    
-                    print(f"DEBUG: {indent}Nested merge using inputs: {nested_inputs}")
-                    
-                    # Create the intermediate merge transform
-                    nested_lengths = []
-                    for nested_item in nested_values:
-                        lengths = parser._flatten_merge_lengths(nested_item, variables)
-                        nested_lengths.extend(lengths)
-                    
-                    print(f"DEBUG: {indent}Creating intermediate merge with lengths: {nested_lengths}")
-                    intermediate_merge = MergeTransform(lengths=nested_lengths)
-                    
-                    # Create intermediate node
-                    intermediate_node_id = f"s{actual_stage_num}_t{transform_idx}_intermediate_{depth}_{i}"
-                    
-                    # Calculate the merge formula
-                    if nested_inputs:
-                        try:
-                            intermediate_formula = intermediate_merge.sympy_calculate_upper(nested_inputs)[0]
-                            print(f"DEBUG: {indent}Intermediate formula: {intermediate_formula}")
-                        except Exception as e:
-                            print(f"DEBUG: {indent}Failed to create intermediate formula: {e}")
-                            intermediate_formula = sum(nested_inputs) if nested_inputs else sp.Symbol("intermediate")
-                    else:
-                        intermediate_formula = sp.Symbol("intermediate")
-                    
-                    # Store intermediate result
-                    intermediate_nodes[intermediate_node_id] = intermediate_formula
-                    intermediate_formulas[intermediate_node_id] = intermediate_formula
-                    
-                    # Track this intermediate node for later edge connections
-                    intermediate_info = {
-                        'node_id': intermediate_node_id,
-                        'input_indices': [start_idx + j for j in range(needed_inputs)],
-                        'formula': intermediate_formula
-                    }
-                    created_intermediate_nodes.append(intermediate_info)
-                    
-                    # Substitute variables and create the DOT node
-                    # Filter variables to only include numeric values that SymPy can handle
-                    safe_vars = {k: v for k, v in variables.items() if isinstance(v, (int, float, complex, sp.Basic))}
-                    substituted_formula = intermediate_formula.subs(safe_vars)
-                    simplified_formula = sp.simplify(substituted_formula)
-                    
-                    try:
-                        formula_str = str(simplified_formula)
-                        if (not any(func in formula_str for func in ['floor', 'ceiling', 'sqrt']) 
-                            and '/' not in formula_str and '**' not in formula_str):
-                            try:
-                                pretty_str = sp.pretty(simplified_formula, use_unicode=False)
-                                if '\n' not in pretty_str:
-                                    formula_str = pretty_str
-                            except:
-                                pass
-                    except Exception:
-                        formula_str = f"intermediate_{depth}_{i}"
-                    
-                    label = f'<<FONT POINT-SIZE="12">{formula_str}</FONT>>'
-                    dot.node(intermediate_node_id, label, fillcolor="#ffcc99")  # Orange for intermediate
-                    print(f"DEBUG: {indent}Created intermediate node {intermediate_node_id}")
-                    
-                    # Create edges from inputs to intermediate node - use the actual input indices
-                    for j, nested_input in enumerate(nested_inputs):
-                        actual_input_idx = start_idx + j
-                        if actual_input_idx in prev_stage_output_nodes:
-                            dot.edge(prev_stage_output_nodes[actual_input_idx], intermediate_node_id, 
-                                    label="Merge")
-                    
-                    # Use the intermediate result as a symbol for further processing
-                    result_symbols.append(intermediate_formula)
-                    
-            else:
-                # Handle non-dict items (shouldn't happen in proper structure)
-                print(f"DEBUG: {indent}Unexpected item type: {type(item)}")
-                if current_inputs:
-                    result_symbols.append(current_inputs.pop(0))
-        
-        return result_symbols
-    
-    # Process the hierarchical structure
-    working_inputs = input_symbols.copy()
-    processed_symbols = process_structure_recursive(structure, working_inputs)
-    
-    # Create the final merge if needed
-    if len(processed_symbols) > 1:
-        # For hierarchical merge, we need to create the correct lengths for the final merge
-        # The final merge should combine the outputs of the hierarchical structure
-        # Calculate the effective lengths for the final merge
-        final_lengths = []
-        
-        # For each processed symbol, determine its contribution
-        for i, (symbol, struct_item) in enumerate(zip(processed_symbols, structure)):
-            if isinstance(struct_item, dict):
-                if struct_item.get('type') == 'pass_through':
-                    # Pass-through contributes its original length
-                    value = struct_item.get('value', 1)
-                    if hasattr(value, 'subs'):
-                        # It's a SymPy expression
-                        safe_variables = {k: v for k, v in variables.items() if not isinstance(v, list)}
-                        final_lengths.append(int(value.subs(safe_variables)))
-                    else:
-                        final_lengths.append(int(value))
-                elif struct_item.get('type') == 'merge':
-                    # Nested merge contributes the product of its input lengths
-                    nested_lengths = []
-                    for nested_item in struct_item.get('values', []):
-                        nested_lengths.extend(parser._flatten_merge_lengths(nested_item, variables))
-                    final_lengths.append(int(sp.prod(nested_lengths)))
-            else:
-                # Fallback
-                final_lengths.append(1)
-        
-        print(f"DEBUG: Final merge lengths calculated as: {final_lengths}")
-        
-        # Create final merge transform with correct lengths
-        final_merge = MergeTransform(lengths=final_lengths)
-        try:
-            final_formula = final_merge.sympy_calculate_upper(processed_symbols)[0]
-            print(f"DEBUG: Final hierarchical merge formula: {final_formula}")
-            return ([final_formula], created_intermediate_nodes)
-        except Exception as e:
-            print(f"DEBUG: Failed to create final merge formula: {e}")
-            return ([sum(processed_symbols)], created_intermediate_nodes)
-    elif len(processed_symbols) == 1:
-        return (processed_symbols, created_intermediate_nodes)
-    else:
-        # Fallback
-        return ([sum(input_symbols) if input_symbols else sp.Symbol("merged")], created_intermediate_nodes)
 
 def build_transformation_graph_from_pytensor(descriptors, variables):
     """
@@ -791,9 +599,6 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                         input_symbols.append(sp.Symbol(f"d_{idx}"))
 
                 try:
-                    # Initialize variable for hierarchical merge tracking
-                    hierarchical_intermediate_nodes = []
-                    
                     # Apply the transform - use correct directional terminology  
                     # In forward graph, we're going from inputs to outputs (upper → lower)
                     if isinstance(transform, pytensor.tensor_descriptor.UnmergeTransform):
@@ -853,38 +658,26 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                                 # Fallback: create coordinate symbols
                                 output_formulas = [sp.Symbol(f"coord{i}") for i in range(len(upper_indices))]
                     elif isinstance(transform, pytensor.tensor_descriptor.MergeTransform):
-                        # Check if this is a hierarchical merge
-                        if hasattr(transform, '_hierarchy_info') and transform._hierarchy_info.get('is_hierarchical'):
-                            print(f"DEBUG: Processing hierarchical merge with structure: {transform._hierarchy_info['structure']}")
-                            # Create separate nodes for hierarchical merge
-                            output_formulas, intermediate_node_info = create_hierarchical_merge_nodes(
-                                transform, input_symbols, lower_indices, upper_indices,
-                                transform._hierarchy_info['structure'], variables, dot,
-                                stage_idx, i, actual_stage_num, prev_stage_output_nodes
-                            )
-                            # Store intermediate node info for custom edge creation
-                            hierarchical_intermediate_nodes = intermediate_node_info
+                        # Regular merge handling - hierarchical merge complexity was removed
+                        # MergeTransform: upper (multiple) → lower (single)
+                        if len(lower_indices) > 1 and len(upper_indices) == 1:
+                            # Case: multiple inputs → 1 output: use calculate_upper_index (composition)
+                            try:
+                                output_formulas = transform.sympy_calculate_upper(input_symbols)
+                                print(f"DEBUG: MergeTransform.sympy_calculate_upper({input_symbols}) -> {len(output_formulas)} outputs")
+                            except Exception as merge_error:
+                                print(f"DEBUG: MergeTransform.sympy_calculate_upper failed: {merge_error}")
+                                formula = sum(input_symbols) if input_symbols else sp.Symbol("merged")
+                                output_formulas = [formula]
                         else:
-                            # Regular flat merge - use directional semantics
-                            # MergeTransform: upper (multiple) → lower (single)
-                            if len(lower_indices) > 1 and len(upper_indices) == 1:
-                                # Case: multiple inputs → 1 output: use calculate_upper_index (composition)
-                                try:
-                                    output_formulas = transform.sympy_calculate_upper(input_symbols)
-                                    print(f"DEBUG: MergeTransform.sympy_calculate_upper({input_symbols}) -> {len(output_formulas)} outputs")
-                                except Exception as merge_error:
-                                    print(f"DEBUG: MergeTransform.sympy_calculate_upper failed: {merge_error}")
-                                    formula = sum(input_symbols) if input_symbols else sp.Symbol("merged")
-                                    output_formulas = [formula]
-                            else:
-                                # Case: 1 input → multiple outputs: use calculate_lower_index (decomposition)
-                                single_input = input_symbols[0] if input_symbols else sp.Symbol("merged")
-                                try:
-                                    output_formulas = transform.sympy_calculate_lower([single_input])
-                                    print(f"DEBUG: MergeTransform.sympy_calculate_lower({single_input}) -> {len(output_formulas)} outputs")
-                                except Exception as merge_error:
-                                    print(f"DEBUG: MergeTransform.sympy_calculate_lower failed: {merge_error}")
-                                    output_formulas = [sp.Symbol(f"comp{i}") for i in range(len(upper_indices))]
+                            # Case: 1 input → multiple outputs: use calculate_lower_index (decomposition)
+                            single_input = input_symbols[0] if input_symbols else sp.Symbol("merged")
+                            try:
+                                output_formulas = transform.sympy_calculate_lower([single_input])
+                                print(f"DEBUG: MergeTransform.sympy_calculate_lower({single_input}) -> {len(output_formulas)} outputs")
+                            except Exception as merge_error:
+                                print(f"DEBUG: MergeTransform.sympy_calculate_lower failed: {merge_error}")
+                                output_formulas = [sp.Symbol(f"comp{i}") for i in range(len(upper_indices))]
                     elif isinstance(transform, pytensor.tensor_descriptor.UnmergeTransform):
                         # Duplicate UnmergeTransform handling - use same forward logic
                         if len(input_symbols) == 1:
@@ -952,48 +745,8 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                             print(f"DEBUG: Added DOT node {node_id} with label {formula_str}")
                             
                             # Create edges from input nodes to this output node
-                            # Special handling for hierarchical merges
-                            if (isinstance(transform, pytensor.tensor_descriptor.MergeTransform) and 
-                                hasattr(transform, '_hierarchy_info') and transform._hierarchy_info.get('is_hierarchical')):
-                                # For hierarchical merges, create custom edges
-                                print(f"DEBUG: Creating custom edges for hierarchical merge")
-                                
-                                # Get the structure to understand the hierarchy
-                                structure = transform._hierarchy_info['structure']
-                                
-                                # Create edges based on the hierarchical structure
-                                consumed_inputs = set()  # Track which inputs have been consumed by intermediate nodes
-                                
-                                # First, mark inputs consumed by intermediate nodes
-                                if 'hierarchical_intermediate_nodes' in locals():
-                                    for intermediate_info in hierarchical_intermediate_nodes:
-                                        consumed_inputs.update(intermediate_info['input_indices'])
-                                        print(f"DEBUG: Inputs {intermediate_info['input_indices']} consumed by intermediate {intermediate_info['node_id']}")
-                                
-                                # Create edges from remaining inputs and intermediate nodes to final node
-                                for struct_idx, struct_item in enumerate(structure):
-                                    if isinstance(struct_item, dict):
-                                        if struct_item.get('type') == 'pass_through':
-                                            # Pass-through connects directly from input to final
-                                            input_idx = struct_idx  # For the first element (A)
-                                            if input_idx not in consumed_inputs and input_idx in prev_stage_output_nodes:
-                                                transform_name = "Merge"
-                                                dot.edge(prev_stage_output_nodes[input_idx], node_id, 
-                                                       label=transform_name)
-                                                print(f"DEBUG: Created edge from input {input_idx} to final node {node_id}")
-                                        
-                                        elif struct_item.get('type') == 'merge':
-                                            # Nested merge connects from intermediate node to final
-                                            if 'hierarchical_intermediate_nodes' in locals():
-                                                for intermediate_info in hierarchical_intermediate_nodes:
-                                                    if struct_idx == 1:  # This is the second item in structure (the nested merge)
-                                                        transform_name = "Merge"
-                                                        dot.edge(intermediate_info['node_id'], node_id, 
-                                                               label=transform_name)
-                                                        print(f"DEBUG: Created edge from intermediate {intermediate_info['node_id']} to final node {node_id}")
-                            
                             # Special handling for EmbedTransform in naive descriptors
-                            elif (isinstance(transform, pytensor.tensor_descriptor.EmbedTransform) and 
+                            if (isinstance(transform, pytensor.tensor_descriptor.EmbedTransform) and 
                                 stage_idx == 0 and "make_naive_tensor_descriptor" in descriptors[0]):
                                 # For naive descriptor EmbedTransform, connect all input dimensions
                                 expected_input_dims = len(transform.lengths)
@@ -1636,9 +1389,6 @@ def build_backward_transformation_graph_from_pytensor(descriptors, variables):
                     input_symbols.append(sp.Symbol(f"back_d_{idx}"))
 
             try:
-                # Initialize variable for hierarchical merge tracking
-                hierarchical_intermediate_nodes = []
-                
                 # Apply the transform - use correct directional terminology
                 # In backward graph, we're going from final outputs back to inputs (lower → upper)
                 if isinstance(transform, pytensor.tensor_descriptor.UnmergeTransform):
