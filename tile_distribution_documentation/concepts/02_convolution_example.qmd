@@ -6,7 +6,7 @@ jupyter: python3
 
 # Introduction
 
-This chapter demonstrates a practical application of tensor descriptors by implementing convolution operations. We'll progress from a naive implementation to an optimized approach using tensor descriptors, showing how they enable efficient memory access patterns for GPU acceleration.
+This chapter demonstrates a practical application of tensor descriptors by implementing convolution operations. We'll progress from a naive implementation to an optimized approach using tensor descriptors, showing how they enable efficient memory access patterns for GPU acceleration. First we show how we can achieve the results using numpy implementation.
 
 The convolution operation is fundamental in deep learning, and understanding its implementation details reveals how high-performance libraries achieve their efficiency. We'll explore:
 
@@ -19,14 +19,26 @@ The convolution operation is fundamental in deep learning, and understanding its
 ## Setup and Test Data
 
 ```{python}
-#| echo: false
-#| output: false
-import numpy as np
+# Import all required modules for the page
 import sys
-sys.path.append('../..')
+sys.path.insert(0, "../pytensor")
+from pytensor.tensor_descriptor import (
+    make_naive_tensor_descriptor,
+    make_naive_tensor_descriptor_packed,
+    make_naive_tensor_descriptor_aligned,
+    transform_tensor_descriptor,
+    PassThroughTransform,
+    UnmergeTransform,
+    MergeTransform, make_merge_transform
+)
+```
+
+```{python}
+import numpy as np
 from pytensor.tensor_descriptor import (
     EmbedTransform, MergeTransform, MultiIndex,
-    make_naive_tensor_descriptor, transform_tensor_descriptor
+    make_naive_tensor_descriptor, transform_tensor_descriptor,
+    make_merge_transform
 )
 
 def create_test_data():
@@ -277,7 +289,7 @@ Perfect! We now have a 4D tensor `[4, 4, 3, 3]` containing all 16 convolution wi
 
 ## 3. Window Extraction with Tensor Descriptors
 
-Now let's achieve the same result using tensor descriptors:
+Now let's achieve the same result using tensor descriptors, we have seen a similar results before when we learnt about the `EmbedTransform` that is behind `make_naive_tensor_descriptor`.
 
 ```{python}
 def extract_windows_tensor_descriptor(image, kernel_size=3):
@@ -323,6 +335,7 @@ The key insight is the stride pattern `[W, 1, W, 1]`:
 - Moving one step in `kernel_w` direction requires jumping `1` element (one column)
 
 ### Verification: NumPy vs Tensor Descriptor Windows
+We can see that we get the same results as we do in numpy approach.
 
 ```{python}
 # Compare the two approaches
@@ -338,7 +351,7 @@ else:
 
 ## 4. Im2col Transformation with NumPy
 
-The next step is converting our 4D windows to a 2D matrix format suitable for matrix multiplication. This is called the "im2col" (image to column) transformation:
+The next step is converting our 4D windows to a 2D matrix format suitable for matrix multiplication. This is called the "im2col" (image to column) transformation. This can be done by using reshape operator of numpy.
 
 ```{python}
 def im2col_numpy(windows):
@@ -371,21 +384,29 @@ Each row of the im2col matrix contains a flattened convolution window. This tran
 
 ## 5. Im2col with Tensor Descriptors
 
-Great question! Since we already extracted windows using tensor descriptors, we can simply reshape them just like the NumPy version:
+Since we already extracted windows using tensor descriptors, we can simply reshape them just like the NumPy version, let's see how we can do it using the transformation pipelines.
+
+### Simple Approach: Reshape Existing Windows
+
+Since we already extracted the 4D windows using a tensor descriptor, the simplest way to get the im2col matrix is to just reshape the result, similar to how we handled the NumPy array.
 
 ```{python}
-# Use the windows we already extracted with tensor descriptors
-im2col_td_simple = windows_td.reshape(16, 9)
+def im2col_td_simple(windows_td):
+    """Convert 4D tensor descriptor windows to 2D im2col matrix."""
+    out_h, out_w, K, K = windows_td.shape
+    num_windows = out_h * out_w
+    patch_size = K * K
+    
+    # Reshape to 2D matrix
+    im2col_matrix = windows_td.reshape(num_windows, patch_size)
+    
+    print(f"4D TD windows shape: {windows_td.shape}")
+    print(f"2D im2col (simple) shape: {im2col_matrix.shape}")
+    
+    return im2col_matrix
 
-print(f"Tensor descriptor windows shape: {windows_td.shape}")
-print(f"Tensor descriptor im2col shape: {im2col_td_simple.shape}")
-print(f"Simple reshape: just like NumPy!")
-
-# Show it's identical to our NumPy version
-print(f"\nFirst few rows of TD im2col matrix:")
-for i in range(3):
-    win_i, win_j = i // 4, i % 4
-    print(f"Row {i} (window [{win_i},{win_j}]): {' '.join(f'{val:3.0f}' for val in im2col_td_simple[i])}")
+# Create im2col from tensor descriptor windows
+im2col_td_matrix = im2col_td_simple(windows_td)
 ```
 
 Perfect! This is exactly the same as the NumPy approach - just reshape the 4D windows into a 2D matrix.
@@ -395,6 +416,8 @@ Perfect! This is exactly the same as the NumPy approach - just reshape the 4D wi
 However, tensor descriptors can also create the im2col layout directly without intermediate 4D windows. This is useful for GPU implementations:
 
 ```{python}
+from pytensor.tensor_descriptor import make_merge_transform
+
 def create_direct_im2col_descriptor(image, kernel_size=3):
     """Create im2col matrix directly using tensor descriptors."""
     H, W = image.shape
@@ -407,14 +430,14 @@ def create_direct_im2col_descriptor(image, kernel_size=3):
     windows_descriptor = make_naive_tensor_descriptor(window_lengths, window_strides)
     
     # Step 2: Apply merge transforms to create 2D im2col layout directly
-    merge_windows = MergeTransform([out_h, out_w])  # Merge spatial output dimensions
-    merge_patch = MergeTransform([K, K])  # Merge kernel dimensions
+    merge_windows = make_merge_transform([out_h, out_w])  # Merge spatial output dimensions
+    merge_patch = make_merge_transform([K, K])  # Merge kernel dimensions
     
-    im2col_descriptor = transform_tensor_descriptor(
+    im2col_descriptor = transform_tensor_descriptor( #
         windows_descriptor,
         transforms=[merge_windows, merge_patch],
-        lower_dimension_hidden_idss=[[1, 2], [3, 4]],
-        upper_dimension_hidden_idss=[[5], [6]]
+        lower_dimension_hidden_idss=[[0, 1], [2, 3]],
+        upper_dimension_hidden_idss=[[0], [1]]
     )
     
     print(f"Direct im2col descriptor shape: {im2col_descriptor.get_lengths()}")
@@ -427,6 +450,33 @@ im2col_descriptor = create_direct_im2col_descriptor(image)
 print(f"\nExample: offset for window 0, patch element 0: {im2col_descriptor.calculate_offset([0, 0])}")
 print(f"Example: offset for window 0, patch element 4: {im2col_descriptor.calculate_offset([0, 4])}")
 print(f"Example: offset for window 1, patch element 0: {im2col_descriptor.calculate_offset([1, 0])}")
+
+# Extract data using the direct descriptor
+def extract_im2col_with_descriptor(image, descriptor):
+    """Extract im2col matrix using tensor descriptor."""
+    image_flat = image.flatten()
+    descriptor_shape = descriptor.get_lengths()
+    num_windows, patch_size = descriptor_shape
+    
+    im2col_matrix = np.zeros((num_windows, patch_size))
+    
+    for i in range(num_windows):
+        for j in range(patch_size):
+            offset = descriptor.calculate_offset([i, j])
+            im2col_matrix[i, j] = image_flat[offset]
+    
+    print(f"Extracted im2col matrix using descriptor: {im2col_matrix.shape}")
+    return im2col_matrix
+
+# Extract im2col matrix using tensor descriptor
+im2col_td_direct = extract_im2col_with_descriptor(image, im2col_descriptor)
+
+# Show the matrix structure
+print(f"\nim2col_td_direct matrix (each row is a flattened window):")
+out_h, out_w = 4, 4  # Our output dimensions
+for i, row in enumerate(im2col_td_direct):
+    win_i, win_j = i // out_w, i % out_w
+    print(f"Row {i} (window [{win_i},{win_j}]): {' '.join(f'{val:3.0f}' for val in row)}")
 ```
 
 ### Why Both Approaches?
@@ -443,15 +493,21 @@ This transforms the 4D tensor `[out_h, out_w, K, K]` directly into a 2D matrix `
 ### Verification: NumPy vs Tensor Descriptor Im2col
 
 ```{python}
-# Compare the simple reshape approaches
-difference = np.linalg.norm(im2col_numpy - im2col_td_simple)
-print(f"L2 norm of difference: {difference}")
+# Compare NumPy approach with direct tensor descriptor approach
+difference = np.linalg.norm(im2col_numpy - im2col_td_direct)
+print(f"L2 norm of difference (NumPy vs Tensor Descriptor): {difference}")
 
 if difference < 1e-10:
     print("✅ SUCCESS: Tensor descriptor im2col identical to NumPy!")
 else:
     print("❌ ERROR: Tensor descriptor im2col differs from NumPy")
-    print(f"Max difference: {np.max(np.abs(im2col_numpy - im2col_td_simple))}")
+    print(f"Max difference: {np.max(np.abs(im2col_numpy - im2col_td_direct))}")
+
+# Also verify that simple reshape gives same result
+difference_simple = np.linalg.norm(im2col_numpy - im2col_td_matrix)
+print(f"\nL2 norm of difference (NumPy vs Simple Reshape): {difference_simple}")
+if difference_simple < 1e-10:
+    print("✅ SUCCESS: Simple reshape approach also identical!")
 ```
 
 ## 6. Convolution via Matrix Multiplication
@@ -486,6 +542,7 @@ print_matrix(im2col_output, "Convolution via Im2col")
 ```
 
 ### Final Verification: All Methods Equivalent
+
 
 ```{python}
 # Verify that all methods produce the same result

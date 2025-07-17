@@ -28,7 +28,7 @@ from pytensor.tensor_descriptor import (
     transform_tensor_descriptor,
     PassThroughTransform,
     UnmergeTransform,
-    MergeTransform
+    MergeTransform, make_merge_transform
 )
 ```
 
@@ -265,8 +265,8 @@ print("  - MergeTransform to combine 'wavesPerM' and 'wavesPerK'.")
 print("  - MergeTransform to combine 'WarpSize' and 'KVector'.")
 transforms = [
     PassThroughTransform(NumIssues),
-    MergeTransform([wavesPerM, wavesPerK]),
-    MergeTransform([WarpSize, KVector])
+    make_merge_transform([wavesPerM, wavesPerK]),
+    make_merge_transform([WarpSize, KVector])
 ]
 
 # 4. Define dimension mappings

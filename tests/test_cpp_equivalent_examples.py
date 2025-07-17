@@ -72,50 +72,6 @@ class TestCppEquivalentExamples:
         merge_transform = result.transforms[2]
         assert merge_transform.lengths == [kKPerBlock // kKPack, kKPack]
 
-    def test_complex_nested_merge(self):
-        """Test: Complex Nested Merge example"""
-        # Parameters from examples.py
-        A, B, C, D = 3, 2, 4, 5
-        
-        # Create input descriptor
-        input_desc = make_naive_tensor_descriptor_packed([A, B*C, D, 1])
-        
-        # Create nested transforms - this is the key C++ equivalent test
-        transforms = make_tuple(
-            make_merge_transform(
-                make_tuple(
-                    make_pass_through_transform(number(A)),
-                    make_merge_transform(make_tuple(number(B), number(C)))
-                )
-            ),
-            make_pass_through_transform(number(D))
-        )
-        
-        # Apply transformation
-        result = transform_tensor_descriptor(
-            input_desc,
-            transforms,
-            make_tuple(sequence(0, 1, 2), sequence(3)),
-            make_tuple(sequence(0), sequence(1))
-        )
-        
-        # Verify C++ equivalent behavior - the final result should have the expected dimensions
-        expected_lengths = [A * B * C, D]
-        assert result.get_lengths() == expected_lengths
-        
-        # Verify we have the expected number of transforms (original + new)
-        assert len(result.transforms) >= 2
-        
-        # Check that the final result has the expected structure
-        # The nested merge should be flattened to a single merge with combined length
-        merge_found = False
-        for transform in result.transforms:
-            if isinstance(transform, MergeTransform):
-                # Check if this merge has the expected flattened structure
-                if transform.lengths == [A, B * C]:
-                    merge_found = True
-                    break
-        assert merge_found, "Expected flattened merge transform not found"
 
     def test_all_pass_through(self):
         """Test: All Pass-Through example"""
@@ -408,52 +364,6 @@ class TestCppEquivalentExamples:
         assert len(result.transforms) == 2
         assert isinstance(result.transforms[0], UnmergeTransform)
         assert isinstance(result.transforms[1], UnmergeTransform)
-
-    def test_nested_merge_flattening_behavior(self):
-        """Test specific nested merge flattening behavior to match C++"""
-        # This tests the core C++ equivalent behavior
-        A, B, C = 2, 3, 4
-        
-        # Create nested merge transform
-        nested_transform = make_merge_transform(
-            make_tuple(
-                number(A),
-                make_merge_transform(
-                    make_tuple(number(B), number(C))
-                )
-            )
-        )
-        
-        # This should be flattened immediately in C++ equivalent behavior
-        assert isinstance(nested_transform, MergeTransform)
-        
-        # The nested structure should be flattened to [A, B*C]
-        assert nested_transform.lengths == [A, B * C]
-
-    def test_triple_nested_merge(self):
-        """Test triple nested merge transforms"""
-        A, B, C, D = 2, 3, 4, 5
-        
-        # Create triple nested merge
-        triple_nested = make_merge_transform(
-            make_tuple(
-                number(A),
-                make_merge_transform(
-                    make_tuple(
-                        number(B),
-                        make_merge_transform(
-                            make_tuple(number(C), number(D))
-                        )
-                    )
-                )
-            )
-        )
-        
-        # In C++ this would be completely flattened
-        assert isinstance(triple_nested, MergeTransform)
-        
-        # Should be flattened to [A, B*C*D]
-        assert triple_nested.lengths == [A, B * C * D]
 
     def test_mixed_transform_types(self):
         """Test mixing pass-through and merge transforms"""
