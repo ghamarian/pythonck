@@ -1542,29 +1542,7 @@ def make_merge_transform(lengths: Union[List[int], Tuple]) -> Transform:
     if isinstance(lengths, tuple):
         lengths = list(lengths)
     
-    # Check if this contains nested Transform objects
-    if any(isinstance(item, Transform) for item in lengths):
-        # This is a nested case - flatten it immediately (match C++ behavior)
-        flattened_lengths = []
-        for item in lengths:
-            if isinstance(item, Transform):
-                if isinstance(item, MergeTransform):
-                    # Nested merge: multiply lengths
-                    flattened_lengths.append(math.prod(item.lengths))
-                elif isinstance(item, PassThroughTransform):
-                    # Pass-through: use its length
-                    flattened_lengths.append(item.length)
-                else:
-                    raise ValueError(f"Unsupported nested transform in make_merge_transform: {type(item)}")
-            else:
-                # Direct integer length
-                flattened_lengths.append(item)
-        
-        # Return flattened merge transform
-        return MergeTransform(flattened_lengths)
-    else:
-        # Simple case - create normal MergeTransform
-        return MergeTransform(lengths)
+    return MergeTransform(lengths)
 
 
 def make_merge_transform_for_visualization(lengths: Union[List[int], Tuple]) -> Transform:

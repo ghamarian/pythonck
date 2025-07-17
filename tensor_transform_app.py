@@ -1362,6 +1362,7 @@ def build_backward_transformation_graph_from_pytensor(descriptors, variables):
             # For backward: we swap the interpretation
             # What was "upper" in forward becomes "lower" in backward (input)
             # What was "lower" in forward becomes "upper" in backward (output)
+            
             backward_input_indices = new_upper_idss[i]  # These are our inputs for backward
             backward_output_indices = new_lower_idss[i]  # These are our outputs for backward
             
@@ -1410,11 +1411,11 @@ def build_backward_transformation_graph_from_pytensor(descriptors, variables):
                     # EmbedTransform: upper (multiple) → lower (single) 
                     # In backward direction (lower → upper): single input → multiple outputs
                     if len(input_symbols) == 1:
-                        # Single input → multiple outputs: use calculate_lower_index (decomposition)
-                        output_formulas = transform.sympy_calculate_lower(input_symbols)
-                    else:
-                        # Multiple inputs → single output: use calculate_upper_index (composition)
+                        # Single input → multiple outputs: use sympy_calculate_upper (decomposition)
                         output_formulas = transform.sympy_calculate_upper(input_symbols)
+                    else:
+                        # Multiple inputs → single output: use sympy_calculate_lower (composition)
+                        output_formulas = transform.sympy_calculate_lower(input_symbols)
                 elif isinstance(transform, pytensor.tensor_descriptor.MergeTransform):
                     # MergeTransform: upper (multiple) → lower (single)
                     # In backward direction (lower → upper): 

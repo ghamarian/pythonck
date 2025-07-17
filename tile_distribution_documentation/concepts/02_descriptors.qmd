@@ -3,12 +3,6 @@ title: "Tensor Descriptors - Complete Tensor Specifications"
 format: live-html
 ---
 
-## Overview
-
-TensorDescriptor is the complete specification for a tensor in memory. It combines TensorAdaptor (the transformation pipeline) with element space information (how much memory is needed). Think of it as the complete blueprint that tells you everything about how a tensor is laid out in memory.
-
-TensorDescriptor is what you'll actually use in real applications - it provides the complete interface for creating, accessing, and manipulating tensors.
-
 ```{pyodide}
 #| echo: false
 #| output: false
@@ -19,211 +13,183 @@ import micropip
 await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl")
 ```
 
-## TensorDescriptor vs TensorAdaptor
+## Overview
 
-Let's start by understanding how TensorDescriptor extends TensorAdaptor:
+A `TensorDescriptor` is the complete blueprint for a tensor. It combines a shape, stride information, and a series of transformations into a single object that defines exactly how a tensor's data is laid out in memory. This guide will walk you through creating tensors, from basic layouts to complex, transformed views.
 
 ```{pyodide}
 #| echo: true
 #| output: true
-
-# Import required modules
+# Import all required modules for the page
 from pytensor.tensor_descriptor import (
-    TensorDescriptor,
-    TensorAdaptor,
     make_naive_tensor_descriptor,
     make_naive_tensor_descriptor_packed,
     make_naive_tensor_descriptor_aligned,
     transform_tensor_descriptor,
-    EmbedTransform,
-    UnmergeTransform
+    PassThroughTransform,
+    UnmergeTransform,
+    MergeTransform
 )
-from pytensor.tensor_coordinate import MultiIndex
-import numpy as np
-
-print("📋 TensorDescriptor vs TensorAdaptor")
-print("--" * 50)
-print("  TensorAdaptor:")
-print("    • Defines coordinate transformations")
-print("    • Specifies how dimensions map and transform")
-print("    • No memory size information")
-print("")
-print("  TensorDescriptor:")
-print("    • Extends TensorAdaptor")
-print("    • Adds element_space_size (total memory needed)")
-print("    • Adds guaranteed vector lengths/strides")
-print("    • Complete tensor memory specification")
 ```
 
-## Naive Tensor Descriptor: Custom Strides
+## Creating Basic Tensor Layouts
 
-The most flexible way to create tensors is with custom strides, allowing you to control exactly how data is laid out in memory:
+You can create descriptors for several common memory layouts.
+
+### 1. Custom Strides
+
+The most fundamental way to define a tensor is with custom strides. This gives you full control over how many elements to "jump" in memory to move to the next item along each dimension. This is useful for creating padded layouts.
 
 ```{pyodide}
 #| echo: true
 #| output: true
-
-print("1️⃣ Naive Tensor Descriptor: Custom Strides")
-print("--" * 50)
-
-# Create 2D tensor with custom strides
+# Create a 3x4 tensor, but make each row take up 8 elements in memory (4 for data, 4 for padding)
 lengths = [3, 4]
-strides = [8, 1]  # Row-major with padding
+strides = [8, 1]  # To move to the next row (dim 0), jump 8 elements. To move to the next column (dim 1), jump 1.
+
 descriptor = make_naive_tensor_descriptor(lengths, strides)
 
-print(f"  Tensor shape: {lengths}")
-print(f"  Custom strides: {strides}")
-print(f"  Number of dimensions: {descriptor.get_num_of_dimension()}")
-print(f"  Dimension lengths: {descriptor.get_lengths()}")
-print(f"  Element space size: {descriptor.get_element_space_size()}")
-print(f"  Number of transforms: {descriptor.get_num_of_transform()}")
+print(f"Tensor Shape: {descriptor.get_lengths()}")
+print(f"Custom Strides: {strides}")
+# The total memory needed is 3 rows * 8 elements/row = 24
+print(f"Element Space Size: {descriptor.get_element_space_size()}")
 
-# Calculate offsets for different positions
-test_coords = [[0, 0], [0, 3], [1, 0], [2, 3]]
-print("\n  Memory offset calculations:")
-for coord_list in test_coords:
-    offset = descriptor.calculate_offset(coord_list)
-    expected = coord_list[0] * strides[0] + coord_list[1] * strides[1]
-    print(f"    {coord_list} → offset {offset} (expected: {expected})")
+# Calculate offset of the element at [row=1, col=2]
+offset = descriptor.calculate_offset([1, 2])
+print(f"Offset of [1, 2]: {offset} (Expected: 1*8 + 2*1 = 10)")
 ```
 
-## Packed Tensor Descriptor: Row-Major Layout
+### 2. Packed (Row-Major) Layout
 
-For most applications, packed (row-major) layout is the preferred choice. It provides memory efficiency by eliminating padding - the strides are calculated directly from the lengths based on row-major ordering.
+For most cases, a tightly packed, row-major layout is sufficient. The strides are calculated automatically, leaving no unused space between elements.
 
 ```{pyodide}
 #| echo: true
 #| output: true
-
-print("2️⃣ Packed Tensor Descriptor: Row-Major Layout")
-print("--" * 50)
-
-# Create 2D tensor with packed layout
 lengths = [3, 4]
 descriptor_packed = make_naive_tensor_descriptor_packed(lengths)
 
-print(f"  Tensor shape: {lengths}")
-print(f"  Layout: packed (row-major)")
-print(f"  Number of dimensions: {descriptor_packed.get_num_of_dimension()}")
-print(f"  Dimension lengths: {descriptor_packed.get_lengths()}")
-print(f"  Element space size: {descriptor_packed.get_element_space_size()}")
-print(f"  Expected size: {3 * 4} = {3 * 4}")
+print(f"Tensor Shape: {descriptor_packed.get_lengths()}")
+# Total memory is 3 * 4 = 12
+print(f"Element Space Size: {descriptor_packed.get_element_space_size()}")
 
-# Calculate offsets for packed layout
-test_coords = [[0, 0], [0, 3], [1, 0], [2, 3]]
-print("\n  Memory offset calculations (packed):")
-for coord_list in test_coords:
-    offset = descriptor_packed.calculate_offset(coord_list)
-    expected = coord_list[0] * 4 + coord_list[1]  # Row-major calculation
-    print(f"    {coord_list} → offset {offset} (expected: {expected})")
+# Calculate offset of the element at [row=1, col=2]
+offset = descriptor_packed.calculate_offset([1, 2])
+print(f"Offset of [1, 2]: {offset} (Expected: 1*4 + 2*1 = 6)")
 ```
 
-## Multi-Dimensional Descriptors
+### 3. Aligned Layout
 
-TensorDescriptor works with any number of dimensions:
+For GPU performance, memory layouts often need to be aligned. This function creates a row-major layout but ensures that each row's starting address is a multiple of a given alignment value, adding padding if necessary.
 
 ```{pyodide}
 #| echo: true
 #| output: true
-
-print("3️⃣ Multi-Dimensional Descriptors")
-print("--" * 50)
-
-# Create 3D tensor
-tensor_3d = make_naive_tensor_descriptor_packed([2, 3, 4])
-print(f"  3D tensor shape: {tensor_3d.get_lengths()}")
-print(f"  3D element space size: {tensor_3d.get_element_space_size()}")
-
-# Create 4D tensor  
-tensor_4d = make_naive_tensor_descriptor_packed([2, 2, 3, 2])
-print(f"  4D tensor shape: {tensor_4d.get_lengths()}")
-print(f"  4D element space size: {tensor_4d.get_element_space_size()}")
-
-# Test multi-dimensional offset calculation
-coord_3d = [1, 2, 1]
-offset_3d = tensor_3d.calculate_offset(coord_3d)
-expected_3d = 1 * (3 * 4) + 2 * 4 + 1  # 1*12 + 2*4 + 1 = 21
-print(f"\n  3D offset [{1}, {2}, {1}] → {offset_3d} (expected: {expected_3d})")
-
-coord_4d = [1, 1, 2, 1]  
-offset_4d = tensor_4d.calculate_offset(coord_4d)
-expected_4d = 1 * (2 * 3 * 2) + 1 * (3 * 2) + 2 * 2 + 1  # 1*12 + 1*6 + 2*2 + 1 = 23
-print(f"  4D offset [{1}, {1}, {2}, {1}] → {offset_4d} (expected: {expected_4d})")
-```
-
-## Aligned Tensor Descriptor: Memory Alignment
-For GPU performance, memory-aligned layouts are often necessary. The aligned descriptor aligns the second-to-last dimension according to the specified alignment parameter. In the example below, we set the alignment to 8 bytes, which ensures each row starts at an 8-byte boundary.
-
-```{pyodide}
-#| echo: true
-#| output: true
-
-print("4️⃣ Aligned Tensor Descriptor: Memory Alignment")
-print("--" * 50)
-
-# Create tensor with 8-byte alignment
 lengths = [4, 5]
-align = 8
+align = 8 # Align each row to an 8-byte boundary
 descriptor_aligned = make_naive_tensor_descriptor_aligned(lengths, align)
 
-print(f"  Tensor shape: {lengths}")
-print(f"  Alignment: {align} bytes")
-print(f"  Dimension lengths: {descriptor_aligned.get_lengths()}")
-print(f"  Element space size: {descriptor_aligned.get_element_space_size()}")
+print(f"Tensor Shape: {descriptor_aligned.get_lengths()}")
+print(f"Alignment: {align}")
 
-# Show how alignment affects memory layout
-print(f"\n  Without alignment: {4 * 5} = {4 * 5} elements")
-print(f"  With alignment: {descriptor_aligned.get_element_space_size()} elements")
-print(f"  Padding added for alignment efficiency")
+# Without alignment, size is 4*5=20. With alignment, the stride of the first dim (rows) is padded to be a multiple of 8.
+# The stride for dim 1 (columns) is 1. The stride for dim 0 (rows) becomes 8 (the smallest multiple of 8 >= 5).
+# Total size = 4 rows * 8 elements/row = 32.
+print(f"Element Space Size: {descriptor_aligned.get_element_space_size()} (Expected: 32)")
 ```
 
-## Transform Tensor Descriptor: Adding Transformations
+## The Pipeline Concept
 
-You can add transformations to existing descriptors to create more complex layouts. Understanding how `transform_tensor_descriptor` works internally is crucial for building transformation pipelines.
+It's useful to think of every `TensorDescriptor` as a **transformation pipeline**. The functions above (`make_naive...`) create the *first stage* of this pipeline: they define the initial transformation that takes a simple, one-dimensional block of memory and presents it as a logical, multi-dimensional tensor view.
 
-### How transform_tensor_descriptor Works (C++ Equivalent)
+The power of the library comes from adding more stages to this pipeline to create increasingly complex layouts.
 
-The `transform_tensor_descriptor` function follows the true C++ pattern:
+### The Initial Pipeline Stage: A Closer Look
 
-1. **Step 1**: Uses `transform_tensor_adaptor` to create new adaptor from existing descriptor
-2. **Step 2**: Combines that adaptor with element space size to create the final descriptor
-
-**What You Specify** (logical indices starting from 0):
-
-- **`lower_dimension_hidden_idss`**: Which logical dimensions of the input tensor to feed into each transform
-- **`upper_dimension_hidden_idss`**: Which logical dimensions of the output tensor each transform should create
-
-**Internal Process**:
-
-- The function first calls `transform_tensor_adaptor` to handle the coordinate transformation logic
-- Then wraps the resulting adaptor with element space information to create a complete descriptor
-- Element space size is preserved (transforms don't change underlying memory layout)
-
-In our example below: the original [2, 6] tensor has logical dimensions [0, 1]. We take logical dimension 1 (the second dimension with length 6), apply an UnmergeTransform to split it into [2, 3], and route the output to new logical dimensions [0, 1]. The final tensor accesses logical dimensions [0, 1, 2], giving us the [2, 2, 3] layout.
+Let's inspect the pipeline of a simple packed descriptor to see this first stage in action.
 
 ```{pyodide}
 #| echo: true
 #| output: true
-
-print("5️⃣ Transform Tensor Descriptor: Adding Transformations")
+print("Inspecting the initial pipeline of a [3, 4] tensor")
 print("--" * 50)
 
-# Start with a basic 2D descriptor
+# Create a simple packed tensor
+simple_desc = make_naive_tensor_descriptor_packed([3, 4])
+
+print(f"Descriptor Shape: {simple_desc.get_lengths()}")
+print(f"Total Transforms in Pipeline: {simple_desc.get_num_of_transform()}")
+
+print("\n--- Initial Transform Internals ---")
+# This shows the inputs to the transform pipeline. For a naive descriptor, it's the raw buffer (ID 0).
+print(f"Lower IDs (Inputs): {simple_desc.get_lower_dimension_hidden_idss()}")
+
+# This shows the outputs of the transform pipeline, which become the logical dimensions.
+print(f"Upper IDs (Outputs): {simple_desc.get_upper_dimension_hidden_idss()}")
+```
+
+As the output shows, creating a simple `[3, 4]` tensor sets up a pipeline with a single transform.
+
+*   **`Lower IDs (Inputs): [[0]]`**: This means the transform takes one input: the raw, one-dimensional memory buffer, which is always at hidden dimension ID `0`.
+*   **`Upper IDs (Outputs): [[1, 2]]`**: This means the transform produces two outputs, which are assigned to hidden dimension IDs `1` and `2`. These become the logical dimensions `0` and `1` that you interact with when you access the tensor.
+
+Understanding this initial stage is key to seeing how `transform_tensor_descriptor` later adds *new* stages that take these output dimensions (`1` and `2`) as their inputs.
+
+## Advanced Layouts: A Step-by-Step Transformation
+
+The `transform_tensor_descriptor` function adds new stages to an existing descriptor's pipeline. Let's walk through this with a detailed example, mirroring the process of a debug script.
+
+### Goal: Transform a `[2, 6]` Tensor into a `[2, 2, 3]` View
+
+We will reinterpret a 2D tensor with shape `[2, 6]` as a 3D tensor with shape `[2, 2, 3]`, without changing the underlying 12-element memory buffer.
+
+#### Step 1: Define and Analyze the Base Descriptor
+
+First, we create the `[2, 6]` base descriptor. As we established, this creates an initial pipeline stage.
+
+```{pyodide}
+#| echo: true
+#| output: true
+print("--- Step 1: Analyze Base Descriptor ---")
 base_descriptor = make_naive_tensor_descriptor_packed([2, 6])
-print(f"  Base descriptor: {base_descriptor.get_lengths()}")
-print(f"  Base element space size: {base_descriptor.get_element_space_size()}")
-print(f"  Logical dimensions: 0 (first), 1 (second)")
+print(f"Base Descriptor Shape: {base_descriptor.get_lengths()}")
+print("Internal Analysis:")
+print(f"  - This descriptor has {base_descriptor.get_num_of_transform()} transform.")
+print(f"  - It takes the raw buffer (hidden ID 0) as input: Lower IDs {base_descriptor.get_lower_dimension_hidden_idss()}")
+print(f"  - It produces two outputs (hidden IDs 1 and 2): Upper IDs {base_descriptor.get_upper_dimension_hidden_idss()}")
+print("  - These outputs become logical dimensions 0 and 1.")
+```
 
-# Add an unmerge transform to split the second dimension
-print(f"\n  Adding UnmergeTransform([2, 3]):")
-print(f"    Input: logical dimension 1 (length 6)")
-print(f"    Output: logical dimensions 0, 1 (lengths [2, 3])")
-print(f"    Result: [0, 1, 2] → [2, 2, 3]")
+#### Step 2: Define the New Transformation Stage
 
-transforms = [UnmergeTransform([2, 3])]
-lower_dimension_hidden_idss = [[1]]  # Apply to the second logical dimension (index 1)
-upper_dimension_hidden_idss = [[0, 1]]  # Output to new logical dimensions 0, 1
+To get from `[2, 6]` to `[2, 2, 3]`, we must add a new transform for each of the base descriptor's logical dimensions.
 
+*   **For logical dimension 0 (length 2):** We want to preserve it, so we'll use a `PassThroughTransform`.
+*   **For logical dimension 1 (length 6):** We want to split it, so we'll use an `UnmergeTransform([2, 3])`.
+
+We wire this new stage into the pipeline using the `lower` and `upper` ID parameters, which operate on the **logical dimensions** of their respective descriptors (input and output).
+
+#### Step 3: Apply Transformation and Analyze the Result
+
+Now we apply the transform and inspect the final, complete pipeline.
+
+```{pyodide}
+#| echo: true
+#| output: true
+print("\n--- Step 3: Apply Transformation & Analyze ---")
+# Define the two new transforms to add to the pipeline
+transforms = [
+    PassThroughTransform(2),     # For logical dim 0
+    UnmergeTransform([2, 3])     # For logical dim 1
+]
+
+# Define the pipeline wiring using logical dimension indices
+# Input side:
+lower_dimension_hidden_idss = [[0], [1]] # Pipe logical dim 0 to transform 0, logical dim 1 to transform 1
+# Output side:
+upper_dimension_hidden_idss = [[0], [1, 2]] # Transform 0's output is final logical dim 0. Transform 1's outputs are final logical dims 1 and 2.
+
+# Create the new descriptor by adding the transforms
 transformed_descriptor = transform_tensor_descriptor(
     input_descriptor=base_descriptor,
     transforms=transforms,
@@ -231,363 +197,105 @@ transformed_descriptor = transform_tensor_descriptor(
     upper_dimension_hidden_idss=upper_dimension_hidden_idss
 )
 
-print(f"  Transformed descriptor: {transformed_descriptor.get_lengths()}")
-print(f"  Transformed element space size: {transformed_descriptor.get_element_space_size()}")
-print(f"  Total transforms: {transformed_descriptor.get_num_of_transform()}")
-print(f"  Layout changed from [2, 6] to [2, 2, 3]")
+print(f"Final Descriptor Shape: {transformed_descriptor.get_lengths()}")
+print(f"Total Transforms in Final Pipeline: {transformed_descriptor.get_num_of_transform()}")
+
+print("\n--- Final Pipeline Internals ---")
+print(f"Lower Hidden IDs (Inputs to each transform):")
+print(f"  {transformed_descriptor.get_lower_dimension_hidden_idss()}")
+print(f"Upper Hidden IDs (Outputs from each transform):")
+print(f"  {transformed_descriptor.get_upper_dimension_hidden_idss()}")
+print(f"Top-Level Hidden IDs (Backing the final logical dims):")
+print(f"  {transformed_descriptor.get_top_dimension_hidden_idss()}")
 ```
 
-## Advanced Examples: Complex Nested Transforms
+### Analysis of the Final Pipeline
 
-Now let's explore more sophisticated examples that demonstrate the real power of TensorAdaptors in complex scenarios:
+The final debug output shows the full story of our three-stage pipeline:
+
+*   **Transform `[0]` (The Base `UnmergeTransform`)**:
+    *   `Lower hidden IDs: [[0]]`: Takes the raw memory buffer as input.
+    *   `Upper hidden IDs: [[1, 2]]`: Produces the two original logical dimensions, backed by hidden IDs `1` and `2`.
+
+*   **Transform `[1]` (Our New `PassThroughTransform`)**:
+    *   `Lower hidden IDs: [[1]]`: Correctly takes hidden ID `1` as its input. This is because we specified input **logical dimension `0`**, which was backed by hidden ID `1`.
+    *   `Upper hidden IDs: [[3]]`: Produces a new output, hidden ID `3`.
+
+*   **Transform `[2]` (Our New `UnmergeTransform`)**:
+    *   `Lower hidden IDs: [[2]]`: Correctly takes hidden ID `2` as its input, as it was wired from **logical dimension `1`**.
+    *   `Upper hidden IDs: [[4, 5]]`: Splits its input into two new outputs, hidden IDs `4` and `5`.
+
+*   **Final Result**: The `Top dimension hidden IDs` of the final descriptor are `[3, 4, 5]`. These are the outputs of our new transforms, and they now back the final logical dimensions `0, 1, 2` of the `[2, 2, 3]` tensor.
+
+## Real-World GPU Example: 5D to 3D Block Transformation
+
+These concepts are critical in GPU programming. This example transforms a 5D tensor representing a GPU thread block's workload into a simpler 3D view using `MergeTransform`.
+
+<!-- Image: 5D to 3D transformation diagram -->
+
+The logic is the same: we start with a 5D descriptor and apply new transforms (`PassThrough` and `Merge`) to its logical dimensions to produce a new 3D descriptor.
 
 ```{pyodide}
 #| echo: true
 #| output: true
-
-print("🔗 Complex Nested Merge Example")
+print("🔗 5D to 3D LDS Block Descriptor Example")
 print("=" * 50)
 
-# Parameters from real GPU computing scenarios
-A, B, C, D = 3, 2, 4, 5
+# 1. Define Parameters (typical for a GPU block)
+print("Input Parameters:")
+Block_M = 256
+NumWarps = 8
+WarpSize = 64
+KVector = 4
+wavesPerK = 2
+wavesPerM = NumWarps // wavesPerK
+NumIssues = Block_M // wavesPerM
+print(f"  NumIssues={NumIssues}, wavesPerM={wavesPerM}, wavesPerK={wavesPerK}, WarpSize={WarpSize}, KVector={KVector}")
 
-print(f"Transform dimensions: A={A}, B={B}, C={C}, D={D}")
-print("Goal: Flatten nested merge structure")
+# 2. Create the base 5D descriptor
+base_lengths = [NumIssues, wavesPerM, wavesPerK, WarpSize, KVector]
+base_descriptor = make_naive_tensor_descriptor_packed(base_lengths)
+print(f"\nInput 5D descriptor: {base_descriptor.get_lengths()}")
+print("  - This is the complex layout we want to simplify.")
 
-# Create input descriptor
-input_desc = make_naive_tensor_descriptor_packed([A, B*C, D, 1])
-print(f"Input descriptor: {input_desc.get_lengths()}")
+# 3. Create transforms to simplify the layout
+print("\nTransforms to be applied:")
+print("  - PassThroughTransform to preserve the 'NumIssues' dimension.")
+print("  - MergeTransform to combine 'wavesPerM' and 'wavesPerK'.")
+print("  - MergeTransform to combine 'WarpSize' and 'KVector'.")
+transforms = [
+    PassThroughTransform(NumIssues),
+    MergeTransform([wavesPerM, wavesPerK]),
+    MergeTransform([WarpSize, KVector])
+]
 
-# Create nested transforms - this demonstrates the key capability
-print("\n🔧 Creating nested merge transforms:")
-print("  Inner merge: merge(B, C)")
-print("  Outer merge: merge(pass_through(A), inner_merge)")
-print("  Pass-through: pass_through(D)")
+# 4. Define dimension mappings
+lower_dimension_hidden_idss = [[0], [1, 2], [3, 4]]
+upper_dimension_hidden_idss = [[0], [1], [2]]
 
-transforms = make_tuple(
-    make_merge_transform(
-        make_tuple(
-            make_pass_through_transform(number(A)),
-            make_merge_transform(make_tuple(number(B), number(C)))
-        )
-    ),
-    make_pass_through_transform(number(D))
+# 5. Apply the transformation
+transformed_descriptor = transform_tensor_descriptor(
+    input_descriptor=base_descriptor,
+    transforms=transforms,
+    lower_dimension_hidden_idss=lower_dimension_hidden_idss,
+    upper_dimension_hidden_idss=upper_dimension_hidden_idss
 )
 
-# Apply transformation
-result = transform_tensor_descriptor(
-    input_desc,
-    transforms,
-    make_tuple(sequence(0, 1, 2), sequence(3)),
-    make_tuple(sequence(0), sequence(1))
-)
+print(f"\nTransformed 3D descriptor: {transformed_descriptor.get_lengths()}")
 
-print(f"\n✅ Result:")
-print(f"  Input: {input_desc.get_lengths()}")
-print(f"  Output: {result.get_lengths()}")
-print(f"  Expected: [{A * B * C}, {D}] = [{A * B * C}, {D}]")
-
-# Verify the result has the expected dimensions
-expected_lengths = [A * B * C, D]
-actual_lengths = result.get_lengths()
-
-print(f"\n🎯 Verification:")
-print(f"  Expected lengths: {expected_lengths}")
-print(f"  Actual lengths: {actual_lengths}")
-print(f"  Match: {expected_lengths == actual_lengths}")
-
-# Check that the nested merge was flattened properly
-print(f"\n🔍 Transform Analysis:")
-print(f"  Number of transforms: {len(result.transforms)}")
-print(f"  Transform types: {[type(t).__name__ for t in result.transforms]}")
-
-merge_found = False
-for i, transform in enumerate(result.transforms):
-    if isinstance(transform, MergeTransform):
-        print(f"  Transform {i}: MergeTransform with lengths {transform.lengths}")
-        if transform.lengths == [A, B * C]:
-            merge_found = True
-            print(f"    ✅ Found flattened merge: A={A}, B*C={B*C}")
-
-if not merge_found:
-    print(f"    ⚠️  Nested structure may not have been flattened as expected")
-```
-
-## Real-World GPU Examples: Specialized Block Descriptors
-
-These examples show how TensorAdaptors are used in real GPU computing scenarios with complex memory layouts:
-
-```{pyodide}
-#| echo: true
-#| output: true
-
-print("🔗 K LDS Block Descriptor Example")
-print("=" * 50)
-
-# Parameters from real GPU kernel implementations - Local Data Store block for K dimension
-NumKLdsBuffers = 2
-kNPerBlock = 128
-kKPerBlock = 32
-kKVector = 8
-kKPack = 4
-
-print(f"GPU Memory Layout Parameters:")
-print(f"  NumKLdsBuffers={NumKLdsBuffers} (double buffering)")
-print(f"  kNPerBlock={kNPerBlock} (N dimension per block)")
-print(f"  kKPerBlock={kKPerBlock} (K dimension per block)")
-print(f"  kKVector={kKVector} (vectorization factor)")
-print(f"  kKPack={kKPack} (packing factor)")
-
-# Create input descriptor - represents the raw memory layout
-input_desc = make_naive_tensor_descriptor_packed([
-    NumKLdsBuffers, kNPerBlock, kKPerBlock // kKVector, kKVector, kKPack
-])
-
-print(f"\nInput descriptor (raw memory layout): {input_desc.get_lengths()}")
-print(f"  Dimensions: [buffers, N, K_blocks, K_vector, K_pack]")
-
-# Create transforms - merge related dimensions for efficient access
-print("\n🔧 Creating specialized transforms:")
-print("  Merge buffers and N dimension (for block-level access)")
-print("  Merge K-related dimensions (K_blocks, K_vector, K_pack)")
-
-transforms = make_tuple(
-    make_merge_transform(make_tuple(number(NumKLdsBuffers), number(kNPerBlock))),
-    make_merge_transform(make_tuple(
-        number(kKPerBlock // kKVector),
-        number(kKVector // kKPack),
-        number(kKPack)
-    ))
-)
-
-# Apply transformation
-result = transform_tensor_descriptor(
-    input_desc,
-    transforms,
-    make_tuple(sequence(0, 1), sequence(2, 3, 4)),
-    make_tuple(sequence(0), sequence(1))
-)
-
-print(f"\n✅ Result:")
-print(f"  Input: {input_desc.get_lengths()}")
-print(f"  Output: {result.get_lengths()}")
-
-# Verify dimensions
+# 6. Verify the result
 expected_lengths = [
-    NumKLdsBuffers * kNPerBlock,
-    (kKPerBlock // kKVector) * (kKVector // kKPack) * kKPack
+    NumIssues,
+    wavesPerM * wavesPerK,
+    WarpSize * KVector
 ]
-actual_lengths = result.get_lengths()
-
-print(f"\n🎯 Verification:")
-print(f"  Expected lengths: {expected_lengths}")
-print(f"  Actual lengths: {actual_lengths}")
-print(f"  Match: {expected_lengths == actual_lengths}")
-
-# Verify calculation
-print(f"\n🔍 Calculation Verification:")
-print(f"  Merged N dimension: {NumKLdsBuffers} * {kNPerBlock} = {NumKLdsBuffers * kNPerBlock}")
-print(f"  Merged K dimension: ({kKPerBlock}//{kKVector}) * ({kKVector}//{kKPack}) * {kKPack}")
-print(f"                    = {kKPerBlock // kKVector} * {kKVector // kKPack} * {kKPack}")
-print(f"                    = {(kKPerBlock // kKVector) * (kKVector // kKPack) * kKPack}")
+print(f"Expected 3D descriptor:    {expected_lengths}")
+print(f"Verification: {'Success' if transformed_descriptor.get_lengths() == expected_lengths else 'Failure'}")
 ```
-
-```{pyodide}
-#| echo: true
-#| output: true
-
-print("🔗 Arithmetic Sequence Transform Example")
-print("=" * 50)
-
-# Parameters from examples - demonstrate unmerging
-lengths = [2, 4, 8]
-total_length = lengths[0] * lengths[1] * lengths[2]
-
-print(f"Sequence parameters:")
-print(f"  Target lengths: {lengths}")
-print(f"  Total elements: {total_length}")
-
-# Create input descriptor - single flat dimension
-input_desc = make_naive_tensor_descriptor_packed([total_length])
-print(f"\nInput descriptor (flat): {input_desc.get_lengths()}")
-
-# Create unmerge transform - split into multiple dimensions
-print("\n🔧 Creating unmerge transform:")
-print(f"  Split {total_length} elements into {lengths}")
-
-transforms = make_tuple(
-    make_unmerge_transform(make_tuple(number(lengths[0]), number(lengths[1]), number(lengths[2])))
-)
-
-# Apply transformation
-result = transform_tensor_descriptor(
-    input_desc,
-    transforms,
-    make_tuple(sequence(0)),
-    make_tuple(sequence(0, 1, 2))
-)
-
-print(f"\n✅ Result:")
-print(f"  Input: {input_desc.get_lengths()}")
-print(f"  Output: {result.get_lengths()}")
-
-# Verify dimensions
-expected_lengths = lengths
-actual_lengths = result.get_lengths()
-
-print(f"\n🎯 Verification:")
-print(f"  Expected lengths: {expected_lengths}")
-print(f"  Actual lengths: {actual_lengths}")
-print(f"  Match: {expected_lengths == actual_lengths}")
-
-# Verify calculation
-print(f"\n🔍 Calculation Verification:")
-print(f"  Original: {total_length} elements")
-print(f"  Split into: {lengths[0]} × {lengths[1]} × {lengths[2]} = {lengths[0] * lengths[1] * lengths[2]}")
-print(f"  Conservation: {total_length} = {lengths[0] * lengths[1] * lengths[2]} ✅")
-```
-
-### Advanced Concepts Summary
-
-The examples above demonstrate several key advanced concepts:
-
-**Complex Nested Transforms**: The nested merge example shows how sophisticated hierarchical transformations are automatically flattened by the tensor descriptor system. This is crucial for GPU kernels that need to combine multiple levels of data organization.
-
-**Real-World GPU Memory Layouts**: The K LDS (Local Data Store) block descriptor example demonstrates how TensorAdaptors handle the complex memory hierarchies found in actual GPU computing:
-- **Double buffering** for overlapping computation and memory access
-- **Vectorization factors** for efficient SIMD operations  
-- **Packing factors** for optimal memory bandwidth utilization
-- **Block-level organization** for thread cooperation patterns
-
-**Dimension Conservation**: The arithmetic sequence transform shows how dimensions can be split and merged while preserving the total number of elements - a fundamental requirement for correct tensor operations.
-
-These patterns are essential for:
-- **GEMM operations** (matrix multiplication kernels)
-- **Convolution implementations** (deep learning kernels)
-- **Memory coalescing** (efficient GPU memory access)
-- **Thread block coordination** (cooperative GPU algorithms)
-
-## C++ Equivalent: Complex Nested Transforms
-
-The real power of TensorAdaptors becomes clear when we see how they correspond to complex C++ tensor operations. Here's the **true working equivalent** of complex nested C++ transforms:
-
-```{pyodide}
-#| echo: true
-#| output: true
-
-print("🎯 C++ Equivalent: TRUE WORKING IMPLEMENTATION")
-print("--" * 50)
-
-# Show the original C++ pattern
-print("Original C++ transform_tensor_descriptor call:")
-print("  transform_tensor_descriptor(")
-print("    input_desc,")
-print("    make_tuple(")
-print("      make_merge_transform(")
-print("        make_tuple(")
-print("          make_pass_through_transform(number<A>{}),")
-print("          make_merge_transform(make_tuple(number<B>{}, number<C>{}))") 
-print("        )")
-print("      ),")
-print("      make_pass_through_transform(number<D>{})")
-print("    ),")
-print("    make_tuple(sequence<0, 1, 2>{}, sequence<3>{}),")
-print("    make_tuple(sequence<0>{}, sequence<1>{})")
-print("  )")
-
-print("\nC++ Goal: 4D input [A, B, C, D] → 2D output [merged_ABC, D]")
-print("where merged_ABC = A*(B*C) + B*C + C")
-
-# Create the TRUE working Python equivalent
-A, B, C, D = 3, 2, 4, 5
-print(f"\nWith dimensions: A={A}, B={B}, C={C}, D={D}")
-
-# This is the WORKING configuration discovered through systematic testing
-cpp_equivalent = make_single_stage_tensor_adaptor(
-    transforms=[
-        UnmergeTransform([A, B, C]),  # Merge A,B,C dimensions
-        PassThroughTransform(D)       # Pass-through D dimension
-    ],
-    lower_dimension_old_top_idss=[
-        [0],        # First transform takes top dim 0
-        [1]         # Second transform takes top dim 1
-    ],
-    upper_dimension_new_top_idss=[
-        [0, 1, 2],  # First transform outputs to bottom dims 0,1,2
-        [3]         # Second transform outputs to bottom dim 3
-    ]
-)
-
-print(f"\n🎯 Python Equivalent Result:")
-print(f"  Adaptor: {cpp_equivalent.get_num_of_top_dimension()}D → {cpp_equivalent.get_num_of_bottom_dimension()}D")
-print(f"  ✅ Perfect! We have the correct 4D → 2D transformation")
-
-# Test the coordinate transformations
-test_coordinates = [
-    [0, 0, 0, 0],  # Origin
-    [1, 0, 0, 1],  # A=1, D=1
-    [0, 1, 0, 2],  # B=1, D=2
-    [0, 0, 1, 3],  # C=1, D=3
-    [2, 1, 3, 4],  # Complex example
-]
-
-print("\n📊 Testing Coordinate Transformations:")
-print("Input 4D [A, B, C, D] → Output 2D [merged_ABC, D]")
-
-for coord_list in test_coordinates:
-    top_coord = MultiIndex(4, coord_list)
-    bottom_coord = cpp_equivalent.calculate_bottom_index(top_coord)
-    
-    # Expected calculation matches C++ nested structure
-    a, b, c, d = coord_list
-    expected_abc = a * (B * C) + b * C + c
-    expected_d = d
-    expected = [expected_abc, expected_d]
-    
-    result = bottom_coord.to_list()
-    status = "✅" if result == expected else "❌"
-    
-    print(f"  {coord_list} → {result} (expected: {expected}) {status}")
-
-print("\n🔍 Mathematical Verification:")
-print("C++ nested calculation: merge(pass_through(A), merge(B,C))")
-print("For example [2,1,3,4]:")
-print("  Step 1: merge(B,C) = 1*4 + 3 = 7")
-print("  Step 2: merge(A, BC) = 2*8 + 7 = 23")
-print("  Step 3: pass_through(D) = 4")
-print("  Result: [23, 4] ✅")
-
-print("\n🎊 SUCCESS: True C++ equivalent achieved!")
-print("Key insights:")
-print("  • UnmergeTransform.calculate_lower_index() performs merging")
-print("  • Parameter mapping determines coordinate flow")
-print("  • Complex nested C++ transforms → Simple Python adaptors")
-```
-
-This implementation successfully creates the exact Python equivalent of the complex nested C++ transform pattern, with full mathematical equivalence and working coordinate transformations.
 
 ## Summary
 
-TensorDescriptor is the complete tensor specification that you'll use in real applications:
-
-**Creation Functions**:
-- **`make_naive_tensor_descriptor`**: Custom strides for maximum flexibility
-- **`make_naive_tensor_descriptor_packed`**: Row-major layout for memory efficiency  
-- **`make_naive_tensor_descriptor_aligned`**: Memory-aligned layouts for GPU performance
-- **`transform_tensor_descriptor`**: Add transformations to existing descriptors
-
-**Key Properties**:
-- **Dimension Information**: `get_lengths()`, `get_num_of_dimension()`
-- **Memory Layout**: `get_element_space_size()`, `calculate_offset()`
-- **Transform Pipeline**: Inherits all TensorAdaptor functionality
-- **Performance Hints**: Guaranteed vector lengths and strides
-
-**Memory Layout Types**:
-- **Packed**: Most memory efficient, contiguous data
-- **Strided**: Custom layouts with padding for alignment or performance
-- **Aligned**: GPU-optimized layouts with memory alignment
-- **Transformed**: Complex layouts created by chaining transformations
-
-TensorDescriptor combines the flexibility of TensorAdaptor transformations with the practicality of complete memory specifications. It's the bridge between the mathematical abstractions of coordinate transforms and the physical reality of memory layouts.
-
-Next, we'll see how TensorDescriptors are used in the high-level **Tile Distribution API** to create efficient GPU data access patterns. 
+-   **`TensorDescriptor` is a Pipeline**: It describes transformations from a 1D buffer to a logical tensor view.
+-   **`make_naive...` Creates the First Stage**: It sets up the initial transform from a buffer to a simple packed layout.
+-   **`transform_tensor_descriptor` Adds New Stages**: It allows you to build complex views by adding transforms to the pipeline.
+-   **Handle All Input Dimensions**: When transforming, you must provide a new transform for each logical dimension of the input descriptor to avoid losing data. 

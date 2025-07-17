@@ -19,6 +19,8 @@ The convolution operation is fundamental in deep learning, and understanding its
 ## Setup and Test Data
 
 ```{python}
+#| echo: false
+#| output: false
 import numpy as np
 import sys
 sys.path.append('../..')
