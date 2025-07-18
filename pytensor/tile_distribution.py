@@ -149,18 +149,26 @@ class TileDistribution:
         if partition_index is None:
             partition_index = self.get_partition_index()
         
-        # Create dummy coordinate to extract R indices
-        ps_ys_idx = partition_index + [0] * self.ndim_y
-        coord = make_tensor_adaptor_coordinate(
-            self.ps_ys_to_xs_adaptor,
-            MultiIndex(len(ps_ys_idx), ps_ys_idx)
-        )
+        # Handle case of no R dimensions
+        if self.ndim_r == 0:
+            return []
         
-        # Extract R indices from hidden dimensions
+        # Validate input dimensions
+        if len(partition_index) != self.ndim_p:
+            raise ValueError(f"Length of partition_index ({len(partition_index)}) must match ndim_p ({self.ndim_p})")
+        
+        # Get the ps_over_rs_derivative matrix from encoding detail
+        ps_over_rs_derivative = self.encoding.detail.ps_over_rs_derivative
+        
+        # Calculate R indices using matrix multiplication
         rs_idx = [0] * self.ndim_r
-        
-        # This is a simplified version - in practice would need full mapping
-        # from encoding to extract R indices from hidden dimensions
+        for r_dim_idx in range(self.ndim_r):
+            accumulated_value = 0
+            for p_dim_idx in range(self.ndim_p):
+                # ps_over_rs_derivative has shape [NDimP][NDimR]
+                derivative_val = ps_over_rs_derivative[p_dim_idx][r_dim_idx]
+                accumulated_value += partition_index[p_dim_idx] * derivative_val
+            rs_idx[r_dim_idx] = accumulated_value
         
         return rs_idx
     

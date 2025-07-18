@@ -45,28 +45,15 @@ check_directory() {
     fi
 }
 
-# Check git repository status
-check_git_status() {
-    # Check if we're in a git repository
+# Check if we're in a git repository (for tag creation)
+check_git_repo() {
     if ! git rev-parse --git-dir > /dev/null 2>&1; then
         log_error "Not in a git repository"
         exit 1
     fi
     
-    # Show current branch
     CURRENT_BRANCH=$(git branch --show-current)
     log_info "Current branch: $CURRENT_BRANCH"
-    
-    # Check if there are uncommitted changes
-    if ! git diff --quiet HEAD; then
-        log_warning "⚠️  You have uncommitted changes:"
-        git status --porcelain | head -10
-        log_warning "Please commit all changes before running release."
-        log_warning "This ensures a clean release process."
-        exit 1
-    fi
-    
-    log_success "Working directory is clean"
 }
 
 # Check GitHub CLI availability
@@ -224,6 +211,8 @@ update_documentation_urls() {
 
 # Create and push git tag
 create_git_tag() {
+    check_git_repo
+    
     log_info "Creating git tag v$VERSION..."
     
     # Check if tag already exists
@@ -259,7 +248,6 @@ main() {
     log_info "Script version: Enhanced release script with git safety checks"
     
     check_directory
-    check_git_status
     check_github_cli
     get_version
     clean_build
@@ -312,7 +300,6 @@ show_help() {
     echo "  - GitHub CLI (gh) installed and authenticated"
     echo "  - Python build tools (will be installed automatically if missing)"
     echo "  - Git repository with remote origin set"
-    echo "  - All changes committed (clean working directory)"
     echo ""
     echo "Examples:"
     echo "  $0                 # Run full release process"
