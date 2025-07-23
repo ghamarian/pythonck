@@ -7,6 +7,11 @@ format: live-html
 
 BufferView provides structured access to raw memory regions for GPU kernels. It handles different memory address spaces (global, shared, register) with support for vectorized operations.
 
+- Handles out-of-bounds access safely with configurable invalid values
+- Supports both scalar and vector data types
+- Implements AMD GPU-specific optimizations (buffer addressing, atomic operations)
+- Manages memory coherence and caching policies
+
 ```{pyodide}
 #| echo: false
 #| output: false
@@ -18,6 +23,12 @@ await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/mas
 ```
 
 ## Basic Creation
+
+Out-of-Bounds Handling:
+
+- Zero Value Mode: Returns numerical zero for invalid accesses
+- Custom Value Mode: Returns user-specified invalid value
+
 
 ```{pyodide}
 #| echo: true
@@ -35,6 +46,32 @@ buffer_view = make_buffer_view(data, len(data), AddressSpaceEnum.GLOBAL)
 print(f"Buffer size: {buffer_view.buffer_size}")
 print(f"Address space: {buffer_view.address_space.name}")
 print(f"Data: {data}")
+```
+
+### Zero Value Mode
+```cpp
+// Basic buffer view creation with automatic zero for invalid elements
+void basic_creation_example() {
+    // Create data array
+    constexpr size_t buffer_size = 8;
+    float data[buffer_size] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f};
+    
+    // Create global memory buffer view
+    auto buffer_view = make_buffer_view<address_space_enum::global>(data, buffer_size);
+}
+```
+
+### Custom Value Mode
+```cpp
+void custom_invalid_value_example() {
+    constexpr size_t buffer_size = 8;
+    float data[buffer_size] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f};
+    float custom_invalid = 13.0f;
+    
+    // Create buffer view with custom invalid value
+    auto buffer_view = make_buffer_view<address_space_enum::global>(
+        data, buffer_size, custom_invalid);
+}
 ```
 
 ## Get Operations
