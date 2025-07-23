@@ -156,7 +156,9 @@ def test_tile_operations_with_both_methods():
         
         # Use sweep_tile to collect values
         values = []
-        def collect_value(y_indices):
+        def collect_value(*distributed_indices):
+            # Convert TileDistributedIndex objects to Y indices for get_element()
+            y_indices = loaded_tensor.tile_distribution.get_y_indices_from_distributed_indices(list(distributed_indices))
             value = loaded_tensor.get_element(y_indices)
             values.append(value)
         

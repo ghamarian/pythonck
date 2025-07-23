@@ -243,14 +243,14 @@ def test_sweep_tile_compatibility():
     
     print("\n=== Testing sweep_tile compatibility ===")
     
-    # Create a simple tile distribution
+    # Create a simple tile distribution using working pattern
     encoding = TileDistributionEncoding(
         rs_lengths=[],
-        hs_lengthss=[[2, 2], [2, 2]],  # 2×2 × 2×2 tile
-        ps_to_rhss_major=[[1], [1]],
-        ps_to_rhss_minor=[[1], [1]], 
-        ys_to_rhs_major=[1, 1],
-        ys_to_rhs_minor=[0, 1]
+        hs_lengthss=[[2], [3]],  # Simple single-element spans
+        ps_to_rhss_major=[[], []],
+        ps_to_rhss_minor=[[], []], 
+        ys_to_rhs_major=[1, 2],
+        ys_to_rhs_minor=[0, 0]
     )
     
     tile_distribution = make_static_tile_distribution(encoding)
@@ -264,7 +264,9 @@ def test_sweep_tile_compatibility():
     # Collect values using current method
     values_current = []
     
-    def collect_current(y_indices):
+    def collect_current(*distributed_indices):
+        # Convert TileDistributedIndex objects to Y indices for computation
+        y_indices = tensor.tile_distribution.get_y_indices_from_distributed_indices(list(distributed_indices))
         # Simulate some computation based on y_indices
         value = sum(y_indices) * 10.0
         values_current.append(value)

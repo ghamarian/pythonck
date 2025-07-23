@@ -55,10 +55,10 @@ def reduce_on_sequence(seq: List[int], reduce_func: Callable[[int, int], int], i
 
 def reverse_slice_sequence(seq: List[int], slice_size: int, mask: List[int] = None) -> Tuple[List[int], List[int], int]:
     """
-    Reverse slice sequence implementation that matches C++ algorithm.
+    Reverse slice sequence implementation that matches C++ algorithm using GCD.
     
-    This processes the sequence from right to left, consuming the slice_size
-    by taking as much as possible from each dimension.
+    This processes the sequence from left to right (in the C++ "reverse" order),
+    consuming the slice_size using GCD for sliceable dimensions.
     
     Args:
         seq: Sequence to slice
@@ -77,49 +77,42 @@ def reverse_slice_sequence(seq: List[int], slice_size: int, mask: List[int] = No
     if len(seq) == 0:
         return [], [], 0
     
-    # Process from right to left, consuming slice_size
+    # C++ algorithm: process from left to right, using GCD
     dim_lengths = []
     dim_slices = []
-    split_idx = 0
+    remaining_slice_sizes = [slice_size]
+    split_idx = len(seq)  # Initialize to "no split" value
     split_flag = False
     
-    remaining = slice_size
-    
-    for i in range(len(seq) - 1, -1, -1):
-        x = seq[i]
-        m = mask[i]
+    for i, (x, m) in enumerate(zip(seq, mask)):
+        current_slice_size = remaining_slice_sizes[-1]
         
-        if m:  # This dimension is sliceable
-            if remaining >= x:
-                # We can take the full dimension, but only if it divides evenly
-                if remaining % x != 0:
-                    raise ValueError(f"Cannot evenly divide sequence {seq} with slice size {slice_size}")
-                slice_length = x
-                remaining = remaining // x
-            else:
-                # We can only take part of the dimension
-                if x % remaining != 0:
-                    raise ValueError(f"Cannot evenly divide sequence {seq} with slice size {slice_size}")
-                slice_length = remaining
-                remaining = 1
-        else:  # This dimension is not sliceable
+        if m:  # This dimension is sliceable (mask = 1)
+            # Use GCD like C++ implementation
+            slice_length = gcd(x, current_slice_size)
+        else:  # This dimension is not sliceable (mask = 0)
             slice_length = x
-            # remaining stays the same for non-sliceable dimensions
         
-        # Calculate number of slices for this dimension
         num_slices = x // slice_length
         
-        # Insert at beginning to build left-to-right result
-        dim_lengths.insert(0, slice_length)
-        dim_slices.insert(0, num_slices)
+        dim_lengths.append(slice_length)
+        dim_slices.append(num_slices)
+        
+        # Update remaining slice sizes for next iteration
+        if m:  # Only update for sliceable dimensions
+            next_slice_size = current_slice_size // slice_length
+        else:
+            next_slice_size = current_slice_size
+        remaining_slice_sizes.append(next_slice_size)
         
         # Check split condition - first index where slicing differs from original
-        if m and slice_length != x and remaining == 1 and not split_flag:
+        # AND remaining slice size becomes 1 (indicating we're done slicing)
+        if m and slice_length != x and next_slice_size == 1 and not split_flag:
             split_flag = True
             split_idx = i
     
-    # Verify we can evenly divide
-    if remaining != 1:
+    # Verify we can evenly divide (final remaining should be 1)
+    if remaining_slice_sizes[-1] != 1:
         raise ValueError(f"Cannot evenly divide sequence {seq} with slice size {slice_size}")
     
     return dim_lengths, dim_slices, split_idx
@@ -127,9 +120,9 @@ def reverse_slice_sequence(seq: List[int], slice_size: int, mask: List[int] = No
 
 def slice_sequence(seq: List[int], slice_size: int, mask: List[int] = None) -> Tuple[List[int], List[int], int]:
     """
-    Slice sequence using the direct "consume from right to left" algorithm.
+    Slice sequence implementing the true C++ pattern.
     
-    Equivalent to C++ slice_sequence.
+    C++ pattern: reverses inputs, calls reverse_slice_sequence, then reverses outputs.
     
     Args:
         seq: Sequence to slice  
@@ -150,56 +143,26 @@ def slice_sequence(seq: List[int], slice_size: int, mask: List[int] = None) -> T
     if mask is None:
         mask = [1] * len(seq)
     
-    if len(seq) != len(mask):
-        raise ValueError("Sequence and mask must have same length")
+    # Special case: if slice_size equals total size, no slicing occurs
+    total_size = reduce_on_sequence(seq, multiplies, 1)
+    if slice_size == total_size:
+        return seq[:], [1] * len(seq), 0
     
-    if len(seq) == 0:
-        return [], [], 0
+    # C++ pattern: reverse inputs, call reverse_slice_sequence, then transform outputs
+    reversed_seq = list(reversed(seq))
+    reversed_mask = list(reversed(mask))
     
-    # Direct algorithm: process from right to left, consuming slice_size
-    dim_lengths = []
-    dim_slices = []
-    remaining = slice_size
-    split_idx = 0
-    split_flag = False
+    # Call reverse_slice_sequence with reversed inputs
+    r_lengths, r_nums, r_split_idx = reverse_slice_sequence(reversed_seq, slice_size, reversed_mask)
     
-    for i in range(len(seq) - 1, -1, -1):
-        x = seq[i]
-        m = mask[i]
-        
-        if m:  # This dimension is sliceable
-            if remaining >= x:
-                # We can take the full dimension, but only if it divides evenly
-                if remaining % x != 0:
-                    raise ValueError(f"Cannot evenly divide sequence {seq} with slice size {slice_size}")
-                slice_length = x
-                remaining = remaining // x
-            else:
-                # We can only take part of the dimension
-                if x % remaining != 0:
-                    raise ValueError(f"Cannot evenly divide sequence {seq} with slice size {slice_size}")
-                slice_length = remaining
-                remaining = 1
-        else:  # This dimension is not sliceable
-            slice_length = x
-            # remaining stays the same for non-sliceable dimensions
-        
-        num_slices = x // slice_length
-        
-        # Insert at beginning to build left-to-right result
-        dim_lengths.insert(0, slice_length)
-        dim_slices.insert(0, num_slices)
-        
-        # Check split condition - first index where slicing differs from original
-        if m and slice_length != x and remaining == 1 and not split_flag:
-            split_flag = True
-            split_idx = i
+    # Transform outputs following C++ pattern:
+    # 1. Reverse the lengths and nums
+    # 2. Adjust split_idx as: len(seq) - r_split_idx - 1
+    slice_lengths = list(reversed(r_lengths))
+    slice_nums = list(reversed(r_nums))
+    split_idx = len(seq) - r_split_idx - 1
     
-    # Verify we can evenly divide
-    if remaining != 1:
-        raise ValueError(f"Cannot evenly divide sequence {seq} with slice size {slice_size}")
-    
-    return dim_lengths, dim_slices, split_idx
+    return slice_lengths, slice_nums, split_idx
 
 
 def get_y_unpacks_from_x_unpacks(y_lengths: List[int], x_unpacks: int) -> List[int]:

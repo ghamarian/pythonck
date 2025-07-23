@@ -15,7 +15,7 @@ from tile_distribution.examples import get_default_variables
 from pytensor.tile_distribution_encoding import TileDistributionEncoding
 from pytensor.tile_distribution import make_static_tile_distribution
 from pytensor.static_distributed_tensor import StaticDistributedTensor
-from pytensor.sweep_tile import sweep_tile, sweep_tensor_direct
+from pytensor.sweep_tile import sweep_tile
 from pytensor.tensor_view import make_naive_tensor_view
 from pytensor.tile_window import make_tile_window
 from pytensor.partition_simulation import set_global_thread_position
@@ -88,43 +88,25 @@ def demonstrate_old_problematic_api():
     values_old = []
     access_count = 0
     
-    def process_with_ugly_conversion(distributed_idx):
+    def process_with_ugly_conversion(*distributed_indices):
         nonlocal access_count, values_old
         
         try:
             # THE UGLY CONVERSION CODE that shouldn't be needed:
-            if hasattr(distributed_idx, 'partial_indices'):
-                flat_indices = distributed_idx.partial_indices
-                
-                # Use spans to correctly group distributed indices by X dimensions
-                spans = loaded_tensor.tile_distribution.get_distributed_spans()
-                distributed_indices_list = []
-                idx_offset = 0
-                
-                for span in spans:
-                    span_size = len(span.partial_lengths)
-                    x_indices = flat_indices[idx_offset:idx_offset + span_size]
-                    distributed_indices_list.append(make_tile_distributed_index(x_indices))
-                    idx_offset += span_size 
-                
-                # Convert to Y indices using the complex dual-case function
-                y_indices = loaded_tensor.tile_distribution.get_y_indices_from_distributed_indices(distributed_indices_list)
-                
-                # Finally access the value
-                value = loaded_tensor.get_element(y_indices)
-                values_old.append(value)
-                
-                if access_count < 5:
-                    print(f"  UGLY: flat{flat_indices} -> spans{len(spans)} -> Y{y_indices} -> value {value}")
-            else:
-                # Alternative approach using integer access
-                y_indices = loaded_tensor.tile_distribution.get_y_indices_from_distributed_indices(access_count)
-                value = loaded_tensor.get_element(y_indices)
-                values_old.append(value)
-                
-                if access_count < 5:
-                    print(f"  ALT: access{access_count} -> Y{y_indices} -> value {value}")
-        
+            # Now we receive multiple TileDistributedIndex objects (correct C++ behavior)
+            # but this "old API" still shows the ugly conversion pattern
+            
+            # Convert multiple TileDistributedIndex objects to Y indices
+            y_indices = loaded_tensor.tile_distribution.get_y_indices_from_distributed_indices(list(distributed_indices))
+            
+            # Finally access the value
+            value = loaded_tensor.get_element(y_indices)
+            values_old.append(value)
+            
+            if access_count < 5:
+                indices_repr = [idx.partial_indices for idx in distributed_indices]
+                print(f"  UGLY: {len(distributed_indices)} distributed indices {indices_repr} -> Y{y_indices} -> value {value}")
+            
         except Exception as e:
             if access_count < 5:
                 print(f"  ERROR at access {access_count}: {e}")
@@ -203,19 +185,22 @@ def demonstrate_fixed_clean_api():
     values_new = []
     access_count = 0
     
-    def process_clean_no_conversion(y_indices):
+    def process_clean_no_conversion(*distributed_indices):
         nonlocal access_count, values_new
         
-        # NO CONVERSION NEEDED! Direct access with Y indices
+        # CLEAN: Simple conversion using proper API (both APIs now use same pattern)
+        y_indices = loaded_tensor.tile_distribution.get_y_indices_from_distributed_indices(list(distributed_indices))
         value = loaded_tensor.get_element(y_indices)
         values_new.append(value)
         
         if access_count < 5:
-            print(f"  CLEAN: Y{y_indices} -> value {value}")
+            indices_repr = [idx.partial_indices for idx in distributed_indices]
+            print(f"  CLEAN: {len(distributed_indices)} distributed indices {indices_repr} -> Y{y_indices} -> value {value}")
         access_count += 1
     
-    print("\nUsing FIXED API (no conversions):")
-    # This is the clean pattern that matches C++:
+    print("\nUsing FIXED API (same C++ pattern, but cleaner conversion):")
+    # Note: Both APIs now use the same C++ pattern (distributed indices), 
+    # but this one could be written more cleanly:
     sweep_tile(loaded_tensor, process_clean_no_conversion)
     
     print(f"Total accesses: {access_count}")

@@ -82,20 +82,24 @@ class TestReverseSliceSequence:
     """Test reverse_slice_sequence function."""
     
     def test_reverse_slice_basic(self):
-        """Test basic reverse slicing."""
-        # Simple case
+        """Test basic reverse slicing with GCD algorithm."""
+        # Simple case: [4, 2] with slice_size=8
+        # total_size = 4*2 = 8, so slice_size equals total_size
         lengths, nums, split_idx = reverse_slice_sequence([4, 2], 8)
-        assert lengths == [4, 2]
-        assert nums == [1, 1]
-        assert split_idx == 0
+        assert lengths == [4, 2]  # gcd(4,8)=4, gcd(2,4)=2
+        assert nums == [1, 1]     # 4/4=1, 2/2=1
+        assert split_idx == 2     # no split, so len(seq)
     
     def test_reverse_slice_with_splitting(self):
-        """Test reverse slicing that requires splitting."""
-        # This should split the last dimension
+        """Test reverse slicing that requires splitting with GCD."""
+        # [4, 8] with slice_size=4
+        # i=0: gcd(4,4)=4, nums=4/4=1, remaining=4/4=1
+        # i=1: gcd(8,1)=1, nums=8/1=8, remaining=1/1=1
+        # split occurs at i=1 because slice_length(1) != x(8) and remaining==1
         lengths, nums, split_idx = reverse_slice_sequence([4, 8], 4)
-        assert lengths == [1, 4]
-        assert nums == [4, 2]
-        assert split_idx == 1
+        assert lengths == [4, 1]   # gcd(4,4)=4, gcd(8,1)=1
+        assert nums == [1, 8]      # 4/4=1, 8/1=8
+        assert split_idx == 1      # split at index 1
     
     def test_reverse_slice_invalid(self):
         """Test invalid reverse slicing."""

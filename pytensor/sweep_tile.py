@@ -13,6 +13,7 @@ import numpy as np
 from .tile_distribution import TileDistributedSpan, TileDistributedIndex, make_tile_distributed_index
 from .static_distributed_tensor import StaticDistributedTensor
 from .sequence_utils import get_y_unpacks_from_x_unpacks
+from .functional_utils import StaticUford
 
 
 def sweep_tile_span(span: TileDistributedSpan, 
@@ -45,8 +46,8 @@ def sweep_tile_uspan(span: TileDistributedSpan,
     """
     Sweep over a span with unpacking support.
     
-    This function implements the C++ static_uford functionality with proper
-    unpacking based on the get_y_unpacks_from_x_unpacks algorithm.
+    This function implements the C++ static_uford functionality using our
+    StaticUford class for proper C++ compatibility.
     
     Args:
         span: The distributed span to sweep over
@@ -57,6 +58,10 @@ def sweep_tile_uspan(span: TileDistributedSpan,
         unpacks = [1] * len(span.partial_lengths)
     
     span_lengths = span.partial_lengths
+    
+    # Handle empty spans gracefully
+    if not span_lengths or any(length == 0 for length in span_lengths):
+        return
     
     # Check if this is the "no unpacking" case (all unpacks are 1)
     is_no_unpacking = all(unpack == 1 for unpack in unpacks)
@@ -70,137 +75,54 @@ def sweep_tile_uspan(span: TileDistributedSpan,
             dstr_idx = make_tile_distributed_index(list(indices))
             func(dstr_idx)
     else:
-        # Complex unpacking case using proper C++ logic
-        # Calculate how many groups we have in each dimension
-        dim_groups = []
-        total_calls = 1
-        
-        for length, unpack in zip(span_lengths, unpacks):
-            num_groups = (length + unpack - 1) // unpack  # Ceiling division
-            total_calls *= num_groups
-            groups = []
-            for group_idx in range(num_groups):
-                start_idx = group_idx * unpack
-                end_idx = min(start_idx + unpack, length)
-                group = list(range(start_idx, end_idx))
-                groups.append(group)
-            dim_groups.append(groups)
-        
-        # Iterate over all group combinations
-        for group_combo in itertools.product(*dim_groups):
-            # Create distributed indices for this combination
+        # Use StaticUford for proper C++ static_uford compatibility
+        def uford_func(*index_lists):
+            # Convert raw index lists to TileDistributedIndex objects
             dstr_indices = []
+            for index_list in index_lists:
+                dstr_indices.append(make_tile_distributed_index(index_list))
             
-            # For each position in the unpacking pattern
-            max_group_size = max(len(group) for group in group_combo)
-            for pos in range(max_group_size):
-                indices = []
-                for dim_idx, group in enumerate(group_combo):
-                    if pos < len(group):
-                        indices.append(group[pos])
-                    else:
-                        # Pad with the last valid index in this dimension
-                        indices.append(group[-1])
-                
-                if indices:  # Only create index if we have values
-                    dstr_indices.append(make_tile_distributed_index(indices))
-            
-            # Apply function with unpacked indices
-            if dstr_indices:
-                func(*dstr_indices)
+            # Call the original function with distributed indices
+            func(*dstr_indices)
+        
+        # Create StaticUford with the span lengths and unpacks
+        static_uford = StaticUford(span_lengths, unpacks)
+        static_uford(uford_func)
 
 
-def sweep_tensor_direct(distributed_tensor: StaticDistributedTensor,
-                       func: Callable[[List[int]], None]) -> None:
-    """
-    FIXED version of sweep_tile that works directly with StaticDistributedTensor instances.
-    
-    This matches the C++ pattern where sweep_tile<DistributedTensor>(func) uses the tensor
-    directly without needing a separate template tensor.
-    
-    This eliminates the API mismatch by:
-    1. Taking a StaticDistributedTensor instance (like C++ template)
-    2. Generating Y indices directly that work with get_element()
-    3. No conversion between different index formats needed
-    
-    Args:
-        distributed_tensor: The distributed tensor to sweep over (e.g., from tile_window.load())
-        func: Function that takes Y indices and processes them
-              Signature: func(y_indices: List[int]) -> None
-              
-    Example:
-        loaded = tile_window.load()
-        sweep_tensor_direct(loaded, lambda y_indices: 
-            print(f"Value at Y{y_indices}: {loaded.get_element(y_indices)}")
-        )
-    """
-    # Get the tile distribution from the tensor
-    tile_distribution = distributed_tensor.tile_distribution
-    
-    # Get all Y dimension lengths to iterate over
-    y_lengths = tile_distribution.ys_to_d_descriptor.get_lengths()
-    
-    # Iterate through all Y indices (this matches C++ sweep_tile pattern)
-    ranges = [range(length) for length in y_lengths]
-    
-    for y_indices in itertools.product(*ranges):
-        # Convert to list for consistency and call function
-        y_indices_list = list(y_indices)
-        func(y_indices_list)
-
-
-def sweep_tile(distributed_tensor_type: Union[type, Any],
+def sweep_tile(distributed_tensor: StaticDistributedTensor,
                func: Callable[..., None],
                unpacks_per_x_dim: Optional[List[int]] = None) -> None:
     """
-    Enhanced sweep-tile utility with control over unpacks along each X-dimension.
+    Sweep-tile utility with control over unpacks along each X-dimension.
     
-    This now properly implements the C++ sweep_tile logic using get_y_unpacks_from_x_unpacks
-    to convert X unpacks to Y unpacks for each span.
+    This matches the C++ implementation exactly: always processes spans and
+    passes TileDistributedIndex objects to the function, regardless of unpacking.
     
-    The lambda function argument is the distributed index, which can be directly
-    plugged into the distributed tensor as setter/getter.
+    The lambda function argument always receives TileDistributedIndex objects,
+    just like in C++.
     
     Examples:
-        # Sweep tile 1 by 1
-        sweep_tile(MyDistributedTensor, lambda idx: process(tensor[idx]))
+        # Sweep tile 1 by 1 - receives single TileDistributedIndex per call
+        sweep_tile(tensor_instance, lambda idx: process(idx))
         
-        # Sweep tile with 2 pixels from last dim each function call
-        sweep_tile(MyDistributedTensor, 
-                  lambda idx0, idx1: process_pair(tensor[idx0], tensor[idx1]),
+        # Sweep tile with 2 pixels from last dim - receives 2 TileDistributedIndex per call
+        sweep_tile(tensor_instance, 
+                  lambda idx0, idx1: process_pair(idx0, idx1),
                   [1, 2])
         
-        # Sweep tile with 2x2 pixel each function call
-        sweep_tile(MyDistributedTensor,
-                  lambda idx00, idx01, idx10, idx11: process_2x2(...),
+        # Sweep tile with 2x2 pixel - receives 4 TileDistributedIndex per call
+        sweep_tile(tensor_instance,
+                  lambda idx00, idx01, idx10, idx11: process_2x2(idx00, idx01, idx10, idx11),
                   [2, 2])
     
     Args:
-        distributed_tensor_type: Type of the distributed tensor or instance
-        func: Function to apply to distributed indices
+        distributed_tensor: StaticDistributedTensor instance
+        func: Function to apply to TileDistributedIndex objects
         unpacks_per_x_dim: Number of elements to unpack per X dimension
     """
-    # FIXED API: If given a StaticDistributedTensor instance, use the direct API
-    if isinstance(distributed_tensor_type, StaticDistributedTensor):
-        # This is the FIXED pattern - use sweep_tensor_direct
-        if unpacks_per_x_dim is None or all(x == 1 for x in unpacks_per_x_dim):
-            # Simple case: use the clean direct API
-            sweep_tensor_direct(distributed_tensor_type, func)
-            return
-        else:
-            # Complex unpacking case - would need more implementation
-            # For now, fall back to original logic
-            pass
-    
-    # Get distributed spans from the tensor type or instance
-    if hasattr(distributed_tensor_type, 'tile_distribution'):
-        # It's an instance
-        spans = distributed_tensor_type.tile_distribution.get_distributed_spans()
-    elif hasattr(distributed_tensor_type, 'get_distributed_spans'):
-        # It's a type with class method
-        spans = distributed_tensor_type.get_distributed_spans()
-    else:
-        raise ValueError("Cannot get distributed spans from provided tensor")
+    # Always use the span-based approach like C++
+    spans = distributed_tensor.tile_distribution.get_distributed_spans()
     
     if unpacks_per_x_dim is None:
         unpacks_per_x_dim = [1] * len(spans)
@@ -212,6 +134,8 @@ def sweep_tile(distributed_tensor_type: Union[type, Any],
     def process_spans(span_idx: int, current_span_indices: List[Any]):
         if span_idx >= len(spans):
             # Base case: apply function with all accumulated indices
+            # C++ does: unpack(f, span_idx) = f(*span_idx)
+            # Always pass TileDistributedIndex objects, just like C++
             func(*current_span_indices)
             return
         
@@ -248,28 +172,21 @@ class TileSweeper(Generic[TypeVar('T')]):
     The functionality is the same as sweep_tile().
     
     Attributes:
-        distributed_tensor_type: Type of the distributed tensor or instance
+        distributed_tensor: StaticDistributedTensor instance
         func: Function to apply to indices
         unpacks_per_x_dim: Unpacking configuration
     """
     
-    distributed_tensor_type: Union[type, Any]
+    distributed_tensor: StaticDistributedTensor
     func: Callable[..., None]
     unpacks_per_x_dim: Optional[List[int]] = None
     
     def __post_init__(self):
         """Initialize unpacks if not provided."""
         if self.unpacks_per_x_dim is None:
-            # Determine number of dimensions
-            if hasattr(self.distributed_tensor_type, 'tile_distribution'):
-                # It's an instance
-                spans = self.distributed_tensor_type.tile_distribution.get_distributed_spans()
-                ndim = len(spans)
-            elif hasattr(self.distributed_tensor_type, 'get_num_of_dimension'):
-                ndim = self.distributed_tensor_type.get_num_of_dimension()
-            else:
-                # Default
-                ndim = 1
+            # Determine number of dimensions from the tensor instance
+            spans = self.distributed_tensor.tile_distribution.get_distributed_spans()
+            ndim = len(spans)
             self.unpacks_per_x_dim = [1] * ndim
     
     def get_num_of_access(self) -> int:
@@ -279,14 +196,8 @@ class TileSweeper(Generic[TypeVar('T')]):
         Returns:
             Total number of function calls that will be made
         """
-        # Get spans
-        if hasattr(self.distributed_tensor_type, 'tile_distribution'):
-            # It's an instance
-            spans = self.distributed_tensor_type.tile_distribution.get_distributed_spans()
-        elif hasattr(self.distributed_tensor_type, 'get_distributed_spans'):
-            spans = self.distributed_tensor_type.get_distributed_spans()
-        else:
-            return 1
+        # Get spans from the tensor instance
+        spans = self.distributed_tensor.tile_distribution.get_distributed_spans()
         
         # Calculate total accesses
         total = 1
@@ -308,7 +219,7 @@ class TileSweeper(Generic[TypeVar('T')]):
         """
         if access_idx is None:
             # Execute full sweep
-            sweep_tile(self.distributed_tensor_type, self.func, self.unpacks_per_x_dim)
+            sweep_tile(self.distributed_tensor, self.func, self.unpacks_per_x_dim)
         else:
             # Execute specific access
             # This requires converting linear access index to multi-dimensional indices
@@ -316,14 +227,8 @@ class TileSweeper(Generic[TypeVar('T')]):
     
     def _execute_access(self, access_idx: int) -> None:
         """Execute a specific access by index."""
-        # Get spans
-        if hasattr(self.distributed_tensor_type, 'tile_distribution'):
-            # It's an instance
-            spans = self.distributed_tensor_type.tile_distribution.get_distributed_spans()
-        elif hasattr(self.distributed_tensor_type, 'get_distributed_spans'):
-            spans = self.distributed_tensor_type.get_distributed_spans()
-        else:
-            return
+        # Get spans from the tensor instance
+        spans = self.distributed_tensor.tile_distribution.get_distributed_spans()
         
         # Convert linear index to multi-dimensional group indices
         group_indices = []
@@ -355,14 +260,14 @@ class TileSweeper(Generic[TypeVar('T')]):
         self.func(*dstr_indices)
 
 
-def make_tile_sweeper(distributed_tensor_or_type: Union[type, Any],
+def make_tile_sweeper(distributed_tensor: StaticDistributedTensor,
                      func: Callable[..., None],
                      unpacks_per_x_dim: Optional[List[int]] = None) -> TileSweeper:
     """
     Create a tile sweeper instance.
     
     Args:
-        distributed_tensor_or_type: Either a distributed tensor type or instance
+        distributed_tensor: StaticDistributedTensor instance
         func: Function to apply during sweep
         unpacks_per_x_dim: Unpacking configuration
         
@@ -370,7 +275,7 @@ def make_tile_sweeper(distributed_tensor_or_type: Union[type, Any],
         TileSweeper instance
     """
     return TileSweeper(
-        distributed_tensor_type=distributed_tensor_or_type,
+        distributed_tensor=distributed_tensor,
         func=func,
         unpacks_per_x_dim=unpacks_per_x_dim
     ) 

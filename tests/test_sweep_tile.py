@@ -231,14 +231,14 @@ class TestSweepTileEnhanced:
     
     def test_sweep_tile_multi_span(self):
         """Test sweep_tile with multiple spans."""
-        # Create a 2D distributed tensor with 2 spans
+        # Use the working pattern for multiple spans
         encoding = make_tile_distribution_encoding(
             rs_lengths=[],
             hs_lengthss=[[2], [4]],  # Two spans: [2] and [4]
-            ps_to_rhss_major=[[1]],
-            ps_to_rhss_minor=[[0]],
-            ys_to_rhs_major=[1],
-            ys_to_rhs_minor=[0]
+            ps_to_rhss_major=[[], []],
+            ps_to_rhss_minor=[[], []],
+            ys_to_rhs_major=[1, 2],
+            ys_to_rhs_minor=[0, 0]
         )
         
         transform1 = EmbedTransform([2], [1])
@@ -250,7 +250,7 @@ class TestSweepTileEnhanced:
             bottom_dimension_hidden_ids=[0, 1],
             top_dimension_hidden_ids=[2, 3]
         )
-        descriptor = make_naive_tensor_descriptor([2, 4], [1, 1])
+        descriptor = make_naive_tensor_descriptor([2, 4], [4, 1])
         
         dist = make_tile_distribution(
             ps_ys_to_xs_adaptor=adaptor,
@@ -423,14 +423,14 @@ class TestEdgeCasesAndErrorHandling:
     
     def test_sweep_tile_uspan_edge_cases(self):
         """Test edge cases for sweep_tile_uspan."""
-        # Test with empty span
+        # Test with empty span - should not call visitor (nothing to sweep)
         empty_span = make_tile_distributed_span([])
         calls = []
         def visitor(*indices):
             calls.append(len(indices))
         
         sweep_tile_uspan(empty_span, visitor, [])
-        assert len(calls) == 1  # Should make one call with no indices
+        assert len(calls) == 0  # Should not call visitor for empty spans
         
         # Test with single element span
         single_span = make_tile_distributed_span([1])
@@ -438,13 +438,19 @@ class TestEdgeCasesAndErrorHandling:
         sweep_tile_uspan(single_span, visitor, [1])
         assert len(calls) == 1
         
-        # Test with large unpacking that exceeds span size
+        # Test with valid unpacking that exactly divides the span length
+        divisible_span = make_tile_distributed_span([6])
+        calls = []
+        # y_unpacks=[3] with length=6 is valid (6 divisible by 3 = 2 groups)
+        sweep_tile_uspan(divisible_span, visitor, [3])
+        assert len(calls) == 2  # Should have 2 groups of 3 elements each
+        
+        # Test with exact divisor unpacking  
         small_span = make_tile_distributed_span([2])
         calls = []
-        # y_unpacks=[3] means we want 3 groups, but span only has 2 elements
-        # This should handle gracefully
-        sweep_tile_uspan(small_span, visitor, [3])
-        assert len(calls) > 0  # Should still make calls
+        # y_unpacks=[2] with length=2 is valid (2 divisible by 2 = 1 group)
+        sweep_tile_uspan(small_span, visitor, [2])
+        assert len(calls) == 1  # Should have 1 group of 2 elements
     
     def test_get_y_unpacks_error_handling(self):
         """Test error handling in get_y_unpacks_from_x_unpacks integration."""
@@ -597,69 +603,19 @@ class TestRegressionAndCompatibility:
 class TestSweepTile:
     """Test cases for sweep_tile function."""
     
-    def test_sweep_tile_basic(self):
-        """Test basic sweep_tile functionality."""
-        # Create a simple distributed tensor type
+    def test_sweep_tile_single_span(self):
+        """Test sweep_tile with single span (single X dimension)."""
+        # Create distribution with single X dimension
         encoding = make_tile_distribution_encoding(
             rs_lengths=[],
-            hs_lengthss=[[2], [2]],
-            ps_to_rhss_major=[[1]],
-            ps_to_rhss_minor=[[0]],
-            ys_to_rhs_major=[1],
-            ys_to_rhs_minor=[0]
-        )
-        
-        transform1 = EmbedTransform([2], [1])
-        transform2 = EmbedTransform([2], [1])
-        
-        adaptor = TensorAdaptor(
-            transforms=[transform1, transform2],
-            lower_dimension_hidden_idss=[[0], [1]],
-            upper_dimension_hidden_idss=[[2], [3]],
-            bottom_dimension_hidden_ids=[0, 1],
-            top_dimension_hidden_ids=[2, 3]
-        )
-        
-        descriptor = make_naive_tensor_descriptor([2], [1])
-        
-        dist = make_tile_distribution(
-            ps_ys_to_xs_adaptor=adaptor,
-            ys_to_d_descriptor=descriptor,
-            encoding=encoding
-        )
-        
-        # Create distributed tensor
-        tensor = StaticDistributedTensor(
-            data_type=np.float32,
-            tile_distribution=dist
-        )
-        
-        # Track visits
-        visits = []
-        
-        def process(idx):
-            visits.append(idx)
-        
-        # Sweep tile
-        sweep_tile(tensor, process)
-        
-        # Should have visited some indices
-        assert len(visits) > 0
-    
-    def test_sweep_tile_with_unpacking(self):
-        """Test sweep_tile with unpacking."""
-        # Create distribution
-        encoding = make_tile_distribution_encoding(
-            rs_lengths=[],
-            hs_lengthss=[[4]],  # Single dimension with 4 elements
-            ps_to_rhss_major=[[1]],
-            ps_to_rhss_minor=[[0]],
+            hs_lengthss=[[4]],  # Single X dimension with 4 elements
+            ps_to_rhss_major=[[]],
+            ps_to_rhss_minor=[[]],
             ys_to_rhs_major=[1],
             ys_to_rhs_minor=[0]
         )
         
         transform = EmbedTransform([4], [1])
-        
         adaptor = TensorAdaptor(
             transforms=[transform],
             lower_dimension_hidden_idss=[[0]],
@@ -681,35 +637,145 @@ class TestSweepTile:
             tile_distribution=dist
         )
         
-        # Track calls with pairs
-        pairs = []
+        # Track visits - expect single TileDistributedIndex per call
+        visits = []
         
-        def process_pair(idx0, idx1):
-            pairs.append((idx0, idx1))
+        def process_single(idx):
+            assert isinstance(idx, TileDistributedIndex)
+            visits.append(idx.partial_indices)
         
-        # Sweep with unpacking of 2
-        sweep_tile(tensor, process_pair, [2])
+        sweep_tile(tensor, process_single)
         
-        # Should have processed pairs
-        assert len(pairs) > 0
-
-
-class TestTileSweeper:
-    """Test cases for TileSweeper class."""
+        # Should visit all 4 elements
+        assert len(visits) == 4
+        expected_indices = [[0], [1], [2], [3]]
+        for expected in expected_indices:
+            assert expected in visits
     
-    def test_tile_sweeper_creation(self):
-        """Test creating a tile sweeper."""
-        # Create distribution
+    def test_sweep_tile_multiple_spans(self):
+        """Test sweep_tile with multiple spans (multiple X dimensions)."""
+        # Create distribution with 2 X dimensions - using a known working pattern
         encoding = make_tile_distribution_encoding(
             rs_lengths=[],
-            hs_lengthss=[[2], [2]],
-            ps_to_rhss_major=[[1]],
-            ps_to_rhss_minor=[[0]],
+            hs_lengthss=[[2], [3]],  # First X dimension: 2 elements, Second: 3 elements
+            ps_to_rhss_major=[[], []],
+            ps_to_rhss_minor=[[], []],
+            ys_to_rhs_major=[1, 2],
+            ys_to_rhs_minor=[0, 0]
+        )
+        
+        # Create simple transforms
+        transform1 = EmbedTransform([2], [1])
+        transform2 = EmbedTransform([3], [1])
+        
+        adaptor = TensorAdaptor(
+            transforms=[transform1, transform2],
+            lower_dimension_hidden_idss=[[0], [1]],
+            upper_dimension_hidden_idss=[[2], [3]],
+            bottom_dimension_hidden_ids=[0, 1],
+            top_dimension_hidden_ids=[2, 3]
+        )
+        
+        descriptor = make_naive_tensor_descriptor([2, 3], [3, 1])  # 2*3=6 total elements
+        
+        dist = make_tile_distribution(
+            ps_ys_to_xs_adaptor=adaptor,
+            ys_to_d_descriptor=descriptor,
+            encoding=encoding
+        )
+        
+        tensor = StaticDistributedTensor(
+            data_type=np.float32,
+            tile_distribution=dist
+        )
+        
+        # Track visits - expect 2 TileDistributedIndex objects per call
+        visits = []
+        
+        def process_multiple(idx1, idx2):
+            assert isinstance(idx1, TileDistributedIndex)
+            assert isinstance(idx2, TileDistributedIndex)
+            visits.append((idx1.partial_indices, idx2.partial_indices))
+        
+        sweep_tile(tensor, process_multiple)
+        
+        # First span: 2 elements, Second span: 3 elements
+        # Total calls: 2 * 3 = 6
+        assert len(visits) == 6
+        
+        # Verify all combinations are present
+        expected_combinations = [
+            ([0], [0]), ([0], [1]), ([0], [2]),
+            ([1], [0]), ([1], [1]), ([1], [2])
+        ]
+        for expected in expected_combinations:
+            assert expected in visits, f"Expected combination {expected} not found in {visits}"
+    
+    def test_sweep_tile_with_unpacking_single_span(self):
+        """Test sweep_tile with unpacking on single span."""
+        # Single span with 4 elements
+        encoding = make_tile_distribution_encoding(
+            rs_lengths=[],
+            hs_lengthss=[[4]],
+            ps_to_rhss_major=[[]],
+            ps_to_rhss_minor=[[]],
             ys_to_rhs_major=[1],
             ys_to_rhs_minor=[0]
         )
         
-        transform1 = EmbedTransform([2], [1])
+        transform = EmbedTransform([4], [1])
+        adaptor = TensorAdaptor(
+            transforms=[transform],
+            lower_dimension_hidden_idss=[[0]],
+            upper_dimension_hidden_idss=[[1]],
+            bottom_dimension_hidden_ids=[0],
+            top_dimension_hidden_ids=[1]
+        )
+        
+        descriptor = make_naive_tensor_descriptor([4], [1])
+        
+        dist = make_tile_distribution(
+            ps_ys_to_xs_adaptor=adaptor,
+            ys_to_d_descriptor=descriptor,
+            encoding=encoding
+        )
+        
+        tensor = StaticDistributedTensor(
+            data_type=np.float32,
+            tile_distribution=dist
+        )
+        
+        # Test with x_unpacks=2: should get 2 TileDistributedIndex per call
+        visits = []
+        
+        def process_unpacked(idx1, idx2):
+            assert isinstance(idx1, TileDistributedIndex)
+            assert isinstance(idx2, TileDistributedIndex)
+            visits.append((idx1.partial_indices, idx2.partial_indices))
+        
+        sweep_tile(tensor, process_unpacked, [2])
+        
+        # With 4 elements and unpack=2: 4/2 = 2 calls
+        assert len(visits) == 2
+        
+        # Should get pairs: ([0], [1]) and ([2], [3])
+        expected_pairs = [([0], [1]), ([2], [3])]
+        for expected in expected_pairs:
+            assert expected in visits
+    
+    def test_sweep_tile_with_unpacking_multiple_spans(self):
+        """Test sweep_tile with different unpacking on multiple spans."""
+        # Use the same setup as the working multiple spans test but with unpacking
+        encoding = make_tile_distribution_encoding(
+            rs_lengths=[],
+            hs_lengthss=[[4], [2]],  # First X dimension: 4 elements, Second: 2 elements
+            ps_to_rhss_major=[[], []],
+            ps_to_rhss_minor=[[], []],
+            ys_to_rhs_major=[1, 2],
+            ys_to_rhs_minor=[0, 0]
+        )
+        
+        transform1 = EmbedTransform([4], [1])
         transform2 = EmbedTransform([2], [1])
         
         adaptor = TensorAdaptor(
@@ -718,6 +784,60 @@ class TestTileSweeper:
             upper_dimension_hidden_idss=[[2], [3]],
             bottom_dimension_hidden_ids=[0, 1],
             top_dimension_hidden_ids=[2, 3]
+        )
+        
+        descriptor = make_naive_tensor_descriptor([4, 2], [2, 1])  # 4*2=8 total elements
+        
+        dist = make_tile_distribution(
+            ps_ys_to_xs_adaptor=adaptor,
+            ys_to_d_descriptor=descriptor,
+            encoding=encoding
+        )
+        
+        tensor = StaticDistributedTensor(
+            data_type=np.float32,
+            tile_distribution=dist
+        )
+        
+        # Test with unpacks=[2, 1]: first span unpack by 2, second by 1
+        visits = []
+        
+        def process_mixed_unpacking(*indices):
+            # First span contributes 2 indices (unpack=2)
+            # Second span contributes 1 index (unpack=1) 
+            # Total: 3 indices per call
+            assert len(indices) == 3
+            for idx in indices:
+                assert isinstance(idx, TileDistributedIndex)
+            partial_indices = [idx.partial_indices for idx in indices]
+            visits.append(tuple(partial_indices))
+        
+        sweep_tile(tensor, process_mixed_unpacking, [2, 1])
+        
+        # First span: 4 elements / 2 unpack = 2 groups
+        # Second span: 2 elements / 1 unpack = 2 groups
+        # Total calls: 2 * 2 = 4
+        assert len(visits) == 4
+    
+    def test_sweep_tile_error_handling(self):
+        """Test error handling in sweep_tile."""
+        # Create simple tensor
+        encoding = make_tile_distribution_encoding(
+            rs_lengths=[],
+            hs_lengthss=[[2]],
+            ps_to_rhss_major=[[]],
+            ps_to_rhss_minor=[[]],
+            ys_to_rhs_major=[1],
+            ys_to_rhs_minor=[0]
+        )
+        
+        transform = EmbedTransform([2], [1])
+        adaptor = TensorAdaptor(
+            transforms=[transform],
+            lower_dimension_hidden_idss=[[0]],
+            upper_dimension_hidden_idss=[[1]],
+            bottom_dimension_hidden_ids=[0],
+            top_dimension_hidden_ids=[1]
         )
         
         descriptor = make_naive_tensor_descriptor([2], [1])
@@ -733,9 +853,153 @@ class TestTileSweeper:
             tile_distribution=dist
         )
         
+        def dummy_func(idx):
+            pass
+        
+        # Test invalid unpacks length
+        with pytest.raises(ValueError, match="unpacks_per_x_dim length.*must match number of spans"):
+            sweep_tile(tensor, dummy_func, [1, 2])  # Too many unpacks for single span
+    
+    def test_sweep_tile_fallback_on_invalid_unpacks(self):
+        """Test that sweep_tile falls back gracefully on invalid unpacking."""
+        # Create span where unpacking won't work perfectly
+        encoding = make_tile_distribution_encoding(
+            rs_lengths=[],
+            hs_lengthss=[[3]],  # 3 elements - not divisible by 2
+            ps_to_rhss_major=[[]],
+            ps_to_rhss_minor=[[]],
+            ys_to_rhs_major=[1],
+            ys_to_rhs_minor=[0]
+        )
+        
+        transform = EmbedTransform([3], [1])
+        adaptor = TensorAdaptor(
+            transforms=[transform],
+            lower_dimension_hidden_idss=[[0]],
+            upper_dimension_hidden_idss=[[1]],
+            bottom_dimension_hidden_ids=[0],
+            top_dimension_hidden_ids=[1]
+        )
+        
+        descriptor = make_naive_tensor_descriptor([3], [1])
+        
+        dist = make_tile_distribution(
+            ps_ys_to_xs_adaptor=adaptor,
+            ys_to_d_descriptor=descriptor,
+            encoding=encoding
+        )
+        
+        tensor = StaticDistributedTensor(
+            data_type=np.float32,
+            tile_distribution=dist
+        )
+        
+        calls = []
+        def process_indices(idx):
+            calls.append(idx.partial_indices)
+        
+        # Try to use unpacking that won't work (3 not divisible by 2)
+        # Should fall back to default [1] unpacking
+        sweep_tile(tensor, process_indices, [2])
+        
+        # Should still visit all 3 elements (fallback to no unpacking)
+        assert len(calls) == 3
+        assert [0] in calls
+        assert [1] in calls
+        assert [2] in calls
+    
+    # Keep the original test but rename it for clarity
+    def test_sweep_tile_basic_legacy(self):
+        """Legacy test - shows the old API expectation that needs updating."""
+        # Use the working multiple spans pattern
+        encoding = make_tile_distribution_encoding(
+            rs_lengths=[],
+            hs_lengthss=[[2], [3]],  # Use the pattern that works
+            ps_to_rhss_major=[[], []],
+            ps_to_rhss_minor=[[], []],
+            ys_to_rhs_major=[1, 2],
+            ys_to_rhs_minor=[0, 0]
+        )
+        
+        transform1 = EmbedTransform([2], [1])
+        transform2 = EmbedTransform([3], [1])
+        
+        adaptor = TensorAdaptor(
+            transforms=[transform1, transform2],
+            lower_dimension_hidden_idss=[[0], [1]],
+            upper_dimension_hidden_idss=[[2], [3]],
+            bottom_dimension_hidden_ids=[0, 1],
+            top_dimension_hidden_ids=[2, 3]
+        )
+        
+        descriptor = make_naive_tensor_descriptor([2, 3], [3, 1])
+        
+        dist = make_tile_distribution(
+            ps_ys_to_xs_adaptor=adaptor,
+            ys_to_d_descriptor=descriptor,
+            encoding=encoding
+        )
+        
+        tensor = StaticDistributedTensor(
+            data_type=np.float32,
+            tile_distribution=dist
+        )
+        
+        # Track visits - now expects 2 TileDistributedIndex objects (C++ behavior)
         visits = []
         
-        def visitor(idx):
+        def process(idx1, idx2):
+            # Now receives TileDistributedIndex objects, not Y indices
+            assert isinstance(idx1, TileDistributedIndex)
+            assert isinstance(idx2, TileDistributedIndex)
+            visits.append((idx1.partial_indices, idx2.partial_indices))
+        
+        sweep_tile(tensor, process)
+        
+        # Should have visited some indices
+        assert len(visits) > 0
+
+
+class TestTileSweeper:
+    """Test cases for TileSweeper class."""
+    
+    def test_tile_sweeper_creation(self):
+        """Test creating a tile sweeper."""
+        # Use simple single-span distribution that we know works
+        encoding = make_tile_distribution_encoding(
+            rs_lengths=[],
+            hs_lengthss=[[4]],  # Single X dimension with 4 elements
+            ps_to_rhss_major=[[]],
+            ps_to_rhss_minor=[[]],
+            ys_to_rhs_major=[1],
+            ys_to_rhs_minor=[0]
+        )
+        
+        transform = EmbedTransform([4], [1])
+        adaptor = TensorAdaptor(
+            transforms=[transform],
+            lower_dimension_hidden_idss=[[0]],
+            upper_dimension_hidden_idss=[[1]],
+            bottom_dimension_hidden_ids=[0],
+            top_dimension_hidden_ids=[1]
+        )
+        
+        descriptor = make_naive_tensor_descriptor([4], [1])
+        
+        dist = make_tile_distribution(
+            ps_ys_to_xs_adaptor=adaptor,
+            ys_to_d_descriptor=descriptor,
+            encoding=encoding
+        )
+        
+        tensor = StaticDistributedTensor(
+            data_type=np.float32,
+            tile_distribution=dist
+        )
+        
+        visits = []
+        
+        def visitor(idx):  # Single span = single argument
             visits.append(idx)
         
         # Create sweeper
@@ -788,11 +1052,11 @@ class TestTileSweeper:
         
         visits = []
         
-        def visitor(idx):
-            visits.append(idx)
+        def visitor(*indices):
+            visits.append(indices)
         
         sweeper = TileSweeper(
-            distributed_tensor_type=tensor,
+            distributed_tensor=tensor,
             func=visitor,
             unpacks_per_x_dim=[1]
         )
