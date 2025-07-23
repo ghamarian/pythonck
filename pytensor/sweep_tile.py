@@ -12,6 +12,7 @@ import numpy as np
 
 from .tile_distribution import TileDistributedSpan, TileDistributedIndex, make_tile_distributed_index
 from .static_distributed_tensor import StaticDistributedTensor
+from .sequence_utils import get_y_unpacks_from_x_unpacks
 
 
 def sweep_tile_span(span: TileDistributedSpan, 
@@ -44,21 +45,24 @@ def sweep_tile_uspan(span: TileDistributedSpan,
     """
     Sweep over a span with unpacking support.
     
+    This function implements the C++ static_uford functionality with proper
+    unpacking based on the get_y_unpacks_from_x_unpacks algorithm.
+    
     Args:
         span: The distributed span to sweep over
         func: Function to apply to unpacked distributed indices
-        unpacks: Number of elements to unpack per call
+        unpacks: Y unpacks (calculated from X unpacks using get_y_unpacks_from_x_unpacks)
     """
     if unpacks is None:
         unpacks = [1] * len(span.partial_lengths)
+    
+    span_lengths = span.partial_lengths
     
     # Check if this is the "no unpacking" case (all unpacks are 1)
     is_no_unpacking = all(unpack == 1 for unpack in unpacks)
     
     if is_no_unpacking:
         # Simple case: iterate over each individual index
-        # This matches the test expectation for "no unpacking"
-        span_lengths = span.partial_lengths
         ranges = [range(length) for length in span_lengths]
         
         for indices in itertools.product(*ranges):
@@ -66,37 +70,44 @@ def sweep_tile_uspan(span: TileDistributedSpan,
             dstr_idx = make_tile_distributed_index(list(indices))
             func(dstr_idx)
     else:
-        # Complex unpacking case: group elements and unpack multiple indices
-        span_lengths = span.partial_lengths
-        
-        # Calculate groups for each dimension
+        # Complex unpacking case using proper C++ logic
+        # Calculate how many groups we have in each dimension
         dim_groups = []
+        total_calls = 1
+        
         for length, unpack in zip(span_lengths, unpacks):
+            num_groups = (length + unpack - 1) // unpack  # Ceiling division
+            total_calls *= num_groups
             groups = []
-            for i in range(0, length, unpack):
-                group = list(range(i, min(i + unpack, length)))
+            for group_idx in range(num_groups):
+                start_idx = group_idx * unpack
+                end_idx = min(start_idx + unpack, length)
+                group = list(range(start_idx, end_idx))
                 groups.append(group)
             dim_groups.append(groups)
         
         # Iterate over all group combinations
         for group_combo in itertools.product(*dim_groups):
-            # Flatten to get all indices
-            all_indices = []
-            for group in group_combo:
-                for idx in group:
-                    all_indices.append(idx)
-            
-            # Create distributed indices
+            # Create distributed indices for this combination
             dstr_indices = []
-            idx_ptr = 0
-            for unpack in unpacks:
-                indices = all_indices[idx_ptr:idx_ptr + unpack]
+            
+            # For each position in the unpacking pattern
+            max_group_size = max(len(group) for group in group_combo)
+            for pos in range(max_group_size):
+                indices = []
+                for dim_idx, group in enumerate(group_combo):
+                    if pos < len(group):
+                        indices.append(group[pos])
+                    else:
+                        # Pad with the last valid index in this dimension
+                        indices.append(group[-1])
+                
                 if indices:  # Only create index if we have values
                     dstr_indices.append(make_tile_distributed_index(indices))
-                idx_ptr += unpack
             
             # Apply function with unpacked indices
-            func(*dstr_indices)
+            if dstr_indices:
+                func(*dstr_indices)
 
 
 def sweep_tensor_direct(distributed_tensor: StaticDistributedTensor,
@@ -144,6 +155,9 @@ def sweep_tile(distributed_tensor_type: Union[type, Any],
     """
     Enhanced sweep-tile utility with control over unpacks along each X-dimension.
     
+    This now properly implements the C++ sweep_tile logic using get_y_unpacks_from_x_unpacks
+    to convert X unpacks to Y unpacks for each span.
+    
     The lambda function argument is the distributed index, which can be directly
     plugged into the distributed tensor as setter/getter.
     
@@ -164,7 +178,7 @@ def sweep_tile(distributed_tensor_type: Union[type, Any],
     Args:
         distributed_tensor_type: Type of the distributed tensor or instance
         func: Function to apply to distributed indices
-        unpacks_per_x_dim: Number of elements to unpack per dimension
+        unpacks_per_x_dim: Number of elements to unpack per X dimension
     """
     # FIXED API: If given a StaticDistributedTensor instance, use the direct API
     if isinstance(distributed_tensor_type, StaticDistributedTensor):
@@ -191,54 +205,38 @@ def sweep_tile(distributed_tensor_type: Union[type, Any],
     if unpacks_per_x_dim is None:
         unpacks_per_x_dim = [1] * len(spans)
     
-    # Get all span lengths
-    all_lengths = []
-    for span in spans:
-        all_lengths.extend(span.partial_lengths)
+    if len(unpacks_per_x_dim) != len(spans):
+        raise ValueError(f"unpacks_per_x_dim length {len(unpacks_per_x_dim)} must match number of spans {len(spans)}")
     
-    # Calculate total unpacks
-    total_unpacks = 1
-    for unpack in unpacks_per_x_dim:
-        total_unpacks *= unpack
-    
-    # If unpacking is 1 for all dimensions, sweep one by one
-    if total_unpacks == 1:
-        # Simple case: one index at a time
-        ranges = [range(length) for length in all_lengths]
-        for indices in itertools.product(*ranges):
-            # Create single distributed index with all dimensions
-            dstr_idx = make_tile_distributed_index(list(indices))
-            func(dstr_idx)
-    else:
-        # Complex case: multiple indices based on unpacking
-        # This is a simplified implementation
-        # In practice, would need to handle space-filling curves
-        dim_ranges = []
-        dim_idx = 0
-        for x_idx, span in enumerate(spans):
-            unpack = unpacks_per_x_dim[x_idx]
-            for length in span.partial_lengths:
-                # Create groups for this dimension
-                groups = []
-                for i in range(0, length, unpack):
-                    group = list(range(i, min(i + unpack, length)))
-                    groups.append(group)
-                dim_ranges.append(groups)
-                dim_idx += 1
+    # Process each span recursively like C++ sweep_tile_impl
+    def process_spans(span_idx: int, current_span_indices: List[Any]):
+        if span_idx >= len(spans):
+            # Base case: apply function with all accumulated indices
+            func(*current_span_indices)
+            return
         
-        # Iterate over all group combinations
-        for group_combo in itertools.product(*dim_ranges):
-            # Generate all indices in this group
-            indices_list = list(itertools.product(*group_combo))
-            
-            # Create distributed indices
-            dstr_indices = []
-            for indices in indices_list:
-                dstr_idx = make_tile_distributed_index(list(indices))
-                dstr_indices.append(dstr_idx)
-            
-            # Apply function with all indices
-            func(*dstr_indices)
+        # Get current span and its X unpack requirement
+        current_span = spans[span_idx]
+        x_unpacks = unpacks_per_x_dim[span_idx]
+        
+        # Convert X unpacks to Y unpacks using get_y_unpacks_from_x_unpacks
+        y_lengths = current_span.partial_lengths
+        try:
+            y_unpacks = get_y_unpacks_from_x_unpacks(y_lengths, x_unpacks)
+        except ValueError:
+            # If unpacking is not possible, use default [1, 1, ...]
+            y_unpacks = [1] * len(y_lengths)
+        
+        # Use sweep_tile_uspan for this span with proper Y unpacks
+        def span_processor(*span_indices):
+            # Add these indices to accumulated indices and recurse
+            next_span_indices = current_span_indices + list(span_indices)
+            process_spans(span_idx + 1, next_span_indices)
+        
+        sweep_tile_uspan(current_span, span_processor, y_unpacks)
+    
+    # Start the recursive processing
+    process_spans(0, [])
 
 
 @dataclass
