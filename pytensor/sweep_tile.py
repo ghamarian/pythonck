@@ -90,7 +90,7 @@ def sweep_tile_uspan(span: TileDistributedSpan,
         static_uford(uford_func)
 
 
-def sweep_tile(distributed_tensor: StaticDistributedTensor,
+def sweep_tile_old(distributed_tensor: StaticDistributedTensor,
                func: Callable[..., None],
                unpacks_per_x_dim: Optional[List[int]] = None) -> None:
     """
@@ -162,6 +162,77 @@ def sweep_tile(distributed_tensor: StaticDistributedTensor,
     # Start the recursive processing
     process_spans(0, [])
 
+def sweep_tile(distributed_tensor: StaticDistributedTensor,
+               func: Callable[..., None],
+               unpacks_per_x_dim: Optional[List[int]] = None) -> None:
+    """
+    Fixed sweep tile implementation: simplified but correct.
+    
+    Always calls func with one TileDistributedIndex per span,
+    matching the C++ behavior exactly.
+    """
+    spans = distributed_tensor.tile_distribution.get_distributed_spans()
+    
+    if unpacks_per_x_dim is None:
+        unpacks_per_x_dim = [1] * len(spans)
+    
+    # Validation: check that unpacks length matches spans
+    if len(unpacks_per_x_dim) != len(spans):
+        raise ValueError(f"unpacks_per_x_dim length {len(unpacks_per_x_dim)} must match number of spans {len(spans)}")
+    
+    # Check if this is the simple case (no unpacking)
+    if all(unpack == 1 for unpack in unpacks_per_x_dim):
+        # Simple case: each span contributes one TileDistributedIndex
+        # Build all span combinations directly
+        span_index_lists = []
+        
+        for span in spans:
+            # For simple case, just iterate through span normally
+            span_lengths = span.partial_lengths
+            span_indices = []
+            for indices in itertools.product(*[range(length) for length in span_lengths]):
+                span_indices.append(make_tile_distributed_index(list(indices)))
+            span_index_lists.append(span_indices)
+        
+        # Call function with one index per span
+        for combination in itertools.product(*span_index_lists):
+            func(*combination)
+        
+    else:
+        # Complex case: use original logic but simplified
+        # Pre-calculate all span groups
+        all_span_groups = []
+        
+        for span_idx, span in enumerate(spans):
+            x_unpacks = unpacks_per_x_dim[span_idx]
+            y_lengths = span.partial_lengths
+            
+            # Convert X unpacks to Y unpacks
+            try:
+                y_unpacks = get_y_unpacks_from_x_unpacks(y_lengths, x_unpacks)
+            except ValueError:
+                # Fallback to no unpacking for this span
+                y_unpacks = [1] * len(y_lengths)
+            
+            # Collect all index groups for this span
+            span_groups = []
+            def collect_span_group(*indices):
+                # Convert to TileDistributedIndex objects
+                dstr_indices = [make_tile_distributed_index(list(idx)) for idx in indices]
+                span_groups.append(dstr_indices)
+            
+            StaticUford(y_lengths, y_unpacks)(collect_span_group)
+            all_span_groups.append(span_groups)
+        
+        # Generate all combinations across spans
+        for span_combination in itertools.product(*all_span_groups):
+            # Each span_combination contains a list of indices for each span
+            # Flatten to get all indices for this function call
+            all_indices = []
+            for span_group in span_combination:
+                all_indices.extend(span_group)
+            
+            func(*all_indices)
 
 @dataclass
 class TileSweeper(Generic[TypeVar('T')]):

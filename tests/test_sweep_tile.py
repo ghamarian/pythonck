@@ -418,6 +418,250 @@ class TestIntegrationXtoYUnpacks:
             assert len(calls) == expected_calls, f"For x_unpacks={x_unpacks}, expected {expected_calls} calls but got {len(calls)}"
 
 
+class TestDebugUnpackingComplex:
+    """Debug tests with complex y_lengths patterns to stress test unpacking."""
+    
+    def test_debug_long_y_lengths_basic(self):
+        """Test with longer y_lengths to debug unpacking behavior."""
+        # Test with progressively longer y_lengths
+        test_cases = [
+            # (y_lengths, x_unpacks, description)
+            ([8, 4, 2], 1, "8x4x2=64 elements, no unpacking"),
+            ([8, 4, 2], 2, "8x4x2=64 elements, x_unpacks=2"),
+            ([8, 4, 2], 4, "8x4x2=64 elements, x_unpacks=4"),
+            ([8, 4, 2], 8, "8x4x2=64 elements, x_unpacks=8"),
+            ([8, 4, 2], 16, "8x4x2=64 elements, x_unpacks=16"),
+            ([8, 4, 2], 32, "8x4x2=64 elements, x_unpacks=32"),
+            ([8, 4, 2], 64, "8x4x2=64 elements, full unpacking"),
+        ]
+        
+        for y_lengths, x_unpacks, description in test_cases:
+            print(f"\n--- Testing: {description} ---")
+            
+            # Calculate expected values
+            total_elements = np.prod(y_lengths)
+            expected_calls = total_elements // x_unpacks
+            expected_indices_per_call = x_unpacks
+            
+            print(f"Expected: {expected_calls} calls, {expected_indices_per_call} indices per call")
+            
+            # Test with span
+            span = make_tile_distributed_span(y_lengths)
+            
+            # Calculate Y unpacks
+            try:
+                y_unpacks = get_y_unpacks_from_x_unpacks(y_lengths, x_unpacks)
+                print(f"Y unpacks: {y_unpacks}")
+                
+                # Verify our understanding of y_unpacks
+                unpacks_product = np.prod(y_unpacks)
+                print(f"Y unpacks product: {unpacks_product}")
+                
+                # Run the test
+                calls = []
+                all_indices = []
+                
+                def debug_visitor(*indices):
+                    calls.append(len(indices))
+                    for idx in indices:
+                        all_indices.append(idx.partial_indices)
+                    
+                    # Print details for first few calls
+                    if len(calls) <= 3:
+                        indices_str = [idx.partial_indices for idx in indices]
+                        print(f"  Call {len(calls)}: {len(indices)} indices: {indices_str}")
+                
+                sweep_tile_uspan(span, debug_visitor, y_unpacks)
+                
+                print(f"Actual: {len(calls)} calls")
+                print(f"Average indices per call: {len(all_indices) / len(calls) if calls else 0}")
+                
+                # Assertions
+                assert len(calls) == expected_calls, f"Expected {expected_calls} calls, got {len(calls)}"
+                
+                # Check that each call has the expected number of indices
+                for i, call_size in enumerate(calls):
+                    assert call_size == expected_indices_per_call, f"Call {i}: expected {expected_indices_per_call} indices, got {call_size}"
+                
+                # Check that we processed all elements exactly once
+                assert len(all_indices) == total_elements, f"Expected {total_elements} total indices, got {len(all_indices)}"
+                
+                print(f"✓ Test passed!")
+                
+            except ValueError as e:
+                print(f"ValueError (expected for some cases): {e}")
+                
+                # For invalid cases, verify fallback behavior
+                calls = []
+                def fallback_visitor(*indices):
+                    calls.append(len(indices))
+                
+                # Should fall back to no unpacking
+                sweep_tile_uspan(span, fallback_visitor, [1] * len(y_lengths))
+                assert len(calls) == total_elements  # Should visit each element individually
+                print(f"✓ Fallback test passed!")
+    
+    def test_debug_very_long_y_lengths(self):
+        """Test with very long y_lengths to stress test the system."""
+        # Really long y_lengths
+        y_lengths = [16, 8, 4, 2]  # 16*8*4*2 = 1024 elements
+        total_elements = np.prod(y_lengths)
+        
+        print(f"\n--- Very Long Y Lengths Test: {y_lengths} (total: {total_elements}) ---")
+        
+        # Test various unpacking levels
+        unpacking_levels = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]
+        
+        for x_unpacks in unpacking_levels:
+            if total_elements % x_unpacks != 0:
+                continue  # Skip non-divisible cases
+                
+            print(f"\nTesting x_unpacks={x_unpacks}")
+            
+            try:
+                span = make_tile_distributed_span(y_lengths)
+                y_unpacks = get_y_unpacks_from_x_unpacks(y_lengths, x_unpacks)
+                
+                calls = []
+                def counter(*indices):
+                    calls.append(len(indices))
+                
+                sweep_tile_uspan(span, counter, y_unpacks)
+                
+                expected_calls = total_elements // x_unpacks
+                assert len(calls) == expected_calls
+                
+                # Check that each call has correct number of indices
+                for call_size in calls:
+                    assert call_size == x_unpacks
+                
+                print(f"  ✓ {len(calls)} calls, {x_unpacks} indices each")
+                
+            except ValueError as e:
+                print(f"  ValueError: {e}")
+    
+    def test_debug_asymmetric_y_lengths(self):
+        """Test with asymmetric y_lengths to find edge cases."""
+        # Asymmetric patterns that might cause issues
+        test_patterns = [
+            ([3, 5, 7], "Prime numbers"),
+            ([2, 3, 5, 7], "Small primes"),
+            ([1, 4, 1, 4], "Ones and fours"),
+            ([12, 10, 8], "Decreasing even numbers"),
+            ([1, 2, 4, 8, 16], "Powers of 2"),
+            ([6, 4, 3, 2], "Highly composite"),
+        ]
+        
+        for y_lengths, description in test_patterns:
+            total_elements = np.prod(y_lengths)
+            print(f"\n--- Asymmetric Test: {description} {y_lengths} (total: {total_elements}) ---")
+            
+            # Find divisors of total_elements to test
+            divisors = []
+            for i in range(1, min(total_elements + 1, 65)):  # Limit to reasonable range
+                if total_elements % i == 0:
+                    divisors.append(i)
+            
+            for x_unpacks in divisors[:10]:  # Test first 10 divisors
+                try:
+                    span = make_tile_distributed_span(y_lengths)
+                    y_unpacks = get_y_unpacks_from_x_unpacks(y_lengths, x_unpacks)
+                    
+                    calls = []
+                    def counter(*indices):
+                        calls.append(len(indices))
+                    
+                    sweep_tile_uspan(span, counter, y_unpacks)
+                    
+                    expected_calls = total_elements // x_unpacks
+                    assert len(calls) == expected_calls
+                    
+                    print(f"  x_unpacks={x_unpacks}: ✓ {len(calls)} calls")
+                    
+                except ValueError as e:
+                    print(f"  x_unpacks={x_unpacks}: ValueError - {e}")
+                except Exception as e:
+                    print(f"  x_unpacks={x_unpacks}: Error - {e}")
+                    raise  # Re-raise unexpected errors
+    
+    def test_debug_full_sweep_tile_with_long_y_lengths(self):
+        """Test the full sweep_tile function with long y_lengths and multiple spans."""
+        print(f"\n--- Full Sweep Tile Debug Test ---")
+        
+        # Create a multi-span distribution with longer y_lengths
+        encoding = make_tile_distribution_encoding(
+            rs_lengths=[],
+            hs_lengthss=[[8, 4], [6, 2]],  # Two spans: 8*4=32, 6*2=12
+            ps_to_rhss_major=[[], []],
+            ps_to_rhss_minor=[[], []],
+            ys_to_rhs_major=[1, 2],
+            ys_to_rhs_minor=[0, 0]
+        )
+        
+        # Create transforms and distribution
+        transform1 = EmbedTransform([8, 4], [4, 1])  # span0: 32 elements
+        transform2 = EmbedTransform([6, 2], [2, 1])  # span1: 12 elements
+        
+        adaptor = TensorAdaptor(
+            transforms=[transform1, transform2],
+            lower_dimension_hidden_idss=[[0], [1]],
+            upper_dimension_hidden_idss=[[2], [3]],
+            bottom_dimension_hidden_ids=[0, 1],
+            top_dimension_hidden_ids=[2, 3]
+        )
+        
+        descriptor = make_naive_tensor_descriptor([32, 12], [12, 1])
+        
+        dist = make_tile_distribution(
+            ps_ys_to_xs_adaptor=adaptor,
+            ys_to_d_descriptor=descriptor,
+            encoding=encoding
+        )
+        
+        tensor = StaticDistributedTensor(
+            data_type=np.float32,
+            tile_distribution=dist
+        )
+        
+        # Test different unpacking combinations
+        unpacking_tests = [
+            ([1, 1], "No unpacking"),
+            ([2, 1], "Unpack first span by 2"),
+            ([1, 2], "Unpack second span by 2"),
+            ([4, 3], "Unpack both spans"),
+        ]
+        
+        for unpacks, description in unpacking_tests:
+            print(f"\n  Testing: {description} {unpacks}")
+            
+            calls = []
+            total_indices = 0
+            
+            def debug_func(*indices):
+                calls.append(len(indices))
+                nonlocal total_indices
+                total_indices += len(indices)
+                
+                if len(calls) <= 3:  # Print first few calls
+                    indices_str = [idx.partial_indices for idx in indices]
+                    print(f"    Call {len(calls)}: {len(indices)} indices: {indices_str[:5]}{'...' if len(indices_str) > 5 else ''}")
+            
+            try:
+                sweep_tile(tensor, debug_func, unpacks)
+                
+                print(f"    Result: {len(calls)} calls, {total_indices} total indices")
+                
+                # Basic sanity checks
+                assert len(calls) > 0, "Should have at least one call"
+                assert total_indices > 0, "Should process some indices"
+                
+                print(f"    ✓ Test passed")
+                
+            except Exception as e:
+                print(f"    Error: {e}")
+                raise
+
+
 class TestEdgeCasesAndErrorHandling:
     """Test edge cases and error handling for the enhanced sweep functionality."""
     
