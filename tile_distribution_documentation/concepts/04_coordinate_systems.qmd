@@ -45,34 +45,82 @@ Before diving into code, let's understand what problem these coordinate spaces s
 
 **The Solution**: Five coordinate spaces that transform from logical to physical:
 
-**📐 The Five Coordinate Spaces:**
+## The Five Coordinate Spaces
 
-- **🔹 P-space (Partition)**: Thread identification
-  - `thread_x, thread_y, warp_id, block_id`
-  - Maps to: which thread is doing the work
+```{mermaid}
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#fff', 'primaryBorderColor':'#333'}}}%%
+graph TD
+    subgraph "Coordinate Spaces"
+        P["P-Space (Partition)<br/>Thread Identification<br/>thread_x, thread_y, warp_id"]
+        Y["Y-Space (Logical Tile)<br/>Element in Thread's Work<br/>y0, y1, y2, y3"]
+        X["X-Space (Physical Tensor)<br/>Actual Tensor Position<br/>x0, x1"]
+        R["R-Space (Replication)<br/>Data Sharing Pattern<br/>r0, r1"]
+        D["D-Space (Linearized)<br/>Memory Address<br/>d (linear index)"]
+    end
+    
+    subgraph "Transformations"
+        T1["P + Y → X<br/>Thread + Element → Position"]
+        T2["Y → D<br/>Element → Memory"]
+        T3["P → R<br/>Thread → Replication"]
+    end
+    
+    P --> T1
+    Y --> T1
+    T1 --> X
+    
+    Y --> T2
+    T2 --> D
+    
+    P --> T3
+    T3 --> R
+    
+    style P fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style Y fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style X fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style R fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    style D fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    
+    style T1 fill:#ffebee,stroke:#d32f2f,stroke-width:1px
+    style T2 fill:#ffebee,stroke:#d32f2f,stroke-width:1px
+    style T3 fill:#ffebee,stroke:#d32f2f,stroke-width:1px
+```
 
-- **🔹 Y-space (Logical Tile)**: Element within thread's work  
-  - `y0, y1, y2, y3` (logical coordinates)
-  - Maps to: which element within the thread's tile
+### P-space (Partition)
+**Thread identification**
+- Coordinates: `thread_x, thread_y, warp_id, block_id`
+- Purpose: Identifies which thread is doing the work
+- Source: GPU hardware intrinsics
 
-- **🔹 X-space (Physical Tensor)**: Actual tensor coordinates
-  - `x0, x1` (physical matrix coordinates)  
-  - Maps to: actual position in the tensor
+### Y-space (Logical Tile)
+**Element within thread's work**
+- Coordinates: `y0, y1, y2, y3` (logical coordinates)
+- Purpose: Specifies which element within the thread's tile
+- Usage: Iteration over assigned data
 
-- **🔹 R-space (Replication)**: Data sharing across threads
-  - `r0, r1` (replication coordinates)
-  - Maps to: shared data across multiple threads
+### X-space (Physical Tensor)
+**Actual tensor coordinates**
+- Coordinates: `x0, x1` (physical matrix coordinates)
+- Purpose: Maps to actual position in the tensor
+- Result: Global memory addresses
 
-- **🔹 D-space (Linearized Storage)**: Memory layout
-  - `d` (single linear index)
-  - Maps to: actual memory address
+### R-space (Replication)
+**Data sharing across threads**
+- Coordinates: `r0, r1` (replication coordinates)
+- Purpose: Enables shared data across multiple threads
+- Usage: Reduction operations, broadcasting
+
+### D-space (Linearized Storage)
+**Memory layout**
+- Coordinates: `d` (single linear index)
+- Purpose: Maps to actual memory address
+- Usage: Register allocation, memory access
 
 ## P-space: Partition Coordinates
 
 P-space identifies which thread is doing the work. Each thread gets a unique P coordinate.
 
 ```{pyodide}
-print("🔹 P-space: Thread Identification")
+print("P-space: Thread Identification")
 print("=" * 40)
 
 # Example: 2x2 thread grid
@@ -86,7 +134,7 @@ for thread_x in range(thread_grid[0]):
         thread_id = thread_x * thread_grid[1] + thread_y
         print(f"  Thread {thread_id}: P = {p_coord}")
 
-print("\n✅ P-space concept: Each thread has unique partition coordinates")
+print("\nP-space concept: Each thread has unique partition coordinates")
 ```
 
 **Key Insight**: P-space gives each thread a unique identity. In real GPU kernels, these come from hardware intrinsics like `threadIdx.x`, `blockIdx.y`, etc.
@@ -96,7 +144,7 @@ print("\n✅ P-space concept: Each thread has unique partition coordinates")
 Y-space defines what work each thread does. Each thread processes a "tile" of elements.
 
 ```{pyodide}
-print("🔹 Y-space: Logical Tile Coordinates")
+print("Y-space: Logical Tile Coordinates")
 print("=" * 40)
 
 # Example: each thread handles 2x2 elements

@@ -1,0 +1,309 @@
+---
+title: "Terminology Reference - Key Concepts and Definitions"
+format: live-html
+---
+
+## Overview
+
+This page provides a comprehensive reference for all terminology used in the Composable Kernel (CK) tile distribution system. Understanding these terms is essential for working with CK and reading the documentation effectively.
+
+## Core Concepts
+
+### Tile
+A contiguous block of data that is processed as a unit by a group of threads. Tiles are the fundamental unit of work distribution in CK, designed to maximize memory bandwidth utilization and computational efficiency.
+
+**C++ Usage**: `using TileShape = sequence<256, 256>;`
+
+### Distribution
+The pattern by which data is assigned to processing elements (threads, warps, blocks). A distribution defines the mapping from logical coordinates to physical resources.
+
+**C++ Type**: `tile_distribution<...>`
+
+### Encoding
+A compile-time specification that describes how tensor data should be distributed across GPU processing elements. The encoding captures the complete distribution strategy.
+
+**C++ Type**: `tile_distribution_encoding<...>`
+
+## Coordinate Spaces
+
+### P-Space (Partition Space)
+The coordinate space representing processing elements in the GPU hierarchy.
+
+- **Dimensions**: Typically 1 or 2 (e.g., `[lane_id]` or `[warp_id, lane_id]`)
+- **Purpose**: Identifies which thread/warp is executing
+- **Values**: Hardware thread indices
+
+**C++ Example**:
+```cpp
+// Get current thread's P coordinates
+auto p_idx = Distribution::_get_partition_index();
+```
+
+### Y-Space (Yield Space)
+The coordinate space representing the logical access pattern within each tile.
+
+- **Dimensions**: Variable, typically 2-4
+- **Purpose**: Defines iteration pattern within thread's assigned work
+- **Values**: Indices within the tile
+
+**C++ Example**:
+```cpp
+// Iterate over Y-space
+sweep_tile(tensor, [](auto y_idx) { /*...*/ });
+```
+
+### X-Space (Physical Tensor Space)
+The coordinate space representing actual positions in the tensor.
+
+- **Dimensions**: Matches tensor dimensions (e.g., 2 for matrices)
+- **Purpose**: Maps to global memory addresses
+- **Values**: Physical tensor coordinates
+
+**C++ Example**:
+```cpp
+// Calculate X coordinates from P+Y
+auto x_idx = distribution.calculate_index(p_idx);
+```
+
+### R-Space (Replication Space)
+The coordinate space representing data replication patterns.
+
+- **Dimensions**: Variable, often 0-2
+- **Purpose**: Enables data sharing across threads
+- **Values**: Replication indices
+
+**C++ Example**:
+```cpp
+// R-dimensions in encoding
+using Encoding = tile_distribution_encoding<
+    sequence<2>,  // rs_lengths: 2-way replication
+    /*...*/
+>;
+```
+
+### D-Space (Data Space)
+The linearized coordinate space for thread-local storage.
+
+- **Dimensions**: 1 (linear index)
+- **Purpose**: Maps Y-coordinates to register indices
+- **Values**: Linear memory offsets
+
+**C++ Example**:
+```cpp
+// Y-to-D descriptor linearizes storage
+auto d_idx = ys_to_d_descriptor.calculate_offset(y_idx);
+```
+
+## Dimension Types
+
+### H-Dimensions (Hierarchical Dimensions)
+The hierarchical decomposition of tensor dimensions, capturing how work is divided across the GPU hierarchy.
+
+**Structure**: Each H-dimension group is a sequence of factors
+- Example: `sequence<4, 2, 8, 4>` means:
+  - Repeat: 4 iterations per thread
+  - Warps: 2 warps per block
+  - Threads: 8 threads per warp  
+  - Vector: 4 elements per operation
+
+**C++ Example**:
+```cpp
+using HsLengthss = tuple<
+    sequence<4, 2, 8, 4>,  // H0: M dimension
+    sequence<4, 2, 8, 4>   // H1: N dimension
+>;
+```
+
+### RH-Dimensions (R + H Dimensions Combined)
+The combined space of R and H dimensions, used internally for coordinate transformations.
+
+- **Major**: Identifies which dimension group (0 for R, 1+ for H)
+- **Minor**: Identifies position within the group
+
+## Transformations
+
+### Adaptor
+A chain of coordinate transformations that maps between coordinate spaces.
+
+**Types**:
+- `ps_ys_to_xs_adaptor`: Maps (P,Y) → X coordinates
+- `ys_to_d_adaptor`: Maps Y → D coordinates
+
+**C++ Type**: `tensor_adaptor<...>`
+
+### Descriptor
+A complete specification of tensor layout including transformations and memory layout.
+
+**C++ Type**: `tensor_descriptor<...>`
+
+## Operations
+
+### Load Tile
+Operation that transfers data from global memory to thread-local registers according to the distribution pattern.
+
+**C++ Function**: `tile_window.load()`
+
+### Store Tile
+Operation that transfers data from thread-local registers back to global memory.
+
+**C++ Function**: `tile_window.store(tile)`
+
+### Sweep Tile
+Operation that iterates over all elements in a distributed tensor, applying a user-defined function.
+
+**C++ Function**: `sweep_tile(tensor, lambda)`
+
+### Shuffle Tile
+Operation that exchanges data between threads within a warp.
+
+**C++ Function**: `shuffle_tile(tensor, shuffle_pattern)`
+
+## Memory Concepts
+
+### Coalescing
+The property where adjacent threads access adjacent memory locations, maximizing memory bandwidth utilization.
+
+### Bank Conflict
+A performance degradation that occurs when multiple threads in a warp access different addresses in the same memory bank.
+
+### Vectorization
+The technique of loading/storing multiple elements in a single memory transaction.
+
+**C++ Example**:
+```cpp
+// Vector load of 4 elements
+using float4 = vector_type<float, 4>::type;
+float4 data = tensor_view.template get_vectorized_elements<4>(x_idx);
+```
+
+## Distribution Components
+
+### Window
+A view into a subset of a tensor that respects the distribution pattern.
+
+**C++ Type**: `tile_window<...>`
+
+### Static Distributed Tensor
+A thread-local tensor stored in registers, distributed according to a tile distribution.
+
+**C++ Type**: `static_distributed_tensor<...>`
+
+### Spans
+Iteration ranges over distributed dimensions, used by sweep operations.
+
+**C++ Type**: `tile_distributed_span<...>`
+
+## GPU Hardware Terms
+
+### Warp
+A group of threads (32 on AMD GPUs) that execute in lockstep.
+
+### Lane
+An individual thread within a warp (0-31).
+
+### Block
+A group of warps that can cooperate through shared memory.
+
+### Grid
+The complete set of blocks launched for a kernel.
+
+## Template Parameters
+
+### sequence<...>
+A compile-time integer sequence used to specify dimensions and lengths.
+
+**Example**: `sequence<256, 256>` for a 256×256 tile
+
+### tuple<...>
+A heterogeneous collection of types, often used for grouping sequences.
+
+**Example**: `tuple<sequence<4,4>, sequence<4,4>>`
+
+### number<N>
+A compile-time integer constant.
+
+**Example**: `number<16>` represents the value 16
+
+## Optimization Terms
+
+### Register Spilling
+When a kernel uses more registers than available, causing data to spill to slower memory.
+
+### Occupancy
+The ratio of active warps to maximum possible warps on a GPU multiprocessor.
+
+### Memory Bandwidth Utilization
+The percentage of theoretical memory bandwidth achieved by a kernel.
+
+### Instruction-Level Parallelism (ILP)
+The ability to execute multiple independent instructions simultaneously.
+
+## Common Patterns
+
+### GEMM (General Matrix Multiplication)
+A fundamental operation where C = αA×B + βC.
+
+### Reduction
+An operation that combines multiple values into a single result (e.g., sum, max).
+
+### Broadcast
+An operation that replicates a value across multiple processing elements.
+
+### Transpose
+An operation that swaps dimensions of a tensor.
+
+## Performance Metrics
+
+### FLOPS (Floating-Point Operations Per Second)
+Measure of computational throughput.
+
+### Bandwidth
+Rate of data transfer, typically measured in GB/s.
+
+### Latency
+Time delay between issuing an operation and its completion.
+
+### Throughput
+Rate of operation completion, often measured in operations per second.
+
+## Usage Examples
+
+### Creating a Distribution
+```cpp
+// Define encoding
+using MyEncoding = tile_distribution_encoding<
+    sequence<>,                        // No replication
+    tuple<sequence<4,2,8,4>,          // M dimension
+          sequence<4,2,8,4>>,         // N dimension
+    tuple<sequence<1,2>, sequence<1,2>>, // P mappings
+    tuple<sequence<1,1>, sequence<2,2>>, // P minor
+    sequence<1,1,2,2>,                   // Y major
+    sequence<0,3,0,3>                    // Y minor
+>;
+
+// Create distribution
+auto distribution = make_static_tile_distribution(MyEncoding{});
+```
+
+### Using Tile Window
+```cpp
+// Create window
+auto window = make_tile_window(
+    tensor_view,
+    TileShape{},
+    origin,
+    distribution
+);
+
+// Load-compute-store pattern
+auto tile = window.load();
+sweep_tile(tile, compute_func);
+window.store(tile);
+```
+
+## Related Documentation
+
+- [Coordinate Systems](04_coordinate_systems.qmd) - Detailed explanation of coordinate spaces
+- [Tile Distribution](03_tile_distribution.qmd) - Core distribution concepts
+- [Encoding Internals](05_encoding_internals.qmd) - How encodings work internally
+- [Thread Mapping](06_thread_mapping.qmd) - Hardware thread organization

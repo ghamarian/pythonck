@@ -15,7 +15,7 @@ import micropip
 await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl")
 ```
 
-## 🎓 **Complete Learning Journey**
+## Complete Learning Journey
 
 Follow our structured 8-part learning path:
 
@@ -50,23 +50,26 @@ Follow our structured 8-part learning path:
 ### **Thread Mapping** 
 - **[Thread Mapping](concepts/06_thread_mapping.qmd)** - Connecting to hardware, thread cooperation patterns
 
+### **Reference** 
+- **[Terminology](concepts/terminology.qmd)** - Comprehensive glossary of all CK concepts, coordinate spaces, and operations
+
 ### **Coming Soon**
 - **Advanced Topics** - Performance optimization and debugging
 
-## 🎮 **Interactive Applications**
+## Interactive Applications
 
 Explore tile distribution concepts through interactive web applications:
 
-### **[📊 Tile Distribution Visualizer](../app.py)**
+### **[Tile Distribution Visualizer](../app.py)**
 Interactive visualization of tile distribution structures and GPU memory layouts. Perfect for understanding how data is distributed across parallel processing elements.
 
-### **[🔄 Tensor Transform Visualizer](../tensor_transform_app.py)**  
+### **[Tensor Transform Visualizer](../tensor_transform_app.py)**  
 Explore tensor descriptor transformations with visual graphs and mathematical formulas. See how data layouts change through various transformations.
 
-### **[🧵 Thread Visualization App](../thread_visualization_app.py)**
+### **[Thread Visualization App](../thread_visualization_app.py)**
 Visualize GPU thread coordinate mapping and access patterns. Understand how individual threads access distributed tensor data.
 
-## 🚀 **Quick Test**
+## Quick Test
 
 Let's verify everything is working:
 
@@ -81,13 +84,13 @@ from pytensor.buffer_view import make_buffer_view, AddressSpaceEnum
 data = np.array([1, 2, 3, 4], dtype=np.float32)
 buffer_view = make_buffer_view(data, len(data), AddressSpaceEnum.GLOBAL)
 
-print(f"✅ PythonCK loaded successfully!")
-print(f"✅ Buffer view created: size = {buffer_view.buffer_size}")
-print(f"✅ Data type: {buffer_view.dtype}")
-print("🎉 Ready to explore tile distribution!")
+print("PythonCK loaded successfully!")
+print(f"Buffer view created: size = {buffer_view.buffer_size}")
+print(f"Data type: {buffer_view.dtype}")
+print("Ready to explore tile distribution!")
 ```
 
-## 📖 **How to Use This Documentation**
+## How to Use This Documentation
 
 1. **Follow the learning path** - Each part builds on the previous ones
 2. **Run the code** - All examples are interactive and executable
