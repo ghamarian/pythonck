@@ -118,7 +118,7 @@ import numpy as np
 
 # Create data and buffer view
 data = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype=np.float32)
-buffer_view = make_buffer_view(data, len(data), AddressSpaceEnum.GLOBAL)
+buffer_view = make_buffer_view(data=data, buffer_size=len(data), address_space=AddressSpaceEnum.GLOBAL)
 
 print(f"Buffer size: {buffer_view.buffer_size}")
 print(f"Address space: {buffer_view.address_space.name}")
@@ -326,21 +326,21 @@ flowchart LR
 #| output: true
 
 # Basic get operation
-value = buffer_view.get(2, 0, True)
+value = buffer_view.get(index=2, linear_offset=0, is_valid_element=True)
 print(f"Value at index 2: {value}")
 
 # Get with bounds checking
 try:
-    value = buffer_view.get(10, 0, True)  # Out of bounds
+    value = buffer_view.get(index=10, linear_offset=0, is_valid_element=True)  # Out of bounds
 except IndexError as e:
     print(f"Error: {e}")
 
 # Get with valid flag
-value_with_flag = buffer_view.get(3, 0, True)
+value_with_flag = buffer_view.get(index=3, linear_offset=0, is_valid_element=True)
 print(f"Value at index 3 (with flag): {value_with_flag}")
 
 # Invalid flag returns default
-value_invalid = buffer_view.get(3, 0, False)
+value_invalid = buffer_view.get(index=3, linear_offset=0, is_valid_element=False)
 print(f"Value with invalid flag: {value_invalid}")
 ```
 
@@ -406,17 +406,17 @@ import numpy as np
 
 # Scalar vs Vectorized Operations
 data = np.arange(16, dtype=np.float32)
-buffer_view = make_buffer_view(data, len(data), AddressSpaceEnum.GLOBAL)
+buffer_view = make_buffer_view(data=data, buffer_size=len(data), address_space=AddressSpaceEnum.GLOBAL)
 
 # Scalar access (4 separate operations)
 print("Scalar access:")
 for i in range(4):
-    value = buffer_view.get(i, 0, True)
+    value = buffer_view.get(index=i, linear_offset=0, is_valid_element=True)
     print(f"  Load {i}: {value}")
 
 # Vectorized access (single operation)
 print("\nVectorized access:")
-vec4 = buffer_view.get(0, 0, True, vector_size=4)  # Get 4 elements at once
+vec4 = buffer_view.get(index=0, linear_offset=0, is_valid_element=True, vector_size=4)  # Get 4 elements at once
 print(f"  Load float4: {vec4}")
 
 # Performance comparison
@@ -434,21 +434,21 @@ print("  Speedup: ~4x for memory-bound operations")
 
 # Create a writable buffer
 data = np.array([10, 20, 30, 40, 50], dtype=np.float32)
-buffer_view = make_buffer_view(data, len(data), AddressSpaceEnum.GLOBAL)
+buffer_view = make_buffer_view(data=data, buffer_size=len(data), address_space=AddressSpaceEnum.GLOBAL)
 
 print("Original data:", data)
 
 # Basic update
-buffer_view.update(MemoryOperationEnum.SET, 2, 0, True, 99.0)
+buffer_view.update(operation=MemoryOperationEnum.SET, index=2, linear_offset=0, is_valid_element=True, value=99.0)
 print("After update(2, 99.0):", data)
 
 # Invalid flag - no update
-buffer_view.update(MemoryOperationEnum.SET, 4, 0 , False, 77.0)
+buffer_view.update(operation=MemoryOperationEnum.SET, index=4, linear_offset=0, is_valid_element=False, value=77.0)
 print("After update(4, 77.0, valid_flag=False):", data)
 
 # Vectorized update
 vec_data = np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
-buffer_view.update(MemoryOperationEnum.SET, 0, 0, True, vec_data, vector_size=4)
+buffer_view.update(operation=MemoryOperationEnum.SET, index=0, linear_offset=0, is_valid_element=True, value=vec_data, vector_size=4)
 print("After vectorized update:", data)
 ```
 
@@ -513,17 +513,17 @@ graph TB
 
 # Demonstrate atomic operations
 data = np.array([100, 200, 300], dtype=np.float32)
-buffer_view = make_buffer_view(data, len(data), AddressSpaceEnum.GLOBAL)
+buffer_view = make_buffer_view(data=data, buffer_size=len(data), address_space=AddressSpaceEnum.GLOBAL)
 
 print("Initial data:", data)
 
 # Atomic add
-old_value = buffer_view.update(MemoryOperationEnum.ATOMIC_ADD, 0, 0, True, 50)
-print(f"atomic_add(0, 50) - old value: {old_value}, new data: {data}")
+buffer_view.update(operation=MemoryOperationEnum.ATOMIC_ADD, index=0, linear_offset=0, is_valid_element=True, value=50)
+print(f"atomic_add(0, 50) - new data: {data}")
 
 # Atomic max
-old_value = buffer_view.update(MemoryOperationEnum.ATOMIC_MAX, 1, 0, True, 250)
-print(f"atomic_max(1, 250) - old value: {old_value}, new data: {data}")
+buffer_view.update(operation=MemoryOperationEnum.ATOMIC_MAX, index=1, linear_offset=0, is_valid_element=True, value=250)
+print(f"atomic_max(1, 250) - new data: {data}")
 
 ```
 
