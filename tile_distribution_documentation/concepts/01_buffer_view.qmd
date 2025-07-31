@@ -1,11 +1,54 @@
 ---
 title: "Buffer Views - Raw Memory Access"
-format: live-html
+format: 
+  live-html:
+    mermaid:
+      theme: default
 ---
 
 ## Overview
 
 BufferView provides structured access to raw memory regions for GPU kernels. It handles different memory address spaces (global, shared, register) with support for vectorized operations.
+
+### BufferView Architecture
+
+```{=html}
+<div class="mermaid">
+graph TB
+    subgraph "GPU Memory Hierarchy"
+        VGPR["Vector General Purpose Registers<br/>256 KB | 1 cycle | ~100 TB/s"]
+        LDS["Local Data Share<br/>64 KB | ~20 cycles | ~15 TB/s"]
+        L1["L1 Cache<br/>16 KB | ~80 cycles | ~5 TB/s"]
+        L2["L2 Cache<br/>4 MB | ~200 cycles | ~2 TB/s"]
+        GM["Global Memory<br/>16+ GB | ~400 cycles | ~1 TB/s"]
+    end
+    
+    subgraph "BufferView Operations"
+        Read["Read Operations<br/>get(offset)<br/>get&lt;T,N&gt;(offset)"]
+        Write["Write Operations<br/>update(offset, value)<br/>update&lt;T,N&gt;(offset, vec)"]
+        Atomic["Atomic Operations<br/>atomic_add(offset, value)<br/>atomic_max(offset, value)"]
+    end
+    
+    VGPR --> Read
+    LDS --> Read
+    L1 --> Read
+    L2 --> Read
+    GM --> Read
+    
+    Read --> Write
+    Write --> Atomic
+    
+    style VGPR fill:#10b981,stroke:#047857,stroke-width:2px
+    style LDS fill:#f59e0b,stroke:#d97706,stroke-width:2px
+    style L1 fill:#3b82f6,stroke:#1d4ed8,stroke-width:2px
+    style L2 fill:#8b5cf6,stroke:#6d28d9,stroke-width:2px
+    style GM fill:#ef4444,stroke:#b91c1c,stroke-width:2px
+    
+    style Read fill:#dbeafe,stroke:#3b82f6,stroke-width:2px
+    style Write fill:#d1fae5,stroke:#10b981,stroke-width:2px
+    style Atomic fill:#fed7aa,stroke:#f59e0b,stroke-width:2px
+</div>
+```
 
 - Handles out-of-bounds access safely with configurable invalid values
 - Supports both scalar and vector data types
@@ -48,6 +91,45 @@ print(f"Address space: {buffer_view.address_space.name}")
 print(f"Data: {data}")
 ```
 
+### C++ Implementation Reference
+
+**File**: `include/ck_tile/core/tensor/buffer_view.hpp`
+
+```cpp
+#include <ck_tile/core/tensor/buffer_view.hpp>
+#include <ck_tile/core/numeric/integral_constant.hpp>
+
+// Create buffer view in C++
+__device__ void example_buffer_creation()
+{
+    // Static array in global memory
+    float data[8] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f};
+    constexpr index_t buffer_size = 8;
+
+    // Create buffer view for global memory
+    // Template parameters: <AddressSpace>
+    auto buffer_view = make_buffer_view<address_space_enum::global>(
+        data,        // pointer to data
+        buffer_size  // number of elements
+    );
+
+    // Alternative: Create with explicit type
+    using buffer_t = buffer_view<float*, address_space_enum::global>;
+    buffer_t explicit_buffer{data, number<buffer_size>{}};
+
+    // Access properties at compile time
+    constexpr auto size = buffer_view.get_buffer_size();
+    constexpr auto space = buffer_view.get_address_space();
+
+    // The buffer_view type encodes:
+    // - Data type (float)
+    // - Address space (global memory)
+    // - Size (known at compile time for optimization)
+    static_assert(size == 8, "Buffer size should be 8");
+    static_assert(space == address_space_enum::global, "Should be global memory");
+}
+```
+
 ### Zero Value Mode
 ```cpp
 // Basic buffer view creation with automatic zero for invalid elements
@@ -84,168 +166,347 @@ void custom_invalid_value_example() {
 
 print("🔍 Scalar Get Operations")
 
-# Basic get: get(index, linear_offset, is_valid_element)
-value = buffer_view.get(0, 2, True)  # Gets element at position 0+2=2
-print(f"Element at index 2: {value}")
 
-# Invalid element access
-invalid_value = buffer_view.get(0, 0, False)  # Invalid access returns 0
-print(f"Invalid element: {invalid_value}")
+### Python vs C++ Key Differences
 
-# Out of bounds access
-oob_value = buffer_view.get(0, 100, True)  # Beyond buffer size
-print(f"Out of bounds: {oob_value}")
+#### 1. **Compile-Time vs Runtime**
+- **C++**: BufferView uses template metaprogramming with compile-time constants
+  - Size is encoded in the type: `number<8>{}`
+  - Address space is a template parameter
+  - Enables aggressive compiler optimizations
+- **Python**: Everything is runtime
+  - Size is a regular integer
+  - Address space is an enum value
+  - Designed for learning and experimentation
+
+#### 2. **Memory Management**
+- **C++**: Direct pointer to GPU memory
+  - No memory allocation - uses existing memory
+  - Pointer arithmetic for addressing
+  - Zero-copy access to device memory
+- **Python**: NumPy array simulation
+  - Uses host memory to simulate GPU memory
+  - Python manages memory lifetime
+  - Educational approximation of GPU behavior
+
+#### 3. **Type System**
+- **C++**: Strong compile-time typing
+  ```cpp
+  buffer_view<float*, address_space_enum::global>  // Type encodes everything
+  ```
+- **Python**: Dynamic typing with runtime checks
+  ```python
+  BufferView  # Generic class, properties stored as members
+  ```
+
+## Get Operations
+
+### Understanding BufferView Indexing
+
+```{=html}
+<div class="mermaid">
+flowchart LR
+    subgraph "Input Parameters"
+        Offset["Offset<br/>(e.g., 5)"]
+        ValidFlag["Valid Flag<br/>(optional)"]
+    end
+    
+    subgraph "Processing"
+        BoundsCheck{{"Bounds Check<br/>offset < buffer_size?"}}
+        FlagCheck{{"Flag Check<br/>valid_flag == True?"}}
+        Access["Access Memory<br/>buffer[offset]"]
+    end
+    
+    subgraph "Output"
+        ValidResult["Valid Result<br/>Return value"]
+        Invalid["Invalid Result<br/>Return 0 or default"]
+    end
+    
+    Offset --> BoundsCheck
+    ValidFlag --> FlagCheck
+    
+    BoundsCheck -->|Yes| FlagCheck
+    BoundsCheck -->|No| Invalid
+    
+    FlagCheck -->|Yes| Access
+    FlagCheck -->|No| Invalid
+    
+    Access --> ValidResult
+    
+    style Offset fill:#e0e7ff,stroke:#4338ca,stroke-width:2px
+    style ValidFlag fill:#e0e7ff,stroke:#4338ca,stroke-width:2px
+    style ValidResult fill:#d1fae5,stroke:#10b981,stroke-width:2px
+    style Invalid fill:#fee2e2,stroke:#ef4444,stroke-width:2px
+</div>
 ```
-
-### Vector Access
 
 ```{pyodide}
 #| echo: true
 #| output: true
 
-print("🔍 Vector Get Operations")
+# Basic get operation
+value = buffer_view.get(2)
+print(f"Value at index 2: {value}")
 
-# Vector get: specify vector_size > 1
-vector = buffer_view.get(0, 1, True, vector_size=3)  # Gets 3 elements starting at index 1
-print(f"Vector read (3 elements from index 1): {vector}")
+# Get with bounds checking
+try:
+    value = buffer_view.get(10)  # Out of bounds
+except IndexError as e:
+    print(f"Error: {e}")
 
-# Vector read at boundary
-boundary_vector = buffer_view.get(0, 6, True, vector_size=4)  # Partially out of bounds
-print(f"Boundary vector read: {boundary_vector}")
+# Get with valid flag
+value_with_flag = buffer_view.get(3, valid_flag=True)
+print(f"Value at index 3 (with flag): {value_with_flag}")
+
+# Invalid flag returns default
+value_invalid = buffer_view.get(3, valid_flag=False)
+print(f"Value with invalid flag: {value_invalid}")
 ```
 
-## Set Operations
+### C++ Get Operations
 
-### Scalar Writes
+```cpp
+__device__ void example_get_operations()
+{
+    // Create buffer view
+    float data[8] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f};
+    auto buffer = make_buffer_view<address_space_enum::global>(data, 8);
+
+    // Simple get - compile-time bounds checking when possible
+    float value1 = buffer.get(number<2>{});  // Compile-time index
+    float value2 = buffer.get(threadIdx.x);   // Runtime index
+
+    // Get with valid flag - branchless conditional access
+    bool valid_flag = (threadIdx.x < 4);
+    float value3 = buffer.get(threadIdx.x, valid_flag);
+    // Returns data[threadIdx.x] if valid_flag && in_bounds, else 0
+
+    // Get with coordinate (multi-dimensional access)
+    auto coord = make_tuple(number<1>{}, threadIdx.x);
+    float value4 = buffer.get(coord);  // Flattened multi-D access
+
+    // Template-based get for vectorization
+    auto vec4 = buffer.template get<float4>(number<0>{});
+    // Loads 4 floats in a single instruction
+}
+```
+
+## Vectorized Operations
+
+### Scalar vs Vectorized Memory Access
+
+```{=html}
+<div class="mermaid">
+graph LR
+    subgraph "Scalar Access (4 instructions)"
+        S1["Load float[0]"] --> R1["Register 1"]
+        S2["Load float[1]"] --> R2["Register 2"]
+        S3["Load float[2]"] --> R3["Register 3"]
+        S4["Load float[3]"] --> R4["Register 4"]
+    end
+    
+    subgraph "Vectorized Access (1 instruction)"
+        V1["Load float4[0]"] --> VR["Vector Register<br/>(4 floats)"]
+    end
+    
+    subgraph "Performance Impact"
+        Perf["4x fewer instructions<br/>Better memory bandwidth<br/>Reduced latency"]
+    end
+    
+    R1 & R2 & R3 & R4 --> Perf
+    VR --> Perf
+    
+    style S1 fill:#fee2e2,stroke:#ef4444,stroke-width:2px
+    style S2 fill:#fee2e2,stroke:#ef4444,stroke-width:2px
+    style S3 fill:#fee2e2,stroke:#ef4444,stroke-width:2px
+    style S4 fill:#fee2e2,stroke:#ef4444,stroke-width:2px
+    style V1 fill:#d1fae5,stroke:#10b981,stroke-width:2px
+    style Perf fill:#fef3c7,stroke:#f59e0b,stroke-width:2px
+</div>
+```
 
 ```{pyodide}
 #| echo: true
 #| output: true
 
-print("✏️ Scalar Set Operations")
+import numpy as np
 
-# Create a copy for modification
-data_copy = data.copy()
-write_buffer = make_buffer_view(data_copy, len(data_copy))
+# Scalar vs Vectorized Operations
+data = np.arange(16, dtype=np.float32)
+buffer_view = make_buffer_view(data, len(data), AddressSpaceEnum.GLOBAL)
 
-print(f"Original: {data_copy}")
+# Scalar access (4 separate operations)
+print("Scalar access:")
+for i in range(4):
+    value = buffer_view.get(i)
+    print(f"  Load {i}: {value}")
 
-# Basic set: set(index, linear_offset, is_valid_element, value)
-write_buffer.set(0, 2, True, 99.0)  # Set element at position 2
-print(f"After setting index 2 to 99: {data_copy}")
+# Vectorized access (single operation)
+print("\nVectorized access:")
+vec4 = buffer_view.get_vectorized(0, 4)  # Get 4 elements at once
+print(f"  Load float4: {vec4}")
 
-# Invalid write (ignored)
-write_buffer.set(0, 3, False, 777.0)  # Invalid write - ignored
-print(f"After invalid write: {data_copy}")
-```
-
-### Vector Writes
-
-```{pyodide}
-#| echo: true
-#| output: true
-
-print("✏️ Vector Set Operations")
-
-# Reset data
-data_copy = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype=np.float32)
-write_buffer = make_buffer_view(data_copy, len(data_copy))
-
-print(f"Original: {data_copy}")
-
-# Vector set: set with vector_size > 1
-new_values = np.array([10, 20, 30], dtype=np.float32)
-write_buffer.set(0, 1, True, new_values, vector_size=3)
-print(f"After vector write: {data_copy}")
+# Performance comparison
+print("\nPerformance Impact:")
+print("  Scalar: 4 memory transactions")
+print("  Vectorized: 1 memory transaction")
+print("  Speedup: ~4x for memory-bound operations")
 ```
 
 ## Update Operations
 
-### Memory Operation Types
+```{pyodide}
+#| echo: true
+#| output: true
+
+# Create a writable buffer
+data = np.array([10, 20, 30, 40, 50], dtype=np.float32)
+buffer_view = make_buffer_view(data, len(data), AddressSpaceEnum.GLOBAL)
+
+print("Original data:", data)
+
+# Basic update
+buffer_view.update(2, 99.0)
+print("After update(2, 99.0):", data)
+
+# Update with valid flag
+buffer_view.update(3, 88.0, valid_flag=True)
+print("After update(3, 88.0, valid_flag=True):", data)
+
+# Invalid flag - no update
+buffer_view.update(4, 77.0, valid_flag=False)
+print("After update(4, 77.0, valid_flag=False):", data)
+
+# Vectorized update
+vec_data = np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
+buffer_view.update_vectorized(0, vec_data)
+print("After vectorized update:", data)
+```
+
+## Atomic Operations
+
+### Atomic vs Non-Atomic Operations
+
+```{=html}
+<div class="mermaid">
+graph TB
+    subgraph "Non-Atomic Operation (Race Condition)"
+        NA1["Thread 1: Read value (10)"] --> NA2["Thread 1: Add 5 (15)"]
+        NA3["Thread 2: Read value (10)"] --> NA4["Thread 2: Add 3 (13)"]
+        NA2 --> NA5["Thread 1: Write 15"]
+        NA4 --> NA6["Thread 2: Write 13"]
+        NA5 & NA6 --> NA7["Final value: 13 ❌<br/>(Lost update from Thread 1)"]
+    end
+    
+    subgraph "Atomic Operation (Thread-Safe)"
+        A1["Thread 1: atomic_add(5)"] --> A2["Hardware ensures<br/>serialization"]
+        A3["Thread 2: atomic_add(3)"] --> A2
+        A2 --> A4["Final value: 18 ✓<br/>(Both updates applied)"]
+    end
+    
+    style NA7 fill:#fee2e2,stroke:#ef4444,stroke-width:2px
+    style A4 fill:#d1fae5,stroke:#10b981,stroke-width:2px
+</div>
+```
 
 ```{pyodide}
 #| echo: true
 #| output: true
 
-print("🔄 Update Operations")
+# Demonstrate atomic operations
+data = np.array([100, 200, 300], dtype=np.float32)
+buffer_view = make_buffer_view(data, len(data), AddressSpaceEnum.GLOBAL)
 
-# Reset data
-data_copy = np.array([1, 2, 3, 4, 5], dtype=np.float32)
-update_buffer = make_buffer_view(data_copy, len(data_copy))
+print("Initial data:", data)
 
-print(f"Original: {data_copy}")
+# Atomic add
+old_value = buffer_view.atomic_add(0, 50)
+print(f"atomic_add(0, 50) - old value: {old_value}, new data: {data}")
 
-# ADD operation
-update_buffer.update(MemoryOperationEnum.ADD, 0, 0, True, 10.0)
-print(f"After ADD 10 to index 0: {data_copy}")
+# Atomic max
+old_value = buffer_view.atomic_max(1, 250)
+print(f"atomic_max(1, 250) - old value: {old_value}, new data: {data}")
 
-# ATOMIC_MAX operation  
-update_buffer.update(MemoryOperationEnum.ATOMIC_MAX, 0, 1, True, 15.0)
-print(f"After ATOMIC_MAX with 15 at index 1: {data_copy}")
-
-# SET operation (same as set method)
-update_buffer.update(MemoryOperationEnum.SET, 0, 2, True, 100.0)
-print(f"After SET 100 at index 2: {data_copy}")
+# Atomic operations with valid flag
+old_value = buffer_view.atomic_add(2, 100, valid_flag=True)
+print(f"atomic_add(2, 100, valid_flag=True) - old value: {old_value}, new data: {data}")
 ```
 
-### Vector Updates
+### C++ Atomic Operations
 
-```{pyodide}
-#| echo: true
-#| output: true
+```cpp
+__device__ void example_atomic_operations()
+{
+    // Shared memory for workgroup-level reductions
+    __shared__ float shared_sum[256];
+    auto shared_buffer = make_buffer_view<address_space_enum::lds>(
+        shared_sum, 256
+    );
 
-print("🔄 Vector Update Operations")
+    // Initialize shared memory
+    if (threadIdx.x < 256) {
+        shared_buffer.update(threadIdx.x, 0.0f);
+    }
+    __syncthreads();
 
-# Reset data
-data_copy = np.array([1, 2, 3, 4, 5, 6], dtype=np.float32)
-update_buffer = make_buffer_view(data_copy, len(data_copy))
-
-print(f"Original: {data_copy}")
-
-# Vector ADD
-add_values = np.array([10, 20, 30], dtype=np.float32)
-update_buffer.update(MemoryOperationEnum.ADD, 0, 1, True, add_values, vector_size=3)
-print(f"After vector ADD: {data_copy}")
-
-# Vector ATOMIC_MAX
-max_values = np.array([15, 25, 5], dtype=np.float32) 
-update_buffer.update(MemoryOperationEnum.ATOMIC_MAX, 0, 1, True, max_values, vector_size=3)
-print(f"After vector ATOMIC_MAX: {data_copy}")
+    // Each thread atomically adds to shared memory
+    float my_value = float(threadIdx.x);
+    float old = shared_buffer.atomic_add(0, my_value);
+    
+    // Atomic max for finding maximum value
+    shared_buffer.atomic_max(1, my_value);
+    
+    __syncthreads();
+    
+    // Thread 0 reads the results
+    if (threadIdx.x == 0) {
+        float sum = shared_buffer.get(0);
+        float max = shared_buffer.get(1);
+        // sum contains sum of all thread indices
+        // max contains the maximum thread index
+    }
+}
 ```
 
-## Address Spaces
+## Address Space Usage Patterns
 
-Different memory types have different performance characteristics:
-
-```{pyodide}
-#| echo: true
-#| output: true
-
-print("🏠 Address Space Examples")
-
-data = np.array([1, 2, 3, 4], dtype=np.float32)
-
-# Different address spaces
-spaces = [
-    (AddressSpaceEnum.GLOBAL, "Main GPU memory"),
-    (AddressSpaceEnum.LDS, "Local Data Share (fast)"),
-    (AddressSpaceEnum.VGPR, "Vector registers (fastest)"),
-    (AddressSpaceEnum.GENERIC, "Generic addressing")
-]
-
-for space, description in spaces:
-    buffer_view = make_buffer_view(data, len(data), space)
-    print(f"  {space.name}: {description}")
+```{=html}
+<div class="mermaid">
+flowchart TB
+    subgraph "Compute Flow"
+        GM1["Global Memory<br/>Input Data"] --> LDS["LDS<br/>Tile Cache"]
+        LDS --> VGPR["VGPR<br/>Working Set"]
+        VGPR --> Compute["Compute<br/>Operations"]
+        Compute --> VGPR
+        VGPR --> LDS2["LDS<br/>Reduction"]
+        LDS2 --> GM2["Global Memory<br/>Output Data"]
+    end
+    
+    subgraph "Usage Pattern"
+        P1["1. Load tile from Global → LDS"]
+        P2["2. Load working set LDS → VGPR"]
+        P3["3. Compute in VGPR"]
+        P4["4. Store results VGPR → LDS"]
+        P5["5. Reduce in LDS"]
+        P6["6. Write final LDS → Global"]
+    end
+    
+    P1 --> P2 --> P3 --> P4 --> P5 --> P6
+    
+    style GM1 fill:#fee2e2,stroke:#ef4444,stroke-width:2px
+    style LDS fill:#fed7aa,stroke:#f59e0b,stroke-width:2px
+    style VGPR fill:#d1fae5,stroke:#10b981,stroke-width:2px
+    style Compute fill:#e0e7ff,stroke:#4338ca,stroke-width:2px
+</div>
 ```
 
-## Key Features
+## Summary
 
-- **Vectorized Operations**: Read/write multiple elements with `vector_size` parameter
-- **Validity Checking**: `is_valid_element` controls whether operations execute
-- **Bounds Checking**: Automatic handling of out-of-bounds access
-- **Multiple Operations**: SET, ADD, ATOMIC_ADD, ATOMIC_MAX support
-- **Address Space Aware**: Optimized for different GPU memory types
+BufferView provides:
+- **Unified Interface**: Same API for all memory spaces
+- **Type Safety**: Address space encoded in type (C++)
+- **Performance**: Vectorized operations and optimal access patterns
+- **Flexibility**: Support for runtime bounds checking and conditional access
+- **Atomic Operations**: Thread-safe updates for parallel algorithms
 
-## What's Next
-
-BufferView provides the foundation for raw memory access. Next, learn about [TensorView](01_tensor_view.qmd) which adds multi-dimensional structure and coordinate systems on top of BufferView. 
+The abstraction hides the complexity of different memory spaces while exposing the operations needed for high-performance GPU computing.

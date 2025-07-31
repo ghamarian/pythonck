@@ -1,6 +1,9 @@
 ---
 title: "Basic Coordinates"
-format: live-html
+format:
+  live-html:
+    mermaid:
+      theme: default
 engine: jupyter
 pyodide:
   packages:
@@ -17,6 +20,52 @@ MultiIndex represents a position in N-dimensional space - think of it as GPS coo
 - **Fundamental**: Used by all transforms, adaptors, and descriptors
 - **Flexible**: Supports copying, comparison, and modification
 
+### MultiIndex Architecture
+
+```{=html}
+<div class="mermaid">
+graph TB
+    subgraph "MultiIndex Structure"
+        MI["MultiIndex<br/>Container for N integers"]
+        D0["Dimension 0<br/>X coordinate"]
+        D1["Dimension 1<br/>Y coordinate"]
+        D2["Dimension 2<br/>Z coordinate"]
+        DN["Dimension N-1<br/>..."]
+    end
+
+    subgraph "Usage Context"
+        T["Transforms<br/>Input/Output"]
+        A["Adaptors<br/>Position Tracking"]
+        TV["Tensors<br/>Element Access"]
+    end
+
+    subgraph "Operations"
+        Create["Create: MultiIndex(size, values)"]
+        Access["Access: coord[i]"]
+        Modify["Modify: coord[i] = value"]
+        Convert["Convert: to_list()"]
+    end
+
+    MI --> D0
+    MI --> D1
+    MI --> D2
+    MI --> DN
+
+    T --> MI
+    A --> MI
+    TV --> MI
+
+    style MI fill:#f3e5f5,stroke:#7b1fa2,stroke-width:3px
+    style D0 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style D1 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style D2 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style DN fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style T fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style A fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style TV fill:#ffebee,stroke:#d32f2f,stroke-width:2px
+</div>
+```
+
 ```{pyodide}
 #| echo: false
 #| output: false
@@ -25,86 +74,287 @@ MultiIndex represents a position in N-dimensional space - think of it as GPS coo
 # Auto-install pythonck package
 import micropip
 await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl")
-from pytensor.tensor_coordinate import MultiIndex
-import numpy as np
+
 ```
 
-
-## MultiIndex: Basic Multi-Dimensional Coordinates
-
-MultiIndex is the simplest form of tensor coordinate - it represents a position in N-dimensional space:
+## Creating and Using MultiIndex
 
 ```{pyodide}
-print("1️⃣ MultiIndex Basics")
-print("-" * 30)
+#| echo: true
+#| output: true
 
-# Create basic 2D coordinate
-coord_2d = MultiIndex(2, [1, 2])
-print(f"2D coordinate: {coord_2d}")
-print(f"  Size: {coord_2d.size}")
-print(f"  Values: {coord_2d.to_list()}")
-print(f"  Access by index: coord[0]={coord_2d[0]}, coord[1]={coord_2d[1]}")
+from pytensor.tensor import MultiIndex
 
-# Create 3D coordinate
-coord_3d = MultiIndex(3, [0, 1, 2])
-print(f"\n3D coordinate: {coord_3d}")
-print(f"  Size: {coord_3d.size}")
-print(f"  Values: {coord_3d.to_list()}")
-
-# Coordinates can be modified
-coord_3d[1] = 5
-print(f"  After modification: {coord_3d.to_list()}")
-```
-
-## Why MultiIndex Matters
-
-MultiIndex is a simple but essential compile-time templated container in the C++ codebase. In the Python implementation, it serves as a runtime equivalent.
-
-### What MultiIndex Actually Is
-
-- **Compile-time sized container**: In C++, `MultiIndex<N>` has size known at compile time
-- **Simple coordinate storage**: Just holds N integers representing positions in N-dimensional space
-- **Transform interface**: Used as input/output for coordinate transformations
-- **Basic operations**: Supports indexing, copying, and comparison
-
-### Where MultiIndex is Actually Used
-
-Based on the C++ codebase analysis:
-
-- **Transform inputs and outputs**: Every transform takes and returns MultiIndex coordinates
-- **Adaptor coordinate tracking**: TensorAdaptor uses MultiIndex to track positions through transform chains
-- **Element access**: Tensor views use MultiIndex to specify which element to access
-
-## Quick Check
-
-Try creating and modifying a MultiIndex yourself:
-
-```{pyodide}
 # Create a 3D coordinate
-my_coord = MultiIndex(3, [1, 2, 3])
-print(f"Original: {my_coord.to_list()}")
+coord = MultiIndex(size=3, initial_values=[1, 2, 3])
+print(f"3D coordinate: {coord}")
+print(f"As list: {coord.to_list()}")
 
-# Modify one element
-my_coord[1] = 99
-print(f"Modified: {my_coord.to_list()}")
+# Create a 2D coordinate for matrix access
+matrix_coord = MultiIndex(size=2, initial_values=[0, 1])
+print(f"\nMatrix coordinate: {matrix_coord}")
 
-# Check size
-print(f"Size: {my_coord.size}")
+# Create uninitialized coordinate (all zeros)
+empty_coord = MultiIndex(size=4)
+print(f"\nEmpty 4D coordinate: {empty_coord}")
 ```
 
-## Key Takeaways
+### Accessing and Modifying Coordinates
 
-🎯 **MultiIndex: Your basic coordinate toolkit**
+```{pyodide}
+#| echo: true
+#| output: true
 
-1. **Simple but essential**: MultiIndex is just a container for N integers, but it's used everywhere in the coordinate system
-2. **Transform interface**: Every coordinate transformation takes MultiIndex input and produces MultiIndex output
-3. **Adaptor foundation**: TensorAdaptor chains coordinate transformations using MultiIndex to track positions
-4. **Element access**: Tensor views use MultiIndex to specify which element to access
+# Create coordinate
+coord = MultiIndex(size=3, initial_values=[10, 20, 30])
+print(f"Original: {coord}")
 
-**Next steps:**
-- Learn individual transforms (merge, unmerge, pad, etc.)
-- Understand how adaptors chain transforms together
-- See how descriptors define complete tensor layouts
-- Master advanced coordinate operations
+# Access individual dimensions
+print(f"\nDimension 0 (X): {coord[0]}")
+print(f"Dimension 1 (Y): {coord[1]}")
+print(f"Dimension 2 (Z): {coord[2]}")
 
-MultiIndex is simple but powerful - master it now, and everything else will make sense! 
+# Modify dimensions
+coord[0] = 15
+coord[1] = 25
+print(f"\nAfter modification: {coord}")
+
+# Iterate through dimensions
+print("\nIterating through dimensions:")
+for i, value in enumerate(coord):
+    print(f"  Dimension {i}: {value}")
+```
+
+## Coordinate Operations
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+# Create coordinates for comparison
+coord1 = MultiIndex(size=3, initial_values=[1, 2, 3])
+coord2 = MultiIndex(size=3, initial_values=[1, 2, 3])
+coord3 = MultiIndex(size=3, initial_values=[4, 5, 6])
+
+# Equality comparison
+print(f"coord1: {coord1}")
+print(f"coord2: {coord2}")
+print(f"coord3: {coord3}")
+print(f"\ncoord1 == coord2: {coord1 == coord2}")
+print(f"coord1 == coord3: {coord1 == coord3}")
+
+# Copy operation
+coord_copy = coord1.copy()
+print(f"\nOriginal: {coord1}")
+print(f"Copy: {coord_copy}")
+print(f"Are they equal? {coord1 == coord_copy}")
+
+# Modify copy to show independence
+coord_copy[0] = 99
+print(f"\nAfter modifying copy:")
+print(f"Original: {coord1}")
+print(f"Copy: {coord_copy}")
+```
+
+### C++ Implementation Reference
+
+**File**: `include/ck_tile/core/container/multi_index.hpp`
+
+```cpp
+#include <ck_tile/core/container/multi_index.hpp>
+
+__device__ void example_multiindex_usage()
+{
+    // Create 3D coordinate with runtime values
+    auto coord = make_multi_index(1, 2, 3);
+
+    // Access dimensions (runtime)
+    auto x = coord[0];  // Returns 1
+    auto y = coord[1];  // Returns 2
+    auto z = coord[2];  // Returns 3
+
+    // For compile-time coordinates, use number<>
+    auto coord_static = make_multi_index(number<1>{}, number<2>{}, number<3>{});
+
+    // Create from tuple
+    auto shape = make_tuple(128, 256, 64);
+    auto coord2 = to_multi_index(shape);
+
+    // Modify coordinate
+    auto new_coord = coord;
+    new_coord.set<0>(number<5>{});  // Set X to 5
+
+    // Use in tensor access
+    auto tensor = make_naive_tensor_view<address_space_enum::global>(
+        data_ptr, shape, strides
+    );
+    // Create tensor coordinate for access
+    auto tensor_coord = make_tensor_coordinate(
+        tensor.get_tensor_descriptor(), coord
+    );
+    float value = tensor.get_vectorized_elements<float>(tensor_coord, 0);
+}
+```
+
+## MultiIndex in Transforms
+
+MultiIndex serves as the common currency between different coordinate spaces:
+
+```{=html}
+<div class="mermaid" style="width: 50%;">
+flowchart LR
+    subgraph "Coordinate Flow"
+        UI["User Input<br/>[1, 2, 3]"] --> MI["MultiIndex<br/>Storage"]
+        MI --> TR["Transform<br/>Processing"]
+        TR --> MO["MultiIndex<br/>Output"]
+        MO --> TA["Tensor Access<br/>element(coord)"]
+    end
+
+    subgraph "Example: 3D Tensor Access"
+        T3D["3D Tensor<br/>shape=[4,5,6]"] --> COORD["MultiIndex(3, [1,2,3])"]
+        COORD --> ELEM["Element at<br/>position [1,2,3]"]
+    end
+
+    style UI fill:#e0e7ff,stroke:#4338ca,stroke-width:2px
+    style MI fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    style MO fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    style COORD fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+</div>
+```
+
+## Working with Different Tensor Ranks
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+# Function to demonstrate MultiIndex for different tensor types
+def show_tensor_access(shape, coord_values):
+    coord = MultiIndex(size=len(shape), initial_values=coord_values)
+
+    # Calculate linear offset (row-major order)
+    offset = 0
+    stride = 1
+    for i in reversed(range(len(shape))):
+        offset += coord[i] * stride
+        stride *= shape[i]
+
+    print(f"Tensor shape: {shape}")
+    print(f"Coordinate: {coord.to_list()}")
+    print(f"Linear offset: {offset}")
+    print()
+
+# 1D Vector
+show_tensor_access([10], [5])
+
+# 2D Matrix
+show_tensor_access([4, 5], [2, 3])
+
+# 3D Tensor
+show_tensor_access([3, 4, 5], [1, 2, 3])
+
+# 4D Tensor (common in deep learning: batch, channel, height, width)
+show_tensor_access([2, 3, 32, 32], [1, 2, 15, 20])
+```
+
+## MultiIndex Patterns
+
+### Pattern 1: Iteration
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+def iterate_2d_tensor(rows, cols):
+    """Demonstrate how to iterate through a 2D tensor using MultiIndex"""
+    print(f"Iterating through {rows}x{cols} tensor:")
+
+    for i in range(rows):
+        for j in range(cols):
+            coord = MultiIndex(size=2, initial_values=[i, j])
+            print(f"  {coord.to_list()}", end=" ")
+        print()  # New line after each row
+
+iterate_2d_tensor(3, 4)
+```
+
+### Pattern 2: Boundary Checking
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+def is_valid_coordinate(coord, shape):
+    """Check if coordinate is within tensor bounds"""
+    if len(coord.to_list()) != len(shape):
+        return False
+
+    for i, (c, s) in enumerate(zip(coord, shape)):
+        if c < 0 or c >= s:
+            return False
+    return True
+
+# Test boundary checking
+shape = [4, 5, 6]
+test_coords = [
+    [1, 2, 3],  # Valid
+    [3, 4, 5],  # Valid
+    [4, 0, 0],  # Invalid: dimension 0 out of bounds
+    [0, 5, 0],  # Invalid: dimension 1 out of bounds
+    [1, 2],     # Invalid: wrong number of dimensions
+]
+
+for coord_values in test_coords:
+    if len(coord_values) == len(shape):
+        coord = MultiIndex(size=len(shape), initial_values=coord_values)
+        valid = is_valid_coordinate(coord, shape)
+        print(f"Coordinate {coord_values} is {'valid' if valid else 'invalid'}")
+    else:
+        print(f"Coordinate {coord_values} is invalid (wrong dimensions)")
+```
+
+### Pattern 3: Transform Chaining
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+# Simulate how transforms modify coordinates
+def apply_offset(coord, offset):
+    """Apply offset transform to coordinate"""
+    result = coord.copy()
+    for i in range(len(coord.to_list())):
+        result[i] = coord[i] + offset[i]
+    return result
+
+def apply_stride(coord, strides):
+    """Apply stride transform to coordinate"""
+    result = coord.copy()
+    for i in range(len(coord.to_list())):
+        result[i] = coord[i] * strides[i]
+    return result
+
+# Example transform chain
+original = MultiIndex(size=3, initial_values=[1, 2, 3])
+print(f"Original coordinate: {original}")
+
+# Apply transforms
+offset = [10, 20, 30]
+after_offset = apply_offset(original, offset)
+print(f"After offset {offset}: {after_offset}")
+
+strides = [4, 1, 1]
+after_stride = apply_stride(after_offset, strides)
+print(f"After stride {strides}: {after_stride}")
+```
+
+
+## Summary
+
+MultiIndex is the foundation of the coordinate system:
+- **Simple abstraction**: Just a container for N integers
+- **Universal usage**: Every transform and adaptor uses MultiIndex
+- **Type-safe in C++**: Compile-time size and bounds checking
+- **Flexible in Python**: Dynamic size for experimentation
+
+Understanding MultiIndex is crucial before moving to transforms and adaptors, as they all operate on these coordinate containers.

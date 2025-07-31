@@ -45,8 +45,8 @@ website:
 format:
   live-html:
     theme:
-      light: litera
-      dark: slate
+      light: [litera, custom-theme.scss]
+      dark: [slate, custom-theme.scss]
     toc: true
     code-tools: true
     execute:
@@ -54,6 +54,16 @@ format:
     link-external-newwindow: true
     code-copy: true
     anchor-sections: true
+    mermaid:
+      theme: default
+    css: 
+      - global-font-override.css
+      - diagram-sizing-fixes.css
+    include-in-header:
+      - mermaid-include.html
+    include-after-body:
+      - text: |
+          <script src="font-cleanup.js"></script>
 
 pyodide:
   packages:

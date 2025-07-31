@@ -84,8 +84,8 @@ try:
     
     # Create static distributed tensor
     distributed_tensor = make_static_distributed_tensor(
-        tile_distribution=tile_distribution,
-        dtype=np.float32
+        data_type=np.float32,
+        tile_distribution=tile_distribution
     )
     
     print("✅ Static distributed tensor created successfully!")
@@ -106,6 +106,42 @@ except Exception as e:
 ## Thread Buffer Organization
 
 Each thread's buffer is organized to efficiently store the elements in its tile.
+
+```{=html}
+<div class="mermaid">
+graph TB
+    subgraph "Static Distributed Tensor Structure"
+        subgraph "Thread 0"
+            T0B["Buffer<br/>[4 elements]<br/>Contiguous"]
+            T0Y["Y-coordinates<br/>[0,0] [0,1]<br/>[1,0] [1,1]"]
+            T0M["Mapping<br/>Y→Buffer<br/>Linearization"]
+        end
+        
+        subgraph "Thread 1"
+            T1B["Buffer<br/>[4 elements]<br/>Contiguous"]
+            T1Y["Y-coordinates<br/>[0,0] [0,1]<br/>[1,0] [1,1]"]
+            T1M["Mapping<br/>Y→Buffer<br/>Linearization"]
+        end
+        
+        subgraph "Thread N"
+            TNB["Buffer<br/>[4 elements]<br/>Contiguous"]
+            TNY["Y-coordinates<br/>[0,0] [0,1]<br/>[1,0] [1,1]"]
+            TNM["Mapping<br/>Y→Buffer<br/>Linearization"]
+        end
+    end
+    
+    T0Y --> T0M
+    T0M --> T0B
+    T1Y --> T1M
+    T1M --> T1B
+    TNY --> TNM
+    TNM --> TNB
+    
+    style T0B fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style T1B fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style TNB fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+</div>
+```
 
 **📊 Buffer Layout Principles:**
 - Contiguous memory for cache efficiency
@@ -161,6 +197,63 @@ Reading values:
 ## Memory Layout Details
 
 Let's examine the internal memory organization in detail.
+
+```{=html}
+<div class="mermaid">
+graph TB
+    subgraph "Memory Layout Example: [3,2] Tile"
+        subgraph "Logical View (Y-coordinates)"
+            L00["Y[0,0]"]
+            L01["Y[0,1]"]
+            L10["Y[1,0]"]
+            L11["Y[1,1]"]
+            L20["Y[2,0]"]
+            L21["Y[2,1]"]
+        end
+        
+        subgraph "Physical Memory (Buffer)"
+            P0["Addr 0<br/>Val: Y[0,0]"]
+            P1["Addr 1<br/>Val: Y[0,1]"]
+            P2["Addr 2<br/>Val: Y[1,0]"]
+            P3["Addr 3<br/>Val: Y[1,1]"]
+            P4["Addr 4<br/>Val: Y[2,0]"]
+            P5["Addr 5<br/>Val: Y[2,1]"]
+        end
+        
+        subgraph "Address Calculation"
+            AC["addr = y0 * 2 + y1<br/>(row-major)"]
+        end
+    end
+    
+    L00 --> P0
+    L01 --> P1
+    L10 --> P2
+    L11 --> P3
+    L20 --> P4
+    L21 --> P5
+    
+    L00 --> AC
+    L10 --> AC
+    L20 --> AC
+    AC --> P0
+    AC --> P2
+    AC --> P4
+    
+    style L00 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style L01 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style L10 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style L11 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style L20 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style L21 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style P0 fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style P1 fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style P2 fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style P3 fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style P4 fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style P5 fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style AC fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+</div>
+```
 
 **🗃️ Example: [3, 2] tile (6 elements)**
 

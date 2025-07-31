@@ -141,20 +141,20 @@ def main():
     """Main function to run all demonstrations."""
     if not check_imports():
         return False
-    
+
     print_section("Script Title")
-    
+
     # Run demonstrations
     result1 = demonstrate_basic_concept()
     result2 = demonstrate_advanced_usage()
-    
+
     # Run tests
     all_tests_passed = test_concept_operations()
-    
+
     print_section("Summary")
     print(f"✅ Demonstrations completed")
     print(f"✅ All tests passed: {all_tests_passed}")
-    
+
     return all_tests_passed
 
 if __name__ == "__main__":
@@ -200,8 +200,8 @@ Explanation with practical applications.
 
 ## Interactive Exploration
 
-- [Link to relevant Streamlit app](../app.py)
-- [Link to specific visualization](../thread_visualization_app.py)
+- [Link to relevant Streamlit app](../../app.py)
+- [Link to specific visualization](../../thread_visualization_app.py)
 
 ## Practical Applications
 
@@ -249,11 +249,11 @@ python -m pytest validation_scripts/  # If we add pytest support
 - **`app.py`**: Tile Distribution Visualizer
   - Link from Part 0 (motivation) and Part 3 (distribution API)
   - Pre-configured examples for each concept
-  
+
 - **`tensor_transform_app.py`**: Transformation Pipeline Explorer
   - Link from Part 2 (transformation engine)
   - Visual demonstration of transform chains
-  
+
 - **`thread_visualization_app.py`**: Thread Access Pattern Analyzer
   - Link from Part 6 (thread mapping)
   - Thread-by-thread access pattern visualization
