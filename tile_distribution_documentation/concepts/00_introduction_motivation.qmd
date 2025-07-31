@@ -7,6 +7,7 @@ title: "Introduction and Motivation - Why Tile Distribution Matters"
 Before diving into any code, let's establish the fundamental problem tile distribution solves and why it's essential for GPU programming. Understanding the "why" will make all the subsequent concepts much clearer.
 
 **Learning Objectives:**
+
 - Understand the GPU memory coalescing challenge
 - See how tile distribution enables efficient thread cooperation
 - Get intuition for coordinate mapping concepts
@@ -15,8 +16,8 @@ Before diving into any code, let's establish the fundamental problem tile distri
 ## The GPU Memory Problem
 
 ```{=html}
-<div class="mermaid">
-graph TB
+<div class="mermaid" style="margin: 0 auto; display: block; width: 60%;">
+    graph TB
     subgraph "Random Access Pattern (Inefficient)"
         subgraph "Threads"
             T0_R["Thread 0"]
@@ -85,7 +86,7 @@ graph TB
 
 ### Why Random Memory Access is Slow
 
-Modern GPUs have incredible computational power, but they're fundamentally limited by memory bandwidth. When thousands of threads try to access memory randomly, several problems occur:
+Modern GPUs have high computational power, but they are fundamentally limited by memory bandwidth. When thousands of threads try to access memory randomly, several problems occur:
 
 1. **Memory Coalescing**: GPU memory controllers work most efficiently when adjacent threads access adjacent memory locations. Random access patterns prevent this optimization.
 
@@ -104,10 +105,34 @@ def naive_matrix_multiply():
     # Each thread randomly accesses matrix elements
     # No coordination between threads
     # Poor memory coalescing
-    pass
+    
+    # Get this thread's output position
+    row = thread_id // MATRIX_WIDTH
+    col = thread_id % MATRIX_WIDTH
+    
+    # Each thread computes one element of C = A * B
+    result = 0.0
+    for k in range(MATRIX_WIDTH):
+        # Random access pattern - threads in a warp access non-contiguous memory
+        # Thread 0: A[0,0], A[0,1], A[0,2]...
+        # Thread 1: A[1,0], A[1,1], A[1,2]...
+        # These are far apart in memory!
+        a_element = global_memory_A[row * MATRIX_WIDTH + k]
+        
+        # Even worse for B - accessing column-wise causes strided access
+        # Thread 0: B[0,0], B[1,0], B[2,0]...
+        # Thread 1: B[0,1], B[1,1], B[2,1]...
+        # Massive stride between accesses!
+        b_element = global_memory_B[k * MATRIX_WIDTH + col]
+        
+        result += a_element * b_element
+    
+    # Write result - adjacent threads write to adjacent locations (at least this is good)
+    global_memory_C[row * MATRIX_WIDTH + col] = result
 ```
 
 Problems with this approach:
+
 - **Unpredictable Memory Access**: Threads access memory randomly
 - **No Cooperation**: Threads don't coordinate their memory accesses
 - **Poor Cache Utilization**: No locality of reference
@@ -220,4 +245,4 @@ Ready to see how it all works? Let's start building from the foundation: **From 
 
 ## Next Steps
 
-Continue to [Buffer Views](01_buffer_view.qmd) to start building your understanding from the ground up. 
+Continue to [Buffer Views](01_buffer_view.qmd) to start building your understanding from the ground up.

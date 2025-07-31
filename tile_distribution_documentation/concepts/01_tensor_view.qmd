@@ -13,7 +13,7 @@ TensorView adds multi-dimensional structure to raw memory. While BufferView prov
 ### TensorView Architecture
 
 ```{=html}
-<div class="mermaid">
+<div class="mermaid"  style="margin: 0 auto; display: block; width: 60%;">
 graph TB
     subgraph "Memory Foundation"
         Memory["Flat Memory Array<br/>0 1 2 3 4 5 6 7 8 9 10 11"]
@@ -117,7 +117,7 @@ __device__ void example_tensor_creation()
 }
 ```
 
-## Tensor Flow: From Coordinates to Memory
+## Flow & Layouts: From Coordinates to Memory
 
 ```{=html}
 <div class="mermaid">
@@ -148,8 +148,6 @@ flowchart LR
     style Value fill:#d1fae5,stroke:#10b981,stroke-width:2px
 </div>
 ```
-
-## Memory Layout Comparison
 
 ```{=html}
 <div class="mermaid">
@@ -382,7 +380,7 @@ __device__ void advanced_tensor_operations()
 ## Performance Considerations
 
 ```{=html}
-<div class="mermaid">
+<div class="mermaid"  style="margin: 0 auto; display: block; width:70%;">
 graph LR
     subgraph "Memory Access Patterns"
         Seq["Sequential Access<br/>(Good cache usage)"]
@@ -411,6 +409,7 @@ graph LR
 ## Summary
 
 TensorView provides:
+
 - **Multi-dimensional indexing**: Natural coordinate-based access
 - **Flexible memory layouts**: Row-major, column-major, custom strides
 - **Zero-copy views**: Transpose, slice, reshape without copying data

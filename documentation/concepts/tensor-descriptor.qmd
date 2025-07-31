@@ -145,8 +145,8 @@ print("✅ EmbedTransform bidirectional mapping demonstrated")
 
 from pytensor.tensor_descriptor import UnmergeTransform
 
-# Create unmerge transform: 1D → 2D (unpack linear index)
-unmerge = UnmergeTransform([2, 3])  # Split into 2x3
+# Create unmerge transform: 2D → 1D (pack multi-dimensional to linear)
+unmerge = UnmergeTransform([2, 3])  # Pack 2x3 into linear
 
 # Forward: 2D coordinate → 1D packed index
 upper_coord = MultiIndex(2, [1, 2])  # Row 1, Column 2  
@@ -169,8 +169,8 @@ print("✅ UnmergeTransform bidirectional mapping demonstrated")
 
 from pytensor.tensor_descriptor import MergeTransform
 
-# Create merge transform: 2D → 1D (collapse dimensions)
-merge = MergeTransform([2, 3])  # Merge 2x3 into single dimension
+# Create merge transform: 1D → 2D (split single dimension)
+merge = MergeTransform([2, 3])  # Split single dimension into 2x3
 
 # Forward: 1D coordinate → 2D split coordinate
 upper_coord = MultiIndex(1, [5])  # Single index 5
@@ -284,4 +284,4 @@ Now that you understand descriptors, you can move to:
 
 ---
 
-*Descriptors are the mathematical foundation that makes everything else possible. Master these transforms!* 
+*Descriptors are the mathematical foundation that makes everything else possible. Master these transforms!*

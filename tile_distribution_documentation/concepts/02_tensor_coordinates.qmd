@@ -83,15 +83,16 @@ await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/mas
 #| echo: true
 #| output: true
 
-from pytensor.tensor import MultiIndex
+import numpy as np
+from pytensor.tensor_coordinate import MultiIndex
 
 # Create a 3D coordinate
-coord = MultiIndex(size=3, initial_values=[1, 2, 3])
+coord = MultiIndex(size=3, values=[1, 2, 3])
 print(f"3D coordinate: {coord}")
 print(f"As list: {coord.to_list()}")
 
 # Create a 2D coordinate for matrix access
-matrix_coord = MultiIndex(size=2, initial_values=[0, 1])
+matrix_coord = MultiIndex(size=2, values=[0, 1])
 print(f"\nMatrix coordinate: {matrix_coord}")
 
 # Create uninitialized coordinate (all zeros)
@@ -106,7 +107,7 @@ print(f"\nEmpty 4D coordinate: {empty_coord}")
 #| output: true
 
 # Create coordinate
-coord = MultiIndex(size=3, initial_values=[10, 20, 30])
+coord = MultiIndex(size=3, values=[10, 20, 30])
 print(f"Original: {coord}")
 
 # Access individual dimensions
@@ -132,9 +133,9 @@ for i, value in enumerate(coord):
 #| output: true
 
 # Create coordinates for comparison
-coord1 = MultiIndex(size=3, initial_values=[1, 2, 3])
-coord2 = MultiIndex(size=3, initial_values=[1, 2, 3])
-coord3 = MultiIndex(size=3, initial_values=[4, 5, 6])
+coord1 = MultiIndex(size=3, values=[1, 2, 3])
+coord2 = MultiIndex(size=3, values=[1, 2, 3])
+coord3 = MultiIndex(size=3, values=[4, 5, 6])
 
 # Equality comparison
 print(f"coord1: {coord1}")
@@ -201,7 +202,7 @@ __device__ void example_multiindex_usage()
 MultiIndex serves as the common currency between different coordinate spaces:
 
 ```{=html}
-<div class="mermaid" style="width: 50%;">
+<div class="mermaid" style="margin: 0 auto; display: block; width: 20%;>
 flowchart LR
     subgraph "Coordinate Flow"
         UI["User Input<br/>[1, 2, 3]"] --> MI["MultiIndex<br/>Storage"]
@@ -230,7 +231,7 @@ flowchart LR
 
 # Function to demonstrate MultiIndex for different tensor types
 def show_tensor_access(shape, coord_values):
-    coord = MultiIndex(size=len(shape), initial_values=coord_values)
+    coord = MultiIndex(size=len(shape), values=coord_values)
 
     # Calculate linear offset (row-major order)
     offset = 0
@@ -271,7 +272,7 @@ def iterate_2d_tensor(rows, cols):
 
     for i in range(rows):
         for j in range(cols):
-            coord = MultiIndex(size=2, initial_values=[i, j])
+            coord = MultiIndex(size=2, values=[i, j])
             print(f"  {coord.to_list()}", end=" ")
         print()  # New line after each row
 
@@ -306,7 +307,7 @@ test_coords = [
 
 for coord_values in test_coords:
     if len(coord_values) == len(shape):
-        coord = MultiIndex(size=len(shape), initial_values=coord_values)
+        coord = MultiIndex(size=len(shape), values=coord_values)
         valid = is_valid_coordinate(coord, shape)
         print(f"Coordinate {coord_values} is {'valid' if valid else 'invalid'}")
     else:
@@ -335,7 +336,7 @@ def apply_stride(coord, strides):
     return result
 
 # Example transform chain
-original = MultiIndex(size=3, initial_values=[1, 2, 3])
+original = MultiIndex(size=3, values=[1, 2, 3])
 print(f"Original coordinate: {original}")
 
 # Apply transforms
@@ -352,6 +353,7 @@ print(f"After stride {strides}: {after_stride}")
 ## Summary
 
 MultiIndex is the foundation of the coordinate system:
+
 - **Simple abstraction**: Just a container for N integers
 - **Universal usage**: Every transform and adaptor uses MultiIndex
 - **Type-safe in C++**: Compile-time size and bounds checking

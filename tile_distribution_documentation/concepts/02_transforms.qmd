@@ -16,7 +16,7 @@ The transformation engine is built from individual transform types that each han
 
 Explore transformation concepts interactively:
 
-**[🔄 Tensor Transform Visualizer](https://ck.silobrain.com/tensor-transform/)** - Explore tensor descriptor transformations with visual graphs and mathematical formulas. See how data layouts change through various transformations.
+**[Tensor Transform Visualizer](https://ck.silobrain.com/tensor-transform/)** - Explore tensor descriptor transformations with visual graphs and mathematical formulas. See how data layouts change through various transformations.
 
 ## What Are Transforms?
 
@@ -37,8 +37,8 @@ graph TB
     
     subgraph "Transform Types"
         EMB["EmbedTransform<br/>Shape + Strides"]
-        UNM["UnmergeTransform<br/>Linear → Multi-D"]
-        MRG["MergeTransform<br/>Multi-D → Linear"]
+        UNM["UnmergeTransform<br/>Multi-D → Linear"]
+        MRG["MergeTransform<br/>Linear → Multi-D"]
         REP["ReplicateTransform<br/>Broadcast"]
         OFF["OffsetTransform<br/>Translation"]
         PAS["PassThroughTransform<br/>Identity"]
@@ -76,7 +76,6 @@ graph TB
 # Auto-install pythonck package
 import micropip
 await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl")
-
 ```
 
 ## 1. EmbedTransform - View into Larger Space
@@ -109,7 +108,7 @@ graph LR
 ```{pyodide}
 #| echo: true
 #| output: true
-
+import numpy
 from pytensor.tensor_descriptor import EmbedTransform
 from pytensor.tensor_coordinate import MultiIndex
 
@@ -124,10 +123,15 @@ print(f"Strides: {transform.strides}")
 print(f"Dimensions: {transform.ndim}")
 
 # Forward transform: logical → physical
-upper_coord = MultiIndex(size=2, initial_values=[1, 2])
-lower_offset = transform.calculate_lower_index(upper_coord)
-print(f"\nForward: {upper_coord.to_list()} → offset {lower_offset}")
-print(f"Calculation: 1×12 + 2×1 = {lower_offset}")
+upper_coord = MultiIndex(size=2, values=[1, 2])
+lower_coord = transform.calculate_lower_index(upper_coord)
+print(f"\nForward: {upper_coord.to_list()} → offset {lower_coord.to_list()[0]}")
+print(f"Calculation: 1×12 + 2×1 = {lower_coord.to_list()[0]}")
+
+# Backward transform: physical → logical
+lower_idx = MultiIndex(size=1, values=[14])
+upper_recovered = transform.calculate_upper_index(lower_idx)
+print(f"\nBackward: offset {lower_idx.to_list()[0]} → {upper_recovered.to_list()}")
 
 # This creates a 2x3 matrix view at position (0,0) in the buffer
 # Useful for: sub-matrix views, sliding windows, padded layouts
@@ -136,32 +140,44 @@ print(f"Calculation: 1×12 + 2×1 = {lower_offset}")
 ### C++ Implementation
 
 ```cpp
-// Create 3x4 view into larger buffer
+// From composable_kernel/include/ck_tile/core/algorithm/coordinate_transform.hpp
+
+// Create embed transform for 2x3 matrix with strides [12, 1]
 auto transform = make_embed_transform(
-    make_tuple(number<3>{}, number<4>{}),  // upper shape
-    make_tuple(number<8>{}, number<8>{}),  // lower shape  
-    make_tuple(number<8>{}, number<1>{})   // strides
+    make_tuple(2, 3),      // upper lengths
+    make_tuple(12, 1)      // strides/coefficients
 );
 
-// Use in tensor operations
-auto upper_coord = make_tuple(number<1>{}, number<2>{});
-auto lower_coord = transform.calculate_lower_index(upper_coord);
-// Result: (1*8 + 2*1) = (10) in 1D
+// Forward transformation: 2D → 1D
+multi_index<2> upper_coord{1, 2};  // Row 1, Column 2
+multi_index<1> lower_coord;
+transform.calculate_lower_index(lower_coord, upper_coord);
+// Result: lower_coord[0] = 1*12 + 2*1 = 14
+
+// The embed transform inherits from base_transform<1, UpLengths::size()>
+// meaning 1 lower dimension → multiple upper dimensions
+
+// Usage in tensor descriptor
+auto desc = make_naive_tensor_descriptor(
+    make_tuple(number<3>{}, number<4>{}),   // shape
+    make_tuple(number<8>{}, number<1>{})    // strides
+);
+// Internally uses EmbedTransform for strided access
 ```
 
-## 2. UnmergeTransform - Linear to Multi-D
+## 2. UnmergeTransform - Multi-D to Linear
 
-Converts linear (1D) coordinates to multi-dimensional coordinates.
+Converts multi-dimensional coordinates to linear (1D) coordinates.
 
 ```{=html}
 <div class="mermaid">
 graph LR
-    subgraph "Upper (1D)"
-        U1["Linear index: 14"]
+    subgraph "Upper (3D)"
+        U1["Shape: [3, 4, 2]<br/>Coord: (1, 3, 0)"]
     end
     
-    subgraph "Lower (3D)"
-        L1["Shape: [3, 4, 2]<br/>Coord: (1, 3, 0)"]
+    subgraph "Lower (1D)"
+        L1["Linear index: 14"]
     end
     
     subgraph "Calculation"
@@ -182,30 +198,84 @@ graph LR
 
 from pytensor.tensor_descriptor import UnmergeTransform
 
-# Convert linear index to 3D coordinates
+# Convert multi-dimensional coordinates to linear index
 transform = UnmergeTransform(lengths=[3, 4, 2])
 
 print(f"Lengths: {transform.lengths}")
 print(f"Strides: {transform.strides}")
 
-# Forward: 1D → 3D
-linear_idx = MultiIndex(size=1, initial_values=[14])
-coord_3d = transform.calculate_lower_index(linear_idx)
-print(f"\nLinear index {linear_idx.to_list()[0]} → 3D coord {coord_3d.to_list()}")
+# Forward: 3D → 1D
+coord_3d = MultiIndex(size=3, values=[1, 3, 0])
+linear_idx = transform.calculate_lower_index(coord_3d)
+print(f"\n3D coord {coord_3d.to_list()} → Linear index {linear_idx.to_list()[0]}")
 
 # Verify the calculation
 idx = coord_3d.to_list()[0] * (4*2) + coord_3d.to_list()[1] * 2 + coord_3d.to_list()[2]
 print(f"Verification: {coord_3d.to_list()[0]}×8 + {coord_3d.to_list()[1]}×2 + {coord_3d.to_list()[2]} = {idx}")
 
-# Backward: 3D → 1D
-coord_3d_input = MultiIndex(size=3, initial_values=[1, 3, 0])
-linear_result = transform.calculate_upper_index(coord_3d_input)
-print(f"\n3D coord {coord_3d_input.to_list()} → Linear index {linear_result}")
+# Backward: 1D → 3D
+linear_input = MultiIndex(size=1, values=[14])
+coord_3d_result = transform.calculate_upper_index(linear_input)
+print(f"\nLinear index {linear_input.to_list()[0]} → 3D coord {coord_3d_result.to_list()}")
 ```
 
-## 3. MergeTransform - Multi-D to Linear
+### C++ Implementation
 
-Inverse of UnmergeTransform - flattens multi-dimensional coordinates.
+```cpp
+// From composable_kernel/include/ck_tile/core/algorithm/coordinate_transform.hpp
+
+// Create unmerge transform for 3x4x2 tensor
+auto transform = make_unmerge_transform(
+    make_tuple(3, 4, 2)  // upper lengths
+);
+
+// The unmerge transform inherits from base_transform<1, UpLengths::size()>
+// meaning 1 lower dimension → multiple upper dimensions
+
+// Forward: Multi-D → Linear
+multi_index<3> upper_coord{1, 3, 0};
+multi_index<1> lower_coord;
+transform.calculate_lower_index(lower_coord, upper_coord);
+// Result: lower_coord[0] = 1*(4*2) + 3*2 + 0 = 14
+
+// Backward: Linear → Multi-D (unpacking)
+multi_index<1> packed_idx{14};
+multi_index<3> unpacked_coord;
+// This would compute: unpacked_coord = [1, 3, 0]
+
+// Use in tensor descriptor
+auto desc = make_naive_tensor_descriptor_packed(
+    make_tuple(number<3>{}, number<4>{}, number<2>{})
+);
+// UnmergeTransform is used internally for packed layouts
+```
+
+## 3. MergeTransform - Linear to Multi-D
+
+Inverse of UnmergeTransform - expands linear coordinates to multi-dimensional.
+
+```{=html}
+<div class="mermaid">
+graph LR
+    subgraph "Upper (1D)"
+        U1["Linear index: 13"]
+    end
+    
+    subgraph "Lower (2D)"
+        L1["Shape: [4, 5]<br/>Coord: (2, 3)"]
+    end
+    
+    subgraph "Calculation"
+        C["13 = 2×5 + 3<br/>row=13÷5=2, col=13%5=3"]
+    end
+    
+    U1 --> C
+    C --> L1
+    
+    style U1 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style L1 fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+</div>
+```
 
 ```{pyodide}
 #| echo: true
@@ -213,19 +283,52 @@ Inverse of UnmergeTransform - flattens multi-dimensional coordinates.
 
 from pytensor.tensor_descriptor import MergeTransform
 
-# Flatten 2D coordinates to linear
+# Expand linear coordinate to 2D
 transform = MergeTransform(lengths=[4, 5])
 
-# Forward: 2D → 1D
-coord_2d = MultiIndex(size=2, initial_values=[2, 3])
-linear = transform.calculate_lower_index(coord_2d)
-print(f"2D coord {coord_2d.to_list()} → Linear index {linear}")
-print(f"Calculation: 2×5 + 3 = {linear}")
+# Forward: 1D → 2D
+linear = MultiIndex(size=1, values=[13])
+coord_2d = transform.calculate_lower_index(linear)
+print(f"Linear index {linear.to_list()[0]} → 2D coord {coord_2d.to_list()}")
+print(f"Calculation: 13 = 2×5 + 3, so coord is [2, 3]")
 
-# Backward: 1D → 2D  
-linear_input = MultiIndex(size=1, initial_values=[13])
-coord_2d_result = transform.calculate_upper_index(linear_input)
-print(f"\nLinear index {linear_input.to_list()[0]} → 2D coord {coord_2d_result.to_list()}")
+# Backward: 2D → 1D  
+coord_2d_input = MultiIndex(size=2, values=[2, 3])
+linear_result = transform.calculate_upper_index(coord_2d_input)
+print(f"\n2D coord {coord_2d_input.to_list()} → Linear index {linear_result.to_list()[0]}")
+```
+
+### C++ Implementation
+
+```cpp
+// From composable_kernel/include/ck_tile/core/algorithm/coordinate_transform.hpp
+
+// Create merge transform for 4x5 tensor
+auto transform = make_merge_transform(
+    make_tuple(4, 5)  // lower lengths
+);
+
+// The merge transform inherits from base_transform<LowLengths::size(), 1>
+// meaning multiple lower dimensions → 1 upper dimension
+
+// Forward: Linear → Multi-D (splitting)
+multi_index<1> upper_coord{13};
+multi_index<2> lower_coord;
+transform.calculate_lower_index(lower_coord, upper_coord);
+// Result: lower_coord[0] = 13 / 5 = 2 (row)
+//         lower_coord[1] = 13 % 5 = 3 (col)
+
+// CK provides two merge implementations:
+// 1. merge_v2_magic_division (default) - uses magic number division
+// 2. merge_v3_division_mod - for power-of-2 dimensions
+
+// Common usage: dimension reduction
+auto desc = transform_tensor_descriptor(
+    input_desc,
+    make_tuple(make_merge_transform(make_tuple(M, N))),
+    make_tuple(sequence<0, 1>{}),  // merge dims 0,1
+    make_tuple(sequence<0>{})      // to single dim 0
+);
 ```
 
 ## 4. ReplicateTransform - Broadcasting
@@ -254,20 +357,52 @@ graph TB
 
 from pytensor.tensor_descriptor import ReplicateTransform
 
-# ReplicateTransform in Python has a simpler API
-# It creates upper dimensions that all map to the same value
-transform = ReplicateTransform(num_upper_dims=2)
+# ReplicateTransform creates broadcast dimensions
+transform = ReplicateTransform(upper_lengths=[3, 4])
 
-# Show conceptual behavior
-print("ReplicateTransform behavior:")
-print("  Creates dimensions that all map to the same value")
-print("  Used for broadcasting operations")
-print("  Example: All threads in a dimension access the same data")
+# Show behavior
+print(f"Upper lengths: {transform.upper_lengths}")
+print(f"Lower dimensions: {transform.get_num_of_lower_dimension()}")
+print(f"Upper dimensions: {transform.get_num_of_upper_dimension()}")
 
-# Conceptual usage pattern
-print("\nConceptual pattern:")
-print("  Upper coords [0,2], [1,2], [2,2] all map to same lower element")
-print("  This enables efficient broadcasting in GPU kernels")
+# All upper coordinates map to empty lower space
+upper_coord = MultiIndex(size=2, values=[1, 2])
+lower_coord = transform.calculate_lower_index(upper_coord)
+print(f"\nUpper {upper_coord.to_list()} → Lower {lower_coord.to_list()} (empty)")
+
+print("\nBroadcasting pattern:")
+print("  All upper coordinates map to the same (empty) lower space")
+print("  Enables efficient data reuse across threads")
+```
+
+### C++ Implementation
+
+```cpp
+// From composable_kernel/include/ck_tile/core/algorithm/coordinate_transform.hpp
+
+// Create replicate transform for broadcasting
+auto transform = make_replicate_transform(
+    make_tuple(3, 4)  // upper lengths
+);
+
+// The replicate transform inherits from base_transform<0, UpLengths::size()>
+// meaning 0 lower dimensions → multiple upper dimensions
+
+// All upper coordinates map to empty lower space
+multi_index<2> coord1{0, 0};
+multi_index<2> coord2{2, 3};
+multi_index<0> lower1, lower2;
+transform.calculate_lower_index(lower1, coord1);
+transform.calculate_lower_index(lower2, coord2);
+// Both lower1 and lower2 are empty (no lower dimensions)
+
+// Common usage: broadcasting in GEMM
+auto broadcast_desc = transform_tensor_descriptor(
+    scalar_desc,  // 0D tensor
+    make_tuple(make_replicate_transform(make_tuple(M, N))),
+    make_tuple(sequence<>{}),     // no lower dims
+    make_tuple(sequence<0, 1>{})  // create 2 upper dims
+);
 ```
 
 ## 5. OffsetTransform - Translation
@@ -279,24 +414,31 @@ Shifts coordinates by a fixed offset - useful for padding and boundaries.
 #| output: true
 
 from pytensor.tensor_descriptor import OffsetTransform
+from pytensor.tensor_coordinate import MultiIndex
 
 # OffsetTransform adds a constant offset
-element_space_size = 64  # Total buffer size
-offset = 16             # Starting offset in buffer
+low_length = 48         # Size of the sub-region
+offset_value = 16       # Starting offset in buffer
 
 transform = OffsetTransform(
-    element_space_size=element_space_size,
-    offset=offset
+    low_length=low_length,
+    offset=offset_value
 )
 
-print(f"Element space size: {transform.element_space_size}")
-print(f"Offset: {transform.offset}")
+print(f"Low length: {low_length}")
+print(f"Offset: {offset_value}")
+
+# Forward transform: add offset
+upper_coord = MultiIndex(size=1, values=[5])
+lower_coord = transform.calculate_lower_index(upper_coord)
+print(f"\nForward: index {upper_coord.to_list()[0]} → index {lower_coord.to_list()[0]}")
+print(f"Calculation: {upper_coord.to_list()[0]} + {offset_value} = {lower_coord.to_list()[0]}")
 
 # Show offset behavior
 print("\nOffset transform behavior:")
-print(f"  Input index 0 → Output index {offset}")
-print(f"  Input index 5 → Output index {offset + 5}")
+print(f"  Maps coordinates to buffer starting at offset {offset_value}")
 print("  Used for accessing sub-regions of buffers")
+print("  Essential for tile-based algorithms")
 ```
 
 ## 6. PassThroughTransform - Identity
@@ -308,18 +450,46 @@ No-op transform that passes coordinates unchanged.
 #| output: true
 
 from pytensor.tensor_descriptor import PassThroughTransform
+from pytensor.tensor_coordinate import MultiIndex
 
 # Identity transform - no change
-element_space_size = 60  # 3*4*5 elements
-transform = PassThroughTransform(element_space_size=element_space_size)
+low_length = 60  # Size of dimension
 
-print(f"Element space size: {transform.element_space_size}")
+transform = PassThroughTransform(low_length=low_length)
+
+print(f"Low length: {low_length}")
+
+# Forward transform: identity
+upper_coord = MultiIndex(size=1, values=[25])
+lower_coord = transform.calculate_lower_index(upper_coord)
+print(f"\nForward: {upper_coord.to_list()} → {lower_coord.to_list()} (unchanged)")
 
 # Show pass-through behavior
 print("\nPassThroughTransform behavior:")
 print("  Input index = Output index (identity)")
 print("  Used when no transformation needed")
 print("  Optimized away at compile time")
+```
+
+### C++ Implementation
+
+```cpp
+// From composable_kernel/include/ck_tile/core/algorithm/coordinate_transform.hpp
+
+// Create pass-through transform
+auto transform = make_pass_through_transform(60);  // low_length
+
+// The pass_through transform inherits from base_transform<1, 1>
+// meaning 1 lower dimension → 1 upper dimension (identity)
+
+// Forward transformation: no change
+multi_index<1> upper_coord{25};
+multi_index<1> lower_coord;
+transform.calculate_lower_index(lower_coord, upper_coord);
+// Result: lower_coord[0] = upper_coord[0] = 25
+
+// Often optimized away at compile time
+// Used as placeholder in transform chains
 ```
 
 ## 7. PadTransform - Smart Boundaries
@@ -331,22 +501,32 @@ Handles out-of-bounds access with padding values.
 #| output: true
 
 from pytensor.tensor_descriptor import PadTransform
+from pytensor.tensor_coordinate import MultiIndex
 
 # PadTransform handles boundary conditions
-lower_length = 3        # Original dimension length
-left_pad = 1           # Padding on left
-right_pad = 1          # Padding on right
+low_length = 3        # Original dimension length
+left_pad = 1          # Padding on left
+right_pad = 1         # Padding on right
 
 transform = PadTransform(
-    lower_length=lower_length,
+    low_length=low_length,
     left_pad=left_pad,
     right_pad=right_pad
 )
 
-print(f"Lower length: {transform.lower_length}")
-print(f"Left pad: {transform.left_pad}")
-print(f"Right pad: {transform.right_pad}")
-print(f"Upper length: {transform.get_upper_length()}")
+print(f"Low length: {low_length}")
+print(f"Left pad: {left_pad}")
+print(f"Right pad: {right_pad}")
+print(f"Upper length: {low_length + left_pad + right_pad} (total with padding)")
+
+# Test various coordinates
+test_coords = [0, 1, 2, 3, 4]  # 0 is left pad, 1-3 are valid, 4 is right pad
+for idx in test_coords:
+    upper = MultiIndex(size=1, values=[idx])
+    lower = transform.calculate_lower_index(upper)
+    adjusted_idx = lower.to_list()[0]
+    is_valid = 0 <= adjusted_idx < low_length
+    print(f"Upper {idx} → Lower {adjusted_idx} ({'valid' if is_valid else 'padding'})")
 
 # Show padding behavior
 print("\nPadTransform behavior:")
@@ -362,19 +542,24 @@ Transforms can be chained to create complex coordinate mappings:
 ```{=html}
 <div class="mermaid">
 graph LR
-    subgraph "Transform Chain"
-        I["Input<br/>(1, 2)"]
-        T1["Offset<br/>+[10, 20]"]
-        T2["Embed<br/>Stride [4, 1]"]
-        O["Output<br/>(44, 22)"]
+    subgraph "Transform Chain Example"
+        I["Input Coord<br/>(1, 2)"]
+        T1["Embed<br/>Strides [10, 1]"]
+        T2["Offset<br/>+20"]
+        O["Output Index<br/>32"]
     end
     
     I --> T1
-    T1 -->|"(11, 22)"| T2
+    T1 -->|"12"| T2
     T2 --> O
+    
+    subgraph "Calculation"
+        C["1×10 + 2×1 = 12<br/>12 + 20 = 32"]
+    end
     
     style I fill:#e0e7ff,stroke:#4338ca,stroke-width:2px
     style O fill:#d1fae5,stroke:#10b981,stroke-width:2px
+    style C fill:#f3f4f6,stroke:#6b7280,stroke-width:1px
 </div>
 ```
 
@@ -461,6 +646,87 @@ auto padded_desc = transform_tensor_descriptor(
 // The resulting descriptor incorporates all transformations
 ```
 
+### C++ Implementation
+
+```cpp
+// From composable_kernel/include/ck_tile/core/algorithm/coordinate_transform.hpp
+
+// Create pad transform with left and right padding
+auto transform = make_pad_transform(
+    3,   // low_length (original dimension)
+    1,   // left_pad
+    1    // right_pad
+);
+
+// The pad transform inherits from base_transform<1, 1>
+// Total upper length = low_length + left_pad + right_pad = 5
+
+// Forward transformation: adjust for padding
+multi_index<1> upper_coord{1};  // First valid element (after left pad)
+multi_index<1> lower_coord;
+transform.calculate_lower_index(lower_coord, upper_coord);
+// Result: lower_coord[0] = upper_coord[0] - left_pad = 1 - 1 = 0
+
+// Check if coordinate is in valid region
+bool is_valid = transform.is_valid_upper_index_mapped_to_valid_lower_index(upper_coord);
+
+// Variants available:
+auto left_pad_only = make_left_pad_transform(3, 1);   // Only left padding
+auto right_pad_only = make_right_pad_transform(3, 1); // Only right padding
+```
+
+## Additional Transforms in Composable Kernel
+
+### 8. XorTransform - 2D XOR Mapping
+
+```cpp
+// From composable_kernel - special 2D coordinate transform
+auto transform = make_xor_transform(make_tuple(4, 8));  // 4x8 dimensions
+
+// The xor_t transform inherits from base_transform<2, 2>
+// Special mapping: lower[1] = upper[1] ^ (upper[0] % lengths[1])
+
+multi_index<2> upper_coord{2, 5};
+multi_index<2> lower_coord;
+transform.calculate_lower_index(lower_coord, upper_coord);
+// Result: lower[0] = 2, lower[1] = 5 ^ (2 % 8) = 5 ^ 2 = 7
+
+// Used for specialized memory access patterns in some algorithms
+```
+
+### 9. SliceTransform - Extract Sub-region
+
+```cpp
+// From composable_kernel - extract a slice from a dimension
+auto transform = make_slice_transform(
+    10,    // low_length (total dimension)
+    2,     // slice_begin
+    7      // slice_end
+);
+
+// Maps upper range [0, 5) to lower range [2, 7)
+multi_index<1> upper_coord{3};
+multi_index<1> lower_coord;
+transform.calculate_lower_index(lower_coord, upper_coord);
+// Result: lower_coord[0] = 3 + 2 = 5
+```
+
+### 10. ModuloTransform - Cyclic Wrapping
+
+```cpp
+// From composable_kernel - modulo operation for cyclic access
+auto transform = make_modulo_transform(
+    4,     // modulus
+    16     // up_length
+);
+
+// Maps coordinates cyclically
+multi_index<1> upper_coord{13};
+multi_index<1> lower_coord;
+transform.calculate_lower_index(lower_coord, upper_coord);
+// Result: lower_coord[0] = 13 % 4 = 1
+```
+
 ## Summary
 
 Individual transforms provide:
@@ -474,3 +740,9 @@ Understanding these building blocks enables you to:
 2. Implement efficient data access patterns
 3. Handle padding and boundaries correctly
 4. Optimize memory layouts for GPU access
+
+The C++ implementations in Composable Kernel provide:
+- Zero-overhead abstractions through templates
+- Compile-time composition and optimization
+- Support for complex coordinate transformations
+- Integration with GPU kernel generation
