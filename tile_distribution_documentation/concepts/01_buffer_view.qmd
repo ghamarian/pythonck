@@ -50,6 +50,11 @@ graph TB
 </div>
 ```
 
+- Handles out-of-bounds access safely with configurable invalid values
+- Supports both scalar and vector data types
+- Implements AMD GPU-specific optimizations (buffer addressing, atomic operations)
+- Manages memory coherence and caching policies
+
 ```{pyodide}
 #| echo: false
 #| output: false
@@ -61,6 +66,12 @@ await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/mas
 ```
 
 ## Basic Creation
+
+Out-of-Bounds Handling:
+
+- Zero Value Mode: Returns numerical zero for invalid accesses
+- Custom Value Mode: Returns user-specified invalid value
+
 
 ```{pyodide}
 #| echo: true
@@ -118,6 +129,43 @@ __device__ void example_buffer_creation()
     static_assert(space == address_space_enum::global, "Should be global memory");
 }
 ```
+
+### Zero Value Mode
+```cpp
+// Basic buffer view creation with automatic zero for invalid elements
+void basic_creation_example() {
+    // Create data array
+    constexpr size_t buffer_size = 8;
+    float data[buffer_size] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f};
+    
+    // Create global memory buffer view
+    auto buffer_view = make_buffer_view<address_space_enum::global>(data, buffer_size);
+}
+```
+
+### Custom Value Mode
+```cpp
+void custom_invalid_value_example() {
+    constexpr size_t buffer_size = 8;
+    float data[buffer_size] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f};
+    float custom_invalid = 13.0f;
+    
+    // Create buffer view with custom invalid value
+    auto buffer_view = make_buffer_view<address_space_enum::global>(
+        data, buffer_size, custom_invalid);
+}
+```
+
+## Get Operations
+
+### Scalar Access
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+print("🔍 Scalar Get Operations")
+
 
 ### Python vs C++ Key Differences
 
