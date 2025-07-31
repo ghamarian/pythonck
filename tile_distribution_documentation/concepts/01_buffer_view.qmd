@@ -296,21 +296,21 @@ flowchart LR
 #| output: true
 
 # Basic get operation
-value = buffer_view.get(2)
+value = buffer_view.get(2, 0, True)
 print(f"Value at index 2: {value}")
 
 # Get with bounds checking
 try:
-    value = buffer_view.get(10)  # Out of bounds
+    value = buffer_view.get(10, 0, True)  # Out of bounds
 except IndexError as e:
     print(f"Error: {e}")
 
 # Get with valid flag
-value_with_flag = buffer_view.get(3, valid_flag=True)
+value_with_flag = buffer_view.get(3, 0, True)
 print(f"Value at index 3 (with flag): {value_with_flag}")
 
 # Invalid flag returns default
-value_invalid = buffer_view.get(3, valid_flag=False)
+value_invalid = buffer_view.get(3, 0, False)
 print(f"Value with invalid flag: {value_invalid}")
 ```
 
@@ -381,12 +381,12 @@ buffer_view = make_buffer_view(data, len(data), AddressSpaceEnum.GLOBAL)
 # Scalar access (4 separate operations)
 print("Scalar access:")
 for i in range(4):
-    value = buffer_view.get(i)
+    value = buffer_view.get(i, 0, True)
     print(f"  Load {i}: {value}")
 
 # Vectorized access (single operation)
 print("\nVectorized access:")
-vec4 = buffer_view.get_vectorized(0, 4)  # Get 4 elements at once
+vec4 = buffer_view.get(0, 0, True, vector_size=4)  # Get 4 elements at once
 print(f"  Load float4: {vec4}")
 
 # Performance comparison
@@ -409,20 +409,16 @@ buffer_view = make_buffer_view(data, len(data), AddressSpaceEnum.GLOBAL)
 print("Original data:", data)
 
 # Basic update
-buffer_view.update(2, 99.0)
+buffer_view.update(MemoryOperationEnum.SET, 2, 0, True, 99.0)
 print("After update(2, 99.0):", data)
 
-# Update with valid flag
-buffer_view.update(3, 88.0, valid_flag=True)
-print("After update(3, 88.0, valid_flag=True):", data)
-
 # Invalid flag - no update
-buffer_view.update(4, 77.0, valid_flag=False)
+buffer_view.update(MemoryOperationEnum.SET, 4, 0 , False, 77.0)
 print("After update(4, 77.0, valid_flag=False):", data)
 
 # Vectorized update
 vec_data = np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
-buffer_view.update_vectorized(0, vec_data)
+buffer_view.update(MemoryOperationEnum.SET, 0, 0, True, vec_data, vector_size=4)
 print("After vectorized update:", data)
 ```
 
@@ -492,16 +488,13 @@ buffer_view = make_buffer_view(data, len(data), AddressSpaceEnum.GLOBAL)
 print("Initial data:", data)
 
 # Atomic add
-old_value = buffer_view.atomic_add(0, 50)
+old_value = buffer_view.update(MemoryOperationEnum.ATOMIC_ADD, 0, 0, True, 50)
 print(f"atomic_add(0, 50) - old value: {old_value}, new data: {data}")
 
 # Atomic max
-old_value = buffer_view.atomic_max(1, 250)
+old_value = buffer_view.update(MemoryOperationEnum.ATOMIC_MAX, 1, 0, True, 250)
 print(f"atomic_max(1, 250) - old value: {old_value}, new data: {data}")
 
-# Atomic operations with valid flag
-old_value = buffer_view.atomic_add(2, 100, valid_flag=True)
-print(f"atomic_add(2, 100, valid_flag=True) - old value: {old_value}, new data: {data}")
 ```
 
 ## C++ Atomic Operations
