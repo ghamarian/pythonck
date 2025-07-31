@@ -7,7 +7,7 @@
             "request": "launch",
             "module": "pytest",
             "args": [
-                "${workspaceFolder}/complete_sweep_with_tile_window.py",
+                "${workspaceFolder}/tests/test_sweep_tile.py",
                 "-v"
             ],
             "console": "integratedTerminal",
@@ -35,7 +35,7 @@
             "name": "Debug complete sweep with tile window",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/complete_sweep_with_tile_window_fixed.py",
+            "program": "${workspaceFolder}/coordinate_movement_tile_demo.py",
             "args": [
             ],
             "console": "integratedTerminal",

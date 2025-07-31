@@ -22,9 +22,9 @@ from contextlib import redirect_stdout
 sys.path.append('.')
 
 try:
-    from parser import TileDistributionParser, debug_indexing_relationships
-    from examples import get_examples, get_default_variables
-    from tiler_pedantic import TileDistributionPedantic
+    from tile_distribution.parser import TileDistributionParser, debug_indexing_relationships
+    from tile_distribution.examples import get_examples, get_default_variables
+    from tile_distribution.tiler_pedantic import TileDistributionPedantic
 except ImportError as e:
     st.error(f"Import error: {e}")
     st.stop()

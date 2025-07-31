@@ -46,9 +46,12 @@ tile_distribution_documentation/_site/
 *.gif
 *.svg
 *debug*
-*test_*
 formula_images/
 replication_test_images/
+
+# Temporary test result files (not the test files themselves)
+test_results_*.txt
+*_test_output.log
 
 # Temporary and development files
 *.md.bak
@@ -63,4 +66,6 @@ pytensor/rocm.md
 pytensor/sweep_tile_faithful.py
 pytensor/tensor_coordinate_faithful.py
 tile_distribution_documentation_plan.md
-tile_distribution_documentation/_site
+
+
+ tensor_transforms/__pycache__/**/*.pyc

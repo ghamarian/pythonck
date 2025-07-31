@@ -31,7 +31,7 @@ from pytensor.tile_window import make_tile_window
 from pytensor.tensor_view import make_tensor_view
 from pytensor.tensor_descriptor import make_naive_tensor_descriptor_packed
 from pytensor.static_distributed_tensor import make_static_distributed_tensor
-from pytensor.sweep_tile import sweep_tensor_direct, sweep_tile, make_tile_sweeper
+from pytensor.sweep_tile import sweep_tile, make_tile_sweeper
 
 
 def demonstrate_what_are_sweep_operations():
@@ -111,12 +111,12 @@ def demonstrate_basic_sweep():
         print(f"  Visited Y{y_indices}: value = {value}")
     
     # Perform the sweep
-    sweep_tensor_direct(distributed_tensor, collect_value)
+    sweep_tile(distributed_tensor, collect_value)
     
     show_result("Sweep completed", f"Visited {len(collected_values)} elements")
     
     explain_concept("What happened?",
-                   "sweep_tensor_direct automatically iterated over all Y indices "
+                   "sweep_tile automatically iterated over all Y indices "
                    "in the distributed tensor and called our function for each element. "
                    "No manual loops, no missed elements!")
     
@@ -142,7 +142,7 @@ def demonstrate_sweep_with_computation(distributed_tensor):
         print(f"  Y{y_indices}: {input_value}² = {output_value}")
     
     # Perform computation sweep
-    sweep_tensor_direct(distributed_tensor, compute_square)
+    sweep_tile(distributed_tensor, compute_square)
     
     # Verify results
     print("\n📊 Results verification:")
@@ -152,7 +152,7 @@ def demonstrate_sweep_with_computation(distributed_tensor):
         expected = original ** 2
         print(f"  Y{y_indices}: {original} → {computed} (expected {expected})")
     
-    sweep_tensor_direct(result_tensor, verify_result)
+    sweep_tile(result_tensor, verify_result)
     
     explain_concept("Computation Pattern",
                    "This is the classic pattern: sweep over input tensor, compute "
@@ -277,7 +277,7 @@ def test_sweep_operations():
                 nonlocal count
                 count += 1
             
-            sweep_tensor_direct(distributed_tensor, count_elements)
+            sweep_tile(distributed_tensor, count_elements)
             
             # Should visit 4 elements (2x2)
             return count == 4
