@@ -56,6 +56,45 @@ graph TB
 - Manages memory coherence and caching policies
 
 
+## Address Space Usage Patterns
+
+```{=html}
+<div class="mermaid">
+flowchart TB
+    subgraph CF ["Compute Flow"]
+        direction LR
+        GM1["Global Memory<br/>Input Data"] --> LDS["LDS<br/>Tile Cache"]
+        LDS --> VGPR["VGPR<br/>Working Set"]
+        VGPR --> Compute["Compute<br/>Operations"]
+        Compute --> VGPR
+        VGPR --> LDS2["LDS<br/>Reduction"]
+        LDS2 --> GM2["Global Memory<br/>Output Data"]
+    end
+    
+    subgraph UP ["Usage Pattern"]
+        direction LR
+        P1["1. Load tile from Global → LDS"]
+        P2["2. Load working set LDS → VGPR"]
+        P3["3. Compute in VGPR"]
+        P4["4. Store results VGPR → LDS"]
+        P5["5. Reduce in LDS"]
+        P6["6. Write final LDS → Global"]
+        
+        P1 --> P2 --> P3 --> P4 --> P5 --> P6
+    end
+    
+    CF ~~~ UP
+    
+    style GM1 fill:#fee2e2,stroke:#ef4444,stroke-width:2px
+    style LDS fill:#fed7aa,stroke:#f59e0b,stroke-width:2px
+    style VGPR fill:#d1fae5,stroke:#10b981,stroke-width:2px
+    style Compute fill:#e0e7ff,stroke:#4338ca,stroke-width:2px
+</div>
+```
+
+Note: The data  pointers for creating the buffer views should match the address space. In the given examples below the pointers are created in register space and passed to ```make_buffer_view``` in global space for example purpose. That would give an error if replicated.
+
+
 ## Python vs C++ Key Differences
 
 ### Compile-Time vs Runtime
@@ -369,8 +408,6 @@ void scalar_get_operations_example() {
 
 NOTE: Partial Out Of Bound (OOB) access during vector reads will return 'junk' values for the OOB access. Zero or custom invalid value is only returned for complete invalid/OOB access, i.e. when the first address of the vector is invalid.
 
-## Scalar vs Vectorized C++ Reference
-
 ```{pyodide}
 #| echo: true
 #| output: true
@@ -514,65 +551,25 @@ __device__ void example_atomic_operations()
 {
     // Shared memory for workgroup-level reductions
     __shared__ float shared_sum[256];
-    auto shared_buffer = make_buffer_view<address_space_enum::lds>(
+    auto shared_buffer_view = make_buffer_view<address_space_enum::lds>(
         shared_sum, 256
     );
 
     // Initialize shared memory
     if (threadIdx.x < 256) {
-        shared_buffer.update(threadIdx.x, 0.0f);
+        shared_buffer_view.template set<float>(threadIdx.x, 0.0f, true);
     }
     __syncthreads();
 
     // Each thread atomically adds to shared memory
-    float my_value = float(threadIdx.x);
-    float old = shared_buffer.atomic_add(0, my_value);
+    auto my_value = static_cast<float>(threadIdx.x);
+    shared_buffer_view.template update<memory_operation_enum::atomic_add, float>(0,0,true,my_value);
     
     // Atomic max for finding maximum value
-    shared_buffer.atomic_max(1, my_value);
+    shared_buffer_view.template update<memory_operation_enum::atomic_max, float>(0,1,true,my_value);
     
     __syncthreads();
-    
-    // Thread 0 reads the results
-    if (threadIdx.x == 0) {
-        float sum = shared_buffer.get(0);
-        float max = shared_buffer.get(1);
-        // sum contains sum of all thread indices
-        // max contains the maximum thread index
-    }
 }
-```
-
-# Address Space Usage Patterns
-
-```{=html}
-<div class="mermaid">
-flowchart TB
-    subgraph "Compute Flow"
-        GM1["Global Memory<br/>Input Data"] --> LDS["LDS<br/>Tile Cache"]
-        LDS --> VGPR["VGPR<br/>Working Set"]
-        VGPR --> Compute["Compute<br/>Operations"]
-        Compute --> VGPR
-        VGPR --> LDS2["LDS<br/>Reduction"]
-        LDS2 --> GM2["Global Memory<br/>Output Data"]
-    end
-    
-    subgraph "Usage Pattern"
-        P1["1. Load tile from Global → LDS"]
-        P2["2. Load working set LDS → VGPR"]
-        P3["3. Compute in VGPR"]
-        P4["4. Store results VGPR → LDS"]
-        P5["5. Reduce in LDS"]
-        P6["6. Write final LDS → Global"]
-    end
-    
-    P1 --> P2 --> P3 --> P4 --> P5 --> P6
-    
-    style GM1 fill:#fee2e2,stroke:#ef4444,stroke-width:2px
-    style LDS fill:#fed7aa,stroke:#f59e0b,stroke-width:2px
-    style VGPR fill:#d1fae5,stroke:#10b981,stroke-width:2px
-    style Compute fill:#e0e7ff,stroke:#4338ca,stroke-width:2px
-</div>
 ```
 
 # Summary
@@ -585,3 +582,5 @@ BufferView provides:
 - **Atomic Operations**: Thread-safe updates for parallel algorithms
 
 The abstraction hides the complexity of different memory spaces while exposing the operations needed for high-performance GPU computing.
+
+
