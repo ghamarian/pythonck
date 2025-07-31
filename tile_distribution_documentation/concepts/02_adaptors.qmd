@@ -23,6 +23,55 @@ await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/mas
 
 Let's start by understanding what a TensorAdaptor is and how it works:
 
+```{=html}
+<div class="mermaid">
+graph TB
+    subgraph "Adaptor Composition"
+        subgraph "Single Transform"
+            T1["Transform<br/>(e.g., Transpose)"]
+            I1["Input Coords<br/>[0,1,2]"]
+            O1["Output Coords<br/>[2,0,1]"]
+        end
+        
+        subgraph "Chained Transforms"
+            T2A["Transform A<br/>(e.g., Merge)"]
+            T2B["Transform B<br/>(e.g., Pad)"]
+            I2["Input<br/>2D"]
+            M2["Intermediate<br/>1D"]
+            O2["Output<br/>1D Padded"]
+        end
+        
+        subgraph "Complex Pipeline"
+            T3A["Transpose"]
+            T3B["Unmerge"]
+            T3C["Pad"]
+            I3["Input"]
+            O3["Output"]
+        end
+    end
+    
+    I1 --> T1
+    T1 --> O1
+    
+    I2 --> T2A
+    T2A --> M2
+    M2 --> T2B
+    T2B --> O2
+    
+    I3 --> T3A
+    T3A --> T3B
+    T3B --> T3C
+    T3C --> O3
+    
+    style T1 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style T2A fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style T2B fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style T3A fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style T3B fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style T3C fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+</div>
+```
+
 ```{pyodide}
 #| echo: true
 #| output: true
@@ -138,6 +187,44 @@ Now that we saw how we can create an adaptor, let's see how we can combine a few
 ## Chaining Adaptors: Building Complex Transformations
 
 The real power comes from chaining multiple adaptors together to create sophisticated transformations. Below we try some trivial example of combining merge and unmerge just to show how these transformations combine.
+
+```{=html}
+<div class="mermaid">
+graph LR
+    subgraph "Adaptor Chaining Flow"
+        subgraph "Adaptor 1"
+            A1I["Bottom Dims<br/>[0,1]"]
+            A1T["Transform:<br/>Merge[2,3]"]
+            A1O["Top Dims<br/>[0]"]
+        end
+        
+        subgraph "Adaptor 2"
+            A2I["Bottom Dims<br/>[0]"]
+            A2T["Transform:<br/>Unmerge[2,3]"]
+            A2O["Top Dims<br/>[0,1]"]
+        end
+        
+        subgraph "Chained Result"
+            CI["Input 2D<br/>Bottom[0,1]"]
+            CO["Output 2D<br/>Top[0,1]"]
+        end
+    end
+    
+    A1I --> A1T
+    A1T --> A1O
+    A1O --> A2I
+    A2I --> A2T
+    A2T --> A2O
+    
+    CI --> A1I
+    A2O --> CO
+    
+    style A1T fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style A2T fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style CI fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style CO fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+</div>
+```
 
 ```{pyodide}
 #| echo: true

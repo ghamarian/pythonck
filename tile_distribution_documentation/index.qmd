@@ -60,14 +60,21 @@ Follow our structured 8-part learning path:
 
 Explore tile distribution concepts through interactive web applications:
 
-### **[Tile Distribution Visualizer](../app.py)**
+### **Tile Distribution Visualizer**
 Interactive visualization of tile distribution structures and GPU memory layouts. Perfect for understanding how data is distributed across parallel processing elements.
+- **Run locally**: `streamlit run ../app.py`
 
-### **[Tensor Transform Visualizer](../tensor_transform_app.py)**  
+### **Tensor Transform Visualizer**  
 Explore tensor descriptor transformations with visual graphs and mathematical formulas. See how data layouts change through various transformations.
+- **Run locally**: `streamlit run ../tensor_transform_app.py`
 
-### **[Thread Visualization App](../thread_visualization_app.py)**
+### **Thread Visualization App**
 Visualize GPU thread coordinate mapping and access patterns. Understand how individual threads access distributed tensor data.
+- **Run locally**: `streamlit run ../thread_visualization_app.py`
+
+### **GPU Hierarchy Visualizer** (NEW!)
+Visualize how work is distributed across vectors, warps, blocks, and tiles on a GPU with interactive controls.
+- **Run locally**: `streamlit run ../gpu_hierarchy_visualizer.py`
 
 ## Quick Test
 

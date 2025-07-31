@@ -1,6 +1,9 @@
 ---
 title: "Coordinate Systems - The Mathematical Foundation"
-format: live-html
+format: 
+  live-html:
+    mermaid:
+      theme: default
 ---
 
 ```{pyodide}
@@ -47,42 +50,37 @@ Before diving into code, let's understand what problem these coordinate spaces s
 
 ## The Five Coordinate Spaces
 
-```{mermaid}
-%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#fff', 'primaryBorderColor':'#333'}}}%%
-graph TD
-    subgraph "Coordinate Spaces"
-        P["P-Space (Partition)<br/>Thread Identification<br/>thread_x, thread_y, warp_id"]
-        Y["Y-Space (Logical Tile)<br/>Element in Thread's Work<br/>y0, y1, y2, y3"]
-        X["X-Space (Physical Tensor)<br/>Actual Tensor Position<br/>x0, x1"]
-        R["R-Space (Replication)<br/>Data Sharing Pattern<br/>r0, r1"]
-        D["D-Space (Linearized)<br/>Memory Address<br/>d (linear index)"]
+```{=html}
+<div class="mermaid">
+graph TB
+    subgraph "Coordinate Spaces Overview"
+        P["P-space<br/>Thread Identification<br/>Which thread am I?"]
+        Y["Y-space<br/>Logical Tile<br/>Which element in my tile?"]
+        X["X-space<br/>Physical Tensor<br/>Where in the tensor?"]
+        R["R-space<br/>Replication<br/>Data sharing pattern"]
+        D["D-space<br/>Linear Storage<br/>Memory address"]
     end
     
     subgraph "Transformations"
         T1["P + Y → X<br/>Thread + Element → Position"]
-        T2["Y → D<br/>Element → Memory"]
-        T3["P → R<br/>Thread → Replication"]
+        T2["X → D<br/>Position → Address"]
     end
     
     P --> T1
     Y --> T1
     T1 --> X
-    
-    Y --> T2
+    X --> T2
     T2 --> D
     
-    P --> T3
-    T3 --> R
+    R -.-> P
+    R -.-> Y
     
     style P fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
     style Y fill:#fff3e0,stroke:#f57c00,stroke-width:2px
     style X fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
     style R fill:#fce4ec,stroke:#c2185b,stroke-width:2px
     style D fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
-    
-    style T1 fill:#ffebee,stroke:#d32f2f,stroke-width:1px
-    style T2 fill:#ffebee,stroke:#d32f2f,stroke-width:1px
-    style T3 fill:#ffebee,stroke:#d32f2f,stroke-width:1px
+</div>
 ```
 
 ### P-space (Partition)
@@ -119,6 +117,43 @@ graph TD
 
 P-space identifies which thread is doing the work. Each thread gets a unique P coordinate.
 
+### P-space Architecture
+
+```{=html}
+<div class="mermaid">
+graph TB
+    subgraph "GPU Thread Hierarchy"
+        subgraph "Block"
+            subgraph "Warp 0"
+                T0["Thread 0<br/>P=[0,0]"]
+                T1["Thread 1<br/>P=[0,1]"]
+                T2["Thread 2<br/>P=[0,2]"]
+                T31["..."]
+                T3["Thread 31<br/>P=[0,31]"]
+            end
+            subgraph "Warp 1"
+                T32["Thread 32<br/>P=[1,0]"]
+                T33["Thread 33<br/>P=[1,1]"]
+                T34["..."]
+                T63["Thread 63<br/>P=[1,31]"]
+            end
+            W2["Warp 2..."]
+            W7["Warp 7"]
+        end
+    end
+    
+    subgraph "P-space Mapping"
+        PM["P-coordinates = [warp_id, lane_id]<br/>or<br/>P-coordinates = [block_x, block_y, thread_x, thread_y]"]
+    end
+    
+    T0 --> PM
+    T32 --> PM
+    
+    style T0 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style T32 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+</div>
+```
+
 ```{pyodide}
 print("P-space: Thread Identification")
 print("=" * 40)
@@ -137,11 +172,190 @@ for thread_x in range(thread_grid[0]):
 print("\nP-space concept: Each thread has unique partition coordinates")
 ```
 
+### C++ Implementation Reference
+
+**File**: `include/ck_tile/core/container/multi_index.hpp`
+
+```cpp
+#include <ck_tile/core/container/multi_index.hpp>
+#include <ck_tile/core/numeric/tuple.hpp>
+#include <ck_tile/core/utility/thread_id.hpp>
+
+// P-space coordinate calculation in production kernels
+template <typename TileDistribution>
+__device__ void example_p_space_calculation()
+{
+    // Method 1: Get P-coordinates from hardware thread IDs
+    // This is how real CK kernels determine thread position
+    const index_t thread_id = get_thread_local_1d_id();  // Hardware thread ID
+    const index_t warp_id = get_warp_local_1d_id();      // Warp within block
+    const index_t lane_id = get_lane_id();               // Thread within warp
+    
+    // Convert to multi-dimensional P-coordinates
+    // For 2D P-space: [warp_id, lane_id]
+    auto p_coord_2d = make_multi_index(warp_id, lane_id);
+    
+    // For 3D P-space: [block_x, warp_id, lane_id]
+    const index_t block_x = blockIdx.x;
+    auto p_coord_3d = make_multi_index(block_x, warp_id, lane_id);
+    
+    // Method 2: Using tile distribution to get structured P-coordinates
+    // This is the preferred method in CK
+    constexpr auto tile_distribution = TileDistribution{};
+    
+    // Get P-coordinates directly from tile distribution
+    const auto p_coord = tile_distribution.calculate_p_coord();
+    // p_coord is a multi_index with compile-time known size
+    
+    // Access individual P dimensions
+    constexpr index_t p_dim0 = p_coord.at(number<0>{});  // First P dimension
+    constexpr index_t p_dim1 = p_coord.at(number<1>{});  // Second P dimension
+    
+    // P-coordinates are used for:
+    // 1. Work distribution - which data this thread processes
+    // 2. Memory coalescing - ensuring optimal access patterns
+    // 3. Thread cooperation - coordinating shared memory usage
+    
+    // Example: Matrix multiplication P-space
+    // P = [warp_m, warp_n, thread_m, thread_n]
+    // Each dimension controls different aspects of parallelization
+    
+    static_assert(tile_distribution.ndim_p == 2);  // 2D P-space
+}
+
+// Compile-time P-space structure definition
+template <index_t... PSizes>
+struct p_space_definition
+{
+    static constexpr auto p_lengths = make_tuple(number<PSizes>{}...);
+    static constexpr index_t ndim_p = sizeof...(PSizes);
+    
+    // Total number of threads
+    static constexpr index_t total_threads = (PSizes * ...);
+    
+    // Convert linear thread ID to P-coordinates
+    __device__ static constexpr auto thread_id_to_p_coord(index_t tid)
+    {
+        // Compile-time unrolling of coordinate calculation
+        return unravel_index<PSizes...>(tid);
+    }
+};
+
+// Example usage
+using matmul_p_space = p_space_definition<4, 2, 8>;  // 4 warps, 2 groups, 8 threads
+static_assert(matmul_p_space::total_threads == 64);
+static_assert(matmul_p_space::ndim_p == 3);
+```
+
+### Python vs C++ P-Space Differences
+
+#### 1. **Thread ID Source**
+- **C++**: Hardware intrinsics provide real thread IDs
+  ```cpp
+  // Actual GPU hardware values
+  const index_t thread_x = threadIdx.x;     // 0-31 within warp
+  const index_t warp_id = threadIdx.x / 32; // Warp number
+  const index_t block_id = blockIdx.x;      // Block number
+  ```
+  - Direct access to GPU hardware thread hierarchy
+  - Zero-overhead coordinate calculation
+  - Compile-time thread organization validation
+
+- **Python**: Simulated thread grid
+  ```python
+  # Simulation for learning
+  for thread_x in range(thread_grid[0]):
+      for thread_y in range(thread_grid[1]):
+          p_coord = [thread_x, thread_y]
+  ```
+  - Educational simulation of thread behavior
+  - Helps understand thread-to-work mapping
+  - Runtime coordinate generation
+
+#### 2. **Coordinate Structure**
+- **C++**: Template-encoded dimensions
+  ```cpp
+  // P-space structure encoded in types
+  using p_space = multi_index<4, 2, 8>;  // Compile-time sizes
+  static_assert(p_space::size() == 3);   // 3D P-space
+  
+  // Coordinates computed at compile time when possible
+  constexpr auto p_coord = make_multi_index(
+      number<2>{}, number<1>{}, number<5>{}
+  );
+  ```
+
+- **Python**: Runtime lists
+  ```python
+  # Runtime coordinate representation
+  p_coord = [thread_x, thread_y]  # Dynamic size and values
+  ```
+
+#### 3. **Performance Characteristics**
+- **C++**: Zero-overhead abstractions
+  ```cpp
+  // This entire calculation often compiles to single instruction
+  const auto p_coord = tile_distribution.calculate_p_coord();
+  const auto work_offset = p_coord.at(number<0>{}) * work_per_thread;
+  ```
+  - Compile-time coordinate resolution
+  - Hardware thread IDs mapped directly to memory addresses
+  - No runtime overhead for coordinate calculations
+
+- **Python**: Educational clarity
+  ```python
+  # Focus on understanding concepts, not performance
+  thread_id = thread_x * thread_grid[1] + thread_y
+  ```
+  - Runtime calculations help visualize the mapping
+  - Clear step-by-step coordinate generation
+  - Excellent for learning thread organization patterns
+
 **Key Insight**: P-space gives each thread a unique identity. In real GPU kernels, these come from hardware intrinsics like `threadIdx.x`, `blockIdx.y`, etc.
 
 ## Y-space: Logical Tile Coordinates
 
 Y-space defines what work each thread does. Each thread processes a "tile" of elements.
+
+### Y-space Work Assignment
+
+```{=html}
+<div class="mermaid">
+graph TB
+    subgraph "Thread's Tile (2x2 elements)"
+        Y00["Y=[0,0]<br/>Element 0"]
+        Y01["Y=[0,1]<br/>Element 1"]
+        Y10["Y=[1,0]<br/>Element 2"]
+        Y11["Y=[1,1]<br/>Element 3"]
+    end
+    
+    subgraph "Y-space Structure"
+        YS["Each thread processes<br/>the same Y-space pattern<br/>but at different X locations"]
+    end
+    
+    subgraph "Example: 4 Threads"
+        T0["Thread 0<br/>P=[0,0]"]
+        T1["Thread 1<br/>P=[0,1]"]
+        T2["Thread 2<br/>P=[1,0]"]
+        T3["Thread 3<br/>P=[1,1]"]
+    end
+    
+    Y00 --> YS
+    Y01 --> YS
+    Y10 --> YS
+    Y11 --> YS
+    
+    T0 --> YS
+    T1 --> YS
+    T2 --> YS
+    T3 --> YS
+    
+    style Y00 fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style Y01 fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style Y10 fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style Y11 fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+</div>
+```
 
 ```{pyodide}
 print("Y-space: Logical Tile Coordinates")
@@ -160,6 +374,185 @@ for y0 in range(tile_size[0]):
 
 print("\n✅ Y-space concept: Each thread's work is organized in logical tiles")
 ```
+
+### C++ Implementation Reference
+
+**File**: `include/ck_tile/core/container/multi_index.hpp`
+
+```cpp
+#include <ck_tile/core/container/multi_index.hpp>
+#include <ck_tile/core/numeric/tuple.hpp>
+#include <ck_tile/ops/fused_multihead_attention/kernel/impl/fa_fwd_kernel_impl.hpp>
+
+// Y-space coordinate generation in production kernels
+template <typename TileDistribution>
+__device__ void example_y_space_iteration()
+{
+    constexpr auto tile_distribution = TileDistribution{};
+    
+    // Get Y-space dimensions at compile time
+    constexpr auto y_lengths = tile_distribution.get_y_lengths();
+    constexpr index_t y_dim = y_lengths.size();
+    
+    // Method 1: Manual Y-space iteration (educational)
+    // This shows what sweep_tile() does internally
+    constexpr index_t y0_max = y_lengths.at(number<0>{});
+    constexpr index_t y1_max = y_lengths.at(number<1>{});
+    
+    // Completely unrolled at compile time
+    static_for<0, y0_max, 1>{}([&](auto y0) {
+        static_for<0, y1_max, 1>{}([&](auto y1) {
+            // Y-coordinates as compile-time constants
+            constexpr auto y_coord = make_multi_index(y0, y1);
+            
+            // This is one element in the thread's tile
+            // All Y-space iteration happens at compile time
+            // No runtime loops, no branch overhead
+            
+            // Convert Y to actual tensor position using P+Y→X transform
+            const auto x_coord = tile_distribution.calculate_index(
+                p_coord, y_coord  // Combine thread position with element offset
+            );
+            
+            // Process this element
+            // tensor_view(x_coord) = computation(...);
+        });
+    });
+    
+    // Method 2: Using sweep_tile (recommended)
+    // This is the idiomatic CK way to iterate Y-space
+    auto distributed_tensor = make_distributed_tensor(
+        tensor_view, tile_distribution
+    );
+    
+    sweep_tile(distributed_tensor, [&](auto y_coord) {
+        // y_coord is compile-time multi_index
+        // This lambda is called once for each Y-space position
+        // All calls are inlined and unrolled at compile time
+        
+        auto value = distributed_tensor(y_coord);
+        // Process value...
+        distributed_tensor(y_coord) = new_value;
+    });
+    
+    // Method 3: Hierarchical Y-space (advanced)
+    // For complex kernels like FlashAttention
+    constexpr auto y_hierarchical = make_tuple(
+        number<4>{},   // Repeat dimension
+        number<2>{},   // Warp dimension  
+        number<8>{},   // Thread dimension
+        number<4>{}    // Vector dimension
+    );
+    
+    // 4D Y-space: [repeat, warp, thread, vector]
+    // Each dimension serves different purpose:
+    // - Repeat: Algorithm repetition (attention heads)
+    // - Warp: Inter-warp cooperation
+    // - Thread: Per-thread work items
+    // - Vector: SIMD vectorization
+}
+
+// Compile-time Y-space structure
+template <index_t... YSizes>
+struct y_space_definition
+{
+    static constexpr auto y_lengths = make_tuple(number<YSizes>{}...);
+    static constexpr index_t ndim_y = sizeof...(YSizes);
+    
+    // Total elements per thread
+    static constexpr index_t elements_per_thread = (YSizes * ...);
+    
+    // Y-space iterator
+    template <typename Func>
+    __device__ static constexpr void for_each_y(Func&& func)
+    {
+        // Completely unrolled nested loops
+        unroll_y_space<YSizes...>(func);
+    }
+};
+
+// Example: 2x2 tile per thread
+using simple_tile_y = y_space_definition<2, 2>;
+static_assert(simple_tile_y::elements_per_thread == 4);
+static_assert(simple_tile_y::ndim_y == 2);
+
+// Example: Complex 4D hierarchical structure
+using attention_y = y_space_definition<4, 2, 8, 4>;
+static_assert(attention_y::elements_per_thread == 256);
+static_assert(attention_y::ndim_y == 4);
+```
+
+### Python vs C++ Y-Space Differences
+
+#### 1. **Iteration Pattern**
+- **C++**: Compile-time loop unrolling
+  ```cpp
+  // No runtime loops - everything unrolled at compile time
+  static_for<0, 2, 1>{}([&](auto y0) {
+      static_for<0, 2, 1>{}([&](auto y1) {
+          // This becomes 4 separate code blocks, no branching
+          constexpr auto y_coord = make_multi_index(y0, y1);
+          process_element(y_coord);
+      });
+  });
+  ```
+  - Zero runtime overhead for Y-space iteration
+  - All loops unrolled into straight-line code
+  - Perfect instruction-level parallelism
+
+- **Python**: Runtime loops for understanding
+  ```python
+  # Runtime loops help visualize the iteration pattern
+  for y0 in range(2):
+      for y1 in range(2):
+          y_coord = [y0, y1]
+          # Shows the logical structure clearly
+  ```
+  - Clear visualization of iteration patterns
+  - Easy to understand nested loop structure
+  - Good for learning Y-space organization
+
+#### 2. **Coordinate Representation**
+- **C++**: Compile-time multi_index
+  ```cpp
+  // Y-coordinates known at compile time
+  constexpr auto y_coord = make_multi_index(number<0>{}, number<1>{});
+  static_assert(y_coord.size() == 2);
+  
+  // Can be used in template parameters
+  auto element = tensor_view.template get<y_coord.at(number<0>{}), 
+                                        y_coord.at(number<1>{})>();
+  ```
+
+- **Python**: Runtime lists
+  ```python
+  # Runtime coordinate representation
+  y_coord = [y0, y1]  # Flexible but with runtime overhead
+  ```
+
+#### 3. **Memory Access Pattern**
+- **C++**: Optimal register usage
+  ```cpp
+  // Each Y-space element typically maps to a register
+  sweep_tile(distributed_tensor, [&](auto y_coord) {
+      // Compiler assigns each element to optimal register
+      // No memory loads/stores for temporary values
+      auto reg_value = distributed_tensor(y_coord);
+  });
+  ```
+  - Y-space elements stored in registers
+  - Zero memory bandwidth for intermediate values
+  - Perfect cache locality through compile-time optimization
+
+- **Python**: Educational memory model
+  ```python
+  # Simulates the logical organization
+  # Shows how threads organize their work
+  element_id = y0 * tile_size[1] + y1
+  ```
+  - Helps understand data organization principles
+  - Shows relationship between coordinates and memory layout
+  - Good for visualizing thread work distribution
 
 **Key Insight**: Y-space defines the structure of work within each thread. Every thread has the same Y-space structure, but processes different data.
 
@@ -184,11 +577,251 @@ for x_coord in sample_coords:
 print("\n✅ X-space concept: Maps to actual tensor element positions")
 ```
 
+### C++ Implementation Reference
+
+**File**: `include/ck_tile/core/tensor/tensor_descriptor.hpp`
+
+```cpp
+#include <ck_tile/core/tensor/tensor_descriptor.hpp>
+#include <ck_tile/core/container/multi_index.hpp>
+#include <ck_tile/core/numeric/tuple.hpp>
+
+// X-space coordinate handling in production kernels
+template <typename TensorDescriptor>
+__device__ void example_x_space_operations()
+{
+    constexpr auto tensor_desc = TensorDescriptor{};
+    
+    // X-space properties known at compile time
+    constexpr auto x_lengths = tensor_desc.get_lengths();  // Tensor dimensions
+    constexpr auto x_strides = tensor_desc.get_strides();  // Memory layout
+    constexpr index_t ndim_x = x_lengths.size();
+    
+    // Method 1: Direct X-coordinate specification
+    // This is how users think about tensor access
+    constexpr auto x_coord = make_multi_index(number<3>{}, number<4>{});
+    
+    // Convert X-coordinates to linear memory offset
+    constexpr auto linear_offset = tensor_desc.calculate_offset(x_coord);
+    // offset = x_coord[0] * x_strides[0] + x_coord[1] * x_strides[1]
+    //        = 3 * stride[0] + 4 * stride[1]
+    
+    // Method 2: X-coordinates from P+Y transformation
+    // This is how tile distribution generates X-coordinates
+    template <typename TileDistribution>
+    auto calculate_x_from_py(const auto& p_coord, const auto& y_coord)
+    {
+        constexpr auto tile_dist = TileDistribution{};
+        
+        // The core transformation: P + Y → X
+        // This maps thread position + element offset to tensor position
+        const auto x_coord = tile_dist.calculate_index(p_coord, y_coord);
+        
+        return x_coord;
+    }
+    
+    // Method 3: Bounds checking for X-coordinates
+    // Essential for correct memory access
+    template <typename XCoord>
+    __device__ constexpr bool is_valid_x_coord(const XCoord& x_coord)
+    {
+        // Check each dimension against tensor bounds
+        bool valid = true;
+        static_for<0, ndim_x, 1>{}([&](auto dim) {
+            if constexpr (is_known_at_compile_time<decltype(x_coord.at(dim))>::value) {
+                // Compile-time bounds checking
+                static_assert(x_coord.at(dim) < x_lengths.at(dim));
+            } else {
+                // Runtime bounds checking
+                valid = valid && (x_coord.at(dim) < x_lengths.at(dim));
+                valid = valid && (x_coord.at(dim) >= 0);
+            }
+        });
+        return valid;
+    }
+    
+    // Method 4: X-coordinate arithmetic
+    // Used for sliding window operations, padding, etc.
+    __device__ constexpr auto add_x_coordinates(const auto& x1, const auto& x2)
+    {
+        auto result = x1;
+        static_for<0, ndim_x, 1>{}([&](auto dim) {
+            result.at(dim) = x1.at(dim) + x2.at(dim);
+        });
+        return result;
+    }
+    
+    // Method 5: X-coordinate to tensor element access
+    template <typename TensorView>
+    __device__ auto access_tensor_element(TensorView& tensor, const auto& x_coord)
+    {
+        // Direct access using X-coordinates
+        return tensor(x_coord);
+        
+        // Alternative: Manual offset calculation
+        const auto offset = tensor.get_tensor_descriptor().calculate_offset(x_coord);
+        return tensor.get_buffer_view().template get<1>(0, offset, true);
+    }
+}
+
+// X-space descriptor types
+template <typename... XLengths>
+struct x_space_descriptor
+{
+    static constexpr auto x_lengths = make_tuple(XLengths{}...);
+    static constexpr index_t ndim_x = sizeof...(XLengths);
+    
+    // Row-major strides (C-style layout)
+    static constexpr auto x_strides = calculate_row_major_strides(x_lengths);
+    
+    // Total elements in X-space
+    static constexpr index_t total_elements = (XLengths::value * ...);
+    
+    // Convert X-coordinates to linear offset
+    template <typename XCoord>
+    __device__ static constexpr auto calculate_offset(const XCoord& x_coord)
+    {
+        index_t offset = 0;
+        static_for<0, ndim_x, 1>{}([&](auto dim) {
+            offset += x_coord.at(dim) * x_strides.at(dim);
+        });
+        return offset;
+    }
+};
+
+// Example: 2D matrix X-space
+using matrix_x_space = x_space_descriptor<number<1024>, number<768>>;
+static_assert(matrix_x_space::ndim_x == 2);
+static_assert(matrix_x_space::total_elements == 1024 * 768);
+
+// Example: 4D tensor X-space (batch, channels, height, width)
+using conv_x_space = x_space_descriptor<number<32>, number<256>, number<224>, number<224>>;
+static_assert(conv_x_space::ndim_x == 4);
+```
+
+### Python vs C++ X-Space Differences
+
+#### 1. **Coordinate Resolution**
+- **C++**: Compile-time and runtime coordinate handling
+  ```cpp
+  // Compile-time coordinates (fastest)
+  constexpr auto x_coord = make_multi_index(number<3>{}, number<4>{});
+  constexpr auto offset = tensor_desc.calculate_offset(x_coord);
+  // Entire calculation happens at compile time
+  
+  // Runtime coordinates (flexible)
+  const auto x_dynamic = make_multi_index(row, col);
+  const auto offset_dynamic = tensor_desc.calculate_offset(x_dynamic);
+  ```
+  - Compile-time coordinates enable aggressive optimization
+  - Runtime coordinates provide flexibility for dynamic access
+  - Hybrid approaches possible for partially-known coordinates
+
+- **Python**: Always runtime
+  ```python
+  # All coordinate calculations happen at runtime
+  x_coord = [3, 4]
+  linear_idx = x_coord[0] * tensor_size[1] + x_coord[1]
+  ```
+  - Consistent runtime model easier to understand
+  - Good for learning coordinate-to-memory mapping
+  - No compile-time optimization benefits
+
+#### 2. **Memory Layout Control**
+- **C++**: Multiple layout options with compile-time specification
+  ```cpp
+  // Row-major layout (C-style)
+  auto row_major_desc = make_naive_tensor_descriptor_packed(
+      make_tuple(number<M>{}, number<N>{})
+  );
+  // Strides: [N, 1]
+  
+  // Column-major layout (Fortran-style)
+  auto col_major_desc = make_tensor_descriptor(
+      make_tuple(number<M>{}, number<N>{}),
+      make_tuple(number<1>{}, number<M>{}),  // Custom strides
+      make_tuple(number<0>{}, number<0>{})
+  );
+  // Strides: [1, M]
+  
+  // Complex blocked layout
+  auto blocked_desc = make_tensor_descriptor(
+      make_tuple(number<M>{}, number<N>{}),
+      make_tuple(number<block_size * N>{}, number<1>{}),  // Blocked strides
+      make_tuple(number<0>{}, number<0>{})
+  );
+  ```
+
+- **Python**: Simplified row-major model
+  ```python
+  # Only basic row-major layout
+  linear_idx = x_coord[0] * tensor_size[1] + x_coord[1]
+  ```
+
+#### 3. **Bounds Checking and Safety**
+- **C++**: Configurable safety levels
+  ```cpp
+  // Debug mode: Compile-time and runtime checks
+  #ifdef DEBUG
+      static_assert(x_coord.at(number<0>{}) < tensor_lengths.at(number<0>{}));
+      assert(x_coord.at(number<1>{}) < tensor_lengths.at(number<1>{}));
+  #endif
+  
+  // Release mode: Bounds checking disabled for performance
+  // Undefined behavior for out-of-bounds access
+  ```
+  - Compile-time bounds checking when coordinates are known
+  - Runtime bounds checking configurable
+  - Zero overhead in optimized builds
+
+- **Python**: Always safe
+  ```python
+  # Bounds checking helps learning
+  if x_coord[0] >= tensor_size[0] or x_coord[1] >= tensor_size[1]:
+      print("Out of bounds access!")
+  ```
+  - Always safe for learning and experimentation
+  - Clear error messages for invalid coordinates
+  - Focus on correctness over performance
+
 **Key Insight**: X-space represents the actual tensor coordinates that users think about. This is the "physical reality" of where data lives.
 
 ## The Core Transformation: P + Y → X
 
 This is the heart of tile distribution: combining thread identity (P) with logical work coordinates (Y) to get physical tensor coordinates (X).
+
+### P+Y→X Transformation Visualization
+
+```{=html}
+<div class="mermaid">
+graph LR
+    subgraph "Input"
+        P["P-coordinates<br/>Thread identity<br/>P=[1,0]"]
+        Y["Y-coordinates<br/>Element in tile<br/>Y=[0,1]"]
+    end
+    
+    subgraph "Transformation"
+        T["P + Y → X<br/>Base position + Offset"]
+    end
+    
+    subgraph "Output"
+        X["X-coordinates<br/>Tensor position<br/>X=[2,1]"]
+    end
+    
+    subgraph "Example"
+        E["Thread P=[1,0] at base (2,0)<br/>Element Y=[0,1] adds offset (0,1)<br/>Result X=[2,1] in tensor"]
+    end
+    
+    P --> T
+    Y --> T
+    T --> X
+    X --> E
+    
+    style P fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style Y fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style X fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+</div>
+```
 
 ```{pyodide}
 print("🔄 The Key Transformation: P + Y → X")
@@ -247,6 +880,240 @@ print("  • Shared memory: Data accessible by multiple threads")
 print("\n✅ R-space concept: Manages data sharing across threads")
 ```
 
+### C++ Implementation Reference
+
+**File**: `include/ck_tile/core/tile/tile_distribution.hpp`
+
+```cpp
+#include <ck_tile/core/tile/tile_distribution.hpp>
+#include <ck_tile/core/container/multi_index.hpp>
+#include <ck_tile/core/algorithm/reduction.hpp>
+
+// R-space coordinate handling for thread cooperation
+template <typename TileDistribution>
+__device__ void example_r_space_operations()
+{
+    constexpr auto tile_distribution = TileDistribution{};
+    
+    // R-space dimensions for replication patterns
+    constexpr auto r_lengths = tile_distribution.get_r_lengths();
+    constexpr index_t ndim_r = r_lengths.size();
+    
+    // Method 1: Broadcasting with R-space
+    // One thread computes, others replicate the result
+    template <typename DataType>
+    __device__ auto broadcast_across_r_space(DataType value)
+    {
+        // Get this thread's R-coordinates
+        const auto r_coord = tile_distribution.calculate_r_coord();
+        
+        // Check if this is the "source" thread for broadcasting
+        constexpr auto r_origin = make_multi_index(number<0>{}, number<0>{});
+        const bool is_source = (r_coord == r_origin);
+        
+        // Use shared memory for broadcasting
+        __shared__ DataType shared_value;
+        
+        if (is_source) {
+            shared_value = value;  // Source thread stores the value
+        }
+        __syncthreads();
+        
+        // All threads in R-space read the replicated value
+        return shared_value;
+    }
+    
+    // Method 2: Reduction across R-space
+    // Multiple threads contribute, one thread collects result
+    template <typename DataType>
+    __device__ auto reduce_across_r_space(DataType local_value)
+    {
+        // Get R-space coordinates for this thread
+        const auto r_coord = tile_distribution.calculate_r_coord();
+        
+        // Use CK's built-in reduction primitives
+        __shared__ DataType reduction_buffer[32];  // Size based on R-space
+        
+        // Each R-coordinate contributes to reduction
+        const index_t r_linear = r_coord.at(number<0>{}) * r_lengths.at(number<1>{})
+                               + r_coord.at(number<1>{});
+        
+        reduction_buffer[r_linear] = local_value;
+        __syncthreads();
+        
+        // Reduction tree across R-space
+        block_reduce_sum(reduction_buffer, r_lengths.size());
+        
+        // First thread in R-space gets the result
+        constexpr auto r_origin = make_multi_index(number<0>{}, number<0>{});
+        if (r_coord == r_origin) {
+            return reduction_buffer[0];  // Reduced result
+        } else {
+            return DataType{0};  // Other threads get zero
+        }
+    }
+    
+    // Method 3: R-space data distribution patterns
+    // Different R-coordinates access different data portions
+    template <typename TensorView>
+    __device__ auto distribute_across_r_space(TensorView& tensor)
+    {
+        const auto r_coord = tile_distribution.calculate_r_coord();
+        
+        // Each R-coordinate processes different data slice
+        const index_t r0_offset = r_coord.at(number<0>{}) * chunk_size;
+        const index_t r1_offset = r_coord.at(number<1>{}) * chunk_size;
+        
+        // Access tensor with R-space offset
+        const auto base_x_coord = make_multi_index(r0_offset, r1_offset);
+        
+        return tensor(base_x_coord);
+    }
+    
+    // Method 4: Cross-warp cooperation using R-space
+    // R-space enables efficient warp-level primitives
+    template <typename DataType>
+    __device__ auto warp_cooperative_operation(DataType value)
+    {
+        const auto r_coord = tile_distribution.calculate_r_coord();
+        const index_t warp_id = r_coord.at(number<0>{});  // Which warp
+        const index_t lane_id = r_coord.at(number<1>{});  // Which lane in warp
+        
+        // Warp-level shuffle operations
+        DataType result = __shfl_xor_sync(0xFFFFFFFF, value, 1);  // XOR shuffle
+        
+        // Cross-warp communication via shared memory
+        __shared__ DataType warp_results[8];  // Up to 8 warps
+        
+        if (lane_id == 0) {
+            warp_results[warp_id] = result;  // Warp representative stores result
+        }
+        __syncthreads();
+        
+        // All threads can access cross-warp data
+        return warp_results[warp_id];
+    }
+}
+
+// R-space structure definition
+template <index_t... RSizes>
+struct r_space_definition
+{
+    static constexpr auto r_lengths = make_tuple(number<RSizes>{}...);
+    static constexpr index_t ndim_r = sizeof...(RSizes);
+    
+    // Total replication factor
+    static constexpr index_t replication_factor = (RSizes * ...);
+    
+    // R-space iteration
+    template <typename Func>
+    __device__ static constexpr void for_each_r(Func&& func)
+    {
+        // Iterate over all R-coordinates
+        unroll_r_space<RSizes...>(func);
+    }
+    
+    // Check if R-space is trivial (no replication)
+    static constexpr bool is_trivial = (replication_factor == 1);
+};
+
+// Example: No replication (most common)
+using no_replication = r_space_definition<1>;
+static_assert(no_replication::replication_factor == 1);
+static_assert(no_replication::is_trivial == true);
+
+// Example: 2-way replication across warps
+using warp_replication = r_space_definition<2, 1>;
+static_assert(warp_replication::replication_factor == 2);
+static_assert(warp_replication::is_trivial == false);
+
+// Example: Complex 3D replication pattern
+using complex_replication = r_space_definition<2, 2, 4>;
+static_assert(complex_replication::replication_factor == 16);
+```
+
+### Python vs C++ R-Space Differences
+
+#### 1. **Thread Cooperation Mechanisms**
+- **C++**: Hardware-aware cooperation primitives
+  ```cpp
+  // Warp-level operations (32 threads)
+  DataType result = __shfl_down_sync(0xFFFFFFFF, value, 16);
+  
+  // Block-level shared memory
+  __shared__ DataType shared_data[1024];
+  shared_data[threadIdx.x] = local_value;
+  __syncthreads();
+  
+  // Cross-block cooperation via global memory
+  __device__ DataType* global_buffer;
+  atomicAdd(&global_buffer[blockIdx.x], contribution);
+  ```
+  - Direct access to GPU hardware cooperation features
+  - Zero-overhead synchronization primitives
+  - Optimal memory hierarchy utilization
+
+- **Python**: Conceptual replication model
+  ```python
+  # Simulates replication patterns for understanding
+  for r0 in range(replication_factor[0]):
+      for r1 in range(replication_factor[1]):
+          r_coord = [r0, r1]
+          # Shows logical replication structure
+  ```
+  - Helps understand data sharing concepts
+  - Shows replication coordinate organization
+  - Good for visualizing cooperation patterns
+
+#### 2. **Data Sharing Patterns**
+- **C++**: Efficient hardware-specific sharing
+  ```cpp
+  // Shared memory (fast, block-local)
+  __shared__ float lds_buffer[1024];
+  
+  // Warp shuffle (fastest, warp-local)
+  float neighbor_value = __shfl_sync(0xFFFFFFFF, value, neighbor_lane);
+  
+  // Global memory (slow, device-wide)
+  __device__ float* global_shared;
+  ```
+  - Multiple memory hierarchy levels
+  - Hardware-optimized data movement
+  - Latency and bandwidth characteristics known
+
+- **Python**: Abstract sharing model
+  ```python
+  # Focus on logical sharing patterns
+  replica_count = replication_factor[0] * replication_factor[1]
+  # Shows how many threads share each piece of data
+  ```
+
+#### 3. **Reduction Operations**
+- **C++**: Hardware-accelerated reductions
+  ```cpp
+  // Warp-level reduction (single instruction)
+  float sum = warp_reduce_sum(local_value);
+  
+  // Block-level reduction (shared memory tree)
+  float total = block_reduce_sum(local_value);
+  
+  // Device-level reduction (cooperative groups)
+  float global_sum = device_reduce_sum(local_value);
+  ```
+  - Hardware reduction instructions
+  - Optimized reduction trees
+  - Minimal synchronization overhead
+
+- **Python**: Educational reduction concepts
+  ```python
+  # Shows logical reduction structure
+  print("Broadcasting: Same value to multiple threads")
+  print("Reductions: Collecting results from multiple threads")
+  ```
+  - Explains reduction operation concepts
+  - Shows data flow patterns
+  - Good for understanding cooperation requirements
+
 **Key Insight**: R-space enables thread cooperation by managing data that needs to be shared or replicated across multiple threads.
 
 ## D-space: Linearized Storage
@@ -276,11 +1143,302 @@ print("  • Blocked: More complex patterns for cache efficiency")
 print("\n✅ D-space concept: Converts 2D coordinates to memory addresses")
 ```
 
+### C++ Implementation Reference
+
+**File**: `include/ck_tile/core/tensor/tensor_descriptor.hpp`
+
+```cpp
+#include <ck_tile/core/tensor/tensor_descriptor.hpp>
+#include <ck_tile/core/container/multi_index.hpp>
+#include <ck_tile/core/numeric/tuple.hpp>
+
+// D-space linearization in production kernels
+template <typename TensorDescriptor>
+__device__ void example_d_space_linearization()
+{
+    constexpr auto tensor_desc = TensorDescriptor{};
+    
+    // Get tensor layout information
+    constexpr auto lengths = tensor_desc.get_lengths();  // Tensor dimensions
+    constexpr auto strides = tensor_desc.get_strides();  // Memory layout strides
+    constexpr index_t ndim = lengths.size();
+    
+    // Method 1: Standard linearization (X → D transformation)
+    template <typename XCoord>
+    __device__ constexpr auto calculate_linear_offset(const XCoord& x_coord)
+    {
+        index_t linear_offset = 0;
+        
+        // Dot product: offset = Σ(x_coord[i] * strides[i])
+        static_for<0, ndim, 1>{}([&](auto dim) {
+            linear_offset += x_coord.at(dim) * strides.at(dim);
+        });
+        
+        return linear_offset;
+    }
+    
+    // Method 2: Specialized layout patterns
+    
+    // Row-major (C-style) linearization
+    template <typename XCoord>
+    __device__ constexpr auto row_major_linearization(const XCoord& x_coord)
+    {
+        // For shape [M, N]: offset = x0 * N + x1
+        static_assert(ndim == 2);
+        return x_coord.at(number<0>{}) * lengths.at(number<1>{})
+             + x_coord.at(number<1>{});
+    }
+    
+    // Column-major (Fortran-style) linearization
+    template <typename XCoord>
+    __device__ constexpr auto column_major_linearization(const XCoord& x_coord)
+    {
+        // For shape [M, N]: offset = x1 * M + x0
+        static_assert(ndim == 2);
+        return x_coord.at(number<1>{}) * lengths.at(number<0>{})
+             + x_coord.at(number<0>{});
+    }
+    
+    // Method 3: Blocked/tiled linearization patterns
+    // Used for cache-efficient access patterns
+    template <index_t BlockM, index_t BlockN>
+    __device__ constexpr auto blocked_linearization(const auto& x_coord)
+    {
+        // Block-wise storage: arrange data in BlockM×BlockN tiles
+        const index_t block_row = x_coord.at(number<0>{}) / BlockM;
+        const index_t block_col = x_coord.at(number<1>{}) / BlockN;
+        const index_t in_block_row = x_coord.at(number<0>{}) % BlockM;
+        const index_t in_block_col = x_coord.at(number<1>{}) % BlockN;
+        
+        const index_t blocks_per_row = (lengths.at(number<1>{}) + BlockN - 1) / BlockN;
+        const index_t block_id = block_row * blocks_per_row + block_col;
+        const index_t in_block_offset = in_block_row * BlockN + in_block_col;
+        
+        return block_id * (BlockM * BlockN) + in_block_offset;
+    }
+    
+    // Method 4: Vectorized access patterns
+    // D-space coordinates for SIMD operations
+    template <index_t VectorSize>
+    __device__ constexpr auto vectorized_d_coordinates(const auto& base_x_coord)
+    {
+        // Generate D-coordinates for vector load/store
+        auto vector_d_coords = make_array<index_t, VectorSize>{};
+        
+        const auto base_d = calculate_linear_offset(base_x_coord);
+        
+        static_for<0, VectorSize, 1>{}([&](auto vec_idx) {
+            vector_d_coords[vec_idx] = base_d + vec_idx;
+        });
+        
+        return vector_d_coords;
+    }
+    
+    // Method 5: Memory coalescing analysis
+    // Check if D-coordinates enable coalesced access
+    template <index_t NumThreads>
+    __device__ bool check_coalescing_pattern()
+    {
+        // For optimal coalescing, consecutive threads should access
+        // consecutive memory addresses (consecutive D-coordinates)
+        
+        __shared__ index_t thread_d_coords[NumThreads];
+        
+        // Each thread calculates its D-coordinate
+        const index_t tid = threadIdx.x;
+        const auto my_x_coord = calculate_thread_x_coord(tid);
+        const auto my_d_coord = calculate_linear_offset(my_x_coord);
+        
+        thread_d_coords[tid] = my_d_coord;
+        __syncthreads();
+        
+        // Check if D-coordinates are consecutive
+        bool coalesced = true;
+        if (tid == 0) {
+            for (index_t i = 1; i < NumThreads; ++i) {
+                if (thread_d_coords[i] != thread_d_coords[i-1] + 1) {
+                    coalesced = false;
+                    break;
+                }
+            }
+        }
+        
+        return coalesced;
+    }
+}
+
+// D-space descriptor with compile-time layout specification
+template <typename Lengths, typename Strides>
+struct d_space_descriptor
+{
+    static constexpr auto lengths = Lengths{};
+    static constexpr auto strides = Strides{};
+    static constexpr index_t ndim = lengths.size();
+    
+    // Total memory footprint
+    static constexpr index_t total_elements = calculate_total_elements(lengths);
+    
+    // Linearization function
+    template <typename XCoord>
+    __device__ static constexpr auto linearize(const XCoord& x_coord)
+    {
+        index_t offset = 0;
+        static_for<0, ndim, 1>{}([&](auto dim) {
+            offset += x_coord.at(dim) * strides.at(dim);
+        });
+        return offset;
+    }
+    
+    // Memory access pattern analysis
+    static constexpr bool is_row_major = check_row_major_strides(lengths, strides);
+    static constexpr bool is_column_major = check_column_major_strides(lengths, strides);
+    static constexpr bool is_contiguous = check_contiguous_layout(lengths, strides);
+};
+
+// Example: Row-major 2D matrix
+using row_major_matrix = d_space_descriptor<
+    tuple<number<1024>, number<768>>,  // Shape: 1024×768
+    tuple<number<768>, number<1>>      // Strides: [768, 1]
+>;
+static_assert(row_major_matrix::is_row_major == true);
+static_assert(row_major_matrix::total_elements == 1024 * 768);
+
+// Example: Column-major 2D matrix
+using col_major_matrix = d_space_descriptor<
+    tuple<number<1024>, number<768>>,  // Shape: 1024×768
+    tuple<number<1>, number<1024>>     // Strides: [1, 1024]
+>;
+static_assert(col_major_matrix::is_column_major == true);
+```
+
+### Python vs C++ D-Space Differences
+
+#### 1. **Linearization Performance**
+- **C++**: Compile-time offset calculation
+  ```cpp
+  // Compile-time linearization (zero runtime cost)
+  constexpr auto x_coord = make_multi_index(number<3>{}, number<4>{});
+  constexpr auto offset = tensor_desc.calculate_offset(x_coord);
+  // Entire calculation resolved at compile time
+  
+  // Runtime linearization (when needed)
+  const auto dynamic_offset = tensor_desc.calculate_offset(runtime_coord);
+  // Optimized with unrolled loops, no function call overhead
+  ```
+  - Compile-time calculation when coordinates are known
+  - Optimized runtime calculation for dynamic coordinates
+  - Zero function call overhead
+
+- **Python**: Always runtime calculation
+  ```python
+  # Runtime linearization for all coordinates
+  d_coord = x_coord[0] * tensor_shape[1] + x_coord[1]
+  ```
+  - Consistent runtime model
+  - Good for understanding linearization concepts
+  - No compile-time optimization
+
+#### 2. **Memory Layout Control**
+- **C++**: Multiple specialized layout types
+  ```cpp
+  // Row-major descriptor
+  auto row_major = make_naive_tensor_descriptor_packed(shape);
+  
+  // Column-major descriptor  
+  auto col_major = make_tensor_descriptor(shape, col_major_strides, offsets);
+  
+  // Blocked/tiled descriptor
+  auto blocked = make_tensor_descriptor(shape, blocked_strides, offsets);
+  
+  // Each type optimizes for different access patterns
+  ```
+  - Hardware-specific layout optimizations
+  - Cache-friendly blocked patterns
+  - Vectorization-friendly alignments
+
+- **Python**: Single row-major model
+  ```python
+  # Only row-major linearization shown
+  d_coord = x_coord[0] * tensor_shape[1] + x_coord[1]
+  ```
+  - Simplified for learning
+  - Focuses on core linearization concept
+  - Easy to understand and verify
+
+#### 3. **Memory Coalescing Awareness**
+- **C++**: Hardware coalescing optimization
+  ```cpp
+  // Ensure consecutive threads access consecutive memory
+  const index_t tid = threadIdx.x;
+  const auto x_coord = make_multi_index(tid / 32, tid % 32);  // Coalesced pattern
+  const auto d_offset = tensor_desc.calculate_offset(x_coord);
+  // d_offset values: 0, 1, 2, 3, ... (consecutive)
+  
+  // Vectorized loads/stores when possible
+  auto vector_data = tensor_view.template get_vectorized<4>(d_offset);
+  ```
+  - Direct control over memory access patterns
+  - Hardware-aware access optimization
+  - Vectorization opportunities identified
+
+- **Python**: Abstract linearization model
+  ```python
+  # Shows linearization without hardware considerations
+  linear_idx = x_coord[0] * tensor_shape[1] + x_coord[1]
+  ```
+  - Focus on mathematical linearization
+  - No hardware performance considerations
+  - Good for understanding coordinate-to-address mapping
+
 **Key Insight**: D-space handles the final step of converting logical coordinates to actual memory addresses that the hardware can access.
 
 ## Complete Pipeline: P+Y → X → D
 
 Let's trace a complete example from thread identification all the way to memory access.
+
+### Complete Coordinate Pipeline
+
+```{=html}
+<div class="mermaid">
+graph TB
+    subgraph "Step 1: Thread Identification"
+        TID["Thread ID = 5"]
+        P["P-coordinates<br/>P = [0, 5]<br/>(warp 0, lane 5)"]
+    end
+    
+    subgraph "Step 2: Work Assignment"
+        Y["Y-coordinates<br/>Y = [1, 0]<br/>(element in tile)"]
+    end
+    
+    subgraph "Step 3: P+Y Transformation"
+        TRANS["P + Y → X<br/>Thread position + Element offset"]
+        X["X-coordinates<br/>X = [1, 5]<br/>(tensor position)"]
+    end
+    
+    subgraph "Step 4: Linearization"
+        LIN["X → D<br/>Row-major: D = x₀ × width + x₁"]
+        D["D-coordinate<br/>D = 13<br/>(memory address)"]
+    end
+    
+    subgraph "Step 5: Memory Access"
+        MEM["Hardware accesses<br/>memory[13]"]
+    end
+    
+    TID --> P
+    P --> TRANS
+    Y --> TRANS
+    TRANS --> X
+    X --> LIN
+    LIN --> D
+    D --> MEM
+    
+    style P fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
+    style Y fill:#fff3e0,stroke:#f57c00,stroke-width:3px
+    style X fill:#e8f5e9,stroke:#388e3c,stroke-width:3px
+    style D fill:#f3e5f5,stroke:#7b1fa2,stroke-width:3px
+    style MEM fill:#ffebee,stroke:#c62828,stroke-width:3px
+</div>
+```
 
 ```{pyodide}
 print("🔄 Complete Pipeline: P+Y → X → D")

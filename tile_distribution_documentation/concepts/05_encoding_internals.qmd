@@ -1,6 +1,9 @@
 ---
 title: "Encoding Internals - The Internal Machinery"
-format: live-html
+format: 
+  live-html:
+    mermaid:
+      theme: default
 ---
 
 ```{pyodide}
@@ -30,6 +33,49 @@ from pytensor.tile_distribution import make_static_tile_distribution
 The tile distribution encoding system represents the core mathematical framework that transforms high-level tensor distribution specifications into concrete, optimized GPU kernel implementations. This sophisticated compile-time machinery bridges the gap between abstract mathematical descriptions and executable coordinate transformations, enabling the Composable Kernel framework to generate highly efficient code for complex tensor operations.
 
 At its heart, the encoding system defines how multi-dimensional tensor data is distributed across GPU processing elements through a hierarchical decomposition scheme. By specifying relationships between different coordinate spaces - replication (R), hierarchical (H), partition (P), and yield (Y) dimensions - the encoding provides a complete blueprint for data layout and access patterns that can be resolved entirely at compile time.
+
+## Encoding Structure
+
+```{=html}
+<div class="mermaid">
+graph TB
+    subgraph "Encoding Components"
+        RS["R-space Lengths<br/>Replication dimensions"]
+        HS["H-space Lengths<br/>Hierarchical decomposition<br/>[[2,2],[2,2]]"]
+        P2RH["P→RH Mappings<br/>Thread to hierarchy<br/>Major/Minor"]
+        Y2RH["Y→RH Mappings<br/>Element to hierarchy<br/>Major/Minor"]
+    end
+    
+    subgraph "Generated Components"
+        ADAPTOR["ps_ys_to_xs_adaptor<br/>Coordinate transformer"]
+        DESC["ys_to_d_descriptor<br/>Memory linearizer"]
+        ENC["Encoding<br/>Original specification"]
+    end
+    
+    subgraph "Transformation Chain"
+        T1["Replicate<br/>Transform"]
+        T2["Unmerge<br/>Transform"]
+        T3["Merge<br/>Transform"]
+    end
+    
+    RS --> T1
+    HS --> T2
+    P2RH --> ADAPTOR
+    Y2RH --> ADAPTOR
+    
+    T1 --> T2
+    T2 --> T3
+    T3 --> ADAPTOR
+    
+    HS --> DESC
+    Y2RH --> DESC
+    
+    style RS fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    style HS fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style ADAPTOR fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
+    style DESC fill:#fff3e0,stroke:#f57c00,stroke-width:3px
+</div>
+```
 
 ## What is Tile Distribution Encoding?
 
@@ -102,6 +148,56 @@ print(f"  ys_to_rhs_minor: {encoding.ys_to_rhs_minor}")
 
 print("\nEncoding created successfully!")
 ```
+
+## C++ Template Implementation
+
+The encoding system is implemented as a C++ template struct that leverages compile-time computation for maximum performance:
+
+```cpp
+// From include/ck_tile/core/tensor/tile_distribution_encoding.hpp
+
+template <typename RsLengths_,      // Replication dimensions
+          typename HsLengthss_,     // Hierarchical dimensions (tuple of tuples)
+          typename Ps2RHssMajor_,   // P→RH major mapping
+          typename Ps2RHssMinor_,   // P→RH minor mapping
+          typename Ys2RHsMajor_,    // Y→RH major mapping
+          typename Ys2RhsMinor_,    // Y→RH minor mapping
+          typename RHs2Xs_>         // RH→X final mapping
+struct tile_distribution_encoding
+{
+    using rs_lengths_type = RsLengths_;
+    using hs_lengthss_type = HsLengthss_;
+    
+    // Static member functions for compile-time access
+    CK_TILE_HOST_DEVICE static constexpr auto get_rs_lengths()
+    {
+        return rs_lengths_type{};
+    }
+    
+    CK_TILE_HOST_DEVICE static constexpr auto get_hs_lengthss() 
+    {
+        return hs_lengthss_type{};
+    }
+    
+    // Compute total number of dimensions
+    CK_TILE_HOST_DEVICE static constexpr index_t get_num_of_dimension_p()
+    {
+        return size(Ps2RHssMajor_{});
+    }
+    
+    CK_TILE_HOST_DEVICE static constexpr index_t get_num_of_dimension_y()
+    {
+        return size(Ys2RHsMajor_{});
+    }
+};
+```
+
+### Key C++ Features Used
+
+1. **Template Metaprogramming**: All parameters are types, not values, enabling compile-time optimization
+2. **Constexpr Functions**: Everything is computed at compile time
+3. **Type Aliases**: Clean access to template parameters
+4. **Static Member Functions**: No runtime overhead
 
 ## Parameter Breakdown
 
@@ -264,6 +360,99 @@ except Exception as e:
 
 The heart of the system is the adaptor that implements the P+Y → X transformation.
 
+```{=html}
+<div class="mermaid">
+flowchart LR
+    subgraph "Input Coordinates"
+        P["P-coordinates<br/>[warp_id, lane_id]"]
+        Y["Y-coordinates<br/>[y0, y1, y2, y3]"]
+    end
+    
+    subgraph "Transformation Pipeline"
+        C1["Combine P+Y"]
+        T1["Replicate<br/>Transform<br/>(if R-dims exist)"]
+        T2["Unmerge<br/>Transform<br/>(break into H-dims)"]
+        T3["Merge<br/>Transform<br/>(combine to X-dims)"]
+    end
+    
+    subgraph "Output"
+        X["X-coordinates<br/>[x0, x1]<br/>Tensor position"]
+    end
+    
+    P --> C1
+    Y --> C1
+    C1 --> T1
+    T1 --> T2
+    T2 --> T3
+    T3 --> X
+    
+    style P fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style Y fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style X fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+</div>
+```
+
+### C++ Transformation Chain Implementation
+
+The transformation chain is built using C++ template metaprogramming to create a compile-time pipeline:
+
+```cpp
+// Building the transformation chain in make_static_tile_distribution
+template <typename Encoding>
+CK_TILE_HOST_DEVICE auto make_ps_ys_to_xs_adaptor(const Encoding& encoding)
+{
+    // Step 1: Create individual transforms
+    constexpr auto replicate_transform = make_replicate_transform(
+        encoding.get_rs_lengths());
+    
+    constexpr auto unmerge_transform = make_unmerge_transform(
+        encoding.get_hs_lengthss());
+    
+    constexpr auto merge_transform = make_merge_transform(
+        encoding.get_rhs_to_xs_mapping());
+    
+    // Step 2: Chain transforms together
+    constexpr auto transform_chain = chain_transforms(
+        replicate_transform,
+        unmerge_transform, 
+        merge_transform);
+    
+    // Step 3: Create adaptor with the chain
+    return make_tile_adaptor(
+        transform_chain,
+        encoding.get_lower_dimension_hidden_idss());
+}
+```
+
+### How Transforms Work in C++
+
+Each transform is a compile-time object that knows how to convert coordinates:
+
+```cpp
+// Example: Replicate transform implementation
+template <typename Lengths>
+struct replicate_transform
+{
+    static constexpr index_t num_of_upper_dimension = size(Lengths{});
+    static constexpr index_t num_of_lower_dimension = 2 * num_of_upper_dimension;
+    
+    template <typename UpperIndex>
+    CK_TILE_HOST_DEVICE constexpr auto 
+    calculate_lower_index(const UpperIndex& idx_upper) const
+    {
+        // Replicate each coordinate: [a,b] -> [a,b,0,0]
+        auto idx_lower = make_zero_multi_index<num_of_lower_dimension>();
+        
+        static_for<0, num_of_upper_dimension, 1>{}([&](auto i) {
+            idx_lower(i) = idx_upper[i];
+            idx_lower(i + num_of_upper_dimension) = 0;
+        });
+        
+        return idx_lower;
+    }
+};
+```
+
 **🔗 The P+Y → X Transformation Chain**
 
 The `ps_ys_to_xs_adaptor` implements a chain of transformations:
@@ -289,6 +478,81 @@ The `ps_ys_to_xs_adaptor` implements a chain of transformations:
 ## The Y to D Linearization
 
 The descriptor handles the linearization of Y coordinates to memory addresses.
+
+### C++ Implementation of Y→D Descriptor
+
+The Y→D descriptor is responsible for converting multi-dimensional Y coordinates into linear memory offsets:
+
+```cpp
+// Y to D descriptor implementation
+template <typename YLengths, typename YStrides>
+struct ys_to_d_descriptor
+{
+    static constexpr index_t num_of_dimension = size(YLengths{});
+    
+    // Calculate linear offset from Y coordinates
+    template <typename YIndex>
+    CK_TILE_HOST_DEVICE constexpr index_t 
+    calculate_offset(const YIndex& idx_y) const
+    {
+        index_t offset = 0;
+        
+        static_for<0, num_of_dimension, 1>{}([&](auto i) {
+            offset += idx_y[i] * YStrides{}[i];
+        });
+        
+        return offset;
+    }
+    
+    // Get element space size (total elements per thread)
+    CK_TILE_HOST_DEVICE static constexpr index_t 
+    get_element_space_size()
+    {
+        return reduce_on_sequence(
+            YLengths{}, 
+            multiplies{}, 
+            number<1>{});
+    }
+};
+
+// Usage in distributed tensor
+template <typename TileDistribution>
+struct static_distributed_tensor
+{
+    using ys_to_d_descriptor = typename TileDistribution::ys_to_d_descriptor;
+    
+    // Thread-local storage
+    static constexpr index_t thread_buffer_size = 
+        ys_to_d_descriptor::get_element_space_size();
+    
+    DataType thread_buffer_[thread_buffer_size];
+    
+    // Access element at Y coordinate
+    template <typename YIndex>
+    CK_TILE_HOST_DEVICE DataType& at(const YIndex& idx_y)
+    {
+        const index_t offset = ys_to_d_descriptor{}.calculate_offset(idx_y);
+        return thread_buffer_[offset];
+    }
+};
+```
+
+### Memory Layout Optimization
+
+The descriptor enables efficient register allocation:
+
+```cpp
+// Optimized layout for vector operations
+template <index_t M, index_t N, index_t VectorSize>
+struct make_ys_to_d_descriptor_for_gemm
+{
+    // Layout: [M/VectorSize][N][VectorSize]
+    // This ensures vector loads are contiguous in memory
+    using type = tile_descriptor<
+        sequence<M/VectorSize, N, VectorSize>,
+        sequence<N * VectorSize, VectorSize, 1>>;
+};
+```
 
 ### Y to D Linearization Details
 

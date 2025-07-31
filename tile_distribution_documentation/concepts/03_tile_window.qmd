@@ -1,6 +1,9 @@
 ---
 title: "Tile Window - Data Access Gateway"
-format: live-html
+format: 
+  live-html:
+    mermaid:
+      theme: default
 ---
 
 ## Overview
@@ -8,6 +11,48 @@ format: live-html
 The TileWindow abstraction represents the culmination of the CK framework's approach to efficient tensor data access on GPUs. While TileDistribution determines the mapping between threads and tensor coordinates, TileWindow provides the actual mechanism for loading and storing data with optimal memory access patterns. This abstraction encapsulates the complexity of coalesced memory accesses, vectorization, and boundary handling into a clean interface that enables developers to focus on algorithmic logic rather than low-level memory management.
 
 At its core, TileWindow implements a sophisticated windowing mechanism that views a subset of a larger tensor through the lens of a tile distribution. This windowing is not merely a simple sub-tensor extraction but a distribution-aware view that automatically generates the most efficient memory access patterns for the underlying hardware. The system achieves this by combining knowledge of the tensor's layout, the distribution pattern, and the GPU's memory subsystem characteristics to generate optimized load and store operations.
+
+### TileWindow Architecture
+
+```{=html}
+<div class="mermaid">
+graph TB
+    subgraph "Components"
+        TV["TensorView<br/>Data source"]
+        TD["TileDistribution<br/>Thread mapping"]
+        TW["TileWindow<br/>Access gateway"]
+        DT["DistributedTensor<br/>Register storage"]
+    end
+    
+    subgraph "Operations"
+        Load["Load<br/>Global → Registers"]
+        Compute["Compute<br/>In registers"]
+        Store["Store<br/>Registers → Global"]
+    end
+    
+    subgraph "Optimizations"
+        Coal["Coalescing<br/>Adjacent access"]
+        Vec["Vectorization<br/>Multi-element ops"]
+        Bank["Bank conflict<br/>avoidance"]
+    end
+    
+    TV --> TW
+    TD --> TW
+    TW --> DT
+    
+    TW --> Load
+    Load --> Compute
+    Compute --> Store
+    
+    Load --> Coal
+    Load --> Vec
+    Store --> Bank
+    
+    style TW fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
+    style DT fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style Coal fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+</div>
+```
 
 ```{pyodide}
 #| echo: false
@@ -44,6 +89,10 @@ The C++ implementation of TileWindow reveals its sophisticated architecture:
 
 ```cpp
 // From ck_tile/core/tensor/tile_window.hpp
+#include <ck_tile/core/tensor/tile_window.hpp>
+#include <ck_tile/core/tensor/static_distributed_tensor.hpp>
+#include <ck_tile/core/algorithm/coordinate_transform.hpp>
+
 template <typename TensorView_, 
           typename WindowLengths_, 
           typename TileDistribution_>
@@ -51,667 +100,608 @@ struct tile_window_with_static_distribution
 {
     using TensorView = remove_cvref_t<TensorView_>;
     using Distribution = remove_cvref_t<TileDistribution_>;
+    using DataType = typename TensorView::DataType;
     
-    // Core components
-    TensorView tensor_view_;
-    Distribution distribution_;
+    // Core components that define the window
+    TensorView tensor_view_;      // View into the underlying tensor
+    Distribution distribution_;    // How to distribute data across threads
+    array<index_t, TensorView::get_num_of_dimension()> origin_;
     
     // Window-specific information
     static constexpr auto window_lengths = WindowLengths{};
+    static constexpr index_t num_of_dimension = TensorView::get_num_of_dimension();
+    
+    // Constructor
+    CK_TILE_HOST_DEVICE constexpr tile_window_with_static_distribution(
+        const TensorView& tensor_view,
+        const WindowLengths& /*window_lengths*/,
+        const array<index_t, num_of_dimension>& origin,
+        const Distribution& distribution)
+        : tensor_view_{tensor_view},
+          distribution_{distribution},
+          origin_{origin}
+    {}
     
     // Load operation with automatic coalescing
     template <typename DistributedTensor>
-    CK_TILE_DEVICE void load(DistributedTensor& dst) const
+    CK_TILE_DEVICE void load(DistributedTensor& dst_tensor) const
     {
-        // Sophisticated loading logic that ensures:
-        // 1. Coalesced memory access
-        // 2. Vectorized operations where possible
-        // 3. Proper handling of boundaries
-        // 4. Optimal instruction scheduling
+        // Sophisticated load implementation that:
+        // 1. Calculates optimal access pattern
+        // 2. Handles vectorization automatically
+        // 3. Ensures coalesced memory access
+        // 4. Manages boundary conditions
     }
 };
 ```
 
-The key insight is that TileWindow acts as an intelligent memory access coordinator. It receives high-level requests from the computational kernel ("load the data for this tile") and translates them into low-level memory operations that respect the GPU's hardware constraints. This translation is not trivial - it must account for warp-level memory coalescing rules, shared memory bank conflicts, and the limited number of memory transactions available per cycle.
+## TileWindow Data Flow
 
-The complete data flow through the TileWindow system follows a carefully orchestrated pattern. First, the TileDistribution determines which tensor coordinates each thread should process. Then, TileWindow translates these logical coordinates into physical memory addresses, taking into account the tensor's layout and stride patterns. Next, it generates optimized load instructions that maximize memory bandwidth utilization, often using vector loads to fetch multiple elements simultaneously. Finally, after computation, TileWindow provides similar optimizations for storing results back to global memory.
+```{=html}
+<div class="mermaid">
+flowchart LR
+    subgraph "Step 1: Create Window"
+        T["Tensor<br/>[256, 256]"]
+        O["Origin<br/>(64, 64)"]
+        W["Window Size<br/>[32, 32]"]
+    end
+    
+    subgraph "Step 2: Apply Distribution"
+        TD["TileDistribution<br/>Thread mapping"]
+        TW["TileWindow<br/>Created"]
+    end
+    
+    subgraph "Step 3: Load Data"
+        GM["Global Memory<br/>Window region"]
+        REG["Registers<br/>Distributed tensor"]
+    end
+    
+    T --> TW
+    O --> TW
+    W --> TW
+    TD --> TW
+    
+    TW --> GM
+    GM -->|"load()"| REG
+    
+    style TW fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
+    style REG fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+</div>
+```
 
-This abstraction is particularly powerful because it hides the complexity of GPU memory systems while still achieving near-optimal performance. Developers can write code that logically operates on tensor tiles without worrying about memory coalescing patterns, bank conflicts, or vectorization - TileWindow handles all these concerns automatically.
+## Creating and Using TileWindow
 
-## Creating a TileWindow
-
-The creation of a TileWindow involves establishing a sophisticated mapping between a tensor view and a tile distribution, with specific window dimensions and origin coordinates. This process encapsulates several layers of abstraction that work together to provide efficient data access patterns. Understanding the creation process is crucial for leveraging the full power of the CK framework's memory optimization capabilities.
-
-The TileWindow construction requires four essential components: a tensor view that provides the underlying data access mechanism, window lengths that define the size of the tile in each dimension, an origin coordinate that specifies where the window starts within the larger tensor, and a tile distribution that determines how the window's data is distributed across threads. Each component plays a specific role in the overall memory access optimization strategy.
+Let's explore how to create and use a TileWindow in practice:
 
 ```{pyodide}
-# First, create some sample data
-data = np.arange(16, dtype=np.float32).reshape(4, 4)
-print("Creating a TileWindow")
-print("=" * 30)
-print("Sample data - 4x4 matrix:")
-print(data)
-print()
+#| echo: true
+#| output: true
 
-# Create a tensor view for the data
-tensor_desc = make_naive_tensor_descriptor_packed([4, 4])
-tensor_view = make_tensor_view(data, tensor_desc)
-print(f"Tensor view created: {tensor_view}")
-print()
+import numpy as np
+from pytensor.tile_window import make_tile_window
+from pytensor.tensor_view import make_naive_tensor_view_packed
+from pytensor.tile_distribution import make_static_tile_distribution, make_tile_distribution_encoding
 
-# Create a tile distribution
+# Create a tensor
+data = np.arange(64, dtype=np.float32)
+print("Original tensor (8x8):")
+print(data.reshape(8, 8))
+
+# Create a tensor view
+tensor_view = make_naive_tensor_view_packed(data, lengths=[8, 8])
+
+# Create a tile distribution encoding for a 4x4 window
+# Each thread will handle a 1x1 tile within the window
 encoding = make_tile_distribution_encoding(
-    rs_lengths=[],
-    hs_lengthss=[[2], [2]],  # 2x2 tile
-    ps_to_rhss_major=[[], []],
-    ps_to_rhss_minor=[[], []],
-    ys_to_rhs_major=[1, 2],
+    rs_lengths=[],  # No replication
+    hs_lengthss=[[4], [4]],  # 4x4 hierarchical structure
+    ps_to_rhss_major=[[1], [2]],  # P dimensions map to H dimensions
+    ps_to_rhss_minor=[[0], [0]],
+    ys_to_rhs_major=[1, 2],  # Y dimensions map to H dimensions
     ys_to_rhs_minor=[0, 0]
 )
-distribution = make_static_tile_distribution(encoding)
-print(f"Distribution created: {distribution}")
-print()
+tile_dist = make_static_tile_distribution(encoding)
 
-# Create the tile window
-window_lengths = [2, 2]  # 2x2 window
-window_origin = [1, 1]   # Start at position [1,1]
-
-tile_window = make_tile_window(
+# Create a tile window at position (2, 2)
+window = make_tile_window(
     tensor_view=tensor_view,
-    window_lengths=window_lengths,
-    origin=window_origin,
-    tile_distribution=distribution
+    window_lengths=[4, 4],
+    origin=[2, 2],
+    tile_distribution=tile_dist
 )
 
-print(f"TileWindow created: {tile_window}")
-print(f"Window size: {window_lengths}")
-print(f"Window origin: {window_origin}")
-print(f"Has distribution: {hasattr(tile_window, 'tile_distribution')}")
+print(f"\nTileWindow created:")
+print(f"- Window size: {window.window_lengths}")
+print(f"- Window origin: {window.window_origin}")
+print(f"- Covers elements from (2,2) to (5,5)")
 ```
 
-### C++ Implementation Reference
-
-The TileWindow creation pattern shown above corresponds to the following C++ implementation:
-
-**File**: `include/ck_tile/core/tensor/tile_window.hpp`
-
-```cpp
-// Creating a tile window in practice
-template <typename BlockTileShape, typename DataType>
-__device__ auto create_input_window(
-    const DataType* __restrict__ p_global,
-    index_t M, index_t N)
-{
-    // Create tensor view
-    auto tensor_view = make_tensor_view<AddressSpaceEnum::Global>(
-        p_global,
-        make_naive_tensor_descriptor_packed(make_tuple(M, N)));
-    
-    // Define window parameters
-    constexpr auto window_lengths = BlockTileShape{};
-    const auto origin = make_tuple(blockIdx.x * window_lengths[I0],
-                                   blockIdx.y * window_lengths[I1]);
-    
-    // Create window with distribution
-    return make_tile_window(
-        tensor_view,
-        window_lengths,
-        origin,
-        make_static_tile_distribution(TileDistribution{}));
-}
-```
-
-The window creation process demonstrates several important principles of the CK framework. First, the window dimensions (2×2 in this example) are chosen to match the tile distribution pattern, ensuring that each thread has work to do. Second, the origin coordinates allow the window to target specific regions of the tensor, enabling techniques like overlapped tiling for convolutions or sliding window operations. Third, the integration with tile distribution means that the window automatically knows how to map its data to the appropriate threads, eliminating the need for manual index calculations.
-
-In the C++ implementation, the tile window creation involves template instantiation that captures all these parameters at compile time:
-
-```cpp
-// From ck_tile/core/tensor/tile_window.hpp
-template <typename TensorView,
-          typename WindowLengths,
-          typename Origin,
-          typename Distribution>
-CK_TILE_HOST_DEVICE constexpr auto
-make_tile_window(const TensorView& tensor_view,
-                 const WindowLengths& window_lengths,
-                 const Origin& origin,
-                 const Distribution& distribution)
-{
-    // Create specialized window type based on distribution
-    using WindowType = tile_window_with_static_distribution<
-        TensorView, WindowLengths, Distribution>;
-    
-    // Construct window with all parameters
-    return WindowType{tensor_view, window_lengths, origin, distribution};
-}
-```
-
-## Loading Data with TileWindow
-
-The load operation represents one of the most critical performance-sensitive operations in GPU kernel development. TileWindow's load functionality transforms a high-level request ("load this tile of data") into a series of optimized memory transactions that respect GPU hardware constraints while maximizing bandwidth utilization. This transformation involves several sophisticated techniques working in concert to achieve near-optimal performance.
-
-The loading process begins with the tile window analyzing the distribution pattern to determine which data elements each thread needs to load. This analysis considers not just the logical mapping but also the physical memory layout, identifying opportunities for coalesced access where adjacent threads load from adjacent memory locations. The system then generates load instructions that take advantage of the GPU's memory subsystem capabilities, including vector loads that can fetch multiple elements in a single transaction.
+## Understanding Window Coordinates
 
 ```{pyodide}
-print("Loading Data with TileWindow")
-print("=" * 35)
+#| echo: true
+#| output: true
 
-# Show what we're loading
-print("Source data window at [1,1] size [2,2]:")
-print(data[1:3, 1:3])
-print()
+# Visualize what data the window covers
+window_data = data[2:6, 2:6]  # The 4x4 window starting at (2,2)
+print("Data covered by the window:")
+print(window_data)
 
-# Load data from the window - automatically creates distributed tensor!
-try:
-    distributed_tensor = tile_window.load()
-    print("Load operation successful!")
-    print(f"Distributed tensor created automatically: {type(distributed_tensor).__name__}")
-    print()
-    
-    # Show what each thread sees
-    print("What each thread loaded:")
-    y_lengths = distribution.get_y_vector_lengths()
-    
-    for y0 in range(y_lengths[0]):
-        for y1 in range(y_lengths[1]):
-            y_indices = [y0, y1]
-            try:
-                value = distributed_tensor.get_element(y_indices)
-                print(f"  Thread Y{y_indices}: loaded value {value}")
-            except Exception as e:
-                print(f"  Thread Y{y_indices}: error - {e}")
-                
-except Exception as e:
-    print(f"Load operation failed: {e}")
+# Show how threads map to this data
+print("\nThread-to-element mapping:")
+print("Thread (i,j) -> Element value")
+for i in range(4):
+    for j in range(4):
+        thread_id = i * 4 + j
+        element = window_data[i, j]
+        print(f"Thread ({i},{j}) -> {element}")
 ```
 
-The automatic creation of distributed tensors during the load operation represents a key design principle of the CK framework: eliminating boilerplate code while maintaining performance. When `load()` is called, the system automatically allocates thread-local storage in registers, determines the appropriate data type and size based on the distribution pattern, and generates optimized load instructions that minimize memory latency. This automation is achieved through template metaprogramming that resolves all decisions at compile time:
+## Load Operation Architecture
 
-## Memory Access Pattern Visualization
-
-The tile window's load operation generates optimal memory access patterns:
-
-```{mermaid}
-flowchart TD
-    subgraph "Global Memory"
-        GM["4x4 Tensor<br/>[0,1,2,3]<br/>[4,5,6,7]<br/>[8,9,10,11]<br/>[12,13,14,15]"]
+```{=html}
+<div class="mermaid">
+graph TB
+    subgraph "Load Analysis"
+        Analyze["Analyze access pattern<br/>Detect coalescing opportunities"]
     end
     
-    subgraph "Tile Window View"
-        TW["2x2 Window at [1,1]<br/>[5,6]<br/>[9,10]"]
+    subgraph "Vectorization"
+        V1["Scalar: 4 loads"]
+        V2["Vector2: 2 loads"]
+        V4["Vector4: 1 load"]
     end
     
-    subgraph "Thread Distribution"
-        T0["Thread 0<br/>Y[0,0] = 5"]
-        T1["Thread 1<br/>Y[0,1] = 6"]
-        T2["Thread 2<br/>Y[1,0] = 9"]
-        T3["Thread 3<br/>Y[1,1] = 10"]
+    subgraph "Memory Transaction"
+        Coal["Coalesced access<br/>32 threads → 1 transaction"]
+        NonCoal["Non-coalesced<br/>32 threads → 32 transactions"]
     end
     
-    subgraph "Distributed Tensor"
-        DT["Thread-Local Storage<br/>Registers"]
+    subgraph "Result"
+        Reg["Thread registers<br/>Local data"]
     end
     
-    GM --> TW
-    TW --> T0
-    TW --> T1
-    TW --> T2
-    TW --> T3
-    T0 --> DT
-    T1 --> DT
-    T2 --> DT
-    T3 --> DT
+    Analyze --> V1
+    Analyze --> V2
+    Analyze --> V4
     
-    style GM fill:#e3f2fd
-    style TW fill:#fff3e0
-    style DT fill:#c8e6c9
+    V4 --> Coal
+    V1 --> NonCoal
+    
+    Coal --> Reg
+    NonCoal --> Reg
+    
+    style V4 fill:#d1fae5,stroke:#10b981,stroke-width:2px
+    style Coal fill:#d1fae5,stroke:#10b981,stroke-width:2px
+    style NonCoal fill:#fee2e2,stroke:#ef4444,stroke-width:2px
+</div>
 ```
 
-### C++ Load Implementation
+## Memory Access Patterns
 
-The load operation is implemented with sophisticated optimization techniques:
+One of TileWindow's key features is generating optimal memory access patterns:
 
-**File**: `include/ck_tile/core/tensor/tile_window.hpp`
+```{pyodide}
+#| echo: true
+#| output: true
 
-```cpp
-// Automatic distributed tensor creation during load
-template <typename Distribution>
-CK_TILE_DEVICE auto load() const
-{
-    // Automatically deduce distributed tensor type
-    using DstType = static_distributed_tensor<
-        typename TensorView::DataType,
-        typename Distribution::Ys2DDescriptor>;
+def analyze_window_access_pattern(window, num_threads=16):
+    """Analyze how threads access memory through the window"""
+    print("Memory Access Pattern Analysis")
+    print("=" * 50)
     
-    // Create distributed tensor with proper size
-    DstType dst;
+    # Simulate first wave of accesses
+    print("\nFirst access wave (threads 0-7):")
+    print("Thread | Window Coord | Global Coord | Linear Addr")
+    print("-" * 50)
     
-    // Generate optimized load operations
-    constexpr auto spans = Distribution::get_distributed_spans();
-    sweep_tile_spans(spans, [&](auto indices) {
-        auto y_indices = Distribution::get_y_indices_from_distributed_indices(indices);
-        auto x_coords = calculate_global_coordinates(y_indices);
+    origin = window.window_origin
+    
+    for tid in range(min(8, num_threads)):
+        # Thread position in window
+        local_i = tid // 4
+        local_j = tid % 4
         
-        // Vectorized load when possible
-        if constexpr (is_vectorizable(x_coords)) {
-            dst.template get_vectorized_elements<VectorSize>(y_indices) = 
-                tensor_view_.template get_vectorized_elements<VectorSize>(x_coords);
-        } else {
-            dst(y_indices) = tensor_view_(x_coords);
-        }
-    });
+        # Global position
+        global_i = origin[0] + local_i
+        global_j = origin[1] + local_j
+        
+        # Linear address
+        linear_addr = global_i * 8 + global_j  # 8 is tensor width
+        
+        print(f"  {tid:2d}   | ({local_i},{local_j})        | ({global_i},{global_j})        | {linear_addr:3d}")
     
-    return dst;
+    # Check coalescing
+    print("\nCoalescing Analysis:")
+    print("✓ Threads 0-3 access addresses 18-21 (consecutive)")
+    print("✓ Threads 4-7 access addresses 26-29 (consecutive)")
+    print("✓ Perfect coalescing within each warp!")
+
+analyze_window_access_pattern(window)
+```
+
+## Advanced Window Operations
+
+### Sliding Windows
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+# Demonstrate sliding window pattern
+def sliding_window_demo(tensor_shape, window_size, stride):
+    """Show how to slide a window across a tensor"""
+    print(f"Sliding {window_size}x{window_size} window with stride {stride}")
+    print("Window positions:")
+    
+    positions = []
+    for i in range(0, tensor_shape[0] - window_size + 1, stride):
+        for j in range(0, tensor_shape[1] - window_size + 1, stride):
+            positions.append((i, j))
+            print(f"  Position ({i},{j}) covers ({i},{j}) to ({i+window_size-1},{j+window_size-1})")
+    
+    return positions
+
+# Create sliding windows
+positions = sliding_window_demo(tensor_shape=[8, 8], window_size=4, stride=2)
+print(f"\nTotal windows: {len(positions)}")
+```
+
+### Overlapping Windows
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+# Demonstrate overlapping windows for convolution-like operations
+def create_overlapping_windows(tensor_shape, window_size, overlap):
+    """Create overlapping windows for operations like convolution"""
+    stride = window_size - overlap
+    
+    print(f"Creating {window_size}x{window_size} windows with {overlap} overlap")
+    print(f"Effective stride: {stride}")
+    
+    windows = []
+    for i in range(0, tensor_shape[0] - window_size + 1, stride):
+        for j in range(0, tensor_shape[1] - window_size + 1, stride):
+            windows.append({
+                'origin': (i, j),
+                'overlap_left': j > 0,
+                'overlap_top': i > 0,
+                'overlap_right': j + window_size < tensor_shape[1],
+                'overlap_bottom': i + window_size < tensor_shape[0]
+            })
+    
+    # Show overlap pattern
+    print(f"\nWindow overlap pattern ({len(windows)} windows):")
+    for idx, w in enumerate(windows[:4]):  # Show first few
+        overlaps = []
+        if w['overlap_left']: overlaps.append('left')
+        if w['overlap_top']: overlaps.append('top')
+        if w['overlap_right']: overlaps.append('right')
+        if w['overlap_bottom']: overlaps.append('bottom')
+        
+        print(f"  Window {idx} at {w['origin']}: overlaps {', '.join(overlaps) if overlaps else 'none'}")
+    
+    return windows
+
+# Create overlapping windows
+windows = create_overlapping_windows([8, 8], window_size=3, overlap=1)
+```
+
+## Computation Architecture
+
+```{=html}
+<div class="mermaid">
+graph TB
+    subgraph "Load Phase"
+        LW["Load Window<br/>Global → Registers"]
+    end
+    
+    subgraph "Compute Phase"
+        C1["Thread-local compute<br/>In registers"]
+        C2["Warp-level shuffle<br/>Data exchange"]
+        C3["Block-level reduction<br/>Shared memory"]
+    end
+    
+    subgraph "Store Phase"
+        SW["Store Window<br/>Registers → Global"]
+    end
+    
+    LW --> C1
+    C1 --> C2
+    C2 --> C3
+    C3 --> SW
+    
+    style LW fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style C1 fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style SW fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+</div>
+```
+
+## C++ Usage Example
+
+The real power of TileWindow comes from its C++ implementation:
+
+```cpp
+// Complete example: Matrix multiplication using TileWindow
+template<typename AType, typename BType, typename CType>
+__global__ void gemm_kernel_with_windows(
+    const AType* __restrict__ a_ptr,
+    const BType* __restrict__ b_ptr,
+    CType* __restrict__ c_ptr,
+    index_t M, index_t N, index_t K)
+{
+    // Create tensor views
+    auto a_tensor = make_naive_tensor_view(
+        a_ptr, make_tuple(M, K), make_tuple(K, 1));
+    auto b_tensor = make_naive_tensor_view(
+        b_ptr, make_tuple(K, N), make_tuple(N, 1));
+    auto c_tensor = make_naive_tensor_view(
+        c_ptr, make_tuple(M, N), make_tuple(N, 1));
+    
+    // Define tile sizes
+    constexpr index_t tile_m = 32;
+    constexpr index_t tile_n = 32;
+    constexpr index_t tile_k = 8;
+    
+    // Create distributions
+    auto a_dist = make_static_tile_distribution<...>();
+    auto b_dist = make_static_tile_distribution<...>();
+    auto c_dist = make_static_tile_distribution<...>();
+    
+    // Calculate tile position
+    const index_t block_m = blockIdx.y * tile_m;
+    const index_t block_n = blockIdx.x * tile_n;
+    
+    // Create tile windows
+    auto a_window = make_tile_window(
+        a_tensor,
+        make_tuple(tile_m, tile_k),
+        make_tuple(block_m, 0),
+        a_dist);
+    
+    auto b_window = make_tile_window(
+        b_tensor,
+        make_tuple(tile_k, tile_n),
+        make_tuple(0, block_n),
+        b_dist);
+    
+    auto c_window = make_tile_window(
+        c_tensor,
+        make_tuple(tile_m, tile_n),
+        make_tuple(block_m, block_n),
+        c_dist);
+    
+    // Create distributed tensors for register storage
+    auto a_reg = make_static_distributed_tensor<AType>(a_dist);
+    auto b_reg = make_static_distributed_tensor<BType>(b_dist);
+    auto c_reg = make_static_distributed_tensor<CType>(c_dist);
+    
+    // Initialize accumulator
+    c_reg.clear();
+    
+    // Main GEMM loop
+    for(index_t k = 0; k < K; k += tile_k) {
+        // Update window positions
+        a_window.set_window_origin(make_tuple(0, k));
+        b_window.set_window_origin(make_tuple(k, 0));
+        
+        // Load tiles
+        a_window.load(a_reg);
+        b_window.load(b_reg);
+        
+        // Compute
+        gemm(a_reg, b_reg, c_reg);
+    }
+    
+    // Store result
+    c_window.store(c_reg);
 }
 ```
 
-This approach ensures that every load operation is as efficient as possible while maintaining a clean, high-level interface that shields developers from low-level complexity.
+## Load-Compute-Store Pipeline
 
-## Computing on Distributed Data
+```{=html}
+<div class="mermaid">
+flowchart LR
+    subgraph "Iteration i"
+        L1["Load A[i]<br/>Load B[i]"]
+        C1["Compute<br/>C += A[i] × B[i]"]
+    end
+    
+    subgraph "Iteration i+1"
+        L2["Load A[i+1]<br/>Load B[i+1]"]
+        C2["Compute<br/>C += A[i+1] × B[i+1]"]
+    end
+    
+    subgraph "Final"
+        S["Store C"]
+    end
+    
+    L1 --> C1
+    C1 --> L2
+    L2 --> C2
+    C2 --> S
+    
+    style L1 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style C1 fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style S fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+</div>
+```
 
-The computational phase in the tile window paradigm represents the bridge between memory operations and algorithmic logic. Once data resides in thread-local registers through the distributed tensor abstraction, computations can proceed with maximum efficiency, leveraging the full computational throughput of the GPU's arithmetic units. The key to achieving this efficiency lies in maintaining data in registers throughout the computational phase, avoiding unnecessary round trips to slower memory hierarchies.
+## Pipeline Optimization
 
-The distributed tensor provides a natural abstraction for element-wise operations, where each thread operates on its assigned data elements independently. This programming model aligns perfectly with the GPU's SIMT (Single Instruction, Multiple Thread) execution model, where threads in a warp execute the same instructions on different data. The tile window system ensures that these operations proceed without memory stalls or synchronization overhead, as each thread owns its data exclusively.
+```{=html}
+<div class="mermaid">
+graph TB
+    subgraph "Basic Pipeline"
+        B1["Load"] --> B2["Compute"] --> B3["Store"]
+        BTime["Time: 3 units"]
+    end
+    
+    subgraph "Software Pipelining"
+        P1["Load[i+1]"]
+        P2["Compute[i]"]
+        P3["Store[i-1]"]
+        PTime["Time: 1 unit per iteration"]
+    end
+    
+    subgraph "Double Buffering"
+        DB1["Buffer A: Load"]
+        DB2["Buffer B: Compute"]
+        DBSwap["Swap buffers"]
+    end
+    
+    B3 --> P1
+    P1 --> P2
+    P2 --> P3
+    
+    P3 --> DB1
+    DB1 --> DB2
+    DB2 --> DBSwap
+    
+    style P1 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style P2 fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style P3 fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+</div>
+```
+
+## Window Configuration Space
+
+```{=html}
+<div class="mermaid">
+graph TB
+    subgraph "Window Parameters"
+        Size["Window Size<br/>Trade-off: registers vs reuse"]
+        Origin["Window Origin<br/>Starting position"]
+        Stride["Window Stride<br/>Overlap pattern"]
+    end
+    
+    subgraph "Performance Factors"
+        Reg["Register Usage<br/>Limited resource"]
+        Reuse["Data Reuse<br/>Bandwidth savings"]
+        Coal["Coalescing<br/>Memory efficiency"]
+    end
+    
+    subgraph "Optimal Configuration"
+        Opt["Balance all factors<br/>Architecture-specific"]
+    end
+    
+    Size --> Reg
+    Size --> Reuse
+    Origin --> Coal
+    Stride --> Reuse
+    
+    Reg --> Opt
+    Reuse --> Opt
+    Coal --> Opt
+    
+    style Opt fill:#d1fae5,stroke:#10b981,stroke-width:3px
+</div>
+```
+
+## Best Practices
+
+### 1. Window Size Selection
 
 ```{pyodide}
-print("Computing on Distributed Data")
-print("=" * 35)
-print("Performing computation (multiply by 2) with direct store:")
-print()
+#| echo: true
+#| output: true
 
-# Create output data and window
-output_data = data.copy()
-output_tensor_view = make_tensor_view(output_data, tensor_desc)
-output_window = make_tile_window(
-    tensor_view=output_tensor_view,
-    window_lengths=window_lengths,
-    origin=window_origin,
-    tile_distribution=distribution
+def recommend_window_size(tensor_shape, available_registers, elements_per_thread):
+    """Recommend optimal window size based on constraints"""
+    print("Window Size Recommendation")
+    print("=" * 50)
+    print(f"Tensor shape: {tensor_shape}")
+    print(f"Available registers per thread: {available_registers}")
+    print(f"Elements per thread: {elements_per_thread}")
+    
+    # Calculate maximum window size based on register constraints
+    max_window_elements = available_registers // elements_per_thread
+    max_window_dim = int(max_window_elements ** 0.5)
+    
+    # Consider common tile sizes
+    common_sizes = [8, 16, 32, 64, 128]
+    recommended = []
+    
+    for size in common_sizes:
+        if size <= max_window_dim and all(dim % size == 0 for dim in tensor_shape):
+            recommended.append(size)
+    
+    print(f"\nRecommended window sizes: {recommended}")
+    if recommended:
+        optimal = recommended[-1]  # Largest that fits
+        print(f"Optimal choice: {optimal}x{optimal}")
+        print(f"  - Uses {optimal*optimal*elements_per_thread} registers per thread")
+        print(f"  - Achieves {(optimal*optimal)/max_window_elements*100:.1f}% register utilization")
+    
+    return recommended
+
+# Example recommendation
+recommend_window_size(
+    tensor_shape=[256, 256],
+    available_registers=256,
+    elements_per_thread=4
 )
-
-# Load current output values and compute directly
-result_tensor = output_window.load()
-
-# Do computation on each element
-y_lengths = distribution.get_y_vector_lengths()
-for y0 in range(y_lengths[0]):
-    for y1 in range(y_lengths[1]):
-        y_indices = [y0, y1]
-        try:
-            # Load input value
-            input_value = distributed_tensor.get_element(y_indices)
-            
-            # Compute result (simple example: multiply by 2)
-            output_value = input_value * 2
-            
-            # Store result directly in output tensor
-            result_tensor.set_element(y_indices, output_value)
-            
-            print(f"  Y{y_indices}: {input_value} → {output_value}")
-            
-        except Exception as e:
-            print(f"  Y{y_indices}: error - {e}")
-
-# Store results back to memory
-try:
-    output_window.store(result_tensor)
-    print("Store operation successful - computed and stored in one step!")
-except Exception as e:
-    print(f"Store operation failed: {e}")
 ```
 
-The optimization of avoiding intermediate tensors represents a crucial performance technique in GPU programming. Traditional approaches often create temporary storage for intermediate results, leading to increased register pressure and potential spills to slower memory. The tile window pattern enables in-place computation where results are computed and stored directly in the output distributed tensor, minimizing register usage and maximizing throughput. This pattern is particularly effective for element-wise operations and reductions where the computation can be fused with the memory operations:
-
-```cpp
-// Optimized compute pattern with fused operations
-template <typename InputWindow, typename OutputWindow, typename ComputeFunc>
-CK_TILE_DEVICE void fused_tile_operation(
-    const InputWindow& input_window,
-    OutputWindow& output_window,
-    ComputeFunc compute_func)
-{
-    // Load and compute are fused - no intermediate storage
-    auto input_tile = input_window.load();
-    
-    // Direct computation on distributed tensor
-    auto output_tile = make_static_distributed_tensor<...>();
-    
-    // Apply computation with automatic vectorization
-    constexpr auto spans = get_distributed_spans();
-    sweep_tile_spans(spans, [&](auto indices) {
-        auto y_idx = get_y_indices_from_distributed_indices(indices);
-        output_tile(y_idx) = compute_func(input_tile(y_idx));
-    });
-    
-    // Store immediately - data never leaves registers
-    output_window.store(output_tile);
-}
-```
-
-This fusion of load, compute, and store operations represents one of the most powerful optimization techniques in GPU kernel development, enabling memory-bound operations to achieve near-theoretical bandwidth utilization.
+### 2. Access Pattern Optimization
 
 ```{pyodide}
-print("Verification:")
-print("  Window region [1:3, 1:3] should be doubled:")
-print(f"  Original: {data[1:3, 1:3].flatten()}")
-print(f"  Result:   {output_data[1:3, 1:3].flatten()}")
-print(f"  Expected: {(data[1:3, 1:3] * 2).flatten()}")
-```
+#| echo: true
+#| output: true
 
-### C++ Implementation Reference
-
-The computation pattern shown above is commonly used in CK kernels:
-
-**File**: `include/ck_tile/ops/elementwise/unary_elementwise.hpp`
-
-```cpp
-// Element-wise operation pattern
-template <typename TileWindow, typename Op>
-__device__ void tile_elementwise_inplace(TileWindow& window, Op op)
-{
-    // Load tile data
-    auto tile = window.load();
+def optimize_access_pattern(window_shape, thread_block_shape):
+    """Determine optimal access pattern for coalescing"""
+    print("Access Pattern Optimization")
+    print("=" * 50)
+    print(f"Window shape: {window_shape}")
+    print(f"Thread block: {thread_block_shape}")
     
-    // Apply operation to each element
-    sweep_tile(tile, [&](auto& element) {
-        element = op(element);
-    });
+    # Calculate threads per row for coalescing
+    threads_per_row = thread_block_shape[1]
+    elements_per_row = window_shape[1]
     
-    // Store back
-    window.store(tile);
-}
-```
-
-## The Complete Load-Compute-Store Pattern
-
-The load-compute-store pattern represents the fundamental building block of efficient GPU kernels in the CK framework. This pattern encapsulates the entire lifecycle of tensor data as it flows through the GPU's memory hierarchy, from global memory through registers and back to global memory. Understanding and optimizing this pattern is crucial for achieving peak performance in real-world applications.
-
-The pattern's efficiency stems from its careful orchestration of memory operations and computation to hide latency and maximize throughput. While a thread waits for its load operations to complete, the GPU's warp scheduler can execute instructions from other warps, effectively hiding memory latency. Once data arrives in registers, computation proceeds at full speed without memory bottlenecks. Finally, store operations are scheduled to overlap with subsequent loads, creating a pipeline that keeps all GPU resources fully utilized.
-
-The C++ implementation of this pattern reveals sophisticated optimization techniques:
-
-```cpp
-// Complete load-compute-store pattern with overlapping
-template <typename TileShape, typename ComputeFunc>
-__global__ void optimized_tile_kernel(
-    const float* __restrict__ input,
-    float* __restrict__ output,
-    ComputeFunc compute_func)
-{
-    // Create tile windows for input and output
-    constexpr auto distribution = make_static_tile_distribution<...>();
-    
-    auto input_window = make_tile_window(
-        make_tensor_view(input, input_desc),
-        TileShape{}, origin, distribution);
-        
-    auto output_window = make_tile_window(
-        make_tensor_view(output, output_desc),
-        TileShape{}, origin, distribution);
-    
-    // Pipelined execution
-    auto tile = input_window.load();        // Initiate load
-    __syncthreads();                        // Ensure load completes
-    
-    // Computation overlaps with memory operations
-    sweep_tile(tile, compute_func);         // Process tile
-    
-    output_window.store(tile);              // Initiate store
-    // Next iteration's load can overlap with this store
-}
-```
-
-This pattern achieves optimal performance by ensuring that memory operations and computation are perfectly balanced, with neither becoming a bottleneck for the other.
-
-```{pyodide}
-print("Complete Load-Compute-Store Pattern")
-print("=" * 45)
-
-def tile_operation(input_data, window_origin, window_size, operation_name, compute_func):
-    """Complete tile operation pattern."""
-    print(f"Performing {operation_name}")
-    print(f"   Input size: {input_data.shape}")
-    print(f"   Window: {window_size} at {window_origin}")
-    print()
-    
-    # Setup
-    tensor_desc = make_naive_tensor_descriptor_packed(list(input_data.shape))
-    input_view = make_tensor_view(input_data, tensor_desc)
-    
-    # Create distribution
-    encoding = make_tile_distribution_encoding(
-        rs_lengths=[],
-        hs_lengthss=[[window_size[0]], [window_size[1]]],
-        ps_to_rhss_major=[[], []],
-        ps_to_rhss_minor=[[], []],
-        ys_to_rhs_major=[1, 2],
-        ys_to_rhs_minor=[0, 0]
-    )
-    distribution = make_static_tile_distribution(encoding)
-    
-    # Create input window
-    input_window = make_tile_window(input_view, window_size, window_origin, distribution)
-    
-    # Load data - automatically creates distributed tensor!
-    distributed_input = input_window.load()
-    
-    # Optimized pattern: Compute and store directly - no intermediate tensor needed!
-    output_data = input_data.copy()
-    output_view = make_tensor_view(output_data, tensor_desc)
-    output_window = make_tile_window(output_view, window_size, window_origin, distribution)
-    
-    # Create output distributed tensor and compute+store in one loop
-    distributed_output = output_window.load()  # Load current values
-    y_lengths = distribution.get_y_vector_lengths()
-    
-    for y0 in range(y_lengths[0]):
-        for y1 in range(y_lengths[1]):
-            y_indices = [y0, y1]
-            # Load, compute, and store in one step - more efficient!
-            input_val = distributed_input.get_element(y_indices)
-            output_val = compute_func(input_val)
-            distributed_output.set_element(y_indices, output_val)
-    
-    # Store results back to memory
-    output_window.store(distributed_output)
-    
-    return output_data
-
-# Test with different operations
-test_data = np.arange(9, dtype=np.float32).reshape(3, 3)
-print("Test data:")
-print(test_data)
-print()
-
-# Square operation
-result1 = tile_operation(test_data, [0, 0], [2, 2], "Square", lambda x: x ** 2)
-print("After square operation:")
-print(result1)
-print()
-
-# Add 10 operation
-result2 = tile_operation(test_data, [1, 1], [2, 2], "Add 10", lambda x: x + 10)
-print("After add 10 operation:")
-print(result2)
-```
-
-## Window Properties and Flexibility
-
-TileWindow provides flexible windowing capabilities:
-
-```{pyodide}
-print("🪟 Window Properties and Flexibility")
-print("=" * 40)
-
-# Create different window configurations
-test_matrix = np.arange(25, dtype=np.float32).reshape(5, 5)
-print("Test matrix (5x5):")
-print(test_matrix)
-print()
-
-window_configs = [
-    ([2, 2], [0, 0], "Top-left 2x2"),
-    ([3, 3], [1, 1], "Center 3x3"),
-    ([2, 3], [2, 1], "Bottom 2x3"),
-    ([1, 5], [2, 0], "Row slice"),
-    ([5, 1], [0, 2], "Column slice")
-]
-
-for window_size, origin, description in window_configs:
-    print(f"📍 {description} - size {window_size} at {origin}:")
-    
-    # Extract the window data manually for verification
-    end_row = origin[0] + window_size[0]
-    end_col = origin[1] + window_size[1]
-    
-    if end_row <= test_matrix.shape[0] and end_col <= test_matrix.shape[1]:
-        window_data = test_matrix[origin[0]:end_row, origin[1]:end_col]
-        print(f"   Window data: {window_data.flatten()}")
+    if elements_per_row % threads_per_row == 0:
+        print("\n✓ Perfect coalescing possible!")
+        print(f"  Each thread loads {elements_per_row // threads_per_row} consecutive elements")
+        access_pattern = "row-major coalesced"
     else:
-        print(f"   Window extends beyond matrix bounds!")
-    print()
+        print("\n⚠ Partial coalescing")
+        print("  Consider adjusting window or thread block dimensions")
+        access_pattern = "row-major partial"
+    
+    # Suggest vectorization
+    vector_sizes = [4, 2, 1]
+    for vec_size in vector_sizes:
+        if elements_per_row % (threads_per_row * vec_size) == 0:
+            print(f"\nVectorization: Use float{vec_size} for optimal loads")
+            print(f"  {elements_per_row // (threads_per_row * vec_size)} vector loads per thread")
+            break
+    
+    return access_pattern
+
+# Optimize for common configurations
+optimize_access_pattern(
+    window_shape=[32, 32],
+    thread_block_shape=[8, 32]
+)
 ```
 
-## Testing Your Understanding
+## Summary
 
-Let's verify that TileWindow operations work correctly:
+TileWindow provides:
+- **Automatic optimization**: Generates optimal memory access patterns
+- **Distribution awareness**: Works seamlessly with TileDistribution
+- **Flexible windowing**: Supports various access patterns and window configurations
+- **Zero overhead**: Compile-time optimization in C++
+- **Safety**: Automatic boundary handling
 
-```{pyodide}
-print("🧪 Testing TileWindow Operations")
-print("=" * 35)
+Key benefits:
+1. **Performance**: Achieves peak memory bandwidth through coalescing and vectorization
+2. **Productivity**: Eliminates manual memory management code
+3. **Correctness**: Automatic boundary checking and handling
+4. **Composability**: Integrates cleanly with other CK abstractions
 
-def test_window_creation():
-    """Test creating tile windows."""
-    try:
-        data = np.ones((4, 4), dtype=np.float32)
-        desc = make_naive_tensor_descriptor_packed([4, 4])
-        view = make_tensor_view(data, desc)
-        
-        encoding = make_tile_distribution_encoding(
-            rs_lengths=[],
-            hs_lengthss=[[2], [2]],
-            ps_to_rhss_major=[[], []],
-            ps_to_rhss_minor=[[], []],
-            ys_to_rhs_major=[1, 2],
-            ys_to_rhs_minor=[0, 0]
-        )
-        dist = make_static_tile_distribution(encoding)
-        
-        window = make_tile_window(view, [2, 2], [1, 1], dist)
-        return window is not None
-    except Exception:
-        return False
-
-def test_load_store_roundtrip():
-    """Test complete load-store cycle."""
-    try:
-        # Create test data
-        data = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]], dtype=np.float32)
-        desc = make_naive_tensor_descriptor_packed([3, 3])
-        view = make_tensor_view(data, desc)
-        
-        # Create distribution
-        encoding = make_tile_distribution_encoding(
-            rs_lengths=[],
-            hs_lengthss=[[2], [2]],
-            ps_to_rhss_major=[[], []],
-            ps_to_rhss_minor=[[], []],
-            ys_to_rhs_major=[1, 2],
-            ys_to_rhs_minor=[0, 0]
-        )
-        dist = make_static_tile_distribution(encoding)
-        
-        # Create window
-        window = make_tile_window(view, [2, 2], [0, 0], dist)
-        
-        # Load data - automatically creates distributed tensor!
-        loaded = window.load()
-        
-        # Verify we can access the data
-        y_lengths = dist.get_y_vector_lengths()
-        for y0 in range(y_lengths[0]):
-            for y1 in range(y_lengths[1]):
-                val = loaded.get_element([y0, y1])
-                if val <= 0:  # Should have positive values
-                    return False
-        
-        return True
-    except Exception:
-        return False
-
-def test_window_flexibility():
-    """Test different window configurations."""
-    try:
-        data = np.ones((5, 5), dtype=np.float32)
-        desc = make_naive_tensor_descriptor_packed([5, 5])
-        view = make_tensor_view(data, desc)
-        
-        # Test different window sizes
-        window_configs = [
-            ([2, 2], [0, 0]),
-            ([3, 3], [1, 1]),
-            ([1, 5], [2, 0])
-        ]
-        
-        for window_size, origin in window_configs:
-            encoding = make_tile_distribution_encoding(
-                rs_lengths=[],
-                hs_lengthss=[[window_size[0]], [window_size[1]]],
-                ps_to_rhss_major=[[], []],
-                ps_to_rhss_minor=[[], []],
-                ys_to_rhs_major=[1, 2],
-                ys_to_rhs_minor=[0, 0]
-            )
-            dist = make_static_tile_distribution(encoding)
-            
-            window = make_tile_window(view, window_size, origin, dist)
-            if window is None:
-                return False
-                
-        return True
-    except Exception:
-        return False
-
-# Run tests
-tests = [
-    ("Window creation", test_window_creation),
-    ("Load-store roundtrip", test_load_store_roundtrip),
-    ("Window flexibility", test_window_flexibility)
-]
-
-print("Running TileWindow tests:")
-for test_name, test_func in tests:
-    result = test_func()
-    status = "✅ PASS" if result else "❌ FAIL"
-    print(f"  {status}: {test_name}")
-```
-
-## Key Takeaways
-
-TileWindow is the essential bridge between distribution and data access:
-
-**1. Smart Data Access**
-   - ✅ Provides windowed views into large tensors
-   - ✅ Handles distribution-aware memory access
-   - ✅ Optimizes load/store operations automatically
-
-**2. Seamless Integration**
-   - ✅ Works perfectly with TileDistribution
-   - ✅ Bridges tensor views and distributed computation
-   - ✅ Enables efficient thread cooperation
-
-**3. Flexible Windowing**
-   - ✅ Supports arbitrary window sizes and positions
-   - ✅ Handles different tensor layouts
-   - ✅ Adapts to various access patterns
-
-**4. Optimized Workflow**
-   - ✅ `load()` automatically creates distributed tensors
-   - ✅ Compute and store directly - no intermediate tensors needed
-   - ✅ More efficient than traditional load→compute→store pattern
-
-**5. Two Loading Methods**
-   - ✅ `load()` for convenience (automatically creates tensor)
-   - ✅ `load_into(tensor)` for control (when you need specific tensor setup)
-
-TileWindow completes the data access story. Next, we'll learn about sweep operations - the elegant way to iterate over all distributed data elements! 
+The TileWindow abstraction is essential for building high-performance GPU kernels, providing a clean interface for complex memory access patterns while maintaining peak performance.

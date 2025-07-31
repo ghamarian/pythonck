@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compact Scientific Diagrams Test</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link rel="stylesheet" href="diagram-sizing-fixes.css">
+    <link rel="stylesheet" href="diagrams/diagram-styles.css">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: white;
+            color: #1e293b;
+            line-height: 1.6;
+        }
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            color: #0f172a;
+        }
+        h2 {
+            font-size: 1.25rem;
+            margin: 20px 0 10px 0;
+            color: #1e293b;
+        }
+        .test-container {
+            background: white;
+            border: 1px solid #e2e8f0;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .diagram-wrapper {
+            border: 1px solid #ccc;
+            background: white;
+            overflow: hidden;
+        }
+        .info {
+            font-size: 0.875rem;
+            color: #64748b;
+            margin-top: 10px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Compact Scientific Diagram Validation</h1>
+    <p class="info">All diagrams are now compact, animation-free, and optimized for scientific publication.</p>
+
+    <div class="grid">
+        <div class="test-container">
+            <h2>BufferView Architecture</h2>
+            <div class="diagram-wrapper" id="bufferview-test"></div>
+            <p class="info">Compact memory hierarchy visualization</p>
+        </div>
+
+        <div class="test-container">
+            <h2>MultiIndex Structure</h2>
+            <div class="diagram-wrapper" id="multiindex-test"></div>
+            <p class="info">Streamlined coordinate system</p>
+        </div>
+    </div>
+
+    <div class="test-container">
+        <h2>Transform System</h2>
+        <div class="diagram-wrapper" id="transform-test"></div>
+        <p class="info">Minimal transform architecture</p>
+    </div>
+
+    <div class="test-container">
+        <h2>Coordinate Systems</h2>
+        <div class="diagram-wrapper" id="coord-test"></div>
+        <p class="info">Compact coordinate space visualization</p>
+    </div>
+
+    <!-- Load diagram scripts -->
+    <script src="diagrams/diagrams.js"></script>
+    <script src="diagrams/buffer_view/bufferview_architecture.js"></script>
+    <script src="diagrams/tensor_coordinates/multiindex_structure.js"></script>
+    <script src="diagrams/transforms/transform_system_architecture.js"></script>
+    <script src="diagrams/coordinate-systems-diagrams.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Testing compact, animation-free diagrams...');
+
+            // Test BufferView
+            if (typeof createBufferViewArchitecture === 'function') {
+                createBufferViewArchitecture('#bufferview-test');
+                console.log('✓ BufferView loaded (compact)');
+            }
+
+            // Test MultiIndex
+            if (typeof createMultiIndexStructure === 'function') {
+                createMultiIndexStructure('#multiindex-test');
+                console.log('✓ MultiIndex loaded (compact)');
+            }
+
+            // Test Transform System
+            if (typeof createTransformSystemArchitecture === 'function') {
+                createTransformSystemArchitecture('#transform-test');
+                console.log('✓ Transform System loaded (compact)');
+            }
+
+            // Test Coordinate Systems
+            if (typeof CoordinateSystemDiagrams === 'object' && CoordinateSystemDiagrams.fiveCoordinateSpaces) {
+                CoordinateSystemDiagrams.fiveCoordinateSpaces('#coord-test');
+                console.log('✓ Coordinate Systems loaded (compact)');
+            }
+
+            // Verify no animations
+            setTimeout(() => {
+                const hasTransitions = Array.from(document.querySelectorAll('*')).some(el => {
+                    const styles = window.getComputedStyle(el);
+                    return styles.transition !== 'none 0s ease 0s' || styles.animation !== 'none 0s ease 0s normal none 1 running';
+                });
+
+                if (!hasTransitions) {
+                    console.log('✓ No animations detected - diagrams are static');
+                } else {
+                    console.log('⚠ Some animations may still be present');
+                }
+
+                // Check diagram heights
+                const diagrams = document.querySelectorAll('svg');
+                diagrams.forEach((svg, i) => {
+                    const height = svg.getBoundingClientRect().height;
+                    console.log(`Diagram ${i + 1} height: ${height}px`);
+                });
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

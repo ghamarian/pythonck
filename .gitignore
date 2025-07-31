@@ -11,6 +11,7 @@ __pycache__/
 # IDE
 .vscode/
 .idea/
+.claude/
 
 # Package build
 *.egg-info/
@@ -30,9 +31,13 @@ Thumbs.db
 todelete/
 media/
 
-# Documentation temporary files (but keep _site for deployment)
+# Documentation temporary files
 documentation/**/*.quarto_ipynb
 *.quarto_ipynb
+
+# Quarto generated site files
+_site/
+tile_distribution_documentation/_site/
 
 # Images and debug files
 *.png

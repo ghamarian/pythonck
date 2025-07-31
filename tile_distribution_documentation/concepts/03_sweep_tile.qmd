@@ -1,11 +1,15 @@
 ---
 title: "Sweep Tile - Elegant Iteration"
-format: live-html
+format: 
+  live-html:
+    mermaid:
+      theme: default
 ---
 
 ## Overview
 
 Sweep operations are the elegant way to iterate over distributed data. They complete the tile distribution workflow by providing clean, efficient iteration patterns that automatically handle all the complex indexing details.
+
 
 ```{pyodide}
 #| echo: false
@@ -15,573 +19,420 @@ Sweep operations are the elegant way to iterate over distributed data. They comp
 # Auto-install pythonck package
 import micropip
 await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl")
-
-# Setup pytensor path for pyodide environment
-import sys
-import os
-import numpy as np
-
-# Add the project root to path so we can import pytensor
-sys.path.insert(0, '/home/aghamari/github/composable_kernel/visualisation')
-
-# Import the actual CK modules
-from pytensor.tile_distribution import make_static_tile_distribution, make_tile_distribution_encoding
-from pytensor.tile_window import make_tile_window
-from pytensor.tensor_view import make_tensor_view
-from pytensor.tensor_descriptor import make_naive_tensor_descriptor_packed
-from pytensor.static_distributed_tensor import make_static_distributed_tensor
-from pytensor.sweep_tile import sweep_tensor_direct, sweep_tile, make_tile_sweeper
 ```
 
-## What are Sweep Operations?
+## Basic Sweep Mechanism
 
-Sweep operations are the final piece of the distributed computing puzzle:
-
-**The Challenge**: You have distributed data loaded via TileWindow. Now you need to process every element. How do you iterate elegantly?
-
-**The Solution**: Sweep operations provide clean iteration patterns that handle all the complex indexing automatically.
-
-## The Complete GPU Processing Pipeline
-
-```{mermaid}
+```{=html}
+<div class="mermaid">
 flowchart LR
-    subgraph "Data Distribution"
-        TD[Tile Distribution<br/>Work Assignment]
-        TW[Tile Window<br/>Data Loading]
+    subgraph "X-Tile (Reused)"
+        XT["X data loaded once<br/>Stays in registers"]
     end
     
-    subgraph "Processing"
-        SW[Sweep Operations<br/>Element Iteration]
-        UC[User Computation<br/>Lambda Function]
+    subgraph "Y-Sweep"
+        Y1["Y position 0"]
+        Y2["Y position 1"]
+        Y3["Y position 2"]
+        YN["Y position N"]
     end
     
-    subgraph "Memory"
-        GM[Global Memory]
-        R[Registers]
+    subgraph "Computation"
+        C["Process(X, Y)"]
+    end
+    
+    XT --> C
+    Y1 --> C
+    Y2 --> C
+    Y3 --> C
+    YN --> C
+    
+    style XT fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style C fill:#e0e7ff,stroke:#4338ca,stroke-width:2px
+</div>
+```
+
+The key insight: Load X data once, then sweep through Y positions while keeping X in fast memory.
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+import numpy as np
+
+# Simulate a simple 2D sweep operation
+def simulate_sweep(matrix_shape, tile_shape):
+    """Demonstrate sweep concept with a simple matrix"""
+    M, N = matrix_shape
+    tile_m, tile_n = tile_shape
+    
+    print(f"Matrix: {M}x{N}, Tile: {tile_m}x{tile_n}")
+    print(f"Number of tiles: ({M//tile_m}, {N//tile_n})")
+    print()
+    
+    # For each tile position
+    for tile_i in range(0, M, tile_m):
+        for tile_j in range(0, N, tile_n):
+            print(f"Processing tile at ({tile_i}, {tile_j}):")
+            
+            # Load X-tile (column data) - happens once
+            print(f"  Load X-tile: columns {tile_j} to {tile_j+tile_n-1}")
+            
+            # Sweep through Y positions in this tile
+            for y in range(tile_i, min(tile_i + tile_m, M)):
+                print(f"    Sweep Y={y}: process row {y} with loaded columns")
+            print()
+
+# Example: 6x8 matrix with 2x4 tiles
+simulate_sweep((6, 8), (2, 4))
+```
+
+## The Power of SweepTile
+
+### 1. Memory Efficiency
+
+```{=html}
+<div class="mermaid">
+graph TB
+    subgraph "Traditional Approach"
+        T1["Load X[0]"] --> P1["Process"]
+        T2["Load Y[0]"] --> P1
+        T3["Load X[0]"] --> P2["Process"]
+        T4["Load Y[1]"] --> P2
+        T5["Load X[0]"] --> P3["Process"]
+        T6["Load Y[2]"] --> P3
+        Note1["X loaded 3 times!"]
+    end
+    
+    subgraph "Sweep Approach"
+        S1["Load X[0]"] --> SP["Process with<br/>Y[0], Y[1], Y[2]"]
+        S2["Load Y[0,1,2]"] --> SP
+        Note2["X loaded once!"]
+    end
+    
+    style Note1 fill:#fee2e2,stroke:#ef4444,stroke-width:2px
+    style Note2 fill:#d1fae5,stroke:#10b981,stroke-width:2px
+</div>
+```
+
+### 2. Code Example
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+# Conceptual sweep implementation
+class SweepTileSimulation:
+    def __init__(self, data, tile_shape):
+        self.data = data
+        self.tile_shape = tile_shape
+        
+    def sweep_gemm_tile(self, tile_row, tile_col):
+        """Simulate GEMM sweep for one tile"""
+        tile_m, tile_n = self.tile_shape
+        
+        # Phase 1: Load X tile (A matrix columns)
+        print(f"Loading A tile columns {tile_col} to {tile_col + tile_n - 1}")
+        a_tile = self.data[tile_row:tile_row+tile_m, tile_col:tile_col+tile_n]
+        
+        # Phase 2: Sweep through B rows
+        results = []
+        for b_row in range(self.data.shape[0]):
+            # In real GPU: B row data streams through
+            b_data = self.data[b_row, tile_col:tile_col+tile_n]
+            
+            # Compute dot products
+            for a_row in range(a_tile.shape[0]):
+                result = np.dot(a_tile[a_row], b_data)
+                results.append((tile_row + a_row, b_row, result))
+                
+        return results
+
+# Example usage
+data = np.arange(16).reshape(4, 4)
+sweep = SweepTileSimulation(data, (2, 2))
+
+print("Data matrix:")
+print(data)
+print("\nSweeping tile at (0, 0):")
+results = sweep.sweep_gemm_tile(0, 0)
+for r in results[:4]:  # Show first few results
+    print(f"  Result[{r[0]},{r[1]}] = {r[2]}")
+```
+
+## C++ Implementation Pattern
+
+```cpp
+// Sweep pattern for matrix multiplication
+template<typename ADataType, typename BDataType, typename CDataType>
+__device__ void gemm_sweep_tile(
+    const TileDistribution& dist_a,
+    const TileDistribution& dist_b,
+    TileDistribution& dist_c)
+{
+    // Phase 1: Load A tile into registers (X dimension)
+    auto a_tile = make_distributed_tensor(dist_a);
+    a_tile.load();  // Load once, reuse many times
+    
+    // Phase 2: Create sweep for B (Y dimension)
+    auto b_sweep = make_sweep_tile(dist_b);
+    
+    // Phase 3: Sweep through B positions
+    sweep_tile(b_sweep, [&](auto b_slice) {
+        // b_slice is current Y position data
+        
+        // Compute C = A * B for this Y position
+        auto c_slice = make_distributed_tensor(dist_c);
+        
+        // Actual computation
+        gemm(a_tile, b_slice, c_slice);
+        
+        // Store result
+        c_slice.store();
+    });
+}
+```
+
+## Sweep Patterns
+
+### Pattern 1: Simple Linear Sweep
+
+```{=html}
+<div class="mermaid">
+graph LR
+    subgraph "Linear Sweep"
+        S0["Start"] --> P0["Y[0]"]
+        P0 --> P1["Y[1]"]
+        P1 --> P2["Y[2]"]
+        P2 --> P3["Y[3]"]
+        P3 --> E["End"]
+    end
+    
+    style S0 fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style E fill:#ffebee,stroke:#d32f2f,stroke-width:2px
+</div>
+```
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+def linear_sweep(data, x_indices, y_range):
+    """Simple linear sweep pattern"""
+    # Load X data once
+    x_data = data[:, x_indices]
+    print(f"Loaded X data (shape {x_data.shape}):")
+    print(x_data)
+    
+    # Sweep through Y
+    print("\nSweeping Y positions:")
+    for y in y_range:
+        y_data = data[y, :]
+        result = np.dot(x_data.T, y_data)
+        print(f"  Y[{y}]: {y_data} → result: {result}")
+
+# Example
+data = np.arange(20).reshape(4, 5)
+print("Original data:")
+print(data)
+print()
+
+linear_sweep(data, [0, 2], range(4))
+```
+
+### Pattern 2: Strided Sweep
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+def strided_sweep(data, x_tile, y_start, y_stride, y_count):
+    """Sweep with stride - useful for interleaved data"""
+    # Load X tile
+    x_data = data[:, x_tile[0]:x_tile[1]]
+    print(f"X tile: columns {x_tile[0]} to {x_tile[1]-1}")
+    
+    # Strided sweep through Y
+    print(f"Strided sweep: start={y_start}, stride={y_stride}, count={y_count}")
+    for i in range(y_count):
+        y_pos = y_start + i * y_stride
+        if y_pos < data.shape[0]:
+            print(f"  Process Y[{y_pos}]")
+
+# Example: Process every other row
+data = np.arange(24).reshape(6, 4)
+strided_sweep(data, (0, 2), y_start=0, y_stride=2, y_count=3)
+```
+
+### Pattern 3: Block Sweep
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+def block_sweep(data, x_tile, y_blocks):
+    """Sweep through blocks of Y - useful for cache optimization"""
+    print(f"X tile loaded: columns {x_tile}")
+    
+    for block_id, y_block in enumerate(y_blocks):
+        print(f"\nBlock {block_id}: Y[{y_block[0]}:{y_block[1]}]")
+        block_data = data[y_block[0]:y_block[1], :]
+        print(f"  Processing {block_data.shape[0]} rows together")
+        # In GPU: This block fits in shared memory
+
+# Example: Process Y in blocks of 2
+data = np.arange(32).reshape(8, 4)
+block_sweep(data, [0, 2], [(0, 2), (2, 4), (4, 6), (6, 8)])
+```
+
+## Performance Characteristics
+
+```{=html}
+<div class="mermaid">
+graph TB
+    subgraph "Sweep Performance Benefits"
+        B1["Zero runtime overhead<br/>Compile-time unrolling"]
+        B2["Perfect memory coalescing<br/>Sequential access patterns"]
+        B3["Automatic vectorization<br/>Compiler optimizations"]
+        B4["Register reuse<br/>X data stays in VGPR"]
+    end
+    
+    subgraph "Use Cases"
+        U1["Matrix Multiplication<br/>Reuse A columns"]
+        U2["Convolution<br/>Reuse filter weights"]
+        U3["Reduction<br/>Accumulate over Y"]
+        U4["Broadcast<br/>Apply X to all Y"]
+    end
+    
+    B1 --> Performance["High Performance"]
+    B2 --> Performance
+    B3 --> Performance
+    B4 --> Performance
+    
+    Performance --> U1
+    Performance --> U2
+    Performance --> U3
+    Performance --> U4
+    
+    style Performance fill:#d1fae5,stroke:#10b981,stroke-width:3px
+</div>
+```
+
+## Advanced Sweep Features
+
+### 1. Conditional Sweep
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+def conditional_sweep(data, x_tile, condition_fn):
+    """Sweep only positions that meet condition"""
+    x_data = data[:, x_tile[0]:x_tile[1]]
+    
+    swept_positions = []
+    for y in range(data.shape[0]):
+        if condition_fn(y):
+            swept_positions.append(y)
+            # Process this Y position
+            
+    print(f"Swept {len(swept_positions)} of {data.shape[0]} positions")
+    print(f"Positions: {swept_positions}")
+
+# Example: Only process even rows
+data = np.arange(20).reshape(5, 4)
+conditional_sweep(data, (0, 2), lambda y: y % 2 == 0)
+```
+
+### 2. Multi-Dimensional Sweep
+
+```cpp
+// C++ example: 3D sweep for tensor operations
+template<typename XTensor, typename YTensor>
+__device__ void tensor_3d_sweep(
+    const XTensor& x_tensor,    // 2D slice loaded
+    const YTensor& y_tensor)    // 3D tensor to sweep
+{
+    // Sweep through depth dimension
+    constexpr auto depth = y_tensor.get_shape()[2];
+    
+    static_for<0, depth, 1>{}([&](auto z) {
+        // Get 2D slice at depth z
+        auto y_slice = y_tensor.get_slice(make_tuple(_, _, z));
+        
+        // Process x_tensor with y_slice
+        auto result = tensor_op(x_tensor, y_slice);
+        
+        // Store or accumulate result
+        store_result(result, z);
+    });
+}
+```
+
+### 3. Sweep with Accumulation
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+def accumulation_sweep(data, x_tile):
+    """Sweep with running accumulation"""
+    x_data = data[:, x_tile[0]:x_tile[1]]
+    
+    accumulator = np.zeros(x_data.shape[1])
+    print(f"Initial accumulator: {accumulator}")
+    
+    for y in range(data.shape[0]):
+        y_data = data[y, x_tile[0]:x_tile[1]]
+        accumulator += y_data
+        print(f"  After Y[{y}]: {accumulator}")
+    
+    print(f"Final result: {accumulator}")
+
+# Example
+data = np.arange(12).reshape(3, 4)
+print("Data:")
+print(data)
+print("\nAccumulating columns 1 and 2:")
+accumulation_sweep(data, (1, 3))
+```
+
+## Integration with Tile Distribution
+
+```{=html}
+<div class="mermaid">
+flowchart TB
+    subgraph "Complete Workflow"
+        TD["TileDistribution<br/>Define data layout"]
+        TW["TileWindow<br/>Create view"]
+        DT["DistributedTensor<br/>Load X data"]
+        ST["SweepTile<br/>Iterate Y positions"]
+        R["Results<br/>Store outputs"]
     end
     
     TD --> TW
-    TW --> |load()| R
-    R --> SW
-    SW --> |foreach| UC
-    UC --> |store()| GM
+    TW --> DT
+    DT --> ST
+    ST --> R
     
-    style TD fill:#e3f2fd
-    style TW fill:#fff3e0
-    style SW fill:#e8f5e9
-    style UC fill:#fce4ec
+    style TD fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style ST fill:#fff3e0,stroke:#f57c00,stroke-width:3px
+    style R fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+</div>
 ```
 
-### Without Sweep Operations
-- Manual nested loops over Y dimensions
-- Complex index calculations
-- Easy to miss elements or double-process
-- Different code for different access patterns
-
-### With Sweep Operations
-- Elegant lambda-based iteration
-- Automatic handling of all elements
-- Same pattern for any distribution
-- Compiler-optimizable
-
-**Key Insight**: Sweep operations are like forEach() for distributed tensors. Give them a function, and they'll call it for every element in the optimal order.
-
-## Basic Sweep Operations
-
-Let's start with the simplest sweep pattern:
-
-```{pyodide}
-# Create a simple distribution and distributed tensor
-encoding = make_tile_distribution_encoding(
-    rs_lengths=[],
-    hs_lengthss=[[2], [2]],  # 2x2 distribution
-    ps_to_rhss_major=[[], []],
-    ps_to_rhss_minor=[[], []],
-    ys_to_rhs_major=[1, 2],
-    ys_to_rhs_minor=[0, 0]
-)
-distribution = make_static_tile_distribution(encoding)
-
-# Create distributed tensor with some data
-distributed_tensor = make_static_distributed_tensor(np.float32, distribution)
-
-# Populate with test data
-test_values = [[1.0, 2.0], [3.0, 4.0]]
-y_lengths = distribution.get_y_vector_lengths()
-
-for y0 in range(y_lengths[0]):
-    for y1 in range(y_lengths[1]):
-        distributed_tensor.set_element([y0, y1], test_values[y0][y1])
-
-print("Basic Sweep Operations")
-print("=" * 30)
-print("Test data loaded: 2x2 tensor with values [[1,2], [3,4]]")
-print()
-
-# Demonstrate sweep operation
-print("Sweeping over distributed tensor:")
-
-collected_values = []
-
-def collect_value(y_indices):
-    """Function to collect values during sweep."""
-    value = distributed_tensor.get_element(y_indices)
-    collected_values.append((y_indices.copy(), value))
-    print(f"  Visited Y{y_indices}: value = {value}")
-
-# Perform the sweep
-sweep_tensor_direct(distributed_tensor, collect_value)
-
-print(f"\nSweep completed! Visited {len(collected_values)} elements")
-```
-
-### C++ Implementation Reference
-
-The sweep operation pattern is implemented in CK using template functions:
-
-**File**: `include/ck_tile/core/tensor/sweep_tile.hpp`
-
-```cpp
-// Basic sweep over distributed tensor
-template <typename DistributedTensor, typename Func>
-__device__ void sweep_tile(const DistributedTensor& tensor, Func func)
-{
-    // Get Y-space spans for iteration
-    constexpr auto spans = DistributedTensor::get_distributed_spans();
-    
-    // Iterate over all Y indices
-    sweep_tile_spans(spans, [&](auto y_indices) {
-        // Call user function with current indices
-        func(y_indices);
-    });
-}
-
-// Example usage in kernel
-__device__ void process_tile(const auto& tile)
-{
-    // Sum all elements
-    float sum = 0.0f;
-    sweep_tile(tile, [&](auto y_idx) {
-        sum += tile(y_idx);
-    });
-}
-```
-
-**What happened?** `sweep_tensor_direct` automatically iterated over all Y indices in the distributed tensor and called our function for each element. No manual loops, no missed elements!
-
-## Sweep with Computation
-
-Let's use sweep operations for actual computation:
-
-```{pyodide}
-# Create result tensor
-result_tensor = make_static_distributed_tensor(np.float32, distributed_tensor.tile_distribution)
-
-print("Sweep with Computation")
-print("=" * 30)
-print("Computing squares using sweep:")
-print()
-
-def compute_square(y_indices):
-    """Compute square of each element."""
-    input_value = distributed_tensor.get_element(y_indices)
-    output_value = input_value ** 2
-    result_tensor.set_element(y_indices, output_value)
-    print(f"  Y{y_indices}: {input_value}² = {output_value}")
-
-# Perform computation sweep
-sweep_tensor_direct(distributed_tensor, compute_square)
-
-print()
-print("Results verification:")
-def verify_result(y_indices):
-    original = distributed_tensor.get_element(y_indices)
-    computed = result_tensor.get_element(y_indices)
-    expected = original ** 2
-    print(f"  Y{y_indices}: {original} → {computed} (expected {expected})")
-
-sweep_tensor_direct(result_tensor, verify_result)
-```
-
-**Computation Pattern**: This is the classic pattern: sweep over input tensor, compute something, store in result tensor. The sweep handles all the iteration complexity automatically!
-
-## Advanced Sweep Patterns
-
-Let's explore more sophisticated sweep patterns:
-
-```{pyodide}
-# Create a larger distribution for more interesting patterns
-encoding = make_tile_distribution_encoding(
-    rs_lengths=[],
-    hs_lengthss=[[4], [4]],  # 4x4 distribution
-    ps_to_rhss_major=[[], []],
-    ps_to_rhss_minor=[[], []],
-    ys_to_rhs_major=[1, 2],
-    ys_to_rhs_minor=[0, 0]
-)
-distribution = make_static_tile_distribution(encoding)
-distributed_tensor = make_static_distributed_tensor(np.float32, distribution)
-
-# Fill with test data
-y_lengths = distribution.get_y_vector_lengths()
-for y0 in range(y_lengths[0]):
-    for y1 in range(y_lengths[1]):
-        distributed_tensor.set_element([y0, y1], y0 * 4 + y1)
-
-print("Created 4x4 distributed tensor with sequential values")
-print()
-
-# Pattern 1: Conditional processing
-print("🎯 Pattern 1: Conditional Processing")
-def process_even_values(y_indices):
-    value = distributed_tensor.get_element(y_indices)
-    if int(value) % 2 == 0:
-        print(f"  Processing even value at Y{y_indices}: {value}")
-    else:
-        print(f"  Skipping odd value at Y{y_indices}: {value}")
-
-sweep_tensor_direct(distributed_tensor, process_even_values)
-print()
-
-# Pattern 2: Accumulation
-print("🎯 Pattern 2: Accumulation")
-total_sum = 0
-element_count = 0
-
-def accumulate_values(y_indices):
-    global total_sum, element_count
-    value = distributed_tensor.get_element(y_indices)
-    total_sum += value
-    element_count += 1
-    print(f"  Added {value}, running total: {total_sum}")
-
-sweep_tensor_direct(distributed_tensor, accumulate_values)
-print(f"Final sum: {total_sum}, average: {total_sum/element_count}")
-```
-
-## Using TileSweeper for Advanced Control
-
-For more control over the sweep process, we can use TileSweeper:
-
-```{pyodide}
-print("🎛️ Using TileSweeper for Advanced Control")
-print("=" * 45)
-
-# Create a tile sweeper
-def process_element(y_indices):
-    value = distributed_tensor.get_element(y_indices)
-    print(f"  Processing Y{y_indices}: {value}")
-
-sweeper = make_tile_sweeper(distributed_tensor, process_element)
-
-print(f"Sweeper created: {sweeper}")
-print(f"Number of accesses: {sweeper.get_num_of_access()}")
-print()
-
-# TileSweeper gives you more control over the sweep process
-# You can inspect properties, control timing, etc.
-print("🔍 Sweeper Properties:")
-print(f"  Total elements to process: {sweeper.get_num_of_access()}")
-print(f"  Number of accesses: {sweeper.get_num_of_access()}")
-```
-
-## Complete Tile Processing Workflow
-
-Let's demonstrate the complete workflow: load → sweep → compute → store:
-
-```{pyodide}
-print("🔄 Complete Tile Processing Workflow")
-print("=" * 40)
-
-def complete_tile_processing(input_data, window_origin, window_size, operation_name, compute_func):
-    """Complete tile processing with sweep operations."""
-    print(f"🚀 {operation_name} Processing")
-    print(f"   Input: {input_data.shape} matrix")
-    print(f"   Window: {window_size} at {window_origin}")
-    print()
-    
-    # 1. Setup tensor infrastructure
-    tensor_desc = make_naive_tensor_descriptor_packed(list(input_data.shape))
-    input_view = make_tensor_view(input_data, tensor_desc)
-    
-    # 2. Create distribution
-    encoding = make_tile_distribution_encoding(
-        rs_lengths=[],
-        hs_lengthss=[[window_size[0]], [window_size[1]]],
-        ps_to_rhss_major=[[], []],
-        ps_to_rhss_minor=[[], []],
-        ys_to_rhs_major=[1, 2],
-        ys_to_rhs_minor=[0, 0]
-    )
-    distribution = make_static_tile_distribution(encoding)
-    
-    # 3. Create window and load data - automatically creates distributed tensor!
-    input_window = make_tile_window(input_view, window_size, window_origin, distribution)
-    distributed_input = input_window.load()
-    
-    # 4. Create output window and load for direct processing
-    output_data = input_data.copy()
-    output_view = make_tensor_view(output_data, tensor_desc)
-    output_window = make_tile_window(output_view, window_size, window_origin, distribution)
-    distributed_output = output_window.load()
-    
-    def process_with_sweep(y_indices):
-        """Process each element using sweep."""
-        input_val = distributed_input.get_element(y_indices)
-        output_val = compute_func(input_val)
-        distributed_output.set_element(y_indices, output_val)
-        print(f"    Y{y_indices}: {input_val} → {output_val}")
-    
-    print("📊 Processing elements with sweep:")
-    sweep_tensor_direct(distributed_input, process_with_sweep)
-    
-    # 5. Store results back
-    output_window.store(distributed_output)
-    
-    return output_data
-
-# Test the complete workflow
-test_data = np.array([[1, 2, 3, 4], 
-                     [5, 6, 7, 8], 
-                     [9, 10, 11, 12], 
-                     [13, 14, 15, 16]], dtype=np.float32)
-
-print("Original data:")
-print(test_data)
-print()
-
-# Process a 2x2 window with different operations
-result1 = complete_tile_processing(test_data, [1, 1], [2, 2], "Square", lambda x: x ** 2)
-print("\nAfter square operation:")
-print(result1)
-print()
-
-result2 = complete_tile_processing(test_data, [0, 2], [2, 2], "Multiply by 10", lambda x: x * 10)
-print("\nAfter multiply by 10 operation:")
-print(result2)
-```
-
-## Sweep Pattern Comparison
-
-Let's compare different ways to iterate over distributed data:
-
-```{pyodide}
-print("⚖️ Sweep Pattern Comparison")
-print("=" * 35)
-
-# Create test distributed tensor
-encoding = make_tile_distribution_encoding(
-    rs_lengths=[],
-    hs_lengthss=[[3], [3]],  # 3x3 distribution
-    ps_to_rhss_major=[[], []],
-    ps_to_rhss_minor=[[], []],
-    ys_to_rhs_major=[1, 2],
-    ys_to_rhs_minor=[0, 0]
-)
-distribution = make_static_tile_distribution(encoding)
-test_tensor = make_static_distributed_tensor(np.float32, distribution)
-
-# Fill with test data
-y_lengths = distribution.get_y_vector_lengths()
-for y0 in range(y_lengths[0]):
-    for y1 in range(y_lengths[1]):
-        test_tensor.set_element([y0, y1], (y0 + 1) * (y1 + 1))
-
-print("Test tensor filled with multiplication table values")
-print()
-
-# Method 1: Manual loops (the old way)
-print("❌ Method 1: Manual loops")
-print("   Code: Nested for loops with manual indexing")
-print("   Risk: Easy to make mistakes, hard to optimize")
-manual_sum = 0
-for y0 in range(y_lengths[0]):
-    for y1 in range(y_lengths[1]):
-        val = test_tensor.get_element([y0, y1])
-        manual_sum += val
-        print(f"   Manual: Y[{y0},{y1}] = {val}")
-print(f"   Manual sum: {manual_sum}")
-print()
-
-# Method 2: Sweep operations (the CK way)
-print("✅ Method 2: Sweep operations")
-print("   Code: Elegant lambda-based iteration")
-print("   Benefits: Automatic, optimizable, error-free")
-sweep_sum = 0
-def sweep_accumulator(y_indices):
-    global sweep_sum
-    val = test_tensor.get_element(y_indices)
-    sweep_sum += val
-    print(f"   Sweep: Y{y_indices} = {val}")
-
-sweep_tensor_direct(test_tensor, sweep_accumulator)
-print(f"   Sweep sum: {sweep_sum}")
-print()
-
-print(f"Results match: {manual_sum == sweep_sum}")
-```
-
-## Testing Your Understanding
-
-Let's verify that sweep operations work correctly:
-
-```{pyodide}
-print("🧪 Testing Sweep Operations")
-print("=" * 30)
-
-def test_basic_sweep():
-    """Test basic sweep functionality."""
-    try:
-        # Create simple distribution
-        encoding = make_tile_distribution_encoding(
-            rs_lengths=[],
-            hs_lengthss=[[2], [2]],
-            ps_to_rhss_major=[[], []],
-            ps_to_rhss_minor=[[], []],
-            ys_to_rhs_major=[1, 2],
-            ys_to_rhs_minor=[0, 0]
-        )
-        dist = make_static_tile_distribution(encoding)
-        tensor = make_static_distributed_tensor(np.float32, dist)
-        
-        # Fill with test data
-        y_lengths = dist.get_y_vector_lengths()
-        for y0 in range(y_lengths[0]):
-            for y1 in range(y_lengths[1]):
-                tensor.set_element([y0, y1], y0 + y1)
-        
-        # Test sweep
-        element_count = 0
-        def count_elements(y_indices):
-            nonlocal element_count
-            element_count += 1
-        
-        sweep_tensor_direct(tensor, count_elements)
-        
-        expected_count = y_lengths[0] * y_lengths[1]
-        return element_count == expected_count
-        
-    except Exception:
-        return False
-
-def test_tile_sweeper():
-    """Test TileSweeper functionality."""
-    try:
-        # Create distribution
-        encoding = make_tile_distribution_encoding(
-            rs_lengths=[],
-            hs_lengthss=[[2], [2]],
-            ps_to_rhss_major=[[], []],
-            ps_to_rhss_minor=[[], []],
-            ys_to_rhs_major=[1, 2],
-            ys_to_rhs_minor=[0, 0]
-        )
-        dist = make_static_tile_distribution(encoding)
-        tensor = make_static_distributed_tensor(np.float32, dist)
-        
-        # Create tile sweeper
-        def dummy_func(y_indices):
-            pass
-        
-        sweeper = make_tile_sweeper(tensor, dummy_func)
-        
-        # Test sweeper properties
-        num_accesses = sweeper.get_num_of_access()
-        return num_accesses > 0
-        
-    except Exception:
-        return False
-
-def test_sweep_computation():
-    """Test sweep-based computation."""
-    try:
-        # Create distribution
-        encoding = make_tile_distribution_encoding(
-            rs_lengths=[],
-            hs_lengthss=[[2], [2]],
-            ps_to_rhss_major=[[], []],
-            ps_to_rhss_minor=[[], []],
-            ys_to_rhs_major=[1, 2],
-            ys_to_rhs_minor=[0, 0]
-        )
-        dist = make_static_tile_distribution(encoding)
-        input_tensor = make_static_distributed_tensor(np.float32, dist)
-        output_tensor = make_static_distributed_tensor(np.float32, dist)
-        
-        # Fill input with test data
-        y_lengths = dist.get_y_vector_lengths()
-        for y0 in range(y_lengths[0]):
-            for y1 in range(y_lengths[1]):
-                input_tensor.set_element([y0, y1], y0 + y1 + 1)
-        
-        # Compute using sweep
-        def square_operation(y_indices):
-            val = input_tensor.get_element(y_indices)
-            result = val ** 2
-            output_tensor.set_element(y_indices, result)
-        
-        sweep_tensor_direct(input_tensor, square_operation)
-        
-        # Verify results
-        for y0 in range(y_lengths[0]):
-            for y1 in range(y_lengths[1]):
-                input_val = input_tensor.get_element([y0, y1])
-                output_val = output_tensor.get_element([y0, y1])
-                if output_val != input_val ** 2:
-                    return False
-        
-        return True
-        
-    except Exception:
-        return False
-
-# Run tests
-tests = [
-    ("Basic sweep", test_basic_sweep),
-    ("Tile sweeper", test_tile_sweeper),
-    ("Sweep computation", test_sweep_computation)
-]
-
-print("Running sweep operation tests:")
-for test_name, test_func in tests:
-    result = test_func()
-    status = "✅ PASS" if result else "❌ FAIL"
-    print(f"  {status}: {test_name}")
-```
-
-## Key Takeaways
-
-Sweep operations complete the tile distribution story with elegant iteration patterns:
-
-**1. Elegant Iteration**
-
-   - ✅ Lambda-based processing functions
-   - ✅ Automatic handling of all Y indices
-   - ✅ No manual loops or complex indexing
-
-**2. Error-Free Processing**
-
-   - ✅ Impossible to miss elements
-   - ✅ No index calculation errors
-   - ✅ Consistent iteration patterns
-
-**3. Flexible Patterns**
-
-   - ✅ Simple element processing
-   - ✅ Conditional operations
-   - ✅ Accumulation and reduction
-   - ✅ Complex computation workflows
-
-**4. Performance Optimization**
-
-   - ✅ Compiler-friendly iteration patterns
-   - ✅ Optimal memory access sequences
-   - ✅ Hardware-aware processing
-
-**5. Complete Workflow Integration**
-
-   - ✅ Seamless integration with TileDistribution
-   - ✅ Perfect pairing with TileWindow
-   - ✅ Enables complete load → sweep → compute → store patterns
-
-Sweep operations are the final piece that makes distributed tensor processing both elegant and efficient. With TileDistribution, TileWindow, and Sweep operations, you have the complete toolkit for high-performance GPU computing! 
+## Summary
+
+SweepTile provides:
+- **Efficiency**: Load once, use many times
+- **Simplicity**: Clean iteration abstraction
+- **Performance**: Zero overhead, perfect patterns
+- **Flexibility**: Various sweep patterns for different algorithms
+
+Key benefits:
+1. **Memory bandwidth**: Optimal reuse of loaded data
+2. **Register pressure**: Keep hot data in fastest memory
+3. **Code clarity**: Express algorithms naturally
+4. **Compiler optimization**: Enable aggressive optimizations
+
+The sweep pattern is fundamental to high-performance GPU kernels, turning complex iteration patterns into simple, efficient operations.

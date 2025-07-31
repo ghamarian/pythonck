@@ -1,6 +1,9 @@
 ---
 title: "Tile Distribution - The Core API"
-format: live-html
+format: 
+  live-html:
+    mermaid:
+      theme: default
 ---
 
 ## Overview
@@ -13,72 +16,44 @@ The C++ implementation encapsulates this complexity within the `tile_distributio
 
 ## Complete Tile Distribution System Overview
 
-The following diagram illustrates the complete data flow through the tile distribution system:
-
-```{mermaid}
-%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#e3f2fd', 'primaryBorderColor':'#1976d2', 'primaryTextColor':'#0d47a1'}}}%%
-flowchart TB
-    subgraph "Input Layer"
-        TD[Tile Distribution<br/>Encoding]
-        TV[Tensor View]
-        WP[Window Parameters]
+```{=html}
+<div class="mermaid">
+graph TB
+    subgraph "Logical View"
+        T["Tensor<br/>Multi-dimensional data"]
+        TD["TileDistribution<br/>Work assignment"]
+        TW["TileWindow<br/>Data view"]
     end
     
-    subgraph "Coordinate Transform Layer"
-        TDE[Distribution Encoding<br/>Rs, Hs, Ps→RHs, Ys→RHs]
-        PSA[ps_ys_to_xs_adaptor<br/>P+Y→X Transform]
-        YDD[ys_to_d_descriptor<br/>Y→D Linearization]
+    subgraph "Coordinate Spaces"
+        X["X: Physical tensor coords"]
+        Y["Y: Tile pattern coords"]
+        P["P: Processing element coords"]
+        R["R: Replication coords (optional)"]
     end
     
-    subgraph "Distribution Layer"
-        TDist[Tile Distribution<br/>Thread Work Assignment]
-        TW[Tile Window<br/>Memory Access Gateway]
+    subgraph "GPU Execution"
+        W["Warps<br/>32 threads each"]
+        L["Lanes<br/>Thread within warp"]
+        REG["Registers<br/>Thread-local storage"]
     end
     
-    subgraph "Execution Layer"
-        Load[Load Operation<br/>Global→Registers]
-        Compute[Compute<br/>Register Operations]
-        Store[Store Operation<br/>Registers→Global]
-    end
+    T --> TD
+    TD --> TW
     
-    subgraph "Hardware Layer"
-        Threads[GPU Threads]
-        Warps[GPU Warps]
-        Blocks[Thread Blocks]
-        Memory[Global Memory]
-    end
+    TD --> X
+    TD --> Y
+    TD --> P
+    TD --> R
     
-    TD --> TDE
-    TDE --> PSA
-    TDE --> YDD
-    PSA --> TDist
-    YDD --> TDist
+    P --> W
+    P --> L
+    TW --> REG
     
-    TV --> TW
-    WP --> TW
-    TDist --> TW
-    
-    TW --> Load
-    Load --> Compute
-    Compute --> Store
-    
-    Blocks --> Warps
-    Warps --> Threads
-    Threads --> Load
-    Store --> Memory
-    Memory --> Load
-    
-    classDef encoding fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
-    classDef transform fill:#fff3e0,stroke:#f57c00,stroke-width:2px
-    classDef distribution fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
-    classDef execution fill:#fce4ec,stroke:#c2185b,stroke-width:2px
-    classDef hardware fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
-    
-    class TD,TDE encoding
-    class PSA,YDD transform
-    class TDist,TW distribution
-    class Load,Compute,Store execution
-    class Threads,Warps,Blocks,Memory hardware
+    style TD fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
+    style P fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style REG fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+</div>
 ```
 
 ## Interactive Exploration
@@ -89,41 +64,34 @@ Explore tile distribution concepts interactively:
 
 ## Coordinate System Architecture
 
-The tile distribution system operates through a sophisticated coordinate transformation pipeline:
-
-```{mermaid}
-flowchart TD
-    subgraph "Thread Hierarchy"
-        B[Block ID] --> W[Warp ID]
-        W --> L[Lane ID]
+```{=html}
+<div class="mermaid">
+flowchart LR
+    subgraph "Input"
+        TC["Thread Coordinates<br/>(warpId, laneId)"]
     end
     
-    subgraph "Coordinate Spaces"
-        P["P-Space<br/>(Partition)"]
-        Y["Y-Space<br/>(Access Pattern)"]
-        X["X-Space<br/>(Physical Tensor)"]
-        D["D-Space<br/>(Linear Memory)"]
+    subgraph "Transformation Pipeline"
+        P2Y["P → Y<br/>Thread to pattern"]
+        Y2X["Y → X<br/>Pattern to physical"]
+        Y2D["Y → D<br/>Pattern to register"]
     end
     
-    subgraph "Transformations"
-        T1["ps_ys_to_xs_adaptor<br/>(P+Y → X)"]
-        T2["ys_to_d_descriptor<br/>(Y → D)"]
+    subgraph "Output"
+        MC["Memory Coordinates<br/>Global addresses"]
+        RI["Register Indices<br/>Local storage"]
     end
     
-    L --> P
-    W --> P
-    P --> T1
-    Y --> T1
-    T1 --> X
-    Y --> T2
-    T2 --> D
+    TC --> P2Y
+    P2Y --> Y2X
+    P2Y --> Y2D
+    Y2X --> MC
+    Y2D --> RI
     
-    style P fill:#e1f5fe
-    style Y fill:#fff3e0
-    style X fill:#f3e5f5
-    style D fill:#e8f5e9
-    style T1 fill:#ffebee
-    style T2 fill:#ffebee
+    style TC fill:#e0e7ff,stroke:#4338ca,stroke-width:2px
+    style MC fill:#d1fae5,stroke:#10b981,stroke-width:2px
+    style RI fill:#fef3c7,stroke:#f59e0b,stroke-width:2px
+</div>
 ```
 
 ```{pyodide}
@@ -179,427 +147,402 @@ struct tile_distribution
     
     // Calculate which tensor elements this thread accesses
     template <typename PartitionIndex>
-    CK_TILE_HOST_DEVICE auto calculate_index(const PartitionIndex& ps_idx) const
+    CK_TILE_HOST_DEVICE static auto calculate_tile_Ys_index(const PartitionIndex& ps_idx)
     {
-        const auto ps_ys_idx = container_concat(ps_idx, array<index_t, NDimY>{0});
-        const auto coord = make_tensor_adaptor_coordinate(ps_ys_to_xs_, ps_ys_idx);
-        return coord.get_bottom_index();
+        return detail::calculate_tile_Ys_index(
+            StaticTileDistributionEncoding{}, ps_idx);
     }
 };
 ```
 
-This design enables TileDistribution to handle the complex mapping from thread coordinates to tensor positions while maintaining high performance through compile-time optimizations. 
+## Problem Space Mapping
 
-## Creating Real-World Distributions
+```{=html}
+<div class="mermaid">
+graph TB
+    subgraph "Problem Space (256×256 Matrix)"
+        M["Full Matrix<br/>65,536 elements"]
+        T1["Tile 1<br/>32×32"]
+        T2["Tile 2<br/>32×32"]
+        TN["Tile N<br/>32×32"]
+    end
+    
+    subgraph "Thread Assignment"
+        W0["Warp 0<br/>32 threads"]
+        W1["Warp 1<br/>32 threads"]
+        L0["Lane 0-31<br/>Individual threads"]
+    end
+    
+    subgraph "Memory Pattern"
+        MP["Coalesced Access<br/>Sequential addresses<br/>No bank conflicts"]
+    end
+    
+    M --> T1
+    M --> T2
+    M --> TN
+    
+    T1 --> W0
+    T1 --> W1
+    W0 --> L0
+    L0 --> MP
+    
+    style M fill:#fee2e2,stroke:#ef4444,stroke-width:2px
+    style MP fill:#d1fae5,stroke:#10b981,stroke-width:2px
+</div>
+```
 
-The practical application of tile distribution becomes clear when we examine how it's used in real GPU kernels. RMSNorm (Root Mean Square Layer Normalization) serves as an excellent example because it requires sophisticated data access patterns to achieve high performance. The distribution pattern we'll examine is not specific to RMSNorm but represents a general-purpose configuration used across many tensor operations in the CK library.
+## Creating a TileDistribution
 
-The creation of a tile distribution begins with understanding the hierarchical decomposition of work. In modern GPUs, threads are organized in a three-level hierarchy: individual threads (lanes), warps (groups of 32 threads on AMD GPUs), and thread blocks. The tile distribution encoding captures this hierarchy through a series of length specifications that define how many elements each level processes. This hierarchical specification allows the same distribution pattern to scale across different GPU configurations while maintaining optimal memory access patterns.
+Let's see how to create and use a TileDistribution in practice:
 
 ```{pyodide}
-print("Creating a common distribution")
-print("=" * 40)
+#| echo: true
+#| output: true
 
-# RMSNorm distribution parameters
-# Repeat_M=4, WarpPerBlock_M=2, ThreadPerWarp_M=8, Vector_M=4
-# Repeat_N=4, WarpPerBlock_N=2, ThreadPerWarp_N=8, Vector_N=4
+from pytensor.tile_distribution import make_static_tile_distribution, make_tile_distribution_encoding
+import numpy as np
+
+# Create a tile distribution encoding
+# This defines how a tensor is distributed across threads
 encoding = make_tile_distribution_encoding(
-    rs_lengths=[],  # Empty R sequence
-    hs_lengthss=[
-        [4, 2, 8, 4],  # H for X0: Repeat_M, WarpPerBlock_M, ThreadPerWarp_M, Vector_M
-        [4, 2, 8, 4]   # H for X1: Repeat_N, WarpPerBlock_N, ThreadPerWarp_N, Vector_N
-    ],
-    ps_to_rhss_major=[[1, 2], [1, 2]],  # P maps to H dimensions
-    ps_to_rhss_minor=[[1, 1], [2, 2]],  # P minor mappings
-    ys_to_rhs_major=[1, 1, 2, 2],       # Y maps to H dimensions
-    ys_to_rhs_minor=[0, 3, 0, 3]        # Y minor mappings
+    rs_lengths=[],  # No replication dimensions
+    hs_lengthss=[[2, 2], [2, 2]],  # Hierarchical lengths for each X dimension
+    ps_to_rhss_major=[[1], [2]],   # P to RH major mappings
+    ps_to_rhss_minor=[[0], [0]],   # P to RH minor mappings  
+    ys_to_rhs_major=[1, 2],         # Y to RH major mappings
+    ys_to_rhs_minor=[1, 1]          # Y to RH minor mappings
 )
 
-distribution = make_static_tile_distribution(encoding)
+# Create the tile distribution from the encoding
+tile_dist = make_static_tile_distribution(encoding)
 
-print(f"Distribution created: {type(distribution).__name__}")
-print(f"X dimensions: {distribution.ndim_x} (logical data dimensions)")
-print(f"Y dimensions: {distribution.ndim_y} (access pattern dimensions)")
-print(f"P dimensions: {distribution.ndim_p} (thread partition dimensions)")
+print(f"\nTile distribution created:")
+print(f"- X dimensions: {tile_dist.ndim_x}")
+print(f"- Y dimensions: {tile_dist.ndim_y}")
+print(f"- P dimensions: {tile_dist.ndim_p}")
+print(f"- X lengths: {tile_dist.get_lengths()}")
 ```
 
-### C++ Implementation Reference
+## Understanding Thread-to-Data Mapping
 
-The above Python code corresponds to the following C++ implementation found in the CK library:
-
-**File**: `include/ck_tile/ops/rmsnorm2d/pipelines/rmsnorm2d_fwd_pipeline_problem.hpp`
-
-```cpp
-// Tile distribution for RMSNorm forward pass
-using BlockTileShape = sequence<256, 256>;  // M=256, N=256
-
-// Create distribution encoding
-using BlockDistribution = tile_distribution_encoding<
-    /* rs_lengths */ sequence<>,
-    /* hs_lengthss */ tuple<sequence<4, 2, 8, 4>,    // M: Repeat, Warp, Thread, Vector
-                           sequence<4, 2, 8, 4>>,    // N: Repeat, Warp, Thread, Vector
-    /* ps_to_rhss_major */ tuple<sequence<1, 2>, sequence<1, 2>>,
-    /* ps_to_rhss_minor */ tuple<sequence<1, 1>, sequence<2, 2>>,
-    /* ys_to_rhs_major */ sequence<1, 1, 2, 2>,
-    /* ys_to_rhs_minor */ sequence<0, 3, 0, 3>
->;
-
-// Create the actual distribution
-auto block_dstr = make_static_tile_distribution(BlockDistribution{});
-```
-
-## Understanding Distribution Structure
-
-The distribution structure we've created represents a sophisticated mapping strategy that deserves detailed analysis. When we examine the hierarchical decomposition, we see that each dimension follows a pattern of 4×2×8×4, which translates to 256 elements per dimension. This specific factorization is not arbitrary but carefully chosen to align with GPU hardware characteristics.
-
-The first factor (4) represents the repeat count, indicating how many times each thread processes elements in sequence. This vectorization factor is crucial for maximizing memory bandwidth utilization. The second factor (2) corresponds to the number of warps per block in each dimension, enabling efficient inter-warp cooperation. The third factor (8) defines the number of threads per warp assigned to each dimension, and the final factor (4) represents the vector size for memory operations, allowing each thread to load multiple elements in a single transaction.
-
-The coordinate system dimensionality reveals the sophistication of this mapping. With two X dimensions representing the logical tensor space (M and N dimensions of 256 elements each), two P dimensions capturing the thread hierarchy (warp ID and thread ID within warp), four Y dimensions encoding the access pattern within each tile, and zero R dimensions indicating no computational replication, the distribution creates a total addressable space of 256×256 = 65,536 elements.
-
-The tile distribution encoding encompasses three interconnected mechanisms that work together to enable efficient GPU computation. The adapter component (`ps_ys_to_xs_adapter`) performs the crucial transformation from processing coordinates (P) and access pattern coordinates (Y) to physical tensor coordinates (X). This transformation is implemented through a tensor adaptor that encodes the hierarchical relationship between thread positions and data elements. The descriptor component (`ys_to_d_descriptor`) manages the linearization of Y dimensions for efficient register allocation, ensuring that data accessed by each thread can be stored in the limited register file. The spans component provides an iteration mechanism over the Y dimensions, enabling systematic traversal of the data assigned to each thread.
-
-In the C++ implementation, these concepts are realized through template metaprogramming:
-
-```cpp
-// From ck_tile/core/tensor/tile_distribution.hpp
-template <typename PsYs2XsAdaptor_, typename Ys2DDescriptor_, 
-          typename StaticTileDistributionEncoding_, typename TileDistributionDetail_>
-struct tile_distribution
-{
-    using PsYs2XsAdaptor = remove_cvref_t<PsYs2XsAdaptor_>;
-    using Ys2DDescriptor = remove_cvref_t<Ys2DDescriptor_>;
-    using DstrEncode = remove_cvref_t<StaticTileDistributionEncoding_>;
-    
-    static constexpr index_t NDimX = PsYs2XsAdaptor::get_num_of_bottom_dimension();
-    static constexpr index_t NDimY = Ys2DDescriptor::get_num_of_top_dimension();
-    static constexpr index_t NDimP = PsYs2XsAdaptor::get_num_of_top_dimension() - NDimY;
-    
-    PsYs2XsAdaptor ps_ys_to_xs_;
-    Ys2DDescriptor ys_to_d_;
-};
-```
-
-This structure enables compile-time optimization while maintaining the flexibility to handle different distribution patterns.
-
-## Hierarchical Work Decomposition
-
-The distribution we created follows a hierarchical decomposition pattern that maps directly to GPU hardware:
-
-```{mermaid}
-graph TD
-    subgraph "Tensor Space (256x256)"
-        T["Total Elements: 65,536"]
-    end
-    
-    subgraph "Block Level"
-        B["Thread Block<br/>256x256 elements"]
-    end
-    
-    subgraph "Warp Level"
-        W1["Warp 0<br/>128x128"]
-        W2["Warp 1<br/>128x128"]
-        W3["Warp 2<br/>128x128"]
-        W4["Warp 3<br/>128x128"]
-    end
-    
-    subgraph "Thread Level"
-        TH1["Thread 0<br/>16x16"]
-        TH2["Thread 1<br/>16x16"]
-        TH3["...<br/>..."]
-        TH32["Thread 31<br/>16x16"]
-    end
-    
-    subgraph "Vector Level"
-        V1["Vector Op<br/>4 elements"]
-        V2["Repeat 4x"]
-    end
-    
-    T --> B
-    B --> W1
-    B --> W2
-    B --> W3
-    B --> W4
-    W1 --> TH1
-    W1 --> TH2
-    W1 --> TH3
-    W1 --> TH32
-    TH1 --> V1
-    V1 --> V2
-    
-    style T fill:#e3f2fd
-    style B fill:#c5e1a5
-    style W1 fill:#fff9c4
-    style TH1 fill:#ffccbc
-```
-
-## Thread Work Assignments
-
-Now let's see how different threads get their work assignments. The first and most important application of the adapter is to find the beginning of the `X` dimension that this thread is responsible for. There is a convenient method called `calculate_index` in `tile_distribution.hpp` that accepts the partition_index, i.e., `[Warp_id, Thread_id]` as a parameter. It then creates a vector consisting of the partition_index appended with as many zeros as we have Y dimensions. For the distribution in this particular example, it will be `[Warp_id, Thread_id, 0, 0, 0, 0]`.
+The core functionality of TileDistribution is mapping thread IDs to tensor coordinates:
 
 ```{pyodide}
-print("Thread Work Assignments (2D Thread Grid):")
-print("-" * 45)
+#| echo: true  
+#| output: true
 
-# Use specific (M, N) tuples to ensure both dimensions change
-thread_positions = [
-    (0, 0), (0, 1), (1, 0), (1, 1),  # Basic 2x2 grid
-    (2, 0), (0, 2), (2, 2), (3, 3)   # Extended positions
-]
-
-for i, (thread_m, thread_n) in enumerate(thread_positions):
-    partition_index = [thread_m, thread_n]  # M, N thread coordinates
+# Simulate thread access patterns
+def simulate_thread_access(tile_dist, thread_id):
+    """Show which elements a thread accesses"""
+    # In GPU: thread_id would come from get_lane_id()
     
-    try:
-        # Calculate what X coordinates this thread handles
-        x_index = distribution.calculate_index(partition_index)
-        
-        print(f"Thread[{thread_m},{thread_n}] (position {i+1}):")
-        print(f"  → Partition: {partition_index}")
-        print(f"  → X coordinates: {x_index.to_list()}")
-        
-        # Show Y access pattern for this thread
-        y_lengths = distribution.get_y_vector_lengths()
-        print(f"  → Y pattern: {y_lengths}")
-        print()
-        
-    except Exception as e:
-        print(f"Thread[{thread_m},{thread_n}]: Error - {e}")
-        print()
+    # For a 1D partition, use thread_id directly
+    # For 2D partition, convert to (warp, lane)
+    if tile_dist.ndim_p == 1:
+        partition_index = [thread_id]
+    else:
+        warp_id = thread_id // 32
+        lane_id = thread_id % 32
+        partition_index = [warp_id, lane_id]
+    
+    print(f"\nThread {thread_id}:")
+    print(f"  Partition index: {partition_index}")
+    
+    # Calculate the X coordinates this thread accesses
+    x_coords = tile_dist.calculate_index(partition_index)
+    print(f"  Accesses X coordinates: {x_coords.to_list()}")
+
+# Show access pattern for first 4 threads
+for tid in range(4):
+    simulate_thread_access(tile_dist, tid)
 ```
 
-### C++ Implementation Reference
+## Hierarchical Decomposition
 
-The thread work assignment shown above is implemented in CK using the following pattern:
+```{=html}
+<div class="mermaid">
+graph TB
+    subgraph "Level 1: Block Distribution"
+        B["Thread Block<br/>256 threads"]
+        BT1["Block Tile 1<br/>64×64"]
+        BT2["Block Tile 2<br/>64×64"]
+    end
+    
+    subgraph "Level 2: Warp Distribution"
+        W["Warp<br/>32 threads"]
+        WT1["Warp Tile 1<br/>16×16"]
+        WT2["Warp Tile 2<br/>16×16"]
+    end
+    
+    subgraph "Level 3: Thread Distribution"
+        T["Thread"]
+        TT["Thread Tile<br/>2×2"]
+    end
+    
+    B --> BT1
+    BT1 --> W
+    W --> WT1
+    WT1 --> T
+    T --> TT
+    
+    style B fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style W fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style T fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+</div>
+```
 
-**File**: `include/ck_tile/core/tensor/tile_distribution.hpp`
+## Advanced Example: Matrix Multiplication Distribution
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+# Create a more complex distribution for GEMM
+# Using real-world RMSNorm pattern as example
+
+# RMSNorm-style distribution for matrix operations
+# This matches actual CK implementation patterns
+gemm_encoding = make_tile_distribution_encoding(
+    rs_lengths=[],  # No replication
+    hs_lengthss=[
+        [4, 2, 8, 4],  # M dimension: Repeat, WarpPerBlock, ThreadPerWarp, Vector
+        [4, 2, 8, 4]   # N dimension: Repeat, WarpPerBlock, ThreadPerWarp, Vector
+    ],
+    ps_to_rhss_major=[[1, 2], [1, 2]],  # 2D thread grid mapping
+    ps_to_rhss_minor=[[1, 1], [2, 2]],
+    ys_to_rhs_major=[1, 1, 2, 2],       # Y dimension mapping
+    ys_to_rhs_minor=[0, 3, 0, 3]
+)
+
+gemm_dist = make_static_tile_distribution(gemm_encoding)
+
+print("GEMM Tile Distribution (RMSNorm pattern):")
+print(f"X dimensions: {gemm_dist.ndim_x} (M and N)")
+print(f"Y dimensions: {gemm_dist.ndim_y} (access pattern)")
+print(f"P dimensions: {gemm_dist.ndim_p} (thread hierarchy)")
+print(f"\nX lengths: {gemm_dist.get_lengths()}")
+print(f"Each dimension: 4×2×8×4 = {4*2*8*4} elements")
+print(f"Total tile size: {4*2*8*4}×{4*2*8*4} = {(4*2*8*4)**2} elements")
+```
+
+## Work Distribution Pattern
+
+```{=html}
+<div class="mermaid">
+flowchart TB
+    subgraph "Matrix C (128×128)"
+        C["16,384 elements"]
+    end
+    
+    subgraph "Thread Grid (32×32)"
+        TG["1,024 threads"]
+    end
+    
+    subgraph "Per Thread"
+        PT["4×4 tile<br/>16 elements"]
+    end
+    
+    subgraph "Memory Access"
+        MA["Coalesced reads<br/>Efficient writes<br/>No conflicts"]
+    end
+    
+    C --> TG
+    TG --> PT
+    PT --> MA
+    
+    style C fill:#fee2e2,stroke:#ef4444,stroke-width:2px
+    style TG fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style PT fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style MA fill:#d1fae5,stroke:#10b981,stroke-width:2px
+</div>
+```
+
+## Memory Access Patterns
+
+One of the key benefits of TileDistribution is generating optimal memory access patterns:
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+def analyze_access_pattern(tile_dist, num_threads=8):
+    """Analyze memory access pattern for coalescing"""
+    print(f"Analyzing access pattern for {num_threads} consecutive threads:")
+    print("Thread ID | X coordinates accessed | Y pattern")
+    print("-" * 50)
+    
+    for tid in range(num_threads):
+        # Calculate partition index based on thread ID
+        if tile_dist.ndim_p == 1:
+            partition_index = [tid]
+        else:
+            # For 2D: assume threads are linearized within warps
+            partition_index = [tid // 32, tid % 32]
+        
+        try:
+            # Get X coordinates this thread accesses
+            x_coords = tile_dist.calculate_index(partition_index)
+            y_pattern = tile_dist.get_y_vector_lengths()
+            
+            print(f"    {tid:2d}    | {x_coords.to_list():20s} | {y_pattern}")
+        except:
+            print(f"    {tid:2d}    | Out of bounds        |")
+    
+    print("\n💡 Memory Access Pattern:")
+    print("• Each thread accesses a unique set of X coordinates")
+    print("• Y dimensions define the access pattern within each thread's tile")
+    print("• Hardware automatically optimizes for coalescing")
+
+# Create a simple distribution for analysis
+analysis_encoding = make_tile_distribution_encoding(
+    rs_lengths=[],
+    hs_lengthss=[[2, 4], [2, 4]],  # 2x4 tiles per dimension
+    ps_to_rhss_major=[[1], [2]],
+    ps_to_rhss_minor=[[1], [1]],
+    ys_to_rhs_major=[1, 2],
+    ys_to_rhs_minor=[0, 0]
+)
+
+analysis_dist = make_static_tile_distribution(analysis_encoding)
+analyze_access_pattern(analysis_dist)
+```
+
+## C++ Integration Example
+
+The real power of TileDistribution comes from its C++ implementation:
 
 ```cpp
-// Get partition index for current thread
-template <typename Distribution>
-CK_TILE_DEVICE auto get_my_work()
+// Real GEMM kernel pattern using TileDistribution
+template<typename AType, typename BType, typename CType>
+__global__ void gemm_kernel(
+    const AType* __restrict__ a_ptr,
+    const BType* __restrict__ b_ptr,
+    CType* __restrict__ c_ptr,
+    index_t M, index_t N, index_t K)
 {
-    // Get this thread's partition coordinates
-    auto partition_idx = Distribution::_get_partition_index();
+    // Define the tile distribution encoding at compile time
+    using Encoding = tile_distribution_encoding<
+        sequence<>,                                    // R: no replication
+        tuple<sequence<4, 2, 8, 4>,                   // H for M dimension
+              sequence<4, 2, 8, 4>>,                  // H for N dimension
+        tuple<sequence<1, 2>, sequence<1, 2>>,        // P to RH major
+        tuple<sequence<1, 1>, sequence<2, 2>>,        // P to RH minor
+        sequence<1, 1, 2, 2>,                         // Y to RH major
+        sequence<0, 3, 0, 3>                          // Y to RH minor
+    >;
     
-    // Calculate starting X coordinates
-    auto x_start = distribution.calculate_index(partition_idx);
+    // Create the distribution
+    constexpr auto distribution = make_static_tile_distribution(Encoding{});
     
-    // Access pattern is defined by Y dimensions
-    constexpr auto y_lengths = Distribution::get_y_vector_lengths();
+    // Create tensor views
+    auto a_view = make_tensor_view<const AType>(
+        a_ptr, 
+        make_naive_tensor_descriptor_packed(make_tuple(M, K)));
     
-    return make_tuple(x_start, y_lengths);
+    // Create tile window for this thread block
+    auto a_window = make_tile_window(
+        a_view,
+        make_tuple(number<256>{}, number<64>{}),  // window size
+        {blockIdx.x * 256, 0},                    // origin
+        distribution);
+    
+    // Load data to distributed tensor (registers)
+    auto a_reg = make_static_distributed_tensor<AType>(distribution);
+    
+    a_window.load(a_reg);
+    
+    // Computation happens in registers
+    // Results written back through another window
 }
 ```
 
-## Understanding the Coordinate Transformation Process
+## Transformation Pipeline
 
-To gain deeper insight into how the tile distribution system transforms thread coordinates to tensor positions, we can examine the `ps_ys_to_xs_adapter` directly through the `make_tensor_adaptor_coordinate` function. This function represents the core transformation engine that powers the entire distribution system, accepting a `TensorAdaptor` and a `MultiIndex` as inputs and producing a `TensorAdaptorCoordinate` that encodes the complete mapping.
-
-The C++ implementation reveals how this transformation leverages compile-time computation for efficiency:
-
-```cpp
-// Creating and using tensor adaptor coordinates
-template <typename Adaptor, typename BottomIndex>
-CK_TILE_HOST_DEVICE constexpr auto 
-make_tensor_adaptor_coordinate(const Adaptor& adaptor, 
-                               const BottomIndex& bottom_idx)
-{
-    // The coordinate encapsulates both the adaptor and current position
-    return tensor_adaptor_coordinate<Adaptor, BottomIndex>
-        {adaptor, bottom_idx};
-}
-
-// Inside tile_distribution, the transformation is applied
-const auto ps_ys_idx = container_concat(ps_idx, array<index_t, NDimY>{0});
-const auto coord = make_tensor_adaptor_coordinate(ps_ys_to_xs_, ps_ys_idx);
-return coord.get_bottom_index();  // Extract the X coordinates
-```
-
-The transformation process operates through a series of carefully orchestrated steps that preserve the mathematical relationships between different coordinate spaces while ensuring efficient hardware utilization. When a thread queries its assigned tensor positions, the adapter performs a multi-stage transformation that accounts for the hierarchical decomposition of work, the desired access patterns, and the physical constraints of GPU memory systems. This transformation is not merely a simple index calculation but a sophisticated mapping that ensures coalesced memory accesses and balanced work distribution across all processing elements.
-
-```{pyodide}
-print("Coordinate Transformation Testing:")
-print("-" * 45)
-
-# Get the PS_YS to XS adapter
-ps_ys_to_xs_adaptor = distribution.ps_ys_to_xs_adaptor
-
-# Test coordinate transformations with various examples
-test_cases = [
-    # (ps_coords, ys_coords, description)
-    ([0, 0], [0, 0, 0, 0], "Origin coordinates"),
-    ([1, 0], [0, 0, 0, 0], "P0=1, P1=0, Ys at origin"),
-    ([0, 1], [0, 0, 0, 0], "P0=0, P1=1, Ys at origin"),
-    ([1, 1], [0, 0, 0, 0], "Both P coordinates at 1"),
-    ([0, 0], [1, 0, 0, 0], "Y0=1, others at 0"),
-    ([0, 0], [0, 1, 0, 0], "Y1=1, others at 0"),
-    ([0, 0], [0, 0, 1, 0], "Y2=1, others at 0"),
-    ([0, 0], [0, 0, 0, 1], "Y3=1, others at 0"),
-    ([1, 1], [1, 1, 1, 1], "All coordinates at 1"),
-    ([2, 2], [2, 2, 2, 2], "All coordinates at 2"),
-]
-
-for i, (ps_coords, ys_coords, description) in enumerate(test_cases):
-    print(f"\n--- Test Case {i+1}: {description} ---")
-    print(f"Input: ps_coords={ps_coords}, ys_coords={ys_coords}")
-    
-    # Concatenate P and Y coordinates into a single MultiIndex
-    ps_ys_coords = ps_coords + ys_coords
-    ps_ys_multi_idx = MultiIndex(len(ps_ys_coords), ps_ys_coords)
-    
-    # Transform coordinates
-    coord = make_tensor_adaptor_coordinate(ps_ys_to_xs_adaptor, ps_ys_multi_idx)
-    xs_coords = coord.get_bottom_index().to_list()
-    print(f"Output: xs_coords={xs_coords}")
-```
-
-### C++ Transformation Pipeline
-
-The coordinate transformation pipeline is implemented through a sophisticated chain of operations:
-
-**File**: `include/ck_tile/core/tensor/tensor_adaptor.hpp`
-
-```cpp
-// The transformation chain for ps_ys_to_xs mapping
-template <typename... Transforms>
-struct tensor_adaptor
-{
-    // Chain of coordinate transformations
-    tuple<Transforms...> transforms_;
-    
-    template <typename TopIndex>
-    CK_TILE_HOST_DEVICE constexpr auto 
-    calculate_bottom_index(const TopIndex& top_idx) const
-    {
-        // Apply each transform in sequence
-        return transform_tuple_accumulate(
-            transforms_,
-            top_idx,
-            [](const auto& transform, const auto& idx) {
-                return transform.calculate_lower_index(idx);
-            }
-        );
-    }
-};
-```
-
-## Transformation Visualization
-
-The coordinate transformation process can be visualized as a pipeline:
-
-```{mermaid}
-flowchart LR
-    subgraph "Input Coordinates"
-        P["P[warp,lane]"]
-        Y["Y[0,0,0,0]"]
+```{=html}
+<div class="mermaid">
+graph LR
+    subgraph "Input"
+        TID["Thread ID<br/>(0-1023)"]
     end
     
-    subgraph "Transformation Pipeline"
-        C["Concat<br/>P+Y"]
-        R["Replicate<br/>Transform"]
-        U1["Unmerge<br/>H0"]
-        U2["Unmerge<br/>H1"]
-        M["Merge<br/>Final"]
+    subgraph "Stage 1"
+        P["P-coordinates<br/>(warp, lane)"]
+    end
+    
+    subgraph "Stage 2"
+        Y["Y-coordinates<br/>(tile position)"]
+    end
+    
+    subgraph "Stage 3"
+        X["X-coordinates<br/>(tensor indices)"]
     end
     
     subgraph "Output"
-        X["X[m,n]"]
+        ADDR["Memory addresses<br/>Register indices"]
     end
     
-    P --> C
-    Y --> C
-    C --> R
-    R --> U1
-    U1 --> U2
-    U2 --> M
-    M --> X
+    TID --> P
+    P --> Y
+    Y --> X
+    X --> ADDR
     
-    style P fill:#e3f2fd
-    style Y fill:#fff3e0
-    style X fill:#c8e6c9
+    style TID fill:#e0e7ff,stroke:#4338ca,stroke-width:2px
+    style ADDR fill:#d1fae5,stroke:#10b981,stroke-width:2px
+</div>
 ```
 
-The output from these coordinate transformations reveals the sophisticated nature of the thread cooperation pattern. Each thread in the two-dimensional grid receives a unique set of tensor coordinates, creating a carefully orchestrated pattern of data access that maximizes memory bandwidth utilization. When examining the transformation results, we observe that threads with different partition indices map to non-overlapping regions of the tensor space, ensuring that no two threads compete for the same data elements.
+## Performance Comparison
 
-The beauty of this system lies in its abstraction of complexity. Traditional GPU programming requires developers to manually calculate global memory addresses based on thread indices, handle boundary conditions, and ensure coalesced memory accesses. The tile distribution framework eliminates this burden by automatically generating optimal access patterns based on the hierarchical decomposition specified in the encoding. The thread at position [0,0] knows exactly which tensor elements it should process, as does the thread at position [1,1], without any explicit index arithmetic in the kernel code.
-
-This automatic work distribution enables a powerful programming model where developers can focus on the algorithmic aspects of their kernels rather than the mechanical details of thread-to-data mapping. The distribution system ensures that adjacent threads access adjacent memory locations when possible, maximizing memory coalescing and minimizing bank conflicts. Furthermore, the hierarchical nature of the distribution allows the same kernel code to scale across different GPU configurations without modification.
-
-## The Y-to-D Descriptor: Register Space Management
-
-The second critical component of the tile distribution system is the `ys_to_d_descriptor`, which manages the transformation from the multi-dimensional Y coordinate space to a linear D (data) space suitable for register allocation. This descriptor plays a crucial role in determining how tensor elements accessed by each thread are stored in the GPU's register file, directly impacting the efficiency of thread-local computations.
-
-The Y dimensions represent the access pattern within each tile - essentially answering the question "once a thread knows its starting position, how does it traverse its assigned data?" The descriptor linearizes these multi-dimensional access patterns into a one-dimensional space that maps directly to register indices. This linearization is not arbitrary but carefully designed to minimize register bank conflicts and maximize instruction-level parallelism.
-
-In the C++ implementation, the Y-to-D descriptor is constructed as part of the tile distribution creation process:
-
-```cpp
-// From tile_distribution.hpp - descriptor construction
-template <typename StaticTileDistributionEncoding_>
-CK_TILE_HOST_DEVICE constexpr auto make_static_tile_distribution(...)
-{
-    // ... other setup code ...
+```{=html}
+<div class="mermaid">
+graph TB
+    subgraph "Manual Implementation"
+        M1["Calculate indices manually"]
+        M2["Handle boundary conditions"]
+        M3["Ensure coalescing"]
+        M4["Manage bank conflicts"]
+        M5["~200 lines of code"]
+    end
     
-    // Create the Y-to-D adaptor for linearization
-    constexpr auto ys_to_d_adaptor = 
-        CONSTRUCT_STATIC_TENSOR_ADAPTOR_FROM_ENCODING(ys_to_d_adaptor_impl);
+    subgraph "With TileDistribution"
+        T1["make_tile_distribution()"]
+        T2["Automatic optimization"]
+        T3["~10 lines of code"]
+    end
     
-    // Build descriptor from adaptor and total D length
-    constexpr auto ys_to_d_descriptor =
-        make_tensor_descriptor_from_adaptor(ys_to_d_adaptor, number<d_length>{});
-        
-    // The descriptor manages the Y->D transformation
-    // d_length = product of all Y dimension lengths
-    // This determines register allocation size per thread
-}
+    subgraph "Performance"
+        P1["Same performance"]
+        P2["Fewer bugs"]
+        P3["Portable across GPUs"]
+    end
+    
+    M1 --> M5
+    T1 --> T3
+    
+    M5 --> P1
+    T3 --> P1
+    P1 --> P2
+    P2 --> P3
+    
+    style M5 fill:#fee2e2,stroke:#ef4444,stroke-width:2px
+    style T3 fill:#d1fae5,stroke:#10b981,stroke-width:2px
+    style P3 fill:#fef3c7,stroke:#f59e0b,stroke-width:2px
+</div>
 ```
 
-The descriptor serves multiple purposes in the overall system. First, it determines the register footprint of each thread by computing the total number of elements that need to be stored locally. Second, it provides the mapping functions that translate between multi-dimensional Y coordinates and linear register indices. Third, it enables efficient vectorized operations by ensuring that consecutively accessed elements are stored in consecutive registers when possible.
+## Summary
 
-For developers working with the CK framework, understanding the Y-to-D descriptor is essential for optimizing register usage and avoiding register spilling. The descriptor's configuration directly impacts the kernel's occupancy and performance, making it a critical component in the overall optimization strategy.
+TileDistribution provides:
+- **Automatic work distribution**: Maps threads to data efficiently
+- **Optimal memory patterns**: Ensures coalesced access and minimal conflicts
+- **Hierarchical decomposition**: Handles complex tiling strategies
+- **Zero overhead**: Compile-time optimization in C++
+- **Portability**: Same code works across different GPU architectures
 
+Key benefits:
+1. **Correctness**: Eliminates manual index calculation errors
+2. **Performance**: Achieves hand-tuned performance automatically
+3. **Productivity**: Reduces code from hundreds of lines to just a few
+4. **Maintainability**: Clear separation of algorithm from distribution
 
-## Performance Implications and Optimization Strategies
-
-The tile distribution system's design has profound implications for GPU kernel performance. By automatically managing the complex mapping between thread coordinates and tensor positions, it enables several critical optimizations that would be difficult to achieve with manual index calculations. The hierarchical decomposition ensures that threads within a warp access contiguous memory regions, maximizing coalescing efficiency and achieving near-theoretical memory bandwidth utilization.
-
-The system's use of compile-time computation through template metaprogramming means that all coordinate transformations are resolved during compilation, resulting in zero runtime overhead. The generated code is as efficient as hand-optimized implementations while being far more maintainable and portable. This is achieved through aggressive inlining and constant propagation, enabled by the C++ template system:
-
-```cpp
-// Example of compile-time optimization in tile distribution
-template <index_t... PartialHsLengths>
-struct tile_distributed_span
-{
-    using Impl = sequence<PartialHsLengths...>;
-    static constexpr auto impl_ = Impl{};
-    
-    // All span calculations happen at compile time
-    CK_TILE_HOST_DEVICE static constexpr bool is_static() { return true; }
-};
-
-// The compiler can fully optimize these transformations
-CK_TILE_HOST_DEVICE static constexpr auto get_distributed_spans()
-{
-    // Complex calculation reduced to compile-time constants
-    constexpr auto distributed_spans_impl = 
-        DstrEncode::detail::distributed_spans_lengthss_;
-    
-    // Generate optimized code for each dimension
-    return generate_tuple([&](auto i) {
-        constexpr auto span = detail::make_tile_distributed_span(...);
-        return span;
-    }, number<NDimX>{});
-}
-```
-
-## Key Takeaways
-
-The tile distribution system represents a sophisticated solution to one of GPU programming's most challenging problems: efficiently mapping parallel work to hardware resources. Through its elegant abstraction of coordinate transformations and hierarchical decomposition, it enables developers to write high-performance kernels without getting bogged down in low-level details. The key insights from our exploration include:
-
-The four-dimensional coordinate system (X, Y, P, R) provides a mathematically rigorous framework for expressing complex data access patterns while maintaining a clear separation of concerns. The X dimensions represent the physical tensor space, Y dimensions encode access patterns, P dimensions map to the GPU's thread hierarchy, and R dimensions enable computational replication when needed.
-
-The transformation pipeline, implemented through tensor adaptors and descriptors, ensures that all coordinate mappings are resolved at compile time, resulting in zero runtime overhead. This approach leverages C++ template metaprogramming to generate highly optimized code that rivals hand-tuned implementations.
-
-The hierarchical work decomposition naturally maps to GPU hardware organization, ensuring optimal memory access patterns and balanced work distribution. By encoding the decomposition in the tile distribution, the same kernel code can efficiently utilize different GPU configurations without modification.
-
-Mastering tile distribution is essential for understanding the broader CK framework. It forms the foundation upon which higher-level abstractions like tile windows and sweep operations are built. With this understanding, you're now prepared to explore how tile distribution connects to actual data access patterns through the TileWindow abstraction in the next section! 
+The TileDistribution API is the foundation that enables Composable Kernels to achieve both high performance and high productivity in GPU programming.
