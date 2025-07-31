@@ -6,11 +6,11 @@ format:
       theme: default
 ---
 
-## Overview
+# Overview
 
 BufferView provides structured access to raw memory regions for GPU kernels. It handles different memory address spaces (global, shared, register) with support for vectorized operations.
 
-### BufferView Architecture
+## BufferView Architecture
 
 ```{=html}
 <div class="mermaid">
@@ -56,9 +56,9 @@ graph TB
 - Manages memory coherence and caching policies
 
 
-### Python vs C++ Key Differences
+## Python vs C++ Key Differences
 
-#### 1. **Compile-Time vs Runtime**
+### Compile-Time vs Runtime
 - **C++**: BufferView uses template metaprogramming with compile-time constants
   - Size is encoded in the type: `number<8>{}`
   - Address space is a template parameter
@@ -68,7 +68,7 @@ graph TB
   - Address space is an enum value
   - Designed for learning and experimentation
 
-#### 2. **Memory Management**
+### Memory Management
 - **C++**: Direct pointer to GPU memory
   - No memory allocation - uses existing memory
   - Pointer arithmetic for addressing
@@ -78,7 +78,7 @@ graph TB
   - Python manages memory lifetime
   - Educational approximation of GPU behavior
 
-#### 3. **Type System**
+### Type System
 - **C++**: Strong compile-time typing
   ```cpp
   buffer_view<float*, address_space_enum::global>  // Type encodes everything
@@ -100,7 +100,7 @@ import micropip
 await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl")
 ```
 
-## Basic Creation
+# Basic Creation
 
 Out-of-Bounds Handling:
 
@@ -126,7 +126,7 @@ print(f"Address space: {buffer_view.address_space.name}")
 print(f"Data: {data}")
 ```
 
-### C++ Implementation Reference
+## C++ Implementation Reference
 
 **File**: `include/ck_tile/core/tensor/buffer_view.hpp`
 
@@ -165,6 +165,8 @@ __device__ void example_buffer_creation()
 }
 ```
 
+## Creation Modes
+
 ### Zero Value Mode
 ```cpp
 // Basic buffer view creation with automatic zero for invalid elements
@@ -191,9 +193,9 @@ void custom_invalid_value_example() {
 }
 ```
 
-## Get Operations
+# Get Operations
 
-### Scalar Access
+## Scalar Access
 
 **Scalar Access Parameters:**
 
@@ -214,11 +216,11 @@ Is specified while making the buffer view as shown in the above example.
 **Out-of-Bounds Handling:** The buffer view automatically handles bounds checking when AMD buffer addressing is enabled.
 
 
-### Vector Access
+## Vector Access
 
 Vector operations use template parameters to specify the vector type (e.g., `ext_vector_t<float, N>` for N elements). The same parameters apply as scalar access, but the operation reads/writes multiple contiguous elements.
 
-### Scalar vs Vectorized Memory Access
+## Scalar vs Vectorized Memory Access
 
 ```{=html}
 <div class="mermaid">
@@ -251,7 +253,7 @@ graph LR
 ```
 
 
-### Understanding BufferView Indexing
+## Understanding BufferView Indexing
 
 ```{=html}
 <div class="mermaid">
@@ -313,7 +315,7 @@ value_invalid = buffer_view.get(3, valid_flag=False)
 print(f"Value with invalid flag: {value_invalid}")
 ```
 
-### C++ Get Operations
+## C++ Get Operations
 
 ```cpp
 __device__ void example_get_operations()
@@ -341,7 +343,7 @@ __device__ void example_get_operations()
 }
 ```
 
-#### Custom Value Return Mode for OOB & Invalid Access
+### Custom Value Return Mode for OOB & Invalid Access
  ```cpp
 void scalar_get_operations_example() {
 
@@ -367,7 +369,7 @@ void scalar_get_operations_example() {
 
 NOTE: Partial Out Of Bound (OOB) access during vector reads will return 'junk' values for the OOB access. Zero or custom invalid value is only returned for complete invalid/OOB access, i.e. when the first address of the vector is invalid.
 
-### Scalar vs Vectorized C++ Reference
+## Scalar vs Vectorized C++ Reference
 
 ```{pyodide}
 #| echo: true
@@ -397,7 +399,7 @@ print("  Vectorized: 1 memory transaction")
 print("  Speedup: ~4x for memory-bound operations")
 ```
 
-## Update Operations
+# Update Operations
 
 ```{pyodide}
 #| echo: true
@@ -427,6 +429,7 @@ buffer_view.update_vectorized(0, vec_data)
 print("After vectorized update:", data)
 ```
 
+## C++ Update Operations
 
 ```cpp
 void scalar_set_operations_example() {
@@ -455,9 +458,9 @@ void scalar_set_operations_example() {
 }
 ```
 
-## Atomic Operations
+# Atomic Operations
 
-### Atomic vs Non-Atomic Operations
+## Atomic vs Non-Atomic Operations
 
 ```{=html}
 <div class="mermaid">
@@ -504,7 +507,7 @@ old_value = buffer_view.atomic_add(2, 100, valid_flag=True)
 print(f"atomic_add(2, 100, valid_flag=True) - old value: {old_value}, new data: {data}")
 ```
 
-### C++ Atomic Operations
+## C++ Atomic Operations
 
 ```cpp
 __device__ void example_atomic_operations()
@@ -540,7 +543,7 @@ __device__ void example_atomic_operations()
 }
 ```
 
-## Address Space Usage Patterns
+# Address Space Usage Patterns
 
 ```{=html}
 <div class="mermaid">
@@ -572,7 +575,7 @@ flowchart TB
 </div>
 ```
 
-## Summary
+# Summary
 
 BufferView provides:
 - **Unified Interface**: Same API for all memory spaces
