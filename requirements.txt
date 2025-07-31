@@ -1,7 +1,7 @@
-streamlit==1.24.0
-matplotlib==3.7.1
-networkx==3.1
-numpy==1.24.3
-sympy>=1.12
-pytest>=7.0.0
-build>=0.7.0 
+streamlit
+matplotlib
+networkx
+numpy
+sympy
+pytest
+build

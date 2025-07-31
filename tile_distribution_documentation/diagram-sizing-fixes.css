@@ -1,7 +1,6 @@
 /* D3 Diagram Sizing Fixes - Ensure diagrams fit within content area */
 /* Enhanced with Professional Scientific Theme */
 
-@import url('./diagrams/professional-scientific-theme.css');
 
 /* Container constraints for all diagrams - minimal spacing */
 .d3-diagram-container,
