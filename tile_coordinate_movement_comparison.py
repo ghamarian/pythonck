@@ -33,9 +33,10 @@ from pytensor.tensor_coordinate import (
     make_tensor_adaptor_coordinate
 )
 from pytensor.tensor_descriptor import (
-    make_single_stage_tensor_adaptor,
     MergeTransform, UnmergeTransform, PadTransform, EmbedTransform
 )
+
+from pytensor.tensor_adaptor import make_single_stage_tensor_adaptor
 
 
 def setup_tile_configuration():
@@ -197,7 +198,7 @@ def demonstrate_tile_window_operations():
         # Extract all values from loaded tensor
         values = []
         for i in range(loaded_tensor.get_num_of_elements()):
-            y_indices = loaded_tensor.tile_distribution.get_y_indices_from_element_index(i)
+            y_indices = loaded_tensor.tile_distribution.get_y_indices_from_distributed_indices(i)
             value = loaded_tensor.get_element(y_indices)
             values.append(value)
         
@@ -265,9 +266,19 @@ def demonstrate_sweep_tile_operations():
         collected_values = []
         access_count = 0
         
-        def process_element(y_indices):
+        def process_element(*y_indices):
+            """Process a single element from the sweep."""
             nonlocal access_count
-            value = loaded_tensor.get_element(y_indices)
+            
+            # Convert TileDistributedIndex objects to a flat list of indices
+            y_coord = []
+            for idx in y_indices:
+                if hasattr(idx, 'partial_indices'):
+                    y_coord.extend(idx.partial_indices)
+                else:
+                    y_coord.append(idx)
+            
+            value = loaded_tensor.get_element(y_coord)
             collected_values.append(value)
             access_count += 1
         
@@ -343,10 +354,10 @@ def demonstrate_performance_comparison():
     for i in range(num_iterations):
         start_time = time.perf_counter()
         
-        coord = make_tensor_adaptor_coordinate(adaptor, [i % 612])
+        coord = make_tensor_adaptor_coordinate(adaptor, [i % 16, (i // 16) % 32])
         for j in range(movements_per_test):
             try:
-                move_tensor_adaptor_coordinate(adaptor, coord, [1 if j % 2 == 0 else -1])
+                move_tensor_adaptor_coordinate(adaptor, coord, [1 if j % 2 == 0 else -1, 0])
             except:
                 pass  # Out of bounds
         
@@ -360,10 +371,10 @@ def demonstrate_performance_comparison():
     for i in range(num_iterations):
         start_time = time.perf_counter()
         
-        coord = make_tensor_adaptor_coordinate(adaptor, [i % 612])
+        coord = make_tensor_adaptor_coordinate(adaptor, [i % 16, (i // 16) % 32])
         for j in range(movements_per_test):
             try:
-                move_tensor_adaptor_coordinate_efficient(adaptor, coord, [1 if j % 2 == 0 else -1])
+                move_tensor_adaptor_coordinate_efficient(adaptor, coord, [1 if j % 2 == 0 else -1, 0])
             except:
                 pass  # Out of bounds
         

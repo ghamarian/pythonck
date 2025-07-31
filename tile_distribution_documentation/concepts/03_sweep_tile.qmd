@@ -30,7 +30,7 @@ from pytensor.tile_window import make_tile_window
 from pytensor.tensor_view import make_tensor_view
 from pytensor.tensor_descriptor import make_naive_tensor_descriptor_packed
 from pytensor.static_distributed_tensor import make_static_distributed_tensor
-from pytensor.sweep_tile import sweep_tensor_direct, sweep_tile, make_tile_sweeper
+from pytensor.sweep_tile import sweep_tile, make_tile_sweeper
 ```
 
 ## What are Sweep Operations?
@@ -108,12 +108,12 @@ def collect_value(y_indices):
     print(f"  Visited Y{y_indices}: value = {value}")
 
 # Perform the sweep
-sweep_tensor_direct(distributed_tensor, collect_value)
+sweep_tile(distributed_tensor, collect_value)
 
 print(f"\nSweep completed! Visited {len(collected_values)} elements")
 ```
 
-**What happened?** `sweep_tensor_direct` automatically iterated over all Y indices in the distributed tensor and called our function for each element. No manual loops, no missed elements!
+**What happened?** `sweep_tile` automatically iterated over all Y indices in the distributed tensor and called our function for each element. No manual loops, no missed elements!
 
 ## Sweep with Computation
 
@@ -136,7 +136,7 @@ def compute_square(y_indices):
     print(f"  Y{y_indices}: {input_value}² = {output_value}")
 
 # Perform computation sweep
-sweep_tensor_direct(distributed_tensor, compute_square)
+sweep_tile(distributed_tensor, compute_square)
 
 print()
 print("🔍 Results verification:")
@@ -146,7 +146,7 @@ def verify_result(y_indices):
     expected = original ** 2
     print(f"  Y{y_indices}: {original} → {computed} (expected {expected})")
 
-sweep_tensor_direct(result_tensor, verify_result)
+sweep_tile(result_tensor, verify_result)
 ```
 
 **Computation Pattern**: This is the classic pattern: sweep over input tensor, compute something, store in result tensor. The sweep handles all the iteration complexity automatically!
@@ -186,7 +186,7 @@ def process_even_values(y_indices):
     else:
         print(f"  Skipping odd value at Y{y_indices}: {value}")
 
-sweep_tensor_direct(distributed_tensor, process_even_values)
+sweep_tile(distributed_tensor, process_even_values)
 print()
 
 # Pattern 2: Accumulation
@@ -201,7 +201,7 @@ def accumulate_values(y_indices):
     element_count += 1
     print(f"  Added {value}, running total: {total_sum}")
 
-sweep_tensor_direct(distributed_tensor, accumulate_values)
+sweep_tile(distributed_tensor, accumulate_values)
 print(f"Final sum: {total_sum}, average: {total_sum/element_count}")
 ```
 
@@ -279,7 +279,7 @@ def complete_tile_processing(input_data, window_origin, window_size, operation_n
         print(f"    Y{y_indices}: {input_val} → {output_val}")
     
     print("📊 Processing elements with sweep:")
-    sweep_tensor_direct(distributed_input, process_with_sweep)
+    sweep_tile(distributed_input, process_with_sweep)
     
     # 5. Store results back
     output_window.store(distributed_output)
@@ -360,7 +360,7 @@ def sweep_accumulator(y_indices):
     sweep_sum += val
     print(f"   Sweep: Y{y_indices} = {val}")
 
-sweep_tensor_direct(test_tensor, sweep_accumulator)
+sweep_tile(test_tensor, sweep_accumulator)
 print(f"   Sweep sum: {sweep_sum}")
 print()
 
@@ -402,7 +402,7 @@ def test_basic_sweep():
             nonlocal element_count
             element_count += 1
         
-        sweep_tensor_direct(tensor, count_elements)
+        sweep_tile(tensor, count_elements)
         
         expected_count = y_lengths[0] * y_lengths[1]
         return element_count == expected_count
@@ -466,7 +466,7 @@ def test_sweep_computation():
             result = val ** 2
             output_tensor.set_element(y_indices, result)
         
-        sweep_tensor_direct(input_tensor, square_operation)
+        sweep_tile(input_tensor, square_operation)
         
         # Verify results
         for y0 in range(y_lengths[0]):
