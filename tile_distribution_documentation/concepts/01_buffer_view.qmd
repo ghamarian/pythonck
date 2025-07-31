@@ -55,6 +55,41 @@ graph TB
 - Implements AMD GPU-specific optimizations (buffer addressing, atomic operations)
 - Manages memory coherence and caching policies
 
+
+### Python vs C++ Key Differences
+
+#### 1. **Compile-Time vs Runtime**
+- **C++**: BufferView uses template metaprogramming with compile-time constants
+  - Size is encoded in the type: `number<8>{}`
+  - Address space is a template parameter
+  - Enables aggressive compiler optimizations
+- **Python**: Everything is runtime
+  - Size is a regular integer
+  - Address space is an enum value
+  - Designed for learning and experimentation
+
+#### 2. **Memory Management**
+- **C++**: Direct pointer to GPU memory
+  - No memory allocation - uses existing memory
+  - Pointer arithmetic for addressing
+  - Zero-copy access to device memory
+- **Python**: NumPy array simulation
+  - Uses host memory to simulate GPU memory
+  - Python manages memory lifetime
+  - Educational approximation of GPU behavior
+
+#### 3. **Type System**
+- **C++**: Strong compile-time typing
+  ```cpp
+  buffer_view<float*, address_space_enum::global>  // Type encodes everything
+  ```
+- **Python**: Dynamic typing with runtime checks
+  ```python
+  BufferView  # Generic class, properties stored as members
+  ```
+
+
+
 ```{pyodide}
 #| echo: false
 #| output: false
@@ -160,46 +195,61 @@ void custom_invalid_value_example() {
 
 ### Scalar Access
 
-```{pyodide}
-#| echo: true
-#| output: true
+**Scalar Access Parameters:**
 
-print("🔍 Scalar Get Operations")
+- `i` (index): Base offset in terms of T elements  
+
+- `linear_offset`: Additional offset to add to the base index
+-
+ `is_valid_element`: Boolean controlling whether the access is valid
+
+**Invalid Value Modes:**
+
+Is specified while making the buffer view as shown in the above example.
+
+- Zero mode (`InvalidElementUseNumericalZeroValue = true`): Returns zero for invalid accesses.
+
+- Custom mode (`InvalidElementUseNumericalZeroValue = false`): Returns the specified invalid value
+
+**Out-of-Bounds Handling:** The buffer view automatically handles bounds checking when AMD buffer addressing is enabled.
 
 
-### Python vs C++ Key Differences
+### Vector Access
 
-#### 1. **Compile-Time vs Runtime**
-- **C++**: BufferView uses template metaprogramming with compile-time constants
-  - Size is encoded in the type: `number<8>{}`
-  - Address space is a template parameter
-  - Enables aggressive compiler optimizations
-- **Python**: Everything is runtime
-  - Size is a regular integer
-  - Address space is an enum value
-  - Designed for learning and experimentation
+Vector operations use template parameters to specify the vector type (e.g., `ext_vector_t<float, N>` for N elements). The same parameters apply as scalar access, but the operation reads/writes multiple contiguous elements.
 
-#### 2. **Memory Management**
-- **C++**: Direct pointer to GPU memory
-  - No memory allocation - uses existing memory
-  - Pointer arithmetic for addressing
-  - Zero-copy access to device memory
-- **Python**: NumPy array simulation
-  - Uses host memory to simulate GPU memory
-  - Python manages memory lifetime
-  - Educational approximation of GPU behavior
+### Scalar vs Vectorized Memory Access
 
-#### 3. **Type System**
-- **C++**: Strong compile-time typing
-  ```cpp
-  buffer_view<float*, address_space_enum::global>  // Type encodes everything
-  ```
-- **Python**: Dynamic typing with runtime checks
-  ```python
-  BufferView  # Generic class, properties stored as members
-  ```
+```{=html}
+<div class="mermaid">
+graph LR
+    subgraph "Scalar Access (4 instructions)"
+        S1["Load float[0]"] --> R1["Register 1"]
+        S2["Load float[1]"] --> R2["Register 2"]
+        S3["Load float[2]"] --> R3["Register 3"]
+        S4["Load float[3]"] --> R4["Register 4"]
+    end
+    
+    subgraph "Vectorized Access (1 instruction)"
+        V1["Load float4[0]"] --> VR["Vector Register<br/>(4 floats)"]
+    end
+    
+    subgraph "Performance Impact"
+        Perf["4x fewer instructions<br/>Better memory bandwidth<br/>Reduced latency"]
+    end
+    
+    R1 & R2 & R3 & R4 --> Perf
+    VR --> Perf
+    
+    style S1 fill:#fee2e2,stroke:#ef4444,stroke-width:2px
+    style S2 fill:#fee2e2,stroke:#ef4444,stroke-width:2px
+    style S3 fill:#fee2e2,stroke:#ef4444,stroke-width:2px
+    style S4 fill:#fee2e2,stroke:#ef4444,stroke-width:2px
+    style V1 fill:#d1fae5,stroke:#10b981,stroke-width:2px
+    style Perf fill:#fef3c7,stroke:#f59e0b,stroke-width:2px
+</div>
+```
 
-## Get Operations
 
 ### Understanding BufferView Indexing
 
@@ -270,60 +320,54 @@ __device__ void example_get_operations()
 {
     // Create buffer view
     float data[8] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f};
-    auto buffer = make_buffer_view<address_space_enum::global>(data, 8);
+    auto buffer_view = make_buffer_view<address_space_enum::global>(data, 8);
 
     // Simple get - compile-time bounds checking when possible
-    float value1 = buffer.get(number<2>{});  // Compile-time index
-    float value2 = buffer.get(threadIdx.x);   // Runtime index
+    auto value_buf = buffer_view.template get<float>(0,1,true); //get the buffer from the buffer view
+    float value = value_buf.get(0); //get the value from the buffer
 
     // Get with valid flag - branchless conditional access
-    bool valid_flag = (threadIdx.x < 4);
-    float value3 = buffer.get(threadIdx.x, valid_flag);
-    // Returns data[threadIdx.x] if valid_flag && in_bounds, else 0
+    bool valid_flag = false;
+    value_buf = buffer_view.template get<float>(0,1,valid_flag);
+    value = value_buf.get(0);
+    // Returns 0 valid_flag is false
 
-    // Get with coordinate (multi-dimensional access)
-    auto coord = make_tuple(number<1>{}, threadIdx.x);
-    float value4 = buffer.get(coord);  // Flattened multi-D access
-
-    // Template-based get for vectorization
-    auto vec4 = buffer.template get<float4>(number<0>{});
-    // Loads 4 floats in a single instruction
+    // vectorized get
+    using float2 = ext_vector_t<float, 2>;
+    auto vector_buf = buffer_view.template get<float2>(0, 0, true);
+    // Loads 2 floats in a single instruction
+    float val1 = vector_buf.get(0);
+    float val2 = vector_buf.get(1);
 }
 ```
 
-## Vectorized Operations
+#### Custom Value Return Mode for OOB & Invalid Access
+ ```cpp
+void scalar_get_operations_example() {
 
-### Scalar vs Vectorized Memory Access
-
-```{=html}
-<div class="mermaid">
-graph LR
-    subgraph "Scalar Access (4 instructions)"
-        S1["Load float[0]"] --> R1["Register 1"]
-        S2["Load float[1]"] --> R2["Register 2"]
-        S3["Load float[2]"] --> R3["Register 3"]
-        S4["Load float[3]"] --> R4["Register 4"]
-    end
+    // Create data array
+    constexpr size_t buffer_size = 8;
+    float data[buffer_size] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f};
+    float custom_invalid = 13.0f;
     
-    subgraph "Vectorized Access (1 instruction)"
-        V1["Load float4[0]"] --> VR["Vector Register<br/>(4 floats)"]
-    end
+    // Create global memory buffer view with zero invalid value mode (default)
+    auto buffer_view = make_buffer_view<address_space_enum::global>(data, buffer_size, custom_invalid);
     
-    subgraph "Performance Impact"
-        Perf["4x fewer instructions<br/>Better memory bandwidth<br/>Reduced latency"]
-    end
+    // Invalid element access with is_valid_element=false
+    // Returns custom_invalid due to custom invalid value mode
+    auto invalid_value = buffer_view.template get<float>(0, 0, false);
+    printf("Invalid element: %.1f\n", invalid_value.get(0));
     
-    R1 & R2 & R3 & R4 --> Perf
-    VR --> Perf
-    
-    style S1 fill:#fee2e2,stroke:#ef4444,stroke-width:2px
-    style S2 fill:#fee2e2,stroke:#ef4444,stroke-width:2px
-    style S3 fill:#fee2e2,stroke:#ef4444,stroke-width:2px
-    style S4 fill:#fee2e2,stroke:#ef4444,stroke-width:2px
-    style V1 fill:#d1fae5,stroke:#10b981,stroke-width:2px
-    style Perf fill:#fef3c7,stroke:#f59e0b,stroke-width:2px
-</div>
+    // Out of bounds access - AMD buffer addressing handles bounds checking
+    // Will return custom_invalid when accessing beyond buffer_size
+    auto oob_value = buffer_view.template get<float>(0, 100, true);
+    printf("Out of bounds: %.1f\n", oob_value.get(0));
+}
 ```
+
+NOTE: Partial Out Of Bound (OOB) access during vector reads will return 'junk' values for the OOB access. Zero or custom invalid value is only returned for complete invalid/OOB access, i.e. when the first address of the vector is invalid.
+
+### Scalar vs Vectorized C++ Reference
 
 ```{pyodide}
 #| echo: true
@@ -381,6 +425,34 @@ print("After update(4, 77.0, valid_flag=False):", data)
 vec_data = np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
 buffer_view.update_vectorized(0, vec_data)
 print("After vectorized update:", data)
+```
+
+
+```cpp
+void scalar_set_operations_example() {
+        
+    // Create data array
+    constexpr size_t buffer_size = 8;
+    float data[buffer_size] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f};
+    
+    // Create global memory buffer view
+    auto buffer_view = make_buffer_view<address_space_enum::global>(data, buffer_size);
+    
+    // Basic set: set<T>(i, linear_offset, is_valid_element, value)
+    // Sets element at position i + linear_offset = 0 + 2 = 2
+    buffer_view.template set<float>(0, 2, true, 99.0f);
+    
+    // Invalid write with is_valid_element=false (ignored)
+    buffer_view.template set<float>(0, 3, false, 777.0f);
+    
+    // Out of bounds write - handled safely by AMD buffer addressing
+    buffer_view.template set<float>(0, 100, true, 555.0f);
+
+    // Vector set
+    using float2 = ext_vector_t<float, 2>;
+    float2 pair_values{100.0f, 200.0f};
+    buffer_view.template set<float2>(0, 5, true, pair_values);
+}
 ```
 
 ## Atomic Operations
