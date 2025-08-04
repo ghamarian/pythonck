@@ -5,11 +5,11 @@ This module provides static distributed tensor functionality for managing
 tensor data distributed across processing elements.
 """
 
-from typing import List, Optional, Any, Union
+from typing import List, Optional, Any, Union, Tuple
 import numpy as np
 from dataclasses import dataclass, field
 
-from .tile_distribution import TileDistribution
+from .tile_distribution import TileDistribution, TileDistributedIndex
 from .tensor_coordinate import MultiIndex
 
 
@@ -140,8 +140,8 @@ class StaticDistributedTensor:
         """Get the total number of elements in the thread's local buffer."""
         return len(self.thread_buffer)
 
-    def __getitem__(self, key: Union[int, MultiIndex]) -> Any:
-        """Get element or slice from thread buffer using integer or MultiIndex."""
+    def __getitem__(self, key: Union[int, MultiIndex, TileDistributedIndex, Tuple[TileDistributedIndex, ...], List[TileDistributedIndex]]) -> Any:
+        """Get element or slice from thread buffer using various index types."""
         if isinstance(key, int):
             return self.thread_buffer[key]
         elif isinstance(key, MultiIndex):
@@ -151,11 +151,21 @@ class StaticDistributedTensor:
         elif isinstance(key, slice):
             # Allow basic slicing directly on the buffer for simplicity
             return self.thread_buffer[key]
+        elif isinstance(key, TileDistributedIndex):
+            # Single distributed index - convert to Y indices automatically
+            y_indices = self.tile_distribution.get_y_indices_from_distributed_indices([key])
+            offset = self.tile_distribution.ys_to_d_descriptor.calculate_offset(y_indices)
+            return self.thread_buffer[offset]
+        elif isinstance(key, (tuple, list)) and all(isinstance(idx, TileDistributedIndex) for idx in key):
+            # Multiple distributed indices - convert to Y indices automatically
+            y_indices = self.tile_distribution.get_y_indices_from_distributed_indices(list(key))
+            offset = self.tile_distribution.ys_to_d_descriptor.calculate_offset(y_indices)
+            return self.thread_buffer[offset]
         else:
             raise TypeError(f"Unsupported key type for __getitem__: {type(key)}")
 
-    def __setitem__(self, key: Union[int, MultiIndex], value: Any):
-        """Set element in thread buffer using integer or MultiIndex."""
+    def __setitem__(self, key: Union[int, MultiIndex, TileDistributedIndex, Tuple[TileDistributedIndex, ...], List[TileDistributedIndex]], value: Any):
+        """Set element in thread buffer using various index types."""
         if isinstance(key, int):
             if key < 0 or key >= len(self.thread_buffer):
                 raise IndexError(f"Index {key} out of bounds for thread buffer size {len(self.thread_buffer)}")
@@ -166,8 +176,37 @@ class StaticDistributedTensor:
             if offset < 0 or offset >= len(self.thread_buffer):
                 raise IndexError(f"Calculated offset {offset} from MultiIndex {key} is out of bounds for thread buffer size {len(self.thread_buffer)}")
             self.thread_buffer[offset] = value
+        elif isinstance(key, TileDistributedIndex):
+            # Single distributed index - convert to Y indices automatically
+            y_indices = self.tile_distribution.get_y_indices_from_distributed_indices([key])
+            offset = self.tile_distribution.ys_to_d_descriptor.calculate_offset(y_indices)
+            if offset < 0 or offset >= len(self.thread_buffer):
+                raise IndexError(f"Calculated offset {offset} from distributed index {key} is out of bounds")
+            self.thread_buffer[offset] = value
+        elif isinstance(key, (tuple, list)) and all(isinstance(idx, TileDistributedIndex) for idx in key):
+            # Multiple distributed indices - convert to Y indices automatically
+            y_indices = self.tile_distribution.get_y_indices_from_distributed_indices(list(key))
+            offset = self.tile_distribution.ys_to_d_descriptor.calculate_offset(y_indices)
+            if offset < 0 or offset >= len(self.thread_buffer):
+                raise IndexError(f"Calculated offset {offset} from distributed indices {key} is out of bounds")
+            self.thread_buffer[offset] = value
         else:
             raise TypeError(f"Unsupported key type for __setitem__: {type(key)}")
+
+    def __call__(self, key: Union[int, MultiIndex, TileDistributedIndex, Tuple[TileDistributedIndex, ...], List[TileDistributedIndex]]) -> Any:
+        """
+        Call-style access to tensor elements (matches C++ operator()).
+        
+        This provides the same functionality as __getitem__ but with call syntax
+        to match the C++ operator() pattern used in sweep_tile examples.
+        
+        Args:
+            key: Index specification (int, MultiIndex, or distributed indices)
+            
+        Returns:
+            Element value at the specified location
+        """
+        return self.__getitem__(key)
 
     def get_y_sliced_thread_data(self, y_slice_origins: List[int], y_slice_lengths: List[int]) -> List[Any]:
         """

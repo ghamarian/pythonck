@@ -377,6 +377,70 @@ class TestTileDistribution:
         y_indices = dist.get_y_indices_from_distributed_indices(dstr_indices)
         assert y_indices == [1, 2]
     
+    def test_cpp_style_tensor_access(self):
+        """Test C++-style direct tensor access with distributed indices."""
+        from pytensor.static_distributed_tensor import StaticDistributedTensor
+        
+        # Create simple adaptor and descriptor (like other tests)
+        transform = UnmergeTransform([4])  # Simple 2x2 tile
+        
+        adaptor = TensorAdaptor(
+            transforms=[transform],
+            lower_dimension_hidden_idss=[[0]],
+            upper_dimension_hidden_idss=[[1, 2]],
+            bottom_dimension_hidden_ids=[0, 1],
+            top_dimension_hidden_ids=[2, 3]  # P=1, Y=1
+        )
+        
+        descriptor = make_naive_tensor_descriptor([2, 2], [2, 1])
+        
+        # Create simple encoding
+        encoding = TileDistributionEncoding(
+            rs_lengths=[],
+            hs_lengthss=[[2], [2]], 
+            ps_to_rhss_major=[[]],
+            ps_to_rhss_minor=[[]], 
+            ys_to_rhs_major=[1, 2],
+            ys_to_rhs_minor=[0, 0]
+        )
+        
+        tile_dist = TileDistribution(
+            ps_ys_to_xs_adaptor=adaptor,
+            ys_to_d_descriptor=descriptor,
+            encoding=encoding
+        )
+        tensor = StaticDistributedTensor(data_type=float, tile_distribution=tile_dist)
+        
+        # Initialize tensor data
+        for i in range(len(tensor.thread_buffer)):
+            tensor.thread_buffer[i] = i * 10.0
+        
+        # Create distributed indices
+        dstr_idx = TileDistributedIndex([1])
+        dstr_indices = [TileDistributedIndex([0]), TileDistributedIndex([1])]
+        
+        # Test old way vs new way give same results
+        old_y_indices = tile_dist.get_y_indices_from_distributed_indices([dstr_idx])
+        old_value = tensor.get_element(old_y_indices)
+        
+        # Test new C++-style access
+        new_value_call = tensor(dstr_idx)      # Using __call__
+        new_value_index = tensor[dstr_idx]     # Using __getitem__
+        new_value_multiple = tensor[dstr_indices]  # Multiple indices
+        
+        # All should give same result
+        assert old_value == new_value_call
+        assert old_value == new_value_index
+        
+        # Test setting values
+        original_value = tensor[dstr_idx]
+        tensor[dstr_idx] = 999.0
+        assert tensor[dstr_idx] == 999.0
+        
+        # Reset
+        tensor[dstr_idx] = original_value
+        assert tensor[dstr_idx] == original_value
+    
     def test_is_static(self):
         """Test static check."""
         transform = UnmergeTransform([8])
