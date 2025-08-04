@@ -265,11 +265,12 @@ def test_sweep_tile_compatibility():
     values_current = []
     
     def collect_current(*distributed_indices):
-        # Convert TileDistributedIndex objects to Y indices for computation
+        # C++-style: still need Y indices for computation, but cleaner access
         y_indices = tensor.tile_distribution.get_y_indices_from_distributed_indices(list(distributed_indices))
         # Simulate some computation based on y_indices
         value = sum(y_indices) * 10.0
         values_current.append(value)
+        # Note: For tensor access, we could use: tensor[distributed_indices]
     
     sweep_tile(tensor, collect_current)
     
