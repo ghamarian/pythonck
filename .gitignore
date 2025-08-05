@@ -35,9 +35,6 @@ media/
 documentation/**/*.quarto_ipynb
 *.quarto_ipynb
 
-# Quarto generated site files
-_site/
-tile_distribution_documentation/_site/
 
 # Images and debug files
 *.png

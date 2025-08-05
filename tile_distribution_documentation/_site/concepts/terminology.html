@@ -1,0 +1,1778 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.7.32">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>Terminology Reference - Key Concepts and Definitions – Tile Distribution Documentation</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-038ebe7de1ad581fc619d66ba7f7845b.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-9cae0046c5fab5900eed4751693c39dd.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-038ebe7de1ad581fc619d66ba7f7845b.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-185961ed47a39db2ff9d8581d2d02664.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-1f647ac581ac6b74d75948daead8752e.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../site_libs/bootstrap/bootstrap-185961ed47a39db2ff9d8581d2d02664.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<script src="../site_libs/quarto-contrib/live-runtime/live-runtime.js" type="module"></script>
+<link href="../site_libs/quarto-contrib/live-runtime/live-runtime.css" rel="stylesheet">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    mermaid.initialize({ 
+        startOnLoad: true,
+        theme: 'default',
+        themeVariables: {
+            primaryColor: '#f0f7ff',
+            primaryTextColor: '#1e293b',
+            primaryBorderColor: '#2563eb',
+            lineColor: '#6b7280',
+            secondaryColor: '#fef3e2',
+            tertiaryColor: '#f0fdf4',
+            background: '#ffffff',
+            mainBkg: '#f0f7ff',
+            secondBkg: '#fef3e2',
+            tertiaryBkg: '#f0fdf4',
+            primaryTextColor: '#1e293b',
+            fontSize: '16px'
+        }
+    });
+});
+</script>
+<script type="module" src="../site_libs/quarto-ojs/quarto-ojs-runtime.js"></script>
+<link href="../site_libs/quarto-ojs/quarto-ojs.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="../global-font-override.css">
+<link rel="stylesheet" href="../diagram-sizing-fixes.css">
+</head>
+
+<body class="nav-sidebar docked quarto-light"><script id="quarto-html-before-body" type="application/javascript">
+    const toggleBodyColorMode = (bsSheetEl) => {
+      const mode = bsSheetEl.getAttribute("data-mode");
+      const bodyEl = window.document.querySelector("body");
+      if (mode === "dark") {
+        bodyEl.classList.add("quarto-dark");
+        bodyEl.classList.remove("quarto-light");
+      } else {
+        bodyEl.classList.add("quarto-light");
+        bodyEl.classList.remove("quarto-dark");
+      }
+    }
+    const toggleBodyColorPrimary = () => {
+      const bsSheetEl = window.document.querySelector("link#quarto-bootstrap:not([rel=disabled-stylesheet])");
+      if (bsSheetEl) {
+        toggleBodyColorMode(bsSheetEl);
+      }
+    }
+    const setColorSchemeToggle = (alternate) => {
+      const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+      for (let i=0; i < toggles.length; i++) {
+        const toggle = toggles[i];
+        if (toggle) {
+          if (alternate) {
+            toggle.classList.add("alternate");
+          } else {
+            toggle.classList.remove("alternate");
+          }
+        }
+      }
+    };
+    const toggleColorMode = (alternate) => {
+      // Switch the stylesheets
+      const primaryStylesheets = window.document.querySelectorAll('link.quarto-color-scheme:not(.quarto-color-alternate)');
+      const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+      manageTransitions('#quarto-margin-sidebar .nav-link', false);
+      if (alternate) {
+        // note: dark is layered on light, we don't disable primary!
+        enableStylesheet(alternateStylesheets);
+        for (const sheetNode of alternateStylesheets) {
+          if (sheetNode.id === "quarto-bootstrap") {
+            toggleBodyColorMode(sheetNode);
+          }
+        }
+      } else {
+        disableStylesheet(alternateStylesheets);
+        enableStylesheet(primaryStylesheets)
+        toggleBodyColorPrimary();
+      }
+      manageTransitions('#quarto-margin-sidebar .nav-link', true);
+      // Switch the toggles
+      setColorSchemeToggle(alternate)
+      // Hack to workaround the fact that safari doesn't
+      // properly recolor the scrollbar when toggling (#1455)
+      if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+        manageTransitions("body", false);
+        window.scrollTo(0, 1);
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          manageTransitions("body", true);
+        }, 40);
+      }
+    }
+    const disableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        stylesheet.rel = 'disabled-stylesheet';
+      }
+    }
+    const enableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        if(stylesheet.rel !== 'stylesheet') { // for Chrome, which will still FOUC without this check
+          stylesheet.rel = 'stylesheet';
+        }
+      }
+    }
+    const manageTransitions = (selector, allowTransitions) => {
+      const els = window.document.querySelectorAll(selector);
+      for (let i=0; i < els.length; i++) {
+        const el = els[i];
+        if (allowTransitions) {
+          el.classList.remove('notransition');
+        } else {
+          el.classList.add('notransition');
+        }
+      }
+    }
+    const isFileUrl = () => {
+      return window.location.protocol === 'file:';
+    }
+    const hasAlternateSentinel = () => {
+      let styleSentinel = getColorSchemeSentinel();
+      if (styleSentinel !== null) {
+        return styleSentinel === "alternate";
+      } else {
+        return false;
+      }
+    }
+    const setStyleSentinel = (alternate) => {
+      const value = alternate ? "alternate" : "default";
+      if (!isFileUrl()) {
+        window.localStorage.setItem("quarto-color-scheme", value);
+      } else {
+        localAlternateSentinel = value;
+      }
+    }
+    const getColorSchemeSentinel = () => {
+      if (!isFileUrl()) {
+        const storageValue = window.localStorage.getItem("quarto-color-scheme");
+        return storageValue != null ? storageValue : localAlternateSentinel;
+      } else {
+        return localAlternateSentinel;
+      }
+    }
+    const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+      const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+      const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+      let newTheme = '';
+      if(authorPrefersDark) {
+        newTheme = isAlternate ? baseTheme : alternateTheme;
+      } else {
+        newTheme = isAlternate ? alternateTheme : baseTheme;
+      }
+      const changeGiscusTheme = () => {
+        // From: https://github.com/giscus/giscus/issues/336
+        const sendMessage = (message) => {
+          const iframe = document.querySelector('iframe.giscus-frame');
+          if (!iframe) return;
+          iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+        }
+        sendMessage({
+          setConfig: {
+            theme: newTheme
+          }
+        });
+      }
+      const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+      if (isGiscussLoaded) {
+        changeGiscusTheme();
+      }
+    };
+    const authorPrefersDark = false;
+    const darkModeDefault = authorPrefersDark;
+      document.querySelector('link#quarto-text-highlighting-styles.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+      document.querySelector('link#quarto-bootstrap.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+    let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+    // Dark / light mode switch
+    window.quartoToggleColorScheme = () => {
+      // Read the current dark / light value
+      let toAlternate = !hasAlternateSentinel();
+      toggleColorMode(toAlternate);
+      setStyleSentinel(toAlternate);
+      toggleGiscusIfUsed(toAlternate, darkModeDefault);
+      window.dispatchEvent(new Event('resize'));
+    };
+    // Switch to dark mode if need be
+    if (hasAlternateSentinel()) {
+      toggleColorMode(true);
+    } else {
+      toggleColorMode(false);
+    }
+  </script>
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">
+      Tile Distribution Documentation
+      </li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation docked overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="../">Tile Distribution Documentation</a> 
+        <div class="sidebar-tools-main">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
+ <span class="menu-text">Getting Started</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Tile Distribution Documentation</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true">
+ <span class="menu-text">Foundation</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/00_introduction_motivation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Introduction and Motivation - Why Tile Distribution Matters</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/01_buffer_view.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Buffer Views - Raw Memory Access</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/01_tensor_view.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Tensor Views - Multi-Dimensional Structure</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true">
+ <span class="menu-text">Transformation Engine</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/02_tensor_coordinates.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Basic Coordinates</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/02_transforms.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Individual Transforms</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/02_adaptors.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Tensor Adaptors - Chaining Transformations</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/02_descriptors.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Tensor Descriptors - Complete Tensor Specifications</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/02_convolution_example.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Convolution Implementation with Tensor Descriptors</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/02_coordinate_movement.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Advanced Coordinate Operations</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true">
+ <span class="menu-text">Distribution API</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-4" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/03_tile_distribution.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Tile Distribution - The Core API</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/03_tile_window.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Tile Window - Data Access Gateway</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/03_sweep_tile.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Sweep Tile - Elegant Iteration</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true">
+ <span class="menu-text">Coordinate Systems</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-5" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/04_coordinate_systems.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Coordinate Systems - The Mathematical Foundation</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-6" role="navigation" aria-expanded="true">
+ <span class="menu-text">Implementation Deep Dive</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-6" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-6" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/05_encoding_internals.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Encoding Internals - The Internal Machinery</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/05_static_distributed_tensor.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Static Distributed Tensor - Thread-Local Data Containers</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-7" role="navigation" aria-expanded="true">
+ <span class="menu-text">Thread Mapping</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-7" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-7" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/06_thread_mapping.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Thread Mapping - Connecting to Hardware</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#overview" id="toc-overview" class="nav-link active" data-scroll-target="#overview">Overview</a></li>
+  <li><a href="#core-concepts" id="toc-core-concepts" class="nav-link" data-scroll-target="#core-concepts">Core Concepts</a>
+  <ul class="collapse">
+  <li><a href="#tile" id="toc-tile" class="nav-link" data-scroll-target="#tile">Tile</a></li>
+  <li><a href="#distribution" id="toc-distribution" class="nav-link" data-scroll-target="#distribution">Distribution</a></li>
+  <li><a href="#encoding" id="toc-encoding" class="nav-link" data-scroll-target="#encoding">Encoding</a></li>
+  </ul></li>
+  <li><a href="#coordinate-spaces" id="toc-coordinate-spaces" class="nav-link" data-scroll-target="#coordinate-spaces">Coordinate Spaces</a>
+  <ul class="collapse">
+  <li><a href="#p-space-partition-space" id="toc-p-space-partition-space" class="nav-link" data-scroll-target="#p-space-partition-space">P-Space (Partition Space)</a></li>
+  <li><a href="#y-space-yield-space" id="toc-y-space-yield-space" class="nav-link" data-scroll-target="#y-space-yield-space">Y-Space (Yield Space)</a></li>
+  <li><a href="#x-space-physical-tensor-space" id="toc-x-space-physical-tensor-space" class="nav-link" data-scroll-target="#x-space-physical-tensor-space">X-Space (Physical Tensor Space)</a></li>
+  <li><a href="#r-space-replication-space" id="toc-r-space-replication-space" class="nav-link" data-scroll-target="#r-space-replication-space">R-Space (Replication Space)</a></li>
+  <li><a href="#d-space-data-space" id="toc-d-space-data-space" class="nav-link" data-scroll-target="#d-space-data-space">D-Space (Data Space)</a></li>
+  </ul></li>
+  <li><a href="#dimension-types" id="toc-dimension-types" class="nav-link" data-scroll-target="#dimension-types">Dimension Types</a>
+  <ul class="collapse">
+  <li><a href="#h-dimensions-hierarchical-dimensions" id="toc-h-dimensions-hierarchical-dimensions" class="nav-link" data-scroll-target="#h-dimensions-hierarchical-dimensions">H-Dimensions (Hierarchical Dimensions)</a></li>
+  <li><a href="#rh-dimensions-r-h-dimensions-combined" id="toc-rh-dimensions-r-h-dimensions-combined" class="nav-link" data-scroll-target="#rh-dimensions-r-h-dimensions-combined">RH-Dimensions (R + H Dimensions Combined)</a></li>
+  </ul></li>
+  <li><a href="#transformations" id="toc-transformations" class="nav-link" data-scroll-target="#transformations">Transformations</a>
+  <ul class="collapse">
+  <li><a href="#adaptor" id="toc-adaptor" class="nav-link" data-scroll-target="#adaptor">Adaptor</a></li>
+  <li><a href="#descriptor" id="toc-descriptor" class="nav-link" data-scroll-target="#descriptor">Descriptor</a></li>
+  </ul></li>
+  <li><a href="#operations" id="toc-operations" class="nav-link" data-scroll-target="#operations">Operations</a>
+  <ul class="collapse">
+  <li><a href="#load-tile" id="toc-load-tile" class="nav-link" data-scroll-target="#load-tile">Load Tile</a></li>
+  <li><a href="#store-tile" id="toc-store-tile" class="nav-link" data-scroll-target="#store-tile">Store Tile</a></li>
+  <li><a href="#sweep-tile" id="toc-sweep-tile" class="nav-link" data-scroll-target="#sweep-tile">Sweep Tile</a></li>
+  <li><a href="#shuffle-tile" id="toc-shuffle-tile" class="nav-link" data-scroll-target="#shuffle-tile">Shuffle Tile</a></li>
+  </ul></li>
+  <li><a href="#memory-concepts" id="toc-memory-concepts" class="nav-link" data-scroll-target="#memory-concepts">Memory Concepts</a>
+  <ul class="collapse">
+  <li><a href="#coalescing" id="toc-coalescing" class="nav-link" data-scroll-target="#coalescing">Coalescing</a></li>
+  <li><a href="#bank-conflict" id="toc-bank-conflict" class="nav-link" data-scroll-target="#bank-conflict">Bank Conflict</a></li>
+  <li><a href="#vectorization" id="toc-vectorization" class="nav-link" data-scroll-target="#vectorization">Vectorization</a></li>
+  </ul></li>
+  <li><a href="#distribution-components" id="toc-distribution-components" class="nav-link" data-scroll-target="#distribution-components">Distribution Components</a>
+  <ul class="collapse">
+  <li><a href="#window" id="toc-window" class="nav-link" data-scroll-target="#window">Window</a></li>
+  <li><a href="#static-distributed-tensor" id="toc-static-distributed-tensor" class="nav-link" data-scroll-target="#static-distributed-tensor">Static Distributed Tensor</a></li>
+  <li><a href="#spans" id="toc-spans" class="nav-link" data-scroll-target="#spans">Spans</a></li>
+  </ul></li>
+  <li><a href="#gpu-hardware-terms" id="toc-gpu-hardware-terms" class="nav-link" data-scroll-target="#gpu-hardware-terms">GPU Hardware Terms</a>
+  <ul class="collapse">
+  <li><a href="#warp" id="toc-warp" class="nav-link" data-scroll-target="#warp">Warp</a></li>
+  <li><a href="#lane" id="toc-lane" class="nav-link" data-scroll-target="#lane">Lane</a></li>
+  <li><a href="#block" id="toc-block" class="nav-link" data-scroll-target="#block">Block</a></li>
+  <li><a href="#grid" id="toc-grid" class="nav-link" data-scroll-target="#grid">Grid</a></li>
+  </ul></li>
+  <li><a href="#template-parameters" id="toc-template-parameters" class="nav-link" data-scroll-target="#template-parameters">Template Parameters</a>
+  <ul class="collapse">
+  <li><a href="#sequence" id="toc-sequence" class="nav-link" data-scroll-target="#sequence">sequence&lt;…&gt;</a></li>
+  <li><a href="#tuple" id="toc-tuple" class="nav-link" data-scroll-target="#tuple">tuple&lt;…&gt;</a></li>
+  <li><a href="#number" id="toc-number" class="nav-link" data-scroll-target="#number">number<n></n></a></li>
+  </ul></li>
+  <li><a href="#optimization-terms" id="toc-optimization-terms" class="nav-link" data-scroll-target="#optimization-terms">Optimization Terms</a>
+  <ul class="collapse">
+  <li><a href="#register-spilling" id="toc-register-spilling" class="nav-link" data-scroll-target="#register-spilling">Register Spilling</a></li>
+  <li><a href="#occupancy" id="toc-occupancy" class="nav-link" data-scroll-target="#occupancy">Occupancy</a></li>
+  <li><a href="#memory-bandwidth-utilization" id="toc-memory-bandwidth-utilization" class="nav-link" data-scroll-target="#memory-bandwidth-utilization">Memory Bandwidth Utilization</a></li>
+  <li><a href="#instruction-level-parallelism-ilp" id="toc-instruction-level-parallelism-ilp" class="nav-link" data-scroll-target="#instruction-level-parallelism-ilp">Instruction-Level Parallelism (ILP)</a></li>
+  </ul></li>
+  <li><a href="#common-patterns" id="toc-common-patterns" class="nav-link" data-scroll-target="#common-patterns">Common Patterns</a>
+  <ul class="collapse">
+  <li><a href="#gemm-general-matrix-multiplication" id="toc-gemm-general-matrix-multiplication" class="nav-link" data-scroll-target="#gemm-general-matrix-multiplication">GEMM (General Matrix Multiplication)</a></li>
+  <li><a href="#reduction" id="toc-reduction" class="nav-link" data-scroll-target="#reduction">Reduction</a></li>
+  <li><a href="#broadcast" id="toc-broadcast" class="nav-link" data-scroll-target="#broadcast">Broadcast</a></li>
+  <li><a href="#transpose" id="toc-transpose" class="nav-link" data-scroll-target="#transpose">Transpose</a></li>
+  </ul></li>
+  <li><a href="#performance-metrics" id="toc-performance-metrics" class="nav-link" data-scroll-target="#performance-metrics">Performance Metrics</a>
+  <ul class="collapse">
+  <li><a href="#flops-floating-point-operations-per-second" id="toc-flops-floating-point-operations-per-second" class="nav-link" data-scroll-target="#flops-floating-point-operations-per-second">FLOPS (Floating-Point Operations Per Second)</a></li>
+  <li><a href="#bandwidth" id="toc-bandwidth" class="nav-link" data-scroll-target="#bandwidth">Bandwidth</a></li>
+  <li><a href="#latency" id="toc-latency" class="nav-link" data-scroll-target="#latency">Latency</a></li>
+  <li><a href="#throughput" id="toc-throughput" class="nav-link" data-scroll-target="#throughput">Throughput</a></li>
+  </ul></li>
+  <li><a href="#usage-examples" id="toc-usage-examples" class="nav-link" data-scroll-target="#usage-examples">Usage Examples</a>
+  <ul class="collapse">
+  <li><a href="#creating-a-distribution" id="toc-creating-a-distribution" class="nav-link" data-scroll-target="#creating-a-distribution">Creating a Distribution</a></li>
+  <li><a href="#using-tile-window" id="toc-using-tile-window" class="nav-link" data-scroll-target="#using-tile-window">Using Tile Window</a></li>
+  </ul></li>
+  <li><a href="#related-documentation" id="toc-related-documentation" class="nav-link" data-scroll-target="#related-documentation">Related Documentation</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<div class="quarto-title-block"><div><h1 class="title">Terminology Reference - Key Concepts and Definitions</h1><button type="button" class="btn code-tools-button" id="quarto-code-tools-source"><i class="bi"></i> Code</button></div></div>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="overview" class="level2">
+<h2 class="anchored" data-anchor-id="overview">Overview</h2>
+<p>This page provides a comprehensive reference for all terminology used in the Composable Kernel (CK) tile distribution system. Understanding these terms is essential for working with CK and reading the documentation effectively.</p>
+</section>
+<section id="core-concepts" class="level2">
+<h2 class="anchored" data-anchor-id="core-concepts">Core Concepts</h2>
+<section id="tile" class="level3">
+<h3 class="anchored" data-anchor-id="tile">Tile</h3>
+<p>A contiguous block of data that is processed as a unit by a group of threads. Tiles are the fundamental unit of work distribution in CK, designed to maximize memory bandwidth utilization and computational efficiency.</p>
+<p><strong>C++ Usage</strong>: <code>using TileShape = sequence&lt;256, 256&gt;;</code></p>
+</section>
+<section id="distribution" class="level3">
+<h3 class="anchored" data-anchor-id="distribution">Distribution</h3>
+<p>The pattern by which data is assigned to processing elements (threads, warps, blocks). A distribution defines the mapping from logical coordinates to physical resources.</p>
+<p><strong>C++ Type</strong>: <code>tile_distribution&lt;...&gt;</code></p>
+</section>
+<section id="encoding" class="level3">
+<h3 class="anchored" data-anchor-id="encoding">Encoding</h3>
+<p>A compile-time specification that describes how tensor data should be distributed across GPU processing elements. The encoding captures the complete distribution strategy.</p>
+<p><strong>C++ Type</strong>: <code>tile_distribution_encoding&lt;...&gt;</code></p>
+</section>
+</section>
+<section id="coordinate-spaces" class="level2">
+<h2 class="anchored" data-anchor-id="coordinate-spaces">Coordinate Spaces</h2>
+<section id="p-space-partition-space" class="level3">
+<h3 class="anchored" data-anchor-id="p-space-partition-space">P-Space (Partition Space)</h3>
+<p>The coordinate space representing processing elements in the GPU hierarchy.</p>
+<ul>
+<li><strong>Dimensions</strong>: Typically 1 or 2 (e.g., <code>[lane_id]</code> or <code>[warp_id, lane_id]</code>)</li>
+<li><strong>Purpose</strong>: Identifies which thread/warp is executing</li>
+<li><strong>Values</strong>: Hardware thread indices</li>
+</ul>
+<p><strong>C++ Example</strong>:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode cpp code-with-copy"><code class="sourceCode cpp"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">// Get current thread's P coordinates</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="kw">auto</span> p_idx <span class="op">=</span> Distribution<span class="op">::</span>_get_partition_index<span class="op">();</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="y-space-yield-space" class="level3">
+<h3 class="anchored" data-anchor-id="y-space-yield-space">Y-Space (Yield Space)</h3>
+<p>The coordinate space representing the logical access pattern within each tile.</p>
+<ul>
+<li><strong>Dimensions</strong>: Variable, typically 2-4</li>
+<li><strong>Purpose</strong>: Defines iteration pattern within thread’s assigned work</li>
+<li><strong>Values</strong>: Indices within the tile</li>
+</ul>
+<p><strong>C++ Example</strong>:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode cpp code-with-copy"><code class="sourceCode cpp"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co">// Iterate over Y-space</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>sweep_tile<span class="op">(</span>tensor<span class="op">,</span> <span class="op">[](</span><span class="kw">auto</span> y_idx<span class="op">)</span> <span class="op">{</span> <span class="co">/*...*/</span> <span class="op">});</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="x-space-physical-tensor-space" class="level3">
+<h3 class="anchored" data-anchor-id="x-space-physical-tensor-space">X-Space (Physical Tensor Space)</h3>
+<p>The coordinate space representing actual positions in the tensor.</p>
+<ul>
+<li><strong>Dimensions</strong>: Matches tensor dimensions (e.g., 2 for matrices)</li>
+<li><strong>Purpose</strong>: Maps to global memory addresses</li>
+<li><strong>Values</strong>: Physical tensor coordinates</li>
+</ul>
+<p><strong>C++ Example</strong>:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode cpp code-with-copy"><code class="sourceCode cpp"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co">// Calculate X coordinates from P+Y</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="kw">auto</span> x_idx <span class="op">=</span> distribution<span class="op">.</span>calculate_index<span class="op">(</span>p_idx<span class="op">);</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="r-space-replication-space" class="level3">
+<h3 class="anchored" data-anchor-id="r-space-replication-space">R-Space (Replication Space)</h3>
+<p>The coordinate space representing data replication patterns.</p>
+<ul>
+<li><strong>Dimensions</strong>: Variable, often 0-2</li>
+<li><strong>Purpose</strong>: Enables data sharing across threads</li>
+<li><strong>Values</strong>: Replication indices</li>
+</ul>
+<p><strong>C++ Example</strong>:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode cpp code-with-copy"><code class="sourceCode cpp"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co">// R-dimensions in encoding</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="kw">using</span> Encoding <span class="op">=</span> tile_distribution_encoding<span class="op">&lt;</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    sequence<span class="op">&lt;</span><span class="dv">2</span><span class="op">&gt;,</span>  <span class="co">// rs_lengths: 2-way replication</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    <span class="co">/*...*/</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="op">&gt;;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="d-space-data-space" class="level3">
+<h3 class="anchored" data-anchor-id="d-space-data-space">D-Space (Data Space)</h3>
+<p>The linearized coordinate space for thread-local storage.</p>
+<ul>
+<li><strong>Dimensions</strong>: 1 (linear index)</li>
+<li><strong>Purpose</strong>: Maps Y-coordinates to register indices</li>
+<li><strong>Values</strong>: Linear memory offsets</li>
+</ul>
+<p><strong>C++ Example</strong>:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode cpp code-with-copy"><code class="sourceCode cpp"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co">// Y-to-D descriptor linearizes storage</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="kw">auto</span> d_idx <span class="op">=</span> ys_to_d_descriptor<span class="op">.</span>calculate_offset<span class="op">(</span>y_idx<span class="op">);</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+</section>
+<section id="dimension-types" class="level2">
+<h2 class="anchored" data-anchor-id="dimension-types">Dimension Types</h2>
+<section id="h-dimensions-hierarchical-dimensions" class="level3">
+<h3 class="anchored" data-anchor-id="h-dimensions-hierarchical-dimensions">H-Dimensions (Hierarchical Dimensions)</h3>
+<p>The hierarchical decomposition of tensor dimensions, capturing how work is divided across the GPU hierarchy.</p>
+<p><strong>Structure</strong>: Each H-dimension group is a sequence of factors - Example: <code>sequence&lt;4, 2, 8, 4&gt;</code> means: - Repeat: 4 iterations per thread - Warps: 2 warps per block - Threads: 8 threads per warp<br>
+- Vector: 4 elements per operation</p>
+<p><strong>C++ Example</strong>:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode cpp code-with-copy"><code class="sourceCode cpp"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="kw">using</span> HsLengthss <span class="op">=</span> tuple<span class="op">&lt;</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    sequence<span class="op">&lt;</span><span class="dv">4</span><span class="op">,</span> <span class="dv">2</span><span class="op">,</span> <span class="dv">8</span><span class="op">,</span> <span class="dv">4</span><span class="op">&gt;,</span>  <span class="co">// H0: M dimension</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    sequence<span class="op">&lt;</span><span class="dv">4</span><span class="op">,</span> <span class="dv">2</span><span class="op">,</span> <span class="dv">8</span><span class="op">,</span> <span class="dv">4</span><span class="op">&gt;</span>   <span class="co">// H1: N dimension</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="op">&gt;;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="rh-dimensions-r-h-dimensions-combined" class="level3">
+<h3 class="anchored" data-anchor-id="rh-dimensions-r-h-dimensions-combined">RH-Dimensions (R + H Dimensions Combined)</h3>
+<p>The combined space of R and H dimensions, used internally for coordinate transformations.</p>
+<ul>
+<li><strong>Major</strong>: Identifies which dimension group (0 for R, 1+ for H)</li>
+<li><strong>Minor</strong>: Identifies position within the group</li>
+</ul>
+</section>
+</section>
+<section id="transformations" class="level2">
+<h2 class="anchored" data-anchor-id="transformations">Transformations</h2>
+<section id="adaptor" class="level3">
+<h3 class="anchored" data-anchor-id="adaptor">Adaptor</h3>
+<p>A chain of coordinate transformations that maps between coordinate spaces.</p>
+<p><strong>Types</strong>: - <code>ps_ys_to_xs_adaptor</code>: Maps (P,Y) → X coordinates - <code>ys_to_d_adaptor</code>: Maps Y → D coordinates</p>
+<p><strong>C++ Type</strong>: <code>tensor_adaptor&lt;...&gt;</code></p>
+</section>
+<section id="descriptor" class="level3">
+<h3 class="anchored" data-anchor-id="descriptor">Descriptor</h3>
+<p>A complete specification of tensor layout including transformations and memory layout.</p>
+<p><strong>C++ Type</strong>: <code>tensor_descriptor&lt;...&gt;</code></p>
+</section>
+</section>
+<section id="operations" class="level2">
+<h2 class="anchored" data-anchor-id="operations">Operations</h2>
+<section id="load-tile" class="level3">
+<h3 class="anchored" data-anchor-id="load-tile">Load Tile</h3>
+<p>Operation that transfers data from global memory to thread-local registers according to the distribution pattern.</p>
+<p><strong>C++ Function</strong>: <code>tile_window.load()</code></p>
+</section>
+<section id="store-tile" class="level3">
+<h3 class="anchored" data-anchor-id="store-tile">Store Tile</h3>
+<p>Operation that transfers data from thread-local registers back to global memory.</p>
+<p><strong>C++ Function</strong>: <code>tile_window.store(tile)</code></p>
+</section>
+<section id="sweep-tile" class="level3">
+<h3 class="anchored" data-anchor-id="sweep-tile">Sweep Tile</h3>
+<p>Operation that iterates over all elements in a distributed tensor, applying a user-defined function.</p>
+<p><strong>C++ Function</strong>: <code>sweep_tile(tensor, lambda)</code></p>
+</section>
+<section id="shuffle-tile" class="level3">
+<h3 class="anchored" data-anchor-id="shuffle-tile">Shuffle Tile</h3>
+<p>Operation that exchanges data between threads within a warp.</p>
+<p><strong>C++ Function</strong>: <code>shuffle_tile(tensor, shuffle_pattern)</code></p>
+</section>
+</section>
+<section id="memory-concepts" class="level2">
+<h2 class="anchored" data-anchor-id="memory-concepts">Memory Concepts</h2>
+<section id="coalescing" class="level3">
+<h3 class="anchored" data-anchor-id="coalescing">Coalescing</h3>
+<p>The property where adjacent threads access adjacent memory locations, maximizing memory bandwidth utilization.</p>
+</section>
+<section id="bank-conflict" class="level3">
+<h3 class="anchored" data-anchor-id="bank-conflict">Bank Conflict</h3>
+<p>A performance degradation that occurs when multiple threads in a warp access different addresses in the same memory bank.</p>
+</section>
+<section id="vectorization" class="level3">
+<h3 class="anchored" data-anchor-id="vectorization">Vectorization</h3>
+<p>The technique of loading/storing multiple elements in a single memory transaction.</p>
+<p><strong>C++ Example</strong>:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode cpp code-with-copy"><code class="sourceCode cpp"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co">// Vector load of 4 elements</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="kw">using</span> float4 <span class="op">=</span> <span class="dt">vector_type</span><span class="op">&lt;</span><span class="dt">float</span><span class="op">,</span> <span class="dv">4</span><span class="op">&gt;::</span>type<span class="op">;</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>float4 data <span class="op">=</span> tensor_view<span class="op">.</span><span class="kw">template</span> get_vectorized_elements<span class="op">&lt;</span><span class="dv">4</span><span class="op">&gt;(</span>x_idx<span class="op">);</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+</section>
+<section id="distribution-components" class="level2">
+<h2 class="anchored" data-anchor-id="distribution-components">Distribution Components</h2>
+<section id="window" class="level3">
+<h3 class="anchored" data-anchor-id="window">Window</h3>
+<p>A view into a subset of a tensor that respects the distribution pattern.</p>
+<p><strong>C++ Type</strong>: <code>tile_window&lt;...&gt;</code></p>
+</section>
+<section id="static-distributed-tensor" class="level3">
+<h3 class="anchored" data-anchor-id="static-distributed-tensor">Static Distributed Tensor</h3>
+<p>A thread-local tensor stored in registers, distributed according to a tile distribution.</p>
+<p><strong>C++ Type</strong>: <code>static_distributed_tensor&lt;...&gt;</code></p>
+</section>
+<section id="spans" class="level3">
+<h3 class="anchored" data-anchor-id="spans">Spans</h3>
+<p>Iteration ranges over distributed dimensions, used by sweep operations.</p>
+<p><strong>C++ Type</strong>: <code>tile_distributed_span&lt;...&gt;</code></p>
+</section>
+</section>
+<section id="gpu-hardware-terms" class="level2">
+<h2 class="anchored" data-anchor-id="gpu-hardware-terms">GPU Hardware Terms</h2>
+<section id="warp" class="level3">
+<h3 class="anchored" data-anchor-id="warp">Warp</h3>
+<p>A group of threads (32 on AMD GPUs) that execute in lockstep.</p>
+</section>
+<section id="lane" class="level3">
+<h3 class="anchored" data-anchor-id="lane">Lane</h3>
+<p>An individual thread within a warp (0-31).</p>
+</section>
+<section id="block" class="level3">
+<h3 class="anchored" data-anchor-id="block">Block</h3>
+<p>A group of warps that can cooperate through shared memory.</p>
+</section>
+<section id="grid" class="level3">
+<h3 class="anchored" data-anchor-id="grid">Grid</h3>
+<p>The complete set of blocks launched for a kernel.</p>
+</section>
+</section>
+<section id="template-parameters" class="level2">
+<h2 class="anchored" data-anchor-id="template-parameters">Template Parameters</h2>
+<section id="sequence" class="level3">
+<h3 class="anchored" data-anchor-id="sequence">sequence&lt;…&gt;</h3>
+<p>A compile-time integer sequence used to specify dimensions and lengths.</p>
+<p><strong>Example</strong>: <code>sequence&lt;256, 256&gt;</code> for a 256×256 tile</p>
+</section>
+<section id="tuple" class="level3">
+<h3 class="anchored" data-anchor-id="tuple">tuple&lt;…&gt;</h3>
+<p>A heterogeneous collection of types, often used for grouping sequences.</p>
+<p><strong>Example</strong>: <code>tuple&lt;sequence&lt;4,4&gt;, sequence&lt;4,4&gt;&gt;</code></p>
+</section>
+<section id="number" class="level3">
+<h3 class="anchored" data-anchor-id="number">number<n></n></h3>
+<p>A compile-time integer constant.</p>
+<p><strong>Example</strong>: <code>number&lt;16&gt;</code> represents the value 16</p>
+</section>
+</section>
+<section id="optimization-terms" class="level2">
+<h2 class="anchored" data-anchor-id="optimization-terms">Optimization Terms</h2>
+<section id="register-spilling" class="level3">
+<h3 class="anchored" data-anchor-id="register-spilling">Register Spilling</h3>
+<p>When a kernel uses more registers than available, causing data to spill to slower memory.</p>
+</section>
+<section id="occupancy" class="level3">
+<h3 class="anchored" data-anchor-id="occupancy">Occupancy</h3>
+<p>The ratio of active warps to maximum possible warps on a GPU multiprocessor.</p>
+</section>
+<section id="memory-bandwidth-utilization" class="level3">
+<h3 class="anchored" data-anchor-id="memory-bandwidth-utilization">Memory Bandwidth Utilization</h3>
+<p>The percentage of theoretical memory bandwidth achieved by a kernel.</p>
+</section>
+<section id="instruction-level-parallelism-ilp" class="level3">
+<h3 class="anchored" data-anchor-id="instruction-level-parallelism-ilp">Instruction-Level Parallelism (ILP)</h3>
+<p>The ability to execute multiple independent instructions simultaneously.</p>
+</section>
+</section>
+<section id="common-patterns" class="level2">
+<h2 class="anchored" data-anchor-id="common-patterns">Common Patterns</h2>
+<section id="gemm-general-matrix-multiplication" class="level3">
+<h3 class="anchored" data-anchor-id="gemm-general-matrix-multiplication">GEMM (General Matrix Multiplication)</h3>
+<p>A fundamental operation where C = αA×B + βC.</p>
+</section>
+<section id="reduction" class="level3">
+<h3 class="anchored" data-anchor-id="reduction">Reduction</h3>
+<p>An operation that combines multiple values into a single result (e.g., sum, max).</p>
+</section>
+<section id="broadcast" class="level3">
+<h3 class="anchored" data-anchor-id="broadcast">Broadcast</h3>
+<p>An operation that replicates a value across multiple processing elements.</p>
+</section>
+<section id="transpose" class="level3">
+<h3 class="anchored" data-anchor-id="transpose">Transpose</h3>
+<p>An operation that swaps dimensions of a tensor.</p>
+</section>
+</section>
+<section id="performance-metrics" class="level2">
+<h2 class="anchored" data-anchor-id="performance-metrics">Performance Metrics</h2>
+<section id="flops-floating-point-operations-per-second" class="level3">
+<h3 class="anchored" data-anchor-id="flops-floating-point-operations-per-second">FLOPS (Floating-Point Operations Per Second)</h3>
+<p>Measure of computational throughput.</p>
+</section>
+<section id="bandwidth" class="level3">
+<h3 class="anchored" data-anchor-id="bandwidth">Bandwidth</h3>
+<p>Rate of data transfer, typically measured in GB/s.</p>
+</section>
+<section id="latency" class="level3">
+<h3 class="anchored" data-anchor-id="latency">Latency</h3>
+<p>Time delay between issuing an operation and its completion.</p>
+</section>
+<section id="throughput" class="level3">
+<h3 class="anchored" data-anchor-id="throughput">Throughput</h3>
+<p>Rate of operation completion, often measured in operations per second.</p>
+</section>
+</section>
+<section id="usage-examples" class="level2">
+<h2 class="anchored" data-anchor-id="usage-examples">Usage Examples</h2>
+<section id="creating-a-distribution" class="level3">
+<h3 class="anchored" data-anchor-id="creating-a-distribution">Creating a Distribution</h3>
+<div class="sourceCode" id="cb8"><pre class="sourceCode cpp code-with-copy"><code class="sourceCode cpp"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co">// Define encoding</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="kw">using</span> MyEncoding <span class="op">=</span> tile_distribution_encoding<span class="op">&lt;</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    sequence<span class="op">&lt;&gt;,</span>                        <span class="co">// No replication</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    tuple<span class="op">&lt;</span>sequence<span class="op">&lt;</span><span class="dv">4</span><span class="op">,</span><span class="dv">2</span><span class="op">,</span><span class="dv">8</span><span class="op">,</span><span class="dv">4</span><span class="op">&gt;,</span>          <span class="co">// M dimension</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>          sequence<span class="op">&lt;</span><span class="dv">4</span><span class="op">,</span><span class="dv">2</span><span class="op">,</span><span class="dv">8</span><span class="op">,</span><span class="dv">4</span><span class="op">&gt;&gt;,</span>         <span class="co">// N dimension</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>    tuple<span class="op">&lt;</span>sequence<span class="op">&lt;</span><span class="dv">1</span><span class="op">,</span><span class="dv">2</span><span class="op">&gt;,</span> sequence<span class="op">&lt;</span><span class="dv">1</span><span class="op">,</span><span class="dv">2</span><span class="op">&gt;&gt;,</span> <span class="co">// P mappings</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>    tuple<span class="op">&lt;</span>sequence<span class="op">&lt;</span><span class="dv">1</span><span class="op">,</span><span class="dv">1</span><span class="op">&gt;,</span> sequence<span class="op">&lt;</span><span class="dv">2</span><span class="op">,</span><span class="dv">2</span><span class="op">&gt;&gt;,</span> <span class="co">// P minor</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>    sequence<span class="op">&lt;</span><span class="dv">1</span><span class="op">,</span><span class="dv">1</span><span class="op">,</span><span class="dv">2</span><span class="op">,</span><span class="dv">2</span><span class="op">&gt;,</span>                   <span class="co">// Y major</span></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>    sequence<span class="op">&lt;</span><span class="dv">0</span><span class="op">,</span><span class="dv">3</span><span class="op">,</span><span class="dv">0</span><span class="op">,</span><span class="dv">3</span><span class="op">&gt;</span>                    <span class="co">// Y minor</span></span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a><span class="op">&gt;;</span></span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a><span class="co">// Create distribution</span></span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a><span class="kw">auto</span> distribution <span class="op">=</span> make_static_tile_distribution<span class="op">(</span>MyEncoding<span class="op">{});</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="using-tile-window" class="level3">
+<h3 class="anchored" data-anchor-id="using-tile-window">Using Tile Window</h3>
+<div class="sourceCode" id="cb9"><pre class="sourceCode cpp code-with-copy"><code class="sourceCode cpp"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co">// Create window</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="kw">auto</span> window <span class="op">=</span> make_tile_window<span class="op">(</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>    tensor_view<span class="op">,</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>    TileShape<span class="op">{},</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>    origin<span class="op">,</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>    distribution</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a><span class="op">);</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a><span class="co">// Load-compute-store pattern</span></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a><span class="kw">auto</span> tile <span class="op">=</span> window<span class="op">.</span>load<span class="op">();</span></span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>sweep_tile<span class="op">(</span>tile<span class="op">,</span> compute_func<span class="op">);</span></span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>window<span class="op">.</span>store<span class="op">(</span>tile<span class="op">);</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+</section>
+<section id="related-documentation" class="level2">
+<h2 class="anchored" data-anchor-id="related-documentation">Related Documentation</h2>
+<ul>
+<li><a href="../concepts/04_coordinate_systems.html">Coordinate Systems</a> - Detailed explanation of coordinate spaces</li>
+<li><a href="../concepts/03_tile_distribution.html">Tile Distribution</a> - Core distribution concepts</li>
+<li><a href="../concepts/05_encoding_internals.html">Encoding Internals</a> - How encodings work internally</li>
+<li><a href="../concepts/06_thread_mapping.html">Thread Mapping</a> - Hardware thread organization</li>
+</ul>
+
+
+<!-- -->
+
+<script type="ojs-module-contents">
+eyJjb250ZW50cyI6W119
+</script>
+<div id="exercise-loading-indicator" class="exercise-loading-indicator d-none d-flex align-items-center gap-2">
+<div id="exercise-loading-status" class="d-flex gap-2">
+
+</div>
+<div class="spinner-grow spinner-grow-sm">
+
+</div>
+</div>
+<script type="vfs-file">
+W10=
+</script>
+</section>
+
+</main> <!-- /main -->
+<script type="ojs-module-contents">
+eyJjb250ZW50cyI6W119
+</script>
+<script type="module">
+if (window.location.protocol === "file:") { alert("The OJS runtime does not work with file:// URLs. Please use a web server to view this document."); }
+window._ojs.paths.runtimeToDoc = "../../concepts";
+window._ojs.paths.runtimeToRoot = "../..";
+window._ojs.paths.docToRoot = "..";
+window._ojs.selfContained = false;
+window._ojs.runtime.interpretFromScriptTags();
+</script>
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    // Ensure there is a toggle, if there isn't float one in the top right
+    if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+      const a = window.document.createElement('a');
+      a.classList.add('top-right');
+      a.classList.add('quarto-color-scheme-toggle');
+      a.href = "";
+      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const i = window.document.createElement("i");
+      i.classList.add('bi');
+      a.appendChild(i);
+      window.document.body.appendChild(a);
+    }
+    setColorSchemeToggle(hasAlternateSentinel())
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+        const codeEl = trigger.previousElementSibling.cloneNode(true);
+        for (const childEl of codeEl.children) {
+          if (isCodeAnnotation(childEl)) {
+            childEl.remove();
+          }
+        }
+        return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+    const viewSource = window.document.getElementById('quarto-view-source') ||
+                       window.document.getElementById('quarto-code-tools-source');
+    if (viewSource) {
+      const sourceUrl = viewSource.getAttribute("data-quarto-source-url");
+      viewSource.addEventListener("click", function(e) {
+        if (sourceUrl) {
+          // rstudio viewer pane
+          if (/\bcapabilities=\b/.test(window.location)) {
+            window.open(sourceUrl);
+          } else {
+            window.location.href = sourceUrl;
+          }
+        } else {
+          const modal = new bootstrap.Modal(document.getElementById('quarto-embedded-source-code-modal'));
+          modal.show();
+        }
+        return false;
+      });
+    }
+    function toggleCodeHandler(show) {
+      return function(e) {
+        const detailsSrc = window.document.querySelectorAll(".cell > details > .sourceCode");
+        for (let i=0; i<detailsSrc.length; i++) {
+          const details = detailsSrc[i].parentElement;
+          if (show) {
+            details.open = true;
+          } else {
+            details.removeAttribute("open");
+          }
+        }
+        const cellCodeDivs = window.document.querySelectorAll(".cell > .sourceCode");
+        const fromCls = show ? "hidden" : "unhidden";
+        const toCls = show ? "unhidden" : "hidden";
+        for (let i=0; i<cellCodeDivs.length; i++) {
+          const codeDiv = cellCodeDivs[i];
+          if (codeDiv.classList.contains(fromCls)) {
+            codeDiv.classList.remove(fromCls);
+            codeDiv.classList.add(toCls);
+          } 
+        }
+        return false;
+      }
+    }
+    const hideAllCode = window.document.getElementById("quarto-hide-all-code");
+    if (hideAllCode) {
+      hideAllCode.addEventListener("click", toggleCodeHandler(false));
+    }
+    const showAllCode = window.document.getElementById("quarto-show-all-code");
+    if (showAllCode) {
+      showAllCode.addEventListener("click", toggleCodeHandler(true));
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+            // target, if specified
+            link.setAttribute("target", "_blank");
+            if (link.getAttribute("rel") === null) {
+              link.setAttribute("rel", "noopener");
+            }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script><div class="modal fade" id="quarto-embedded-source-code-modal" tabindex="-1" aria-labelledby="quarto-embedded-source-code-modal-label" aria-hidden="true"><div class="modal-dialog modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="quarto-embedded-source-code-modal-label">Source Code</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="">
+<div class="sourceCode" id="cb10" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> "Terminology Reference - Key Concepts and Definitions"</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="an">format:</span><span class="co"> live-html</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a><span class="fu">## Overview</span></span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>This page provides a comprehensive reference for all terminology used in the Composable Kernel (CK) tile distribution system. Understanding these terms is essential for working with CK and reading the documentation effectively.</span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a><span class="fu">## Core Concepts</span></span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a><span class="fu">### Tile</span></span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>A contiguous block of data that is processed as a unit by a group of threads. Tiles are the fundamental unit of work distribution in CK, designed to maximize memory bandwidth utilization and computational efficiency.</span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>**C++ Usage**: <span class="in">`using TileShape = sequence&lt;256, 256&gt;;`</span></span>
+<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a><span class="fu">### Distribution</span></span>
+<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a>The pattern by which data is assigned to processing elements (threads, warps, blocks). A distribution defines the mapping from logical coordinates to physical resources.</span>
+<span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-20"><a href="#cb10-20" aria-hidden="true" tabindex="-1"></a>**C++ Type**: <span class="in">`tile_distribution&lt;...&gt;`</span></span>
+<span id="cb10-21"><a href="#cb10-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-22"><a href="#cb10-22" aria-hidden="true" tabindex="-1"></a><span class="fu">### Encoding</span></span>
+<span id="cb10-23"><a href="#cb10-23" aria-hidden="true" tabindex="-1"></a>A compile-time specification that describes how tensor data should be distributed across GPU processing elements. The encoding captures the complete distribution strategy.</span>
+<span id="cb10-24"><a href="#cb10-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-25"><a href="#cb10-25" aria-hidden="true" tabindex="-1"></a>**C++ Type**: <span class="in">`tile_distribution_encoding&lt;...&gt;`</span></span>
+<span id="cb10-26"><a href="#cb10-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-27"><a href="#cb10-27" aria-hidden="true" tabindex="-1"></a><span class="fu">## Coordinate Spaces</span></span>
+<span id="cb10-28"><a href="#cb10-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-29"><a href="#cb10-29" aria-hidden="true" tabindex="-1"></a><span class="fu">### P-Space (Partition Space)</span></span>
+<span id="cb10-30"><a href="#cb10-30" aria-hidden="true" tabindex="-1"></a>The coordinate space representing processing elements in the GPU hierarchy.</span>
+<span id="cb10-31"><a href="#cb10-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-32"><a href="#cb10-32" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Dimensions**: Typically 1 or 2 (e.g., <span class="in">`[lane_id]`</span> or <span class="in">`[warp_id, lane_id]`</span>)</span>
+<span id="cb10-33"><a href="#cb10-33" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Purpose**: Identifies which thread/warp is executing</span>
+<span id="cb10-34"><a href="#cb10-34" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Values**: Hardware thread indices</span>
+<span id="cb10-35"><a href="#cb10-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-36"><a href="#cb10-36" aria-hidden="true" tabindex="-1"></a>**C++ Example**:</span>
+<span id="cb10-37"><a href="#cb10-37" aria-hidden="true" tabindex="-1"></a><span class="in">```cpp</span></span>
+<span id="cb10-38"><a href="#cb10-38" aria-hidden="true" tabindex="-1"></a><span class="co">// Get current thread's P coordinates</span></span>
+<span id="cb10-39"><a href="#cb10-39" aria-hidden="true" tabindex="-1"></a><span class="kw">auto</span> p_idx <span class="op">=</span> Distribution<span class="op">::</span>_get_partition_index<span class="op">();</span></span>
+<span id="cb10-40"><a href="#cb10-40" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb10-41"><a href="#cb10-41" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-42"><a href="#cb10-42" aria-hidden="true" tabindex="-1"></a><span class="fu">### Y-Space (Yield Space)</span></span>
+<span id="cb10-43"><a href="#cb10-43" aria-hidden="true" tabindex="-1"></a>The coordinate space representing the logical access pattern within each tile.</span>
+<span id="cb10-44"><a href="#cb10-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-45"><a href="#cb10-45" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Dimensions**: Variable, typically 2-4</span>
+<span id="cb10-46"><a href="#cb10-46" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Purpose**: Defines iteration pattern within thread's assigned work</span>
+<span id="cb10-47"><a href="#cb10-47" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Values**: Indices within the tile</span>
+<span id="cb10-48"><a href="#cb10-48" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-49"><a href="#cb10-49" aria-hidden="true" tabindex="-1"></a>**C++ Example**:</span>
+<span id="cb10-50"><a href="#cb10-50" aria-hidden="true" tabindex="-1"></a><span class="in">```cpp</span></span>
+<span id="cb10-51"><a href="#cb10-51" aria-hidden="true" tabindex="-1"></a><span class="co">// Iterate over Y-space</span></span>
+<span id="cb10-52"><a href="#cb10-52" aria-hidden="true" tabindex="-1"></a>sweep_tile<span class="op">(</span>tensor<span class="op">,</span> <span class="op">[](</span><span class="kw">auto</span> y_idx<span class="op">)</span> <span class="op">{</span> <span class="co">/*...*/</span> <span class="op">});</span></span>
+<span id="cb10-53"><a href="#cb10-53" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb10-54"><a href="#cb10-54" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-55"><a href="#cb10-55" aria-hidden="true" tabindex="-1"></a><span class="fu">### X-Space (Physical Tensor Space)</span></span>
+<span id="cb10-56"><a href="#cb10-56" aria-hidden="true" tabindex="-1"></a>The coordinate space representing actual positions in the tensor.</span>
+<span id="cb10-57"><a href="#cb10-57" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-58"><a href="#cb10-58" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Dimensions**: Matches tensor dimensions (e.g., 2 for matrices)</span>
+<span id="cb10-59"><a href="#cb10-59" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Purpose**: Maps to global memory addresses</span>
+<span id="cb10-60"><a href="#cb10-60" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Values**: Physical tensor coordinates</span>
+<span id="cb10-61"><a href="#cb10-61" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-62"><a href="#cb10-62" aria-hidden="true" tabindex="-1"></a>**C++ Example**:</span>
+<span id="cb10-63"><a href="#cb10-63" aria-hidden="true" tabindex="-1"></a><span class="in">```cpp</span></span>
+<span id="cb10-64"><a href="#cb10-64" aria-hidden="true" tabindex="-1"></a><span class="co">// Calculate X coordinates from P+Y</span></span>
+<span id="cb10-65"><a href="#cb10-65" aria-hidden="true" tabindex="-1"></a><span class="kw">auto</span> x_idx <span class="op">=</span> distribution<span class="op">.</span>calculate_index<span class="op">(</span>p_idx<span class="op">);</span></span>
+<span id="cb10-66"><a href="#cb10-66" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb10-67"><a href="#cb10-67" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-68"><a href="#cb10-68" aria-hidden="true" tabindex="-1"></a><span class="fu">### R-Space (Replication Space)</span></span>
+<span id="cb10-69"><a href="#cb10-69" aria-hidden="true" tabindex="-1"></a>The coordinate space representing data replication patterns.</span>
+<span id="cb10-70"><a href="#cb10-70" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-71"><a href="#cb10-71" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Dimensions**: Variable, often 0-2</span>
+<span id="cb10-72"><a href="#cb10-72" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Purpose**: Enables data sharing across threads</span>
+<span id="cb10-73"><a href="#cb10-73" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Values**: Replication indices</span>
+<span id="cb10-74"><a href="#cb10-74" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-75"><a href="#cb10-75" aria-hidden="true" tabindex="-1"></a>**C++ Example**:</span>
+<span id="cb10-76"><a href="#cb10-76" aria-hidden="true" tabindex="-1"></a><span class="in">```cpp</span></span>
+<span id="cb10-77"><a href="#cb10-77" aria-hidden="true" tabindex="-1"></a><span class="co">// R-dimensions in encoding</span></span>
+<span id="cb10-78"><a href="#cb10-78" aria-hidden="true" tabindex="-1"></a><span class="kw">using</span> Encoding <span class="op">=</span> tile_distribution_encoding<span class="op">&lt;</span></span>
+<span id="cb10-79"><a href="#cb10-79" aria-hidden="true" tabindex="-1"></a>    sequence<span class="op">&lt;</span><span class="dv">2</span><span class="op">&gt;,</span>  <span class="co">// rs_lengths: 2-way replication</span></span>
+<span id="cb10-80"><a href="#cb10-80" aria-hidden="true" tabindex="-1"></a>    <span class="co">/*...*/</span></span>
+<span id="cb10-81"><a href="#cb10-81" aria-hidden="true" tabindex="-1"></a><span class="op">&gt;;</span></span>
+<span id="cb10-82"><a href="#cb10-82" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb10-83"><a href="#cb10-83" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-84"><a href="#cb10-84" aria-hidden="true" tabindex="-1"></a><span class="fu">### D-Space (Data Space)</span></span>
+<span id="cb10-85"><a href="#cb10-85" aria-hidden="true" tabindex="-1"></a>The linearized coordinate space for thread-local storage.</span>
+<span id="cb10-86"><a href="#cb10-86" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-87"><a href="#cb10-87" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Dimensions**: 1 (linear index)</span>
+<span id="cb10-88"><a href="#cb10-88" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Purpose**: Maps Y-coordinates to register indices</span>
+<span id="cb10-89"><a href="#cb10-89" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Values**: Linear memory offsets</span>
+<span id="cb10-90"><a href="#cb10-90" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-91"><a href="#cb10-91" aria-hidden="true" tabindex="-1"></a>**C++ Example**:</span>
+<span id="cb10-92"><a href="#cb10-92" aria-hidden="true" tabindex="-1"></a><span class="in">```cpp</span></span>
+<span id="cb10-93"><a href="#cb10-93" aria-hidden="true" tabindex="-1"></a><span class="co">// Y-to-D descriptor linearizes storage</span></span>
+<span id="cb10-94"><a href="#cb10-94" aria-hidden="true" tabindex="-1"></a><span class="kw">auto</span> d_idx <span class="op">=</span> ys_to_d_descriptor<span class="op">.</span>calculate_offset<span class="op">(</span>y_idx<span class="op">);</span></span>
+<span id="cb10-95"><a href="#cb10-95" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb10-96"><a href="#cb10-96" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-97"><a href="#cb10-97" aria-hidden="true" tabindex="-1"></a><span class="fu">## Dimension Types</span></span>
+<span id="cb10-98"><a href="#cb10-98" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-99"><a href="#cb10-99" aria-hidden="true" tabindex="-1"></a><span class="fu">### H-Dimensions (Hierarchical Dimensions)</span></span>
+<span id="cb10-100"><a href="#cb10-100" aria-hidden="true" tabindex="-1"></a>The hierarchical decomposition of tensor dimensions, capturing how work is divided across the GPU hierarchy.</span>
+<span id="cb10-101"><a href="#cb10-101" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-102"><a href="#cb10-102" aria-hidden="true" tabindex="-1"></a>**Structure**: Each H-dimension group is a sequence of factors</span>
+<span id="cb10-103"><a href="#cb10-103" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Example: <span class="in">`sequence&lt;4, 2, 8, 4&gt;`</span> means:</span>
+<span id="cb10-104"><a href="#cb10-104" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Repeat: 4 iterations per thread</span>
+<span id="cb10-105"><a href="#cb10-105" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Warps: 2 warps per block</span>
+<span id="cb10-106"><a href="#cb10-106" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Threads: 8 threads per warp  </span>
+<span id="cb10-107"><a href="#cb10-107" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Vector: 4 elements per operation</span>
+<span id="cb10-108"><a href="#cb10-108" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-109"><a href="#cb10-109" aria-hidden="true" tabindex="-1"></a>**C++ Example**:</span>
+<span id="cb10-110"><a href="#cb10-110" aria-hidden="true" tabindex="-1"></a><span class="in">```cpp</span></span>
+<span id="cb10-111"><a href="#cb10-111" aria-hidden="true" tabindex="-1"></a><span class="kw">using</span> HsLengthss <span class="op">=</span> tuple<span class="op">&lt;</span></span>
+<span id="cb10-112"><a href="#cb10-112" aria-hidden="true" tabindex="-1"></a>    sequence<span class="op">&lt;</span><span class="dv">4</span><span class="op">,</span> <span class="dv">2</span><span class="op">,</span> <span class="dv">8</span><span class="op">,</span> <span class="dv">4</span><span class="op">&gt;,</span>  <span class="co">// H0: M dimension</span></span>
+<span id="cb10-113"><a href="#cb10-113" aria-hidden="true" tabindex="-1"></a>    sequence<span class="op">&lt;</span><span class="dv">4</span><span class="op">,</span> <span class="dv">2</span><span class="op">,</span> <span class="dv">8</span><span class="op">,</span> <span class="dv">4</span><span class="op">&gt;</span>   <span class="co">// H1: N dimension</span></span>
+<span id="cb10-114"><a href="#cb10-114" aria-hidden="true" tabindex="-1"></a><span class="op">&gt;;</span></span>
+<span id="cb10-115"><a href="#cb10-115" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb10-116"><a href="#cb10-116" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-117"><a href="#cb10-117" aria-hidden="true" tabindex="-1"></a><span class="fu">### RH-Dimensions (R + H Dimensions Combined)</span></span>
+<span id="cb10-118"><a href="#cb10-118" aria-hidden="true" tabindex="-1"></a>The combined space of R and H dimensions, used internally for coordinate transformations.</span>
+<span id="cb10-119"><a href="#cb10-119" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-120"><a href="#cb10-120" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Major**: Identifies which dimension group (0 for R, 1+ for H)</span>
+<span id="cb10-121"><a href="#cb10-121" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Minor**: Identifies position within the group</span>
+<span id="cb10-122"><a href="#cb10-122" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-123"><a href="#cb10-123" aria-hidden="true" tabindex="-1"></a><span class="fu">## Transformations</span></span>
+<span id="cb10-124"><a href="#cb10-124" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-125"><a href="#cb10-125" aria-hidden="true" tabindex="-1"></a><span class="fu">### Adaptor</span></span>
+<span id="cb10-126"><a href="#cb10-126" aria-hidden="true" tabindex="-1"></a>A chain of coordinate transformations that maps between coordinate spaces.</span>
+<span id="cb10-127"><a href="#cb10-127" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-128"><a href="#cb10-128" aria-hidden="true" tabindex="-1"></a>**Types**:</span>
+<span id="cb10-129"><a href="#cb10-129" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`ps_ys_to_xs_adaptor`</span>: Maps (P,Y) → X coordinates</span>
+<span id="cb10-130"><a href="#cb10-130" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`ys_to_d_adaptor`</span>: Maps Y → D coordinates</span>
+<span id="cb10-131"><a href="#cb10-131" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-132"><a href="#cb10-132" aria-hidden="true" tabindex="-1"></a>**C++ Type**: <span class="in">`tensor_adaptor&lt;...&gt;`</span></span>
+<span id="cb10-133"><a href="#cb10-133" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-134"><a href="#cb10-134" aria-hidden="true" tabindex="-1"></a><span class="fu">### Descriptor</span></span>
+<span id="cb10-135"><a href="#cb10-135" aria-hidden="true" tabindex="-1"></a>A complete specification of tensor layout including transformations and memory layout.</span>
+<span id="cb10-136"><a href="#cb10-136" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-137"><a href="#cb10-137" aria-hidden="true" tabindex="-1"></a>**C++ Type**: <span class="in">`tensor_descriptor&lt;...&gt;`</span></span>
+<span id="cb10-138"><a href="#cb10-138" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-139"><a href="#cb10-139" aria-hidden="true" tabindex="-1"></a><span class="fu">## Operations</span></span>
+<span id="cb10-140"><a href="#cb10-140" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-141"><a href="#cb10-141" aria-hidden="true" tabindex="-1"></a><span class="fu">### Load Tile</span></span>
+<span id="cb10-142"><a href="#cb10-142" aria-hidden="true" tabindex="-1"></a>Operation that transfers data from global memory to thread-local registers according to the distribution pattern.</span>
+<span id="cb10-143"><a href="#cb10-143" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-144"><a href="#cb10-144" aria-hidden="true" tabindex="-1"></a>**C++ Function**: <span class="in">`tile_window.load()`</span></span>
+<span id="cb10-145"><a href="#cb10-145" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-146"><a href="#cb10-146" aria-hidden="true" tabindex="-1"></a><span class="fu">### Store Tile</span></span>
+<span id="cb10-147"><a href="#cb10-147" aria-hidden="true" tabindex="-1"></a>Operation that transfers data from thread-local registers back to global memory.</span>
+<span id="cb10-148"><a href="#cb10-148" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-149"><a href="#cb10-149" aria-hidden="true" tabindex="-1"></a>**C++ Function**: <span class="in">`tile_window.store(tile)`</span></span>
+<span id="cb10-150"><a href="#cb10-150" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-151"><a href="#cb10-151" aria-hidden="true" tabindex="-1"></a><span class="fu">### Sweep Tile</span></span>
+<span id="cb10-152"><a href="#cb10-152" aria-hidden="true" tabindex="-1"></a>Operation that iterates over all elements in a distributed tensor, applying a user-defined function.</span>
+<span id="cb10-153"><a href="#cb10-153" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-154"><a href="#cb10-154" aria-hidden="true" tabindex="-1"></a>**C++ Function**: <span class="in">`sweep_tile(tensor, lambda)`</span></span>
+<span id="cb10-155"><a href="#cb10-155" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-156"><a href="#cb10-156" aria-hidden="true" tabindex="-1"></a><span class="fu">### Shuffle Tile</span></span>
+<span id="cb10-157"><a href="#cb10-157" aria-hidden="true" tabindex="-1"></a>Operation that exchanges data between threads within a warp.</span>
+<span id="cb10-158"><a href="#cb10-158" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-159"><a href="#cb10-159" aria-hidden="true" tabindex="-1"></a>**C++ Function**: <span class="in">`shuffle_tile(tensor, shuffle_pattern)`</span></span>
+<span id="cb10-160"><a href="#cb10-160" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-161"><a href="#cb10-161" aria-hidden="true" tabindex="-1"></a><span class="fu">## Memory Concepts</span></span>
+<span id="cb10-162"><a href="#cb10-162" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-163"><a href="#cb10-163" aria-hidden="true" tabindex="-1"></a><span class="fu">### Coalescing</span></span>
+<span id="cb10-164"><a href="#cb10-164" aria-hidden="true" tabindex="-1"></a>The property where adjacent threads access adjacent memory locations, maximizing memory bandwidth utilization.</span>
+<span id="cb10-165"><a href="#cb10-165" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-166"><a href="#cb10-166" aria-hidden="true" tabindex="-1"></a><span class="fu">### Bank Conflict</span></span>
+<span id="cb10-167"><a href="#cb10-167" aria-hidden="true" tabindex="-1"></a>A performance degradation that occurs when multiple threads in a warp access different addresses in the same memory bank.</span>
+<span id="cb10-168"><a href="#cb10-168" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-169"><a href="#cb10-169" aria-hidden="true" tabindex="-1"></a><span class="fu">### Vectorization</span></span>
+<span id="cb10-170"><a href="#cb10-170" aria-hidden="true" tabindex="-1"></a>The technique of loading/storing multiple elements in a single memory transaction.</span>
+<span id="cb10-171"><a href="#cb10-171" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-172"><a href="#cb10-172" aria-hidden="true" tabindex="-1"></a>**C++ Example**:</span>
+<span id="cb10-173"><a href="#cb10-173" aria-hidden="true" tabindex="-1"></a><span class="in">```cpp</span></span>
+<span id="cb10-174"><a href="#cb10-174" aria-hidden="true" tabindex="-1"></a><span class="co">// Vector load of 4 elements</span></span>
+<span id="cb10-175"><a href="#cb10-175" aria-hidden="true" tabindex="-1"></a><span class="kw">using</span> float4 <span class="op">=</span> <span class="dt">vector_type</span><span class="op">&lt;</span><span class="dt">float</span><span class="op">,</span> <span class="dv">4</span><span class="op">&gt;::</span>type<span class="op">;</span></span>
+<span id="cb10-176"><a href="#cb10-176" aria-hidden="true" tabindex="-1"></a>float4 data <span class="op">=</span> tensor_view<span class="op">.</span><span class="kw">template</span> get_vectorized_elements<span class="op">&lt;</span><span class="dv">4</span><span class="op">&gt;(</span>x_idx<span class="op">);</span></span>
+<span id="cb10-177"><a href="#cb10-177" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb10-178"><a href="#cb10-178" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-179"><a href="#cb10-179" aria-hidden="true" tabindex="-1"></a><span class="fu">## Distribution Components</span></span>
+<span id="cb10-180"><a href="#cb10-180" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-181"><a href="#cb10-181" aria-hidden="true" tabindex="-1"></a><span class="fu">### Window</span></span>
+<span id="cb10-182"><a href="#cb10-182" aria-hidden="true" tabindex="-1"></a>A view into a subset of a tensor that respects the distribution pattern.</span>
+<span id="cb10-183"><a href="#cb10-183" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-184"><a href="#cb10-184" aria-hidden="true" tabindex="-1"></a>**C++ Type**: <span class="in">`tile_window&lt;...&gt;`</span></span>
+<span id="cb10-185"><a href="#cb10-185" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-186"><a href="#cb10-186" aria-hidden="true" tabindex="-1"></a><span class="fu">### Static Distributed Tensor</span></span>
+<span id="cb10-187"><a href="#cb10-187" aria-hidden="true" tabindex="-1"></a>A thread-local tensor stored in registers, distributed according to a tile distribution.</span>
+<span id="cb10-188"><a href="#cb10-188" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-189"><a href="#cb10-189" aria-hidden="true" tabindex="-1"></a>**C++ Type**: <span class="in">`static_distributed_tensor&lt;...&gt;`</span></span>
+<span id="cb10-190"><a href="#cb10-190" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-191"><a href="#cb10-191" aria-hidden="true" tabindex="-1"></a><span class="fu">### Spans</span></span>
+<span id="cb10-192"><a href="#cb10-192" aria-hidden="true" tabindex="-1"></a>Iteration ranges over distributed dimensions, used by sweep operations.</span>
+<span id="cb10-193"><a href="#cb10-193" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-194"><a href="#cb10-194" aria-hidden="true" tabindex="-1"></a>**C++ Type**: <span class="in">`tile_distributed_span&lt;...&gt;`</span></span>
+<span id="cb10-195"><a href="#cb10-195" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-196"><a href="#cb10-196" aria-hidden="true" tabindex="-1"></a><span class="fu">## GPU Hardware Terms</span></span>
+<span id="cb10-197"><a href="#cb10-197" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-198"><a href="#cb10-198" aria-hidden="true" tabindex="-1"></a><span class="fu">### Warp</span></span>
+<span id="cb10-199"><a href="#cb10-199" aria-hidden="true" tabindex="-1"></a>A group of threads (32 on AMD GPUs) that execute in lockstep.</span>
+<span id="cb10-200"><a href="#cb10-200" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-201"><a href="#cb10-201" aria-hidden="true" tabindex="-1"></a><span class="fu">### Lane</span></span>
+<span id="cb10-202"><a href="#cb10-202" aria-hidden="true" tabindex="-1"></a>An individual thread within a warp (0-31).</span>
+<span id="cb10-203"><a href="#cb10-203" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-204"><a href="#cb10-204" aria-hidden="true" tabindex="-1"></a><span class="fu">### Block</span></span>
+<span id="cb10-205"><a href="#cb10-205" aria-hidden="true" tabindex="-1"></a>A group of warps that can cooperate through shared memory.</span>
+<span id="cb10-206"><a href="#cb10-206" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-207"><a href="#cb10-207" aria-hidden="true" tabindex="-1"></a><span class="fu">### Grid</span></span>
+<span id="cb10-208"><a href="#cb10-208" aria-hidden="true" tabindex="-1"></a>The complete set of blocks launched for a kernel.</span>
+<span id="cb10-209"><a href="#cb10-209" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-210"><a href="#cb10-210" aria-hidden="true" tabindex="-1"></a><span class="fu">## Template Parameters</span></span>
+<span id="cb10-211"><a href="#cb10-211" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-212"><a href="#cb10-212" aria-hidden="true" tabindex="-1"></a><span class="fu">### sequence&lt;...&gt;</span></span>
+<span id="cb10-213"><a href="#cb10-213" aria-hidden="true" tabindex="-1"></a>A compile-time integer sequence used to specify dimensions and lengths.</span>
+<span id="cb10-214"><a href="#cb10-214" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-215"><a href="#cb10-215" aria-hidden="true" tabindex="-1"></a>**Example**: <span class="in">`sequence&lt;256, 256&gt;`</span> for a 256×256 tile</span>
+<span id="cb10-216"><a href="#cb10-216" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-217"><a href="#cb10-217" aria-hidden="true" tabindex="-1"></a><span class="fu">### tuple&lt;...&gt;</span></span>
+<span id="cb10-218"><a href="#cb10-218" aria-hidden="true" tabindex="-1"></a>A heterogeneous collection of types, often used for grouping sequences.</span>
+<span id="cb10-219"><a href="#cb10-219" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-220"><a href="#cb10-220" aria-hidden="true" tabindex="-1"></a>**Example**: <span class="in">`tuple&lt;sequence&lt;4,4&gt;, sequence&lt;4,4&gt;&gt;`</span></span>
+<span id="cb10-221"><a href="#cb10-221" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-222"><a href="#cb10-222" aria-hidden="true" tabindex="-1"></a><span class="fu">### number&lt;N&gt;</span></span>
+<span id="cb10-223"><a href="#cb10-223" aria-hidden="true" tabindex="-1"></a>A compile-time integer constant.</span>
+<span id="cb10-224"><a href="#cb10-224" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-225"><a href="#cb10-225" aria-hidden="true" tabindex="-1"></a>**Example**: <span class="in">`number&lt;16&gt;`</span> represents the value 16</span>
+<span id="cb10-226"><a href="#cb10-226" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-227"><a href="#cb10-227" aria-hidden="true" tabindex="-1"></a><span class="fu">## Optimization Terms</span></span>
+<span id="cb10-228"><a href="#cb10-228" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-229"><a href="#cb10-229" aria-hidden="true" tabindex="-1"></a><span class="fu">### Register Spilling</span></span>
+<span id="cb10-230"><a href="#cb10-230" aria-hidden="true" tabindex="-1"></a>When a kernel uses more registers than available, causing data to spill to slower memory.</span>
+<span id="cb10-231"><a href="#cb10-231" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-232"><a href="#cb10-232" aria-hidden="true" tabindex="-1"></a><span class="fu">### Occupancy</span></span>
+<span id="cb10-233"><a href="#cb10-233" aria-hidden="true" tabindex="-1"></a>The ratio of active warps to maximum possible warps on a GPU multiprocessor.</span>
+<span id="cb10-234"><a href="#cb10-234" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-235"><a href="#cb10-235" aria-hidden="true" tabindex="-1"></a><span class="fu">### Memory Bandwidth Utilization</span></span>
+<span id="cb10-236"><a href="#cb10-236" aria-hidden="true" tabindex="-1"></a>The percentage of theoretical memory bandwidth achieved by a kernel.</span>
+<span id="cb10-237"><a href="#cb10-237" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-238"><a href="#cb10-238" aria-hidden="true" tabindex="-1"></a><span class="fu">### Instruction-Level Parallelism (ILP)</span></span>
+<span id="cb10-239"><a href="#cb10-239" aria-hidden="true" tabindex="-1"></a>The ability to execute multiple independent instructions simultaneously.</span>
+<span id="cb10-240"><a href="#cb10-240" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-241"><a href="#cb10-241" aria-hidden="true" tabindex="-1"></a><span class="fu">## Common Patterns</span></span>
+<span id="cb10-242"><a href="#cb10-242" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-243"><a href="#cb10-243" aria-hidden="true" tabindex="-1"></a><span class="fu">### GEMM (General Matrix Multiplication)</span></span>
+<span id="cb10-244"><a href="#cb10-244" aria-hidden="true" tabindex="-1"></a>A fundamental operation where C = αA×B + βC.</span>
+<span id="cb10-245"><a href="#cb10-245" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-246"><a href="#cb10-246" aria-hidden="true" tabindex="-1"></a><span class="fu">### Reduction</span></span>
+<span id="cb10-247"><a href="#cb10-247" aria-hidden="true" tabindex="-1"></a>An operation that combines multiple values into a single result (e.g., sum, max).</span>
+<span id="cb10-248"><a href="#cb10-248" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-249"><a href="#cb10-249" aria-hidden="true" tabindex="-1"></a><span class="fu">### Broadcast</span></span>
+<span id="cb10-250"><a href="#cb10-250" aria-hidden="true" tabindex="-1"></a>An operation that replicates a value across multiple processing elements.</span>
+<span id="cb10-251"><a href="#cb10-251" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-252"><a href="#cb10-252" aria-hidden="true" tabindex="-1"></a><span class="fu">### Transpose</span></span>
+<span id="cb10-253"><a href="#cb10-253" aria-hidden="true" tabindex="-1"></a>An operation that swaps dimensions of a tensor.</span>
+<span id="cb10-254"><a href="#cb10-254" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-255"><a href="#cb10-255" aria-hidden="true" tabindex="-1"></a><span class="fu">## Performance Metrics</span></span>
+<span id="cb10-256"><a href="#cb10-256" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-257"><a href="#cb10-257" aria-hidden="true" tabindex="-1"></a><span class="fu">### FLOPS (Floating-Point Operations Per Second)</span></span>
+<span id="cb10-258"><a href="#cb10-258" aria-hidden="true" tabindex="-1"></a>Measure of computational throughput.</span>
+<span id="cb10-259"><a href="#cb10-259" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-260"><a href="#cb10-260" aria-hidden="true" tabindex="-1"></a><span class="fu">### Bandwidth</span></span>
+<span id="cb10-261"><a href="#cb10-261" aria-hidden="true" tabindex="-1"></a>Rate of data transfer, typically measured in GB/s.</span>
+<span id="cb10-262"><a href="#cb10-262" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-263"><a href="#cb10-263" aria-hidden="true" tabindex="-1"></a><span class="fu">### Latency</span></span>
+<span id="cb10-264"><a href="#cb10-264" aria-hidden="true" tabindex="-1"></a>Time delay between issuing an operation and its completion.</span>
+<span id="cb10-265"><a href="#cb10-265" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-266"><a href="#cb10-266" aria-hidden="true" tabindex="-1"></a><span class="fu">### Throughput</span></span>
+<span id="cb10-267"><a href="#cb10-267" aria-hidden="true" tabindex="-1"></a>Rate of operation completion, often measured in operations per second.</span>
+<span id="cb10-268"><a href="#cb10-268" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-269"><a href="#cb10-269" aria-hidden="true" tabindex="-1"></a><span class="fu">## Usage Examples</span></span>
+<span id="cb10-270"><a href="#cb10-270" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-271"><a href="#cb10-271" aria-hidden="true" tabindex="-1"></a><span class="fu">### Creating a Distribution</span></span>
+<span id="cb10-272"><a href="#cb10-272" aria-hidden="true" tabindex="-1"></a><span class="in">```cpp</span></span>
+<span id="cb10-273"><a href="#cb10-273" aria-hidden="true" tabindex="-1"></a><span class="co">// Define encoding</span></span>
+<span id="cb10-274"><a href="#cb10-274" aria-hidden="true" tabindex="-1"></a><span class="kw">using</span> MyEncoding <span class="op">=</span> tile_distribution_encoding<span class="op">&lt;</span></span>
+<span id="cb10-275"><a href="#cb10-275" aria-hidden="true" tabindex="-1"></a>    sequence<span class="op">&lt;&gt;,</span>                        <span class="co">// No replication</span></span>
+<span id="cb10-276"><a href="#cb10-276" aria-hidden="true" tabindex="-1"></a>    tuple<span class="op">&lt;</span>sequence<span class="op">&lt;</span><span class="dv">4</span><span class="op">,</span><span class="dv">2</span><span class="op">,</span><span class="dv">8</span><span class="op">,</span><span class="dv">4</span><span class="op">&gt;,</span>          <span class="co">// M dimension</span></span>
+<span id="cb10-277"><a href="#cb10-277" aria-hidden="true" tabindex="-1"></a>          sequence<span class="op">&lt;</span><span class="dv">4</span><span class="op">,</span><span class="dv">2</span><span class="op">,</span><span class="dv">8</span><span class="op">,</span><span class="dv">4</span><span class="op">&gt;&gt;,</span>         <span class="co">// N dimension</span></span>
+<span id="cb10-278"><a href="#cb10-278" aria-hidden="true" tabindex="-1"></a>    tuple<span class="op">&lt;</span>sequence<span class="op">&lt;</span><span class="dv">1</span><span class="op">,</span><span class="dv">2</span><span class="op">&gt;,</span> sequence<span class="op">&lt;</span><span class="dv">1</span><span class="op">,</span><span class="dv">2</span><span class="op">&gt;&gt;,</span> <span class="co">// P mappings</span></span>
+<span id="cb10-279"><a href="#cb10-279" aria-hidden="true" tabindex="-1"></a>    tuple<span class="op">&lt;</span>sequence<span class="op">&lt;</span><span class="dv">1</span><span class="op">,</span><span class="dv">1</span><span class="op">&gt;,</span> sequence<span class="op">&lt;</span><span class="dv">2</span><span class="op">,</span><span class="dv">2</span><span class="op">&gt;&gt;,</span> <span class="co">// P minor</span></span>
+<span id="cb10-280"><a href="#cb10-280" aria-hidden="true" tabindex="-1"></a>    sequence<span class="op">&lt;</span><span class="dv">1</span><span class="op">,</span><span class="dv">1</span><span class="op">,</span><span class="dv">2</span><span class="op">,</span><span class="dv">2</span><span class="op">&gt;,</span>                   <span class="co">// Y major</span></span>
+<span id="cb10-281"><a href="#cb10-281" aria-hidden="true" tabindex="-1"></a>    sequence<span class="op">&lt;</span><span class="dv">0</span><span class="op">,</span><span class="dv">3</span><span class="op">,</span><span class="dv">0</span><span class="op">,</span><span class="dv">3</span><span class="op">&gt;</span>                    <span class="co">// Y minor</span></span>
+<span id="cb10-282"><a href="#cb10-282" aria-hidden="true" tabindex="-1"></a><span class="op">&gt;;</span></span>
+<span id="cb10-283"><a href="#cb10-283" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-284"><a href="#cb10-284" aria-hidden="true" tabindex="-1"></a><span class="co">// Create distribution</span></span>
+<span id="cb10-285"><a href="#cb10-285" aria-hidden="true" tabindex="-1"></a><span class="kw">auto</span> distribution <span class="op">=</span> make_static_tile_distribution<span class="op">(</span>MyEncoding<span class="op">{});</span></span>
+<span id="cb10-286"><a href="#cb10-286" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb10-287"><a href="#cb10-287" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-288"><a href="#cb10-288" aria-hidden="true" tabindex="-1"></a><span class="fu">### Using Tile Window</span></span>
+<span id="cb10-289"><a href="#cb10-289" aria-hidden="true" tabindex="-1"></a><span class="in">```cpp</span></span>
+<span id="cb10-290"><a href="#cb10-290" aria-hidden="true" tabindex="-1"></a><span class="co">// Create window</span></span>
+<span id="cb10-291"><a href="#cb10-291" aria-hidden="true" tabindex="-1"></a><span class="kw">auto</span> window <span class="op">=</span> make_tile_window<span class="op">(</span></span>
+<span id="cb10-292"><a href="#cb10-292" aria-hidden="true" tabindex="-1"></a>    tensor_view<span class="op">,</span></span>
+<span id="cb10-293"><a href="#cb10-293" aria-hidden="true" tabindex="-1"></a>    TileShape<span class="op">{},</span></span>
+<span id="cb10-294"><a href="#cb10-294" aria-hidden="true" tabindex="-1"></a>    origin<span class="op">,</span></span>
+<span id="cb10-295"><a href="#cb10-295" aria-hidden="true" tabindex="-1"></a>    distribution</span>
+<span id="cb10-296"><a href="#cb10-296" aria-hidden="true" tabindex="-1"></a><span class="op">);</span></span>
+<span id="cb10-297"><a href="#cb10-297" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-298"><a href="#cb10-298" aria-hidden="true" tabindex="-1"></a><span class="co">// Load-compute-store pattern</span></span>
+<span id="cb10-299"><a href="#cb10-299" aria-hidden="true" tabindex="-1"></a><span class="kw">auto</span> tile <span class="op">=</span> window<span class="op">.</span>load<span class="op">();</span></span>
+<span id="cb10-300"><a href="#cb10-300" aria-hidden="true" tabindex="-1"></a>sweep_tile<span class="op">(</span>tile<span class="op">,</span> compute_func<span class="op">);</span></span>
+<span id="cb10-301"><a href="#cb10-301" aria-hidden="true" tabindex="-1"></a>window<span class="op">.</span>store<span class="op">(</span>tile<span class="op">);</span></span>
+<span id="cb10-302"><a href="#cb10-302" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb10-303"><a href="#cb10-303" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-304"><a href="#cb10-304" aria-hidden="true" tabindex="-1"></a><span class="fu">## Related Documentation</span></span>
+<span id="cb10-305"><a href="#cb10-305" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-306"><a href="#cb10-306" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Coordinate Systems</span><span class="co">](04_coordinate_systems.qmd)</span> - Detailed explanation of coordinate spaces</span>
+<span id="cb10-307"><a href="#cb10-307" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Tile Distribution</span><span class="co">](03_tile_distribution.qmd)</span> - Core distribution concepts</span>
+<span id="cb10-308"><a href="#cb10-308" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Encoding Internals</span><span class="co">](05_encoding_internals.qmd)</span> - How encodings work internally</span>
+<span id="cb10-309"><a href="#cb10-309" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Thread Mapping</span><span class="co">](06_thread_mapping.qmd)</span> - Hardware thread organization</span></code><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></pre></div>
+</div></div></div></div></div>
+</div> <!-- /content -->
+<script src="font-cleanup.js"></script>
+
+
+
+
+</body></html>

@@ -1,0 +1,238 @@
+/* D3 Diagram Sizing Fixes - Ensure diagrams fit within content area */
+/* Enhanced with Professional Scientific Theme */
+
+
+/* Container constraints for all diagrams - minimal spacing */
+.d3-diagram-container,
+div[id$="-diagram"] {
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    margin: 10px 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+}
+
+/* Remove extra borders around diagrams */
+div[id$="-diagram"] {
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+}
+
+/* Constrain SVG sizes to parent container */
+svg {
+    max-width: 100% !important;
+    height: auto !important;
+    display: block !important;
+    margin: 0 auto !important;
+}
+
+/* Disable all animations and transitions for scientific clarity */
+* {
+    transition: none !important;
+    animation: none !important;
+}
+
+svg .node:hover,
+svg .link:hover,
+svg rect:hover,
+svg circle:hover {
+    filter: none !important;
+    stroke-width: inherit !important;
+    opacity: inherit !important;
+}
+
+/* Specific height overrides for different diagram types - more compact */
+#tensor-view-overview-diagram svg { max-height: 400px !important; }
+#buffer-view-overview-diagram svg { max-height: 400px !important; }
+#bufferview-architecture svg { max-height: 350px !important; }
+#multiindex-structure-diagram svg { max-height: 350px !important; }
+#coordinate-systems-test svg { max-height: 400px !important; }
+#tile-window-overview-diagram svg { max-height: 450px !important; }
+#tile-distribution-overview-diagram svg { max-height: 450px !important; }
+#sweep-tile-overview-diagram svg { max-height: 400px !important; }
+#coordinate-system-comparison-diagram svg { max-height: 400px !important; }
+#encoding-structure-diagram svg { max-height: 450px !important; }
+#transformation-chain-diagram svg { max-height: 400px !important; }
+#gpu-hierarchy-diagram svg { max-height: 450px !important; }
+#thread-to-data-mapping-diagram svg { max-height: 400px !important; }
+
+/* Text sizing within diagrams - Increased for better readability */
+svg text {
+    font-size: 15px !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+}
+
+/* Labels and descriptions */
+svg text.label,
+svg text.description {
+    font-size: 13px !important;
+}
+
+/* Code text */
+svg text.code {
+    font-size: 13px !important;
+    font-family: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace !important;
+}
+
+/* Title text larger */
+svg text.title,
+svg text.heading {
+    font-size: 18px !important;
+    font-weight: 600 !important;
+}
+
+/* Subtitle text */
+svg text.subtitle {
+    font-size: 16px !important;
+    font-weight: 500 !important;
+}
+
+/* Ensure text fits within boxes */
+svg .node rect + text,
+svg .box rect + text {
+    text-anchor: middle !important;
+    dominant-baseline: middle !important;
+}
+
+/* Prevent text overflow in boxes */
+svg foreignObject {
+    overflow: hidden !important;
+}
+
+/* Arrow and line adjustments */
+svg .arrow,
+svg .link,
+svg path.arrow {
+    stroke-width: 1.5px !important;
+    fill: none !important;
+}
+
+/* Marker (arrowhead) sizing */
+svg marker {
+    overflow: visible !important;
+}
+
+svg marker path {
+    stroke-width: 1px !important;
+}
+
+/* Grid and axis text */
+svg .axis text {
+    font-size: 10px !important;
+}
+
+/* Legend text */
+svg .legend text {
+    font-size: 11px !important;
+}
+
+/* Responsive behavior for smaller screens */
+@media (max-width: 768px) {
+    div[id$="-diagram"] {
+        max-height: 400px !important;
+        overflow-x: scroll !important;
+    }
+    
+    svg {
+        min-width: 600px !important;
+    }
+    
+    svg text {
+        font-size: 14px !important;
+    }
+    
+    svg text.title {
+        font-size: 16px !important;
+    }
+    
+    svg text.subtitle {
+        font-size: 14px !important;
+    }
+}
+
+/* Fix for diagram containers with explicit heights */
+div[style*="height"] {
+    max-width: 100% !important;
+    overflow-x: auto !important;
+}
+
+/* Ensure diagrams don't break out of content area */
+.content,
+.main-content,
+article {
+    overflow-x: hidden !important;
+}
+
+/* Specific fixes for problematic diagrams */
+#sweep-operations-mindmap {
+    border: none !important;
+    max-height: 800px !important;
+}
+
+/* Remove any inline styles that set fixed widths */
+svg[width],
+svg[height] {
+    width: 100% !important;
+    height: auto !important;
+    max-height: inherit !important;
+}
+
+/* Box sizing for all diagram elements */
+svg rect,
+svg circle,
+svg ellipse,
+svg path,
+svg line {
+    box-sizing: border-box !important;
+}
+
+/* Ensure text doesn't overflow boxes */
+svg text {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+/* Multiline text handling */
+svg tspan {
+    font-size: inherit !important;
+}
+
+/* Fix alignment issues */
+svg g.node,
+svg g.box {
+    pointer-events: all !important;
+}
+
+/* Ensure proper layering */
+svg .background {
+    z-index: 0 !important;
+}
+
+svg .nodes,
+svg .boxes {
+    z-index: 1 !important;
+}
+
+svg .links,
+svg .arrows {
+    z-index: 2 !important;
+}
+
+svg .labels,
+svg text {
+    z-index: 3 !important;
+}
+
+/* Print styles */
+@media print {
+    div[id$="-diagram"] {
+        max-height: none !important;
+        page-break-inside: avoid !important;
+    }
+    
+    svg {
+        max-height: 600px !important;
+    }
+}

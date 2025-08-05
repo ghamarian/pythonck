@@ -1,0 +1,1789 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.7.32">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>Static Distributed Tensor - Thread-Local Data Containers – Tile Distribution Documentation</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-038ebe7de1ad581fc619d66ba7f7845b.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-9cae0046c5fab5900eed4751693c39dd.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-038ebe7de1ad581fc619d66ba7f7845b.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-185961ed47a39db2ff9d8581d2d02664.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-1f647ac581ac6b74d75948daead8752e.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../site_libs/bootstrap/bootstrap-185961ed47a39db2ff9d8581d2d02664.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<script src="../site_libs/quarto-contrib/live-runtime/live-runtime.js" type="module"></script>
+<link href="../site_libs/quarto-contrib/live-runtime/live-runtime.css" rel="stylesheet">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    mermaid.initialize({ 
+        startOnLoad: true,
+        theme: 'default',
+        themeVariables: {
+            primaryColor: '#f0f7ff',
+            primaryTextColor: '#1e293b',
+            primaryBorderColor: '#2563eb',
+            lineColor: '#6b7280',
+            secondaryColor: '#fef3e2',
+            tertiaryColor: '#f0fdf4',
+            background: '#ffffff',
+            mainBkg: '#f0f7ff',
+            secondBkg: '#fef3e2',
+            tertiaryBkg: '#f0fdf4',
+            primaryTextColor: '#1e293b',
+            fontSize: '16px'
+        }
+    });
+});
+</script>
+<script type="module" src="../site_libs/quarto-ojs/quarto-ojs-runtime.js"></script>
+<link href="../site_libs/quarto-ojs/quarto-ojs.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="../global-font-override.css">
+<link rel="stylesheet" href="../diagram-sizing-fixes.css">
+</head>
+
+<body class="nav-sidebar docked quarto-light"><script id="quarto-html-before-body" type="application/javascript">
+    const toggleBodyColorMode = (bsSheetEl) => {
+      const mode = bsSheetEl.getAttribute("data-mode");
+      const bodyEl = window.document.querySelector("body");
+      if (mode === "dark") {
+        bodyEl.classList.add("quarto-dark");
+        bodyEl.classList.remove("quarto-light");
+      } else {
+        bodyEl.classList.add("quarto-light");
+        bodyEl.classList.remove("quarto-dark");
+      }
+    }
+    const toggleBodyColorPrimary = () => {
+      const bsSheetEl = window.document.querySelector("link#quarto-bootstrap:not([rel=disabled-stylesheet])");
+      if (bsSheetEl) {
+        toggleBodyColorMode(bsSheetEl);
+      }
+    }
+    const setColorSchemeToggle = (alternate) => {
+      const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+      for (let i=0; i < toggles.length; i++) {
+        const toggle = toggles[i];
+        if (toggle) {
+          if (alternate) {
+            toggle.classList.add("alternate");
+          } else {
+            toggle.classList.remove("alternate");
+          }
+        }
+      }
+    };
+    const toggleColorMode = (alternate) => {
+      // Switch the stylesheets
+      const primaryStylesheets = window.document.querySelectorAll('link.quarto-color-scheme:not(.quarto-color-alternate)');
+      const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+      manageTransitions('#quarto-margin-sidebar .nav-link', false);
+      if (alternate) {
+        // note: dark is layered on light, we don't disable primary!
+        enableStylesheet(alternateStylesheets);
+        for (const sheetNode of alternateStylesheets) {
+          if (sheetNode.id === "quarto-bootstrap") {
+            toggleBodyColorMode(sheetNode);
+          }
+        }
+      } else {
+        disableStylesheet(alternateStylesheets);
+        enableStylesheet(primaryStylesheets)
+        toggleBodyColorPrimary();
+      }
+      manageTransitions('#quarto-margin-sidebar .nav-link', true);
+      // Switch the toggles
+      setColorSchemeToggle(alternate)
+      // Hack to workaround the fact that safari doesn't
+      // properly recolor the scrollbar when toggling (#1455)
+      if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+        manageTransitions("body", false);
+        window.scrollTo(0, 1);
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          manageTransitions("body", true);
+        }, 40);
+      }
+    }
+    const disableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        stylesheet.rel = 'disabled-stylesheet';
+      }
+    }
+    const enableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        if(stylesheet.rel !== 'stylesheet') { // for Chrome, which will still FOUC without this check
+          stylesheet.rel = 'stylesheet';
+        }
+      }
+    }
+    const manageTransitions = (selector, allowTransitions) => {
+      const els = window.document.querySelectorAll(selector);
+      for (let i=0; i < els.length; i++) {
+        const el = els[i];
+        if (allowTransitions) {
+          el.classList.remove('notransition');
+        } else {
+          el.classList.add('notransition');
+        }
+      }
+    }
+    const isFileUrl = () => {
+      return window.location.protocol === 'file:';
+    }
+    const hasAlternateSentinel = () => {
+      let styleSentinel = getColorSchemeSentinel();
+      if (styleSentinel !== null) {
+        return styleSentinel === "alternate";
+      } else {
+        return false;
+      }
+    }
+    const setStyleSentinel = (alternate) => {
+      const value = alternate ? "alternate" : "default";
+      if (!isFileUrl()) {
+        window.localStorage.setItem("quarto-color-scheme", value);
+      } else {
+        localAlternateSentinel = value;
+      }
+    }
+    const getColorSchemeSentinel = () => {
+      if (!isFileUrl()) {
+        const storageValue = window.localStorage.getItem("quarto-color-scheme");
+        return storageValue != null ? storageValue : localAlternateSentinel;
+      } else {
+        return localAlternateSentinel;
+      }
+    }
+    const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+      const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+      const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+      let newTheme = '';
+      if(authorPrefersDark) {
+        newTheme = isAlternate ? baseTheme : alternateTheme;
+      } else {
+        newTheme = isAlternate ? alternateTheme : baseTheme;
+      }
+      const changeGiscusTheme = () => {
+        // From: https://github.com/giscus/giscus/issues/336
+        const sendMessage = (message) => {
+          const iframe = document.querySelector('iframe.giscus-frame');
+          if (!iframe) return;
+          iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+        }
+        sendMessage({
+          setConfig: {
+            theme: newTheme
+          }
+        });
+      }
+      const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+      if (isGiscussLoaded) {
+        changeGiscusTheme();
+      }
+    };
+    const authorPrefersDark = false;
+    const darkModeDefault = authorPrefersDark;
+      document.querySelector('link#quarto-text-highlighting-styles.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+      document.querySelector('link#quarto-bootstrap.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+    let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+    // Dark / light mode switch
+    window.quartoToggleColorScheme = () => {
+      // Read the current dark / light value
+      let toAlternate = !hasAlternateSentinel();
+      toggleColorMode(toAlternate);
+      setStyleSentinel(toAlternate);
+      toggleGiscusIfUsed(toAlternate, darkModeDefault);
+      window.dispatchEvent(new Event('resize'));
+    };
+    // Switch to dark mode if need be
+    if (hasAlternateSentinel()) {
+      toggleColorMode(true);
+    } else {
+      toggleColorMode(false);
+    }
+  </script>
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../concepts/05_encoding_internals.html">Implementation Deep Dive</a></li><li class="breadcrumb-item"><a href="../concepts/05_static_distributed_tensor.html">Static Distributed Tensor - Thread-Local Data Containers</a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation docked overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="../">Tile Distribution Documentation</a> 
+        <div class="sidebar-tools-main">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
+ <span class="menu-text">Getting Started</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Tile Distribution Documentation</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true">
+ <span class="menu-text">Foundation</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/00_introduction_motivation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Introduction and Motivation - Why Tile Distribution Matters</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/01_buffer_view.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Buffer Views - Raw Memory Access</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/01_tensor_view.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Tensor Views - Multi-Dimensional Structure</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true">
+ <span class="menu-text">Transformation Engine</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/02_tensor_coordinates.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Basic Coordinates</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/02_transforms.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Individual Transforms</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/02_adaptors.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Tensor Adaptors - Chaining Transformations</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/02_descriptors.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Tensor Descriptors - Complete Tensor Specifications</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/02_convolution_example.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Convolution Implementation with Tensor Descriptors</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/02_coordinate_movement.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Advanced Coordinate Operations</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true">
+ <span class="menu-text">Distribution API</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-4" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/03_tile_distribution.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Tile Distribution - The Core API</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/03_tile_window.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Tile Window - Data Access Gateway</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/03_sweep_tile.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Sweep Tile - Elegant Iteration</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true">
+ <span class="menu-text">Coordinate Systems</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-5" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/04_coordinate_systems.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Coordinate Systems - The Mathematical Foundation</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-6" role="navigation" aria-expanded="true">
+ <span class="menu-text">Implementation Deep Dive</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-6" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-6" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/05_encoding_internals.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Encoding Internals - The Internal Machinery</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/05_static_distributed_tensor.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">Static Distributed Tensor - Thread-Local Data Containers</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-7" role="navigation" aria-expanded="true">
+ <span class="menu-text">Thread Mapping</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-7" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-7" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../concepts/06_thread_mapping.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Thread Mapping - Connecting to Hardware</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#overview" id="toc-overview" class="nav-link active" data-scroll-target="#overview">Overview</a></li>
+  <li><a href="#what-is-a-static-distributed-tensor" id="toc-what-is-a-static-distributed-tensor" class="nav-link" data-scroll-target="#what-is-a-static-distributed-tensor">What is a Static Distributed Tensor?</a></li>
+  <li><a href="#tensor-creation-process" id="toc-tensor-creation-process" class="nav-link" data-scroll-target="#tensor-creation-process">Tensor Creation Process</a></li>
+  <li><a href="#thread-buffer-organization" id="toc-thread-buffer-organization" class="nav-link" data-scroll-target="#thread-buffer-organization">Thread Buffer Organization</a></li>
+  <li><a href="#element-access-patterns" id="toc-element-access-patterns" class="nav-link" data-scroll-target="#element-access-patterns">Element Access Patterns</a></li>
+  <li><a href="#memory-layout-details" id="toc-memory-layout-details" class="nav-link" data-scroll-target="#memory-layout-details">Memory Layout Details</a></li>
+  <li><a href="#thread-coordination" id="toc-thread-coordination" class="nav-link" data-scroll-target="#thread-coordination">Thread Coordination</a></li>
+  <li><a href="#practical-usage-patterns" id="toc-practical-usage-patterns" class="nav-link" data-scroll-target="#practical-usage-patterns">Practical Usage Patterns</a></li>
+  <li><a href="#testing-your-understanding" id="toc-testing-your-understanding" class="nav-link" data-scroll-target="#testing-your-understanding">Testing Your Understanding</a></li>
+  <li><a href="#key-takeaways" id="toc-key-takeaways" class="nav-link" data-scroll-target="#key-takeaways">Key Takeaways</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+
+<header id="title-block-header" class="quarto-title-block default"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../concepts/05_encoding_internals.html">Implementation Deep Dive</a></li><li class="breadcrumb-item"><a href="../concepts/05_static_distributed_tensor.html">Static Distributed Tensor - Thread-Local Data Containers</a></li></ol></nav>
+<div class="quarto-title">
+<div class="quarto-title-block"><div><h1 class="title">Static Distributed Tensor - Thread-Local Data Containers</h1><button type="button" class="btn code-tools-button" id="quarto-code-tools-source"><i class="bi"></i> Code</button></div></div>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<div>
+<div id="pyodide-1" class="exercise-cell">
+
+</div>
+<script type="pyodide-1-contents">
+eyJhdHRyIjp7ImF1dG9ydW4iOnRydWUsImVjaG8iOmZhbHNlLCJlZGl0IjpmYWxzZSwiZXZhbCI6dHJ1ZSwib3V0cHV0IjpmYWxzZX0sImNvZGUiOiJcbiMgQXV0by1pbnN0YWxsIHB5dGhvbmNrIHBhY2thZ2VcbmltcG9ydCBtaWNyb3BpcFxuYXdhaXQgbWljcm9waXAuaW5zdGFsbChcImh0dHBzOi8vcmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbS9naGFtYXJpYW4vcHl0aG9uY2svbWFzdGVyL2RvY3VtZW50YXRpb24vcHl0aG9uY2stMC4xLjAtcHkzLW5vbmUtYW55LndobFwiKVxuXG4jIFNldHVwIHB5dGVuc29yIHBhdGggZm9yIHB5b2RpZGUgZW52aXJvbm1lbnRcbmltcG9ydCBzeXNcbmltcG9ydCBvc1xuaW1wb3J0IG51bXB5IGFzIG5wXG5cbiMgQWRkIHRoZSBwcm9qZWN0IHJvb3QgdG8gcGF0aCBzbyB3ZSBjYW4gaW1wb3J0IHB5dGVuc29yXG5zeXMucGF0aC5pbnNlcnQoMCwgJy9ob21lL2FnaGFtYXJpL2dpdGh1Yi9jb21wb3NhYmxlX2tlcm5lbC92aXN1YWxpc2F0aW9uJylcblxuIyBJbXBvcnQgdGhlIGFjdHVhbCBDSyBtb2R1bGVzXG5mcm9tIHB5dGVuc29yLnRpbGVfZGlzdHJpYnV0aW9uX2VuY29kaW5nIGltcG9ydCBUaWxlRGlzdHJpYnV0aW9uRW5jb2RpbmdcbmZyb20gcHl0ZW5zb3IudGlsZV9kaXN0cmlidXRpb24gaW1wb3J0IG1ha2Vfc3RhdGljX3RpbGVfZGlzdHJpYnV0aW9uXG5mcm9tIHB5dGVuc29yLnN0YXRpY19kaXN0cmlidXRlZF90ZW5zb3IgaW1wb3J0IG1ha2Vfc3RhdGljX2Rpc3RyaWJ1dGVkX3RlbnNvciJ9
+</script>
+</div>
+<section id="overview" class="level2">
+<h2 class="anchored" data-anchor-id="overview">Overview</h2>
+<p>Now that you understand how encodings create the transformation machinery, let’s examine the data structures that hold the actual computation data: <strong>Static Distributed Tensors</strong>.</p>
+<p>These are the thread-local containers that hold each thread’s portion of the distributed computation. They’re “static” because their layout is determined at compile time for maximum performance.</p>
+</section>
+<section id="what-is-a-static-distributed-tensor" class="level2">
+<h2 class="anchored" data-anchor-id="what-is-a-static-distributed-tensor">What is a Static Distributed Tensor?</h2>
+<p>Before diving into the implementation, let’s understand what problem these tensors solve:</p>
+<p><strong>The Challenge</strong>: Each thread needs to store and access its portion of the distributed data efficiently. The access patterns are known at compile time, so we can optimize the layout.</p>
+<p><strong>The Solution</strong>: Static Distributed Tensors are thread-local data containers with compile-time optimized layouts.</p>
+<p><strong>🎯 Key Properties:</strong> - Each thread has its own StaticDistributedTensor - Contains only the data that thread needs - Layout optimized for the thread’s access patterns - Provides efficient element access via Y coordinates - Memory is organized according to tile distribution</p>
+<p><strong>🔍 Comparison with Traditional Tensors:</strong> - <strong>Traditional tensor</strong>: Contains all data, shared access - <strong>Distributed tensor</strong>: Data split across threads - <strong>Static distributed tensor</strong>: Thread-local portion with compile-time optimized layout</p>
+</section>
+<section id="tensor-creation-process" class="level2">
+<h2 class="anchored" data-anchor-id="tensor-creation-process">Tensor Creation Process</h2>
+<p>Static distributed tensors are created from tile distributions and provide the storage for thread-local computations:</p>
+<div>
+<div id="pyodide-2" class="exercise-cell">
+
+</div>
+<script type="pyodide-2-contents">
+eyJhdHRyIjp7ImF1dG9ydW4iOmZhbHNlLCJlZGl0Ijp0cnVlLCJldmFsIjp0cnVlfSwiY29kZSI6InByaW50KFwi8J+UpyBTdGF0aWMgRGlzdHJpYnV0ZWQgVGVuc29yIENyZWF0aW9uXCIpXG5wcmludChcIj1cIiAqIDUwKVxuXG5wcmludChcIkNyZWF0aW9uIFByb2Nlc3M6XCIpXG5wcmludChcIjEuIFN0YXJ0IHdpdGggdGlsZSBkaXN0cmlidXRpb24gKGRlZmluZXMgb3JnYW5pemF0aW9uKVwiKVxucHJpbnQoXCIyLiBTcGVjaWZ5IGRhdGEgdHlwZSAoZmxvYXQzMiwgaW50MzIsIGV0Yy4pXCIpXG5wcmludChcIjMuIENyZWF0ZSBzdGF0aWMgZGlzdHJpYnV0ZWQgdGVuc29yXCIpXG5wcmludChcIjQuIFRlbnNvciBpcyByZWFkeSBmb3IgZWxlbWVudCBhY2Nlc3NcIilcblxuIyBDcmVhdGUgdGlsZSBkaXN0cmlidXRpb24gZmlyc3RcbmVuY29kaW5nID0gVGlsZURpc3RyaWJ1dGlvbkVuY29kaW5nKFxuICAgIHJzX2xlbmd0aHM9W10sICAgICAgICAgICAgICAgICAgICBcbiAgICBoc19sZW5ndGhzcz1bWzIsIDJdLCBbMiwgMl1dLCAgICMgMngyIHRpbGVzIHBlciB0aHJlYWRcbiAgICBwc190b19yaHNzX21ham9yPVtbMV0sIFsyXV0sICAgICBcbiAgICBwc190b19yaHNzX21pbm9yPVtbMF0sIFswXV0sICAgICBcbiAgICB5c190b19yaHNfbWFqb3I9WzEsIDEsIDIsIDJdLCAgICBcbiAgICB5c190b19yaHNfbWlub3I9WzAsIDEsIDAsIDFdICAgICBcbilcblxudHJ5OlxuICAgIHRpbGVfZGlzdHJpYnV0aW9uID0gbWFrZV9zdGF0aWNfdGlsZV9kaXN0cmlidXRpb24oZW5jb2RpbmcpXG4gICAgXG4gICAgcHJpbnQoXCJcXG7inIUgVGlsZSBkaXN0cmlidXRpb24gY3JlYXRlZFwiKVxuICAgIHByaW50KFwi8J+UpyBDcmVhdGluZyBTdGF0aWMgRGlzdHJpYnV0ZWQgVGVuc29yLi4uXCIpXG4gICAgXG4gICAgIyBDcmVhdGUgc3RhdGljIGRpc3RyaWJ1dGVkIHRlbnNvclxuICAgIGRpc3RyaWJ1dGVkX3RlbnNvciA9IG1ha2Vfc3RhdGljX2Rpc3RyaWJ1dGVkX3RlbnNvcihcbiAgICAgICAgZGF0YV90eXBlPW5wLmZsb2F0MzIsXG4gICAgICAgIHRpbGVfZGlzdHJpYnV0aW9uPXRpbGVfZGlzdHJpYnV0aW9uXG4gICAgKVxuICAgIFxuICAgIHByaW50KFwi4pyFIFN0YXRpYyBkaXN0cmlidXRlZCB0ZW5zb3IgY3JlYXRlZCBzdWNjZXNzZnVsbHkhXCIpXG4gICAgXG4gICAgIyBDaGVjayBhdmFpbGFibGUgbWV0aG9kc1xuICAgIGtleV9tZXRob2RzID0gWydnZXRfZWxlbWVudCcsICdzZXRfZWxlbWVudCcsICdnZXRfbnVtX29mX2VsZW1lbnRzJ11cbiAgICBwcmludChmXCJcXG7wn5OLIEF2YWlsYWJsZSBPcGVyYXRpb25zOlwiKVxuICAgIGZvciBtZXRob2QgaW4ga2V5X21ldGhvZHM6XG4gICAgICAgIGhhc19tZXRob2QgPSBoYXNhdHRyKGRpc3RyaWJ1dGVkX3RlbnNvciwgbWV0aG9kKVxuICAgICAgICBzdGF0dXMgPSBcIuKchVwiIGlmIGhhc19tZXRob2QgZWxzZSBcIuKdjFwiXG4gICAgICAgIHByaW50KGZcIiAge3N0YXR1c30ge21ldGhvZH1cIilcbiAgICAgICAgXG5leGNlcHQgRXhjZXB0aW9uIGFzIGU6XG4gICAgcHJpbnQoZlwi4pqg77iPIENyZWF0aW9uIGZhaWxlZDoge2V9XCIpXG4gICAgcHJpbnQoXCJOb3RlOiBXZSdsbCBkZW1vbnN0cmF0ZSB0aGUgY29uY2VwdHMgZXZlbiB3aXRob3V0IGNyZWF0aW9uXCIpIn0=
+</script>
+</div>
+</section>
+<section id="thread-buffer-organization" class="level2">
+<h2 class="anchored" data-anchor-id="thread-buffer-organization">Thread Buffer Organization</h2>
+<p>Each thread’s buffer is organized to efficiently store the elements in its tile.</p>
+<div class="mermaid">
+graph TB
+    subgraph "Static Distributed Tensor Structure"
+        subgraph "Thread 0"
+            T0B["Buffer<br>[4 elements]<br>Contiguous"]
+            T0Y["Y-coordinates<br>[0,0] [0,1]<br>[1,0] [1,1]"]
+            T0M["Mapping<br>Y→Buffer<br>Linearization"]
+        end
+        
+        subgraph "Thread 1"
+            T1B["Buffer<br>[4 elements]<br>Contiguous"]
+            T1Y["Y-coordinates<br>[0,0] [0,1]<br>[1,0] [1,1]"]
+            T1M["Mapping<br>Y→Buffer<br>Linearization"]
+        end
+        
+        subgraph "Thread N"
+            TNB["Buffer<br>[4 elements]<br>Contiguous"]
+            TNY["Y-coordinates<br>[0,0] [0,1]<br>[1,0] [1,1]"]
+            TNM["Mapping<br>Y→Buffer<br>Linearization"]
+        end
+    end
+    
+    T0Y --&gt; T0M
+    T0M --&gt; T0B
+    T1Y --&gt; T1M
+    T1M --&gt; T1B
+    TNY --&gt; TNM
+    TNM --&gt; TNB
+    
+    style T0B fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style T1B fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style TNB fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+</div>
+<p><strong>📊 Buffer Layout Principles:</strong> - Contiguous memory for cache efficiency - Y coordinates provide logical indexing - Buffer positions provide physical indexing - Layout optimized for thread’s access patterns</p>
+<p><strong>📝 Example: [2, 2] Thread Tile</strong></p>
+<p>Y coordinate to buffer position mapping: - Y=[0,0] → Buffer position 0 - Y=[0,1] → Buffer position 1 - Y=[1,0] → Buffer position 2 - Y=[1,1] → Buffer position 3</p>
+<p><strong>🔄 Visual Layout:</strong></p>
+<pre><code>Logical (Y coordinates)    Physical (Buffer)
+Y[0,0] Y[0,1]              Buffer[0] Buffer[1]
+Y[1,0] Y[1,1]           →  Buffer[2] Buffer[3]</code></pre>
+</section>
+<section id="element-access-patterns" class="level2">
+<h2 class="anchored" data-anchor-id="element-access-patterns">Element Access Patterns</h2>
+<p>Static distributed tensors provide efficient element access using Y coordinates.</p>
+<p><strong>🎯 Access Methods:</strong> - <code>get_element(y_indices)</code>: Read value at Y coordinate - <code>set_element(y_indices, value)</code>: Write value at Y coordinate - Y coordinates are logical (within thread’s tile) - Internally maps to efficient buffer access</p>
+<p><strong>📝 Element Access Example ([2, 2] tile):</strong></p>
+<p>Setting values: - <code>tensor.set_element([0, 0], 11)</code> - <code>tensor.set_element([0, 1], 12)</code> - <code>tensor.set_element([1, 0], 21)</code> - <code>tensor.set_element([1, 1], 22)</code></p>
+<p>Reading values: - <code>tensor.get_element([0, 0])</code> → 11 - <code>tensor.get_element([0, 1])</code> → 12 - <code>tensor.get_element([1, 0])</code> → 21 - <code>tensor.get_element([1, 1])</code> → 22</p>
+<p><strong>🚀 Performance Benefits:</strong> - Y coordinate lookup is O(1) - Buffer access is cache-friendly - No bounds checking needed (static layout) - Compiler can optimize access patterns</p>
+</section>
+<section id="memory-layout-details" class="level2">
+<h2 class="anchored" data-anchor-id="memory-layout-details">Memory Layout Details</h2>
+<p>Let’s examine the internal memory organization in detail.</p>
+<div class="mermaid">
+graph TB
+    subgraph "Memory Layout Example: [3,2] Tile"
+        subgraph "Logical View (Y-coordinates)"
+            L00["Y[0,0]"]
+            L01["Y[0,1]"]
+            L10["Y[1,0]"]
+            L11["Y[1,1]"]
+            L20["Y[2,0]"]
+            L21["Y[2,1]"]
+        end
+        
+        subgraph "Physical Memory (Buffer)"
+            P0["Addr 0<br>Val: Y[0,0]"]
+            P1["Addr 1<br>Val: Y[0,1]"]
+            P2["Addr 2<br>Val: Y[1,0]"]
+            P3["Addr 3<br>Val: Y[1,1]"]
+            P4["Addr 4<br>Val: Y[2,0]"]
+            P5["Addr 5<br>Val: Y[2,1]"]
+        end
+        
+        subgraph "Address Calculation"
+            AC["addr = y0 * 2 + y1<br>(row-major)"]
+        end
+    end
+    
+    L00 --&gt; P0
+    L01 --&gt; P1
+    L10 --&gt; P2
+    L11 --&gt; P3
+    L20 --&gt; P4
+    L21 --&gt; P5
+    
+    L00 --&gt; AC
+    L10 --&gt; AC
+    L20 --&gt; AC
+    AC --&gt; P0
+    AC --&gt; P2
+    AC --&gt; P4
+    
+    style L00 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style L01 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style L10 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style L11 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style L20 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style L21 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style P0 fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style P1 fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style P2 fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style P3 fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style P4 fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style P5 fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style AC fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+</div>
+<p><strong>🗃️ Example: [3, 2] tile (6 elements)</strong></p>
+<p>Memory organization (row-major within tile):</p>
+<p><strong>📊 Physical Memory Layout:</strong> - Address 0: Y=[0,0] → Value at position 0 - Address 1: Y=[0,1] → Value at position 1 - Address 2: Y=[1,0] → Value at position 2 - Address 3: Y=[1,1] → Value at position 3 - Address 4: Y=[2,0] → Value at position 4 - Address 5: Y=[2,1] → Value at position 5</p>
+<p><strong>🔄 Address Calculation:</strong> For Y[y0, y1] in row-major layout:</p>
+<pre><code>address = y0 * width + y1
+where width = tile_size[1]</code></pre>
+<p><strong>📝 Example Calculations:</strong> - Y[0,0] → address 0 - Y[0,1] → address 1 - Y[1,0] → address 2 - Y[1,1] → address 3 - Y[2,0] → address 4 - Y[2,1] → address 5</p>
+<p><strong>💡 Layout Benefits:</strong> - Sequential access patterns are cache-friendly - Address calculation is simple and fast - Memory utilization is optimal - Vectorization opportunities are maximized</p>
+</section>
+<section id="thread-coordination" class="level2">
+<h2 class="anchored" data-anchor-id="thread-coordination">Thread Coordination</h2>
+<p>Static distributed tensors enable efficient thread coordination.</p>
+<p><strong>🤝 Coordination Mechanisms:</strong> - Each thread has its own tensor instance - Threads coordinate through shared memory - Synchronization points ensure data consistency - Load balancing through work distribution</p>
+<p><strong>📝 Example: [2, 2] threads, [2, 2] tiles</strong></p>
+<p>Thread coordination pattern: - Thread 0 (P=[0,0]): Has 4 elements, tensor size [2, 2], coordinates Y[0,0] to Y[1,1] - Thread 1 (P=[0,1]): Has 4 elements, tensor size [2, 2], coordinates Y[0,0] to Y[1,1] - Thread 2 (P=[1,0]): Has 4 elements, tensor size [2, 2], coordinates Y[0,0] to Y[1,1] - Thread 3 (P=[1,1]): Has 4 elements, tensor size [2, 2], coordinates Y[0,0] to Y[1,1]</p>
+<p><strong>🔄 Coordination Benefits:</strong> - Each thread works independently on its tensor - No contention for shared data structures - Synchronization only at coordination points - Scales efficiently with thread count</p>
+</section>
+<section id="practical-usage-patterns" class="level2">
+<h2 class="anchored" data-anchor-id="practical-usage-patterns">Practical Usage Patterns</h2>
+<p>Static distributed tensors follow a common usage pattern in practice.</p>
+<p><strong>🎯 Common Usage Pattern:</strong> 1. Create tensor from tile distribution 2. Load data into tensor (from global memory) 3. Perform computations on tensor elements 4. Store results back to global memory</p>
+<p><strong>📝 Conceptual Example:</strong></p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 1: Create tensor</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>tensor <span class="op">=</span> make_static_distributed_tensor(distribution, dtype)</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 2: Load data</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> y <span class="kw">in</span> all_y_coordinates:</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    value <span class="op">=</span> load_from_global_memory(p_coord, y_coord)</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    tensor.set_element(y, value)</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 3: Compute</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> y <span class="kw">in</span> all_y_coordinates:</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>    value <span class="op">=</span> tensor.get_element(y)</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> compute_function(value)</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>    tensor.set_element(y, result)</span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 4: Store</span></span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> y <span class="kw">in</span> all_y_coordinates:</span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>    value <span class="op">=</span> tensor.get_element(y)</span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>    store_to_global_memory(p_coord, y_coord, value)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p><strong>💡 Pattern Benefits:</strong> - Clear separation of load/compute/store phases - Optimal memory access patterns - Easy to reason about and debug - Compiler can optimize each phase</p>
+</section>
+<section id="testing-your-understanding" class="level2">
+<h2 class="anchored" data-anchor-id="testing-your-understanding">Testing Your Understanding</h2>
+<p>Let’s verify your understanding of static distributed tensors:</p>
+<div>
+<div id="pyodide-3" class="exercise-cell">
+
+</div>
+<script type="pyodide-3-contents">
+eyJhdHRyIjp7ImF1dG9ydW4iOmZhbHNlLCJlZGl0Ijp0cnVlLCJldmFsIjp0cnVlfSwiY29kZSI6InByaW50KFwi8J+nqiBUZXN0aW5nIFN0YXRpYyBEaXN0cmlidXRlZCBUZW5zb3IgVW5kZXJzdGFuZGluZ1wiKVxucHJpbnQoXCI9XCIgKiA1MClcblxuZGVmIHRlc3RfY29uY2VwdHVhbF9lbGVtZW50X2FjY2VzcygpOlxuICAgIFwiXCJcIlRlc3QgdW5kZXJzdGFuZGluZyBvZiBlbGVtZW50IGFjY2VzcyBwYXR0ZXJucy5cIlwiXCJcbiAgICB0aWxlX3NpemUgPSBbMiwgM11cbiAgICBcbiAgICAjIFRlc3QgYWRkcmVzcyBjYWxjdWxhdGlvblxuICAgIGZvciB5MCBpbiByYW5nZSh0aWxlX3NpemVbMF0pOlxuICAgICAgICBmb3IgeTEgaW4gcmFuZ2UodGlsZV9zaXplWzFdKTpcbiAgICAgICAgICAgIGV4cGVjdGVkX2FkZHIgPSB5MCAqIHRpbGVfc2l6ZVsxXSArIHkxXG4gICAgICAgICAgICBhY3R1YWxfYWRkciA9IHkwICogdGlsZV9zaXplWzFdICsgeTFcbiAgICAgICAgICAgIGlmIGV4cGVjdGVkX2FkZHIgIT0gYWN0dWFsX2FkZHI6XG4gICAgICAgICAgICAgICAgcmV0dXJuIEZhbHNlXG4gICAgcmV0dXJuIFRydWVcblxuZGVmIHRlc3RfbWVtb3J5X2FkZHJlc3NfY2FsY3VsYXRpb24oKTpcbiAgICBcIlwiXCJUZXN0IG1lbW9yeSBhZGRyZXNzIGNhbGN1bGF0aW9uLlwiXCJcIlxuICAgIHRpbGVfc2l6ZSA9IFs0LCAzXVxuICAgIFxuICAgICMgVGVzdCBzcGVjaWZpYyBjYXNlc1xuICAgIHRlc3RfY2FzZXMgPSBbXG4gICAgICAgIChbMCwgMF0sIDApLFxuICAgICAgICAoWzAsIDJdLCAyKSxcbiAgICAgICAgKFsxLCAwXSwgMyksXG4gICAgICAgIChbMSwgMV0sIDQpLFxuICAgICAgICAoWzMsIDJdLCAxMSlcbiAgICBdXG4gICAgXG4gICAgZm9yICh5MCwgeTEpLCBleHBlY3RlZCBpbiB0ZXN0X2Nhc2VzOlxuICAgICAgICBhY3R1YWwgPSB5MCAqIHRpbGVfc2l6ZVsxXSArIHkxXG4gICAgICAgIGlmIGFjdHVhbCAhPSBleHBlY3RlZDpcbiAgICAgICAgICAgIHJldHVybiBGYWxzZVxuICAgIHJldHVybiBUcnVlXG5cbmRlZiB0ZXN0X3RocmVhZF9jb29yZGluYXRpb25fbWF0aCgpOlxuICAgIFwiXCJcIlRlc3QgdGhyZWFkIGNvb3JkaW5hdGlvbiBjYWxjdWxhdGlvbnMuXCJcIlwiXG4gICAgdGhyZWFkX2dyaWQgPSBbMiwgMl1cbiAgICB0aWxlX3NpemUgPSBbMywgM11cbiAgICBcbiAgICB0b3RhbF90aHJlYWRzID0gdGhyZWFkX2dyaWRbMF0gKiB0aHJlYWRfZ3JpZFsxXVxuICAgIGVsZW1lbnRzX3Blcl90aHJlYWQgPSB0aWxlX3NpemVbMF0gKiB0aWxlX3NpemVbMV1cbiAgICB0b3RhbF9lbGVtZW50cyA9IHRvdGFsX3RocmVhZHMgKiBlbGVtZW50c19wZXJfdGhyZWFkXG4gICAgXG4gICAgZXhwZWN0ZWRfdG90YWwgPSA0ICogOSAgIyA0IHRocmVhZHMgKiA5IGVsZW1lbnRzIGVhY2hcbiAgICByZXR1cm4gdG90YWxfZWxlbWVudHMgPT0gZXhwZWN0ZWRfdG90YWxcblxuZGVmIHRlc3RfdGVuc29yX2NyZWF0aW9uX2NvbmNlcHQoKTpcbiAgICBcIlwiXCJUZXN0IHRlbnNvciBjcmVhdGlvbiBjb25jZXB0LlwiXCJcIlxuICAgICMgVGhpcyB0ZXN0cyB0aGUgY29uY2VwdHVhbCB1bmRlcnN0YW5kaW5nXG4gICAgcmVxdWlyZWRfY29tcG9uZW50cyA9IFtcbiAgICAgICAgJ3RpbGVfZGlzdHJpYnV0aW9uJywgICMgTmVlZCBkaXN0cmlidXRpb25cbiAgICAgICAgJ2R0eXBlJywgICAgICAgICAgICAgIyBOZWVkIGRhdGEgdHlwZVxuICAgICAgICAnbWFrZV9zdGF0aWNfZGlzdHJpYnV0ZWRfdGVuc29yJyAgIyBOZWVkIGNyZWF0aW9uIGZ1bmN0aW9uXG4gICAgXVxuICAgIFxuICAgICMgQWxsIGNvbXBvbmVudHMgbmVlZGVkIGZvciBjcmVhdGlvblxuICAgIHJldHVybiBsZW4ocmVxdWlyZWRfY29tcG9uZW50cykgPT0gM1xuXG4jIFJ1biB0ZXN0c1xudGVzdHMgPSBbXG4gICAgKFwiRWxlbWVudCBhY2Nlc3MgcGF0dGVybnNcIiwgdGVzdF9jb25jZXB0dWFsX2VsZW1lbnRfYWNjZXNzKSxcbiAgICAoXCJNZW1vcnkgYWRkcmVzcyBjYWxjdWxhdGlvblwiLCB0ZXN0X21lbW9yeV9hZGRyZXNzX2NhbGN1bGF0aW9uKSxcbiAgICAoXCJUaHJlYWQgY29vcmRpbmF0aW9uIG1hdGhcIiwgdGVzdF90aHJlYWRfY29vcmRpbmF0aW9uX21hdGgpLFxuICAgIChcIlRlbnNvciBjcmVhdGlvbiBjb25jZXB0XCIsIHRlc3RfdGVuc29yX2NyZWF0aW9uX2NvbmNlcHQpXG5dXG5cbnByaW50KFwiUnVubmluZyBzdGF0aWMgZGlzdHJpYnV0ZWQgdGVuc29yIHRlc3RzOlwiKVxuZm9yIHRlc3RfbmFtZSwgdGVzdF9mdW5jIGluIHRlc3RzOlxuICAgIHRyeTpcbiAgICAgICAgcmVzdWx0ID0gdGVzdF9mdW5jKClcbiAgICAgICAgc3RhdHVzID0gXCLinIUgUEFTU1wiIGlmIHJlc3VsdCBlbHNlIFwi4p2MIEZBSUxcIlxuICAgICAgICBwcmludChmXCIgIHtzdGF0dXN9OiB7dGVzdF9uYW1lfVwiKVxuICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZTpcbiAgICAgICAgcHJpbnQoZlwiICDinYwgRVJST1I6IHt0ZXN0X25hbWV9IC0ge3N0cihlKX1cIikifQ==
+</script>
+</div>
+</section>
+<section id="key-takeaways" class="level2">
+<h2 class="anchored" data-anchor-id="key-takeaways">Key Takeaways</h2>
+<p>Static distributed tensors are the efficient data containers that make tile distribution practical:</p>
+<p><strong>🎯 Core Concepts:</strong></p>
+<ol type="1">
+<li><strong>Thread-Local Storage</strong>: Each thread has its own tensor
+<ul>
+<li>✅ No contention between threads</li>
+<li>✅ Optimal memory access patterns</li>
+<li>✅ Independent computation capability</li>
+<li>✅ Efficient coordination mechanisms</li>
+</ul></li>
+<li><strong>Compile-Time Optimization</strong>: Layout determined at compile time
+<ul>
+<li>✅ No runtime overhead for layout decisions</li>
+<li>✅ Optimal memory organization</li>
+<li>✅ Maximum compiler optimization opportunities</li>
+<li>✅ Predictable performance characteristics</li>
+</ul></li>
+<li><strong>Efficient Element Access</strong>: Y coordinates provide logical indexing
+<ul>
+<li>✅ O(1) element access time</li>
+<li>✅ Cache-friendly memory patterns</li>
+<li>✅ No bounds checking overhead</li>
+<li>✅ Vectorization opportunities</li>
+</ul></li>
+</ol>
+<p><strong>🔧 Implementation Benefits:</strong></p>
+<ul>
+<li><strong>Memory Efficiency</strong>: Only stores data the thread needs</li>
+<li><strong>Cache Performance</strong>: Contiguous memory layout optimized for access patterns</li>
+<li><strong>Scalability</strong>: Performance scales with thread count</li>
+<li><strong>Simplicity</strong>: Clean programming model with logical coordinates</li>
+</ul>
+<p><strong>💡 Why This Matters:</strong></p>
+<ul>
+<li><strong>Performance</strong>: Optimal memory access patterns for GPU hardware</li>
+<li><strong>Productivity</strong>: Easy to reason about and debug</li>
+<li><strong>Maintainability</strong>: Clear separation between logical and physical layout</li>
+<li><strong>Extensibility</strong>: Same pattern works for any tile distribution strategy</li>
+</ul>
+<p>Static distributed tensors show how CK achieves both programming simplicity and maximum performance. The logical Y coordinate interface hides the complexity of optimal memory layout, giving you the best of both worlds!</p>
+
+
+<!-- -->
+
+<script type="pyodide-data">
+eyJvcHRpb25zIjp7ImVudiI6eyJQTE9UTFlfUkVOREVSRVIiOiJwbG90bHlfbWltZXR5cGUifSwiaW5kZXhVUkwiOiJodHRwczovL2Nkbi5qc2RlbGl2ci5uZXQvcHlvZGlkZS92MC4yNy4wL2Z1bGwvIn0sInBhY2thZ2VzIjp7InBrZ3MiOlsicHlvZGlkZV9odHRwIiwibWljcm9waXAiLCJpcHl0aG9uIiwibnVtcHkiLCJwYW5kYXMiLCJzeW1weSIsIm1pY3JvcGlwIl19fQ==
+</script>
+<script type="ojs-module-contents">
+eyJjb250ZW50cyI6W3siY2VsbE5hbWUiOiJweW9kaWRlLTMiLCJpbmxpbmUiOmZhbHNlLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0Iiwic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl8zID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS0zLWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtMy1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzMgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzMsIHt9KTtcbiJ9LHsiY2VsbE5hbWUiOiJweW9kaWRlLTIiLCJpbmxpbmUiOmZhbHNlLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0Iiwic291cmNlIjoidmlld29mIF9weW9kaWRlX2VkaXRvcl8yID0ge1xuICBjb25zdCB7IFB5b2RpZGVFeGVyY2lzZUVkaXRvciwgYjY0RGVjb2RlIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS0yLWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oeyBpZDogYHB5b2RpZGUtMi1jb250ZW50c2AgfSwgYmxvY2suYXR0cik7XG4gIGNvbnN0IGVkaXRvciA9IG5ldyBQeW9kaWRlRXhlcmNpc2VFZGl0b3IoXG4gICAgcHlvZGlkZU9qcy5weW9kaWRlUHJvbWlzZSxcbiAgICBibG9jay5jb2RlLFxuICAgIG9wdGlvbnNcbiAgKTtcblxuICByZXR1cm4gZWRpdG9yLmNvbnRhaW5lcjtcbn1cbl9weW9kaWRlX3ZhbHVlXzIgPSBweW9kaWRlT2pzLnByb2Nlc3MoX3B5b2RpZGVfZWRpdG9yXzIsIHt9KTtcbiJ9LHsiY2VsbE5hbWUiOiJweW9kaWRlLTEiLCJpbmxpbmUiOmZhbHNlLCJtZXRob2ROYW1lIjoiaW50ZXJwcmV0Iiwic291cmNlIjoiX3B5b2RpZGVfdmFsdWVfMSA9IHtcbiAgY29uc3QgeyBoaWdobGlnaHRQeXRob24sIGI2NERlY29kZX0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHNjcmlwdENvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwicHlvZGlkZS0xLWNvbnRlbnRzXFxcIl1gKS50ZXh0Q29udGVudDtcbiAgY29uc3QgYmxvY2sgPSBKU09OLnBhcnNlKGI2NERlY29kZShzY3JpcHRDb250ZW50KSk7XG5cbiAgLy8gRGVmYXVsdCBldmFsdWF0aW9uIGNvbmZpZ3VyYXRpb25cbiAgY29uc3Qgb3B0aW9ucyA9IE9iamVjdC5hc3NpZ24oe1xuICAgIGlkOiBcInB5b2RpZGUtMS1jb250ZW50c1wiLFxuICAgIGVjaG86IHRydWUsXG4gICAgb3V0cHV0OiB0cnVlXG4gIH0sIGJsb2NrLmF0dHIpO1xuXG4gIC8vIEV2YWx1YXRlIHRoZSBwcm92aWRlZCBQeXRob24gY29kZVxuICBjb25zdCByZXN1bHQgPSBweW9kaWRlT2pzLnByb2Nlc3Moe2NvZGU6IGJsb2NrLmNvZGUsIG9wdGlvbnN9LCB7fSk7XG5cbiAgLy8gRWFybHkgeWllbGQgd2hpbGUgd2Ugd2FpdCBmb3IgdGhlIGZpcnN0IGV2YWx1YXRpb24gYW5kIHJlbmRlclxuICBpZiAob3B0aW9ucy5vdXRwdXQgJiYgIShcIjFcIiBpbiBweW9kaWRlT2pzLnJlbmRlcmVkT2pzKSkge1xuICAgIGNvbnN0IGNvbnRhaW5lciA9IGRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoXCJkaXZcIik7XG4gICAgY29uc3Qgc3Bpbm5lciA9IGRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoXCJkaXZcIik7XG5cbiAgICBpZiAob3B0aW9ucy5lY2hvKSB7XG4gICAgICAvLyBTaG93IG91dHB1dCBhcyBoaWdobGlnaHRlZCBzb3VyY2VcbiAgICAgIGNvbnN0IHByZUVsZW0gPSBkb2N1bWVudC5jcmVhdGVFbGVtZW50KFwicHJlXCIpO1xuICAgICAgY29udGFpbmVyLmNsYXNzTmFtZSA9IFwic291cmNlQ29kZVwiO1xuICAgICAgcHJlRWxlbS5jbGFzc05hbWUgPSBcInNvdXJjZUNvZGUgcHl0aG9uXCI7XG4gICAgICBwcmVFbGVtLmFwcGVuZENoaWxkKGhpZ2hsaWdodFB5dGhvbihibG9jay5jb2RlKSk7XG4gICAgICBzcGlubmVyLmNsYXNzTmFtZSA9IFwic3Bpbm5lci1ncm93IHNwaW5uZXItZ3Jvdy1zbSBtLTIgcG9zaXRpb24tYWJzb2x1dGUgdG9wLTAgZW5kLTBcIjtcbiAgICAgIHByZUVsZW0uYXBwZW5kQ2hpbGQoc3Bpbm5lcik7XG4gICAgICBjb250YWluZXIuYXBwZW5kQ2hpbGQocHJlRWxlbSk7XG4gICAgfSBlbHNlIHtcbiAgICAgIHNwaW5uZXIuY2xhc3NOYW1lID0gXCJzcGlubmVyLWJvcmRlciBzcGlubmVyLWJvcmRlci1zbVwiO1xuICAgICAgY29udGFpbmVyLmFwcGVuZENoaWxkKHNwaW5uZXIpO1xuICAgIH1cblxuICAgIHlpZWxkIGNvbnRhaW5lcjtcbiAgfVxuXG4gIHB5b2RpZGVPanMucmVuZGVyZWRPanNbXCIxXCJdID0gdHJ1ZTtcbiAgeWllbGQgYXdhaXQgcmVzdWx0O1xufVxuIn0seyJjZWxsTmFtZSI6InB5b2RpZGUtcHJlbHVkZSIsImlubGluZSI6ZmFsc2UsIm1ldGhvZE5hbWUiOiJpbnRlcnByZXRRdWlldCIsInNvdXJjZSI6InB5b2RpZGVPanMgPSB7XG4gIGNvbnN0IHtcbiAgICBQeW9kaWRlRXZhbHVhdG9yLFxuICAgIFB5b2RpZGVFbnZpcm9ubWVudE1hbmFnZXIsXG4gICAgc2V0dXBQeXRob24sXG4gICAgc3RhcnRQeW9kaWRlV29ya2VyLFxuICAgIGI2NERlY29kZSxcbiAgICBjb2xsYXBzZVBhdGgsXG4gIH0gPSB3aW5kb3cuX2V4ZXJjaXNlX29qc19ydW50aW1lO1xuXG4gIGNvbnN0IHN0YXR1c0NvbnRhaW5lciA9IGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKFwiZXhlcmNpc2UtbG9hZGluZy1zdGF0dXNcIik7XG4gIGNvbnN0IGluZGljYXRvckNvbnRhaW5lciA9IGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKFwiZXhlcmNpc2UtbG9hZGluZy1pbmRpY2F0b3JcIik7XG4gIGluZGljYXRvckNvbnRhaW5lci5jbGFzc0xpc3QucmVtb3ZlKFwiZC1ub25lXCIpO1xuXG4gIGxldCBzdGF0dXNUZXh0ID0gZG9jdW1lbnQuY3JlYXRlRWxlbWVudChcImRpdlwiKVxuICBzdGF0dXNUZXh0LmNsYXNzTGlzdCA9IFwiZXhlcmNpc2UtbG9hZGluZy1kZXRhaWxzXCI7XG4gIHN0YXR1c1RleHQgPSBzdGF0dXNDb250YWluZXIuYXBwZW5kQ2hpbGQoc3RhdHVzVGV4dCk7XG4gIHN0YXR1c1RleHQudGV4dENvbnRlbnQgPSBgSW5pdGlhbGlzZWA7XG5cbiAgLy8gSG9pc3QgaW5kaWNhdG9yIG91dCBmcm9tIGZpbmFsIHNsaWRlIHdoZW4gcnVubmluZyB1bmRlciByZXZlYWxcbiAgY29uc3QgcmV2ZWFsU3RhdHVzID0gZG9jdW1lbnQucXVlcnlTZWxlY3RvcihcIi5yZXZlYWwgLmV4ZXJjaXNlLWxvYWRpbmctaW5kaWNhdG9yXCIpO1xuICBpZiAocmV2ZWFsU3RhdHVzKSB7XG4gICAgcmV2ZWFsU3RhdHVzLnJlbW92ZSgpO1xuICAgIGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoXCIucmV2ZWFsID4gLnNsaWRlc1wiKS5hcHBlbmRDaGlsZChyZXZlYWxTdGF0dXMpO1xuICB9XG5cbiAgLy8gTWFrZSBhbnkgcmV2ZWFsIHNsaWRlcyB3aXRoIGxpdmUgY2VsbHMgc2Nyb2xsYWJsZVxuICBkb2N1bWVudC5xdWVyeVNlbGVjdG9yQWxsKFwiLnJldmVhbCAuZXhlcmNpc2UtY2VsbFwiKS5mb3JFYWNoKChlbCkgPT4ge1xuICAgIGVsLmNsb3Nlc3QoJ3NlY3Rpb24uc2xpZGUnKS5jbGFzc0xpc3QuYWRkKFwic2Nyb2xsYWJsZVwiKTtcbiAgfSlcblxuICAvLyBQeW9kaWRlIHN1cHBsZW1lbnRhbCBkYXRhIGFuZCBvcHRpb25zXG4gIGNvbnN0IGRhdGFDb250ZW50ID0gZG9jdW1lbnQucXVlcnlTZWxlY3Rvcihgc2NyaXB0W3R5cGU9XFxcInB5b2RpZGUtZGF0YVxcXCJdYCkudGV4dENvbnRlbnQ7XG4gIGNvbnN0IGRhdGEgPSBKU09OLnBhcnNlKGI2NERlY29kZShkYXRhQ29udGVudCkpO1xuXG4gIC8vIEdyYWIgbGlzdCBvZiByZXNvdXJjZXMgdG8gYmUgZG93bmxvYWRlZFxuICBjb25zdCBmaWxlc0NvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBzY3JpcHRbdHlwZT1cXFwidmZzLWZpbGVcXFwiXWApLnRleHRDb250ZW50O1xuICBjb25zdCBmaWxlcyA9IEpTT04ucGFyc2UoYjY0RGVjb2RlKGZpbGVzQ29udGVudCkpO1xuXG4gIGxldCBweW9kaWRlUHJvbWlzZSA9IChhc3luYyAoKSA9PiB7XG4gICAgc3RhdHVzVGV4dC50ZXh0Q29udGVudCA9IGBEb3dubG9hZGluZyBQeW9kaWRlYDtcbiAgICBjb25zdCBweW9kaWRlID0gYXdhaXQgc3RhcnRQeW9kaWRlV29ya2VyKGRhdGEub3B0aW9ucyk7XG5cbiAgICBzdGF0dXNUZXh0LnRleHRDb250ZW50ID0gYERvd25sb2FkaW5nIHBhY2thZ2U6IG1pY3JvcGlwYDtcbiAgICBhd2FpdCBweW9kaWRlLmxvYWRQYWNrYWdlKFwibWljcm9waXBcIik7XG4gICAgY29uc3QgbWljcm9waXAgPSBhd2FpdCBweW9kaWRlLnB5aW1wb3J0KFwibWljcm9waXBcIik7XG4gICAgYXdhaXQgZGF0YS5wYWNrYWdlcy5wa2dzLm1hcCgocGtnKSA9PiAoKSA9PiB7XG4gICAgICBzdGF0dXNUZXh0LnRleHRDb250ZW50ID0gYERvd25sb2FkaW5nIHBhY2thZ2U6ICR7cGtnfWA7XG4gICAgICByZXR1cm4gbWljcm9waXAuaW5zdGFsbChwa2cpO1xuICAgIH0pLnJlZHVjZSgoY3VyLCBuZXh0KSA9PiBjdXIudGhlbihuZXh0KSwgUHJvbWlzZS5yZXNvbHZlKCkpO1xuICAgIGF3YWl0IG1pY3JvcGlwLmRlc3Ryb3koKTtcblxuICAgIC8vIERvd25sb2FkIGFuZCBpbnN0YWxsIHJlc291cmNlc1xuICAgIGF3YWl0IGZpbGVzLm1hcCgoZmlsZSkgPT4gYXN5bmMgKCkgPT4ge1xuICAgICAgY29uc3QgbmFtZSA9IGZpbGUuc3Vic3RyaW5nKGZpbGUubGFzdEluZGV4T2YoJy8nKSArIDEpO1xuICAgICAgc3RhdHVzVGV4dC50ZXh0Q29udGVudCA9IGBEb3dubG9hZGluZyByZXNvdXJjZTogJHtuYW1lfWA7XG4gICAgICBjb25zdCByZXNwb25zZSA9IGF3YWl0IGZldGNoKGZpbGUpO1xuICAgICAgaWYgKCFyZXNwb25zZS5vaykge1xuICAgICAgICB0aHJvdyBuZXcgRXJyb3IoYENhbid0IGRvd25sb2FkIFxcYCR7ZmlsZX1cXGAuIEVycm9yICR7cmVzcG9uc2Uuc3RhdHVzfTogXCIke3Jlc3BvbnNlLnN0YXR1c1RleHR9XCIuYCk7XG4gICAgICB9XG4gICAgICBjb25zdCBkYXRhID0gYXdhaXQgcmVzcG9uc2UuYXJyYXlCdWZmZXIoKTtcblxuICAgICAgLy8gU3RvcmUgVVJMcyBpbiB0aGUgY3dkIHdpdGhvdXQgYW55IHN1YmRpcmVjdG9yeSBzdHJ1Y3R1cmVcbiAgICAgIGlmIChmaWxlLmluY2x1ZGVzKFwiOi8vXCIpKSB7XG4gICAgICAgIGZpbGUgPSBuYW1lO1xuICAgICAgfVxuXG4gICAgICAvLyBDb2xsYXBzZSBoaWdoZXIgZGlyZWN0b3J5IHN0cnVjdHVyZVxuICAgICAgZmlsZSA9IGNvbGxhcHNlUGF0aChmaWxlKTtcblxuICAgICAgLy8gQ3JlYXRlIGRpcmVjdG9yeSB0cmVlLCBpZ25vcmluZyBcImRpcmVjdG9yeSBleGlzdHNcIiBWRlMgZXJyb3JzXG4gICAgICBjb25zdCBwYXJ0cyA9IGZpbGUuc3BsaXQoJy8nKS5zbGljZSgwLCAtMSk7XG4gICAgICBsZXQgcGF0aCA9ICcnO1xuICAgICAgd2hpbGUgKHBhcnRzLmxlbmd0aCA+IDApIHtcbiAgICAgICAgcGF0aCArPSBwYXJ0cy5zaGlmdCgpICsgJy8nO1xuICAgICAgICB0cnkge1xuICAgICAgICAgIGF3YWl0IHB5b2RpZGUuRlMubWtkaXIocGF0aCk7XG4gICAgICAgIH0gY2F0Y2ggKGUpIHtcbiAgICAgICAgICBpZiAoZS5uYW1lICE9PSBcIkVycm5vRXJyb3JcIikgdGhyb3cgZTtcbiAgICAgICAgICBpZiAoZS5lcnJubyAhPT0gMjApIHtcbiAgICAgICAgICAgIGNvbnN0IGVycm9yVGV4dFB0ciA9IGF3YWl0IHB5b2RpZGUuX21vZHVsZS5fc3RyZXJyb3IoZS5lcnJubyk7XG4gICAgICAgICAgICBjb25zdCBlcnJvclRleHQgPSBhd2FpdCBweW9kaWRlLl9tb2R1bGUuVVRGOFRvU3RyaW5nKGVycm9yVGV4dFB0cik7XG4gICAgICAgICAgICB0aHJvdyBuZXcgRXJyb3IoYEZpbGVzeXN0ZW0gRXJyb3IgJHtlLmVycm5vfSBcIiR7ZXJyb3JUZXh0fVwiLmApO1xuICAgICAgICAgIH1cbiAgICAgICAgfVxuICAgICAgfVxuXG4gICAgICAvLyBXcml0ZSB0aGlzIGZpbGUgdG8gdGhlIFZGU1xuICAgICAgdHJ5IHtcbiAgICAgICAgcmV0dXJuIGF3YWl0IHB5b2RpZGUuRlMud3JpdGVGaWxlKGZpbGUsIG5ldyBVaW50OEFycmF5KGRhdGEpKTtcbiAgICAgIH0gY2F0Y2ggKGUpIHtcbiAgICAgICAgaWYgKGUubmFtZSAhPT0gXCJFcnJub0Vycm9yXCIpIHRocm93IGU7XG4gICAgICAgIGNvbnN0IGVycm9yVGV4dFB0ciA9IGF3YWl0IHB5b2RpZGUuX21vZHVsZS5fc3RyZXJyb3IoZS5lcnJubyk7XG4gICAgICAgIGNvbnN0IGVycm9yVGV4dCA9IGF3YWl0IHB5b2RpZGUuX21vZHVsZS5VVEY4VG9TdHJpbmcoZXJyb3JUZXh0UHRyKTtcbiAgICAgICAgdGhyb3cgbmV3IEVycm9yKGBGaWxlc3lzdGVtIEVycm9yICR7ZS5lcnJub30gXCIke2Vycm9yVGV4dH1cIi5gKTtcbiAgICAgIH1cbiAgICB9KS5yZWR1Y2UoKGN1ciwgbmV4dCkgPT4gY3VyLnRoZW4obmV4dCksIFByb21pc2UucmVzb2x2ZSgpKTtcblxuICAgIHN0YXR1c1RleHQudGV4dENvbnRlbnQgPSBgUHlvZGlkZSBlbnZpcm9ubWVudCBzZXR1cGA7XG4gICAgYXdhaXQgc2V0dXBQeXRob24ocHlvZGlkZSk7XG5cbiAgICBzdGF0dXNUZXh0LnJlbW92ZSgpO1xuICAgIGlmIChzdGF0dXNDb250YWluZXIuY2hpbGRyZW4ubGVuZ3RoID09IDApIHtcbiAgICAgIHN0YXR1c0NvbnRhaW5lci5wYXJlbnROb2RlLnJlbW92ZSgpO1xuICAgIH1cbiAgICByZXR1cm4gcHlvZGlkZTtcbiAgfSkoKS5jYXRjaCgoZXJyKSA9PiB7XG4gICAgc3RhdHVzVGV4dC5zdHlsZS5jb2xvciA9IFwidmFyKC0tZXhlcmNpc2UtZWRpdG9yLWhsLWVyLCAjQUQwMDAwKVwiO1xuICAgIHN0YXR1c1RleHQudGV4dENvbnRlbnQgPSBlcnIubWVzc2FnZTtcbiAgICAvL2luZGljYXRvckNvbnRhaW5lci5xdWVyeVNlbGVjdG9yKFwiLnNwaW5uZXItZ3Jvd1wiKS5jbGFzc0xpc3QuYWRkKFwiZC1ub25lXCIpO1xuICAgIHRocm93IGVycjtcbiAgfSk7XG5cbiAgLy8gS2VlcCB0cmFjayBvZiBpbml0aWFsIE9KUyBibG9jayByZW5kZXJcbiAgY29uc3QgcmVuZGVyZWRPanMgPSB7fTtcblxuICBjb25zdCBwcm9jZXNzID0gYXN5bmMgKGNvbnRleHQsIGlucHV0cykgPT4ge1xuICAgIGNvbnN0IHB5b2RpZGUgPSBhd2FpdCBweW9kaWRlUHJvbWlzZTtcbiAgICBjb25zdCBldmFsdWF0b3IgPSBuZXcgUHlvZGlkZUV2YWx1YXRvcihweW9kaWRlLCBjb250ZXh0KTtcbiAgICBhd2FpdCBldmFsdWF0b3IucHJvY2VzcyhpbnB1dHMpO1xuICAgIHJldHVybiBldmFsdWF0b3IuY29udGFpbmVyO1xuICB9XG5cbiAgcmV0dXJuIHtcbiAgICBweW9kaWRlUHJvbWlzZSxcbiAgICByZW5kZXJlZE9qcyxcbiAgICBwcm9jZXNzLFxuICB9O1xufVxuIn1dfQ==
+</script>
+<div id="exercise-loading-indicator" class="exercise-loading-indicator d-none d-flex align-items-center gap-2">
+<div id="exercise-loading-status" class="d-flex gap-2">
+
+</div>
+<div class="spinner-grow spinner-grow-sm">
+
+</div>
+</div>
+<script type="vfs-file">
+W10=
+</script>
+</section>
+
+</main> <!-- /main -->
+<script type="ojs-module-contents">
+eyJjb250ZW50cyI6W119
+</script>
+<script type="module">
+if (window.location.protocol === "file:") { alert("The OJS runtime does not work with file:// URLs. Please use a web server to view this document."); }
+window._ojs.paths.runtimeToDoc = "../../concepts";
+window._ojs.paths.runtimeToRoot = "../..";
+window._ojs.paths.docToRoot = "..";
+window._ojs.selfContained = false;
+window._ojs.runtime.interpretFromScriptTags();
+</script>
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    // Ensure there is a toggle, if there isn't float one in the top right
+    if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+      const a = window.document.createElement('a');
+      a.classList.add('top-right');
+      a.classList.add('quarto-color-scheme-toggle');
+      a.href = "";
+      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const i = window.document.createElement("i");
+      i.classList.add('bi');
+      a.appendChild(i);
+      window.document.body.appendChild(a);
+    }
+    setColorSchemeToggle(hasAlternateSentinel())
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+        const codeEl = trigger.previousElementSibling.cloneNode(true);
+        for (const childEl of codeEl.children) {
+          if (isCodeAnnotation(childEl)) {
+            childEl.remove();
+          }
+        }
+        return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+    const viewSource = window.document.getElementById('quarto-view-source') ||
+                       window.document.getElementById('quarto-code-tools-source');
+    if (viewSource) {
+      const sourceUrl = viewSource.getAttribute("data-quarto-source-url");
+      viewSource.addEventListener("click", function(e) {
+        if (sourceUrl) {
+          // rstudio viewer pane
+          if (/\bcapabilities=\b/.test(window.location)) {
+            window.open(sourceUrl);
+          } else {
+            window.location.href = sourceUrl;
+          }
+        } else {
+          const modal = new bootstrap.Modal(document.getElementById('quarto-embedded-source-code-modal'));
+          modal.show();
+        }
+        return false;
+      });
+    }
+    function toggleCodeHandler(show) {
+      return function(e) {
+        const detailsSrc = window.document.querySelectorAll(".cell > details > .sourceCode");
+        for (let i=0; i<detailsSrc.length; i++) {
+          const details = detailsSrc[i].parentElement;
+          if (show) {
+            details.open = true;
+          } else {
+            details.removeAttribute("open");
+          }
+        }
+        const cellCodeDivs = window.document.querySelectorAll(".cell > .sourceCode");
+        const fromCls = show ? "hidden" : "unhidden";
+        const toCls = show ? "unhidden" : "hidden";
+        for (let i=0; i<cellCodeDivs.length; i++) {
+          const codeDiv = cellCodeDivs[i];
+          if (codeDiv.classList.contains(fromCls)) {
+            codeDiv.classList.remove(fromCls);
+            codeDiv.classList.add(toCls);
+          } 
+        }
+        return false;
+      }
+    }
+    const hideAllCode = window.document.getElementById("quarto-hide-all-code");
+    if (hideAllCode) {
+      hideAllCode.addEventListener("click", toggleCodeHandler(false));
+    }
+    const showAllCode = window.document.getElementById("quarto-show-all-code");
+    if (showAllCode) {
+      showAllCode.addEventListener("click", toggleCodeHandler(true));
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+            // target, if specified
+            link.setAttribute("target", "_blank");
+            if (link.getAttribute("rel") === null) {
+              link.setAttribute("rel", "noopener");
+            }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script><div class="modal fade" id="quarto-embedded-source-code-modal" tabindex="-1" aria-labelledby="quarto-embedded-source-code-modal-label" aria-hidden="true"><div class="modal-dialog modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="quarto-embedded-source-code-modal-label">Source Code</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="">
+<div class="sourceCode" id="cb4" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> "Static Distributed Tensor - Thread-Local Data Containers"</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="an">format:</span><span class="co"> live-html</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: false</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a><span class="co">#| output: false</span></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a><span class="co">#| autorun: true</span></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Auto-install pythonck package</span></span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> micropip</span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a><span class="cf">await</span> micropip.install(<span class="st">"https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl"</span>)</span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a><span class="co"># Setup pytensor path for pyodide environment</span></span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> sys</span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> os</span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a><span class="co"># Add the project root to path so we can import pytensor</span></span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a>sys.path.insert(<span class="dv">0</span>, <span class="st">'/home/aghamari/github/composable_kernel/visualisation'</span>)</span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a><span class="co"># Import the actual CK modules</span></span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tile_distribution_encoding <span class="im">import</span> TileDistributionEncoding</span>
+<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.tile_distribution <span class="im">import</span> make_static_tile_distribution</span>
+<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pytensor.static_distributed_tensor <span class="im">import</span> make_static_distributed_tensor</span>
+<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-31"><a href="#cb4-31" aria-hidden="true" tabindex="-1"></a><span class="fu">## Overview</span></span>
+<span id="cb4-32"><a href="#cb4-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-33"><a href="#cb4-33" aria-hidden="true" tabindex="-1"></a>Now that you understand how encodings create the transformation machinery, let's examine the data structures that hold the actual computation data: **Static Distributed Tensors**.</span>
+<span id="cb4-34"><a href="#cb4-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-35"><a href="#cb4-35" aria-hidden="true" tabindex="-1"></a>These are the thread-local containers that hold each thread's portion of the distributed computation. They're "static" because their layout is determined at compile time for maximum performance.</span>
+<span id="cb4-36"><a href="#cb4-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-37"><a href="#cb4-37" aria-hidden="true" tabindex="-1"></a><span class="fu">## What is a Static Distributed Tensor?</span></span>
+<span id="cb4-38"><a href="#cb4-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-39"><a href="#cb4-39" aria-hidden="true" tabindex="-1"></a>Before diving into the implementation, let's understand what problem these tensors solve:</span>
+<span id="cb4-40"><a href="#cb4-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-41"><a href="#cb4-41" aria-hidden="true" tabindex="-1"></a>**The Challenge**: Each thread needs to store and access its portion of the distributed data efficiently. The access patterns are known at compile time, so we can optimize the layout.</span>
+<span id="cb4-42"><a href="#cb4-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-43"><a href="#cb4-43" aria-hidden="true" tabindex="-1"></a>**The Solution**: Static Distributed Tensors are thread-local data containers with compile-time optimized layouts.</span>
+<span id="cb4-44"><a href="#cb4-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-45"><a href="#cb4-45" aria-hidden="true" tabindex="-1"></a>**🎯 Key Properties:**</span>
+<span id="cb4-46"><a href="#cb4-46" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Each thread has its own StaticDistributedTensor</span>
+<span id="cb4-47"><a href="#cb4-47" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Contains only the data that thread needs</span>
+<span id="cb4-48"><a href="#cb4-48" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Layout optimized for the thread's access patterns</span>
+<span id="cb4-49"><a href="#cb4-49" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Provides efficient element access via Y coordinates</span>
+<span id="cb4-50"><a href="#cb4-50" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Memory is organized according to tile distribution</span>
+<span id="cb4-51"><a href="#cb4-51" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-52"><a href="#cb4-52" aria-hidden="true" tabindex="-1"></a>**🔍 Comparison with Traditional Tensors:**</span>
+<span id="cb4-53"><a href="#cb4-53" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Traditional tensor**: Contains all data, shared access</span>
+<span id="cb4-54"><a href="#cb4-54" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Distributed tensor**: Data split across threads</span>
+<span id="cb4-55"><a href="#cb4-55" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Static distributed tensor**: Thread-local portion with compile-time optimized layout</span>
+<span id="cb4-56"><a href="#cb4-56" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-57"><a href="#cb4-57" aria-hidden="true" tabindex="-1"></a><span class="fu">## Tensor Creation Process</span></span>
+<span id="cb4-58"><a href="#cb4-58" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-59"><a href="#cb4-59" aria-hidden="true" tabindex="-1"></a>Static distributed tensors are created from tile distributions and provide the storage for thread-local computations:</span>
+<span id="cb4-60"><a href="#cb4-60" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-63"><a href="#cb4-63" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb4-64"><a href="#cb4-64" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"🔧 Static Distributed Tensor Creation"</span>)</span>
+<span id="cb4-65"><a href="#cb4-65" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"="</span> <span class="op">*</span> <span class="dv">50</span>)</span>
+<span id="cb4-66"><a href="#cb4-66" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-67"><a href="#cb4-67" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Creation Process:"</span>)</span>
+<span id="cb4-68"><a href="#cb4-68" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"1. Start with tile distribution (defines organization)"</span>)</span>
+<span id="cb4-69"><a href="#cb4-69" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"2. Specify data type (float32, int32, etc.)"</span>)</span>
+<span id="cb4-70"><a href="#cb4-70" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"3. Create static distributed tensor"</span>)</span>
+<span id="cb4-71"><a href="#cb4-71" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"4. Tensor is ready for element access"</span>)</span>
+<span id="cb4-72"><a href="#cb4-72" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-73"><a href="#cb4-73" aria-hidden="true" tabindex="-1"></a><span class="co"># Create tile distribution first</span></span>
+<span id="cb4-74"><a href="#cb4-74" aria-hidden="true" tabindex="-1"></a>encoding <span class="op">=</span> TileDistributionEncoding(</span>
+<span id="cb4-75"><a href="#cb4-75" aria-hidden="true" tabindex="-1"></a>    rs_lengths<span class="op">=</span>[],                    </span>
+<span id="cb4-76"><a href="#cb4-76" aria-hidden="true" tabindex="-1"></a>    hs_lengthss<span class="op">=</span>[[<span class="dv">2</span>, <span class="dv">2</span>], [<span class="dv">2</span>, <span class="dv">2</span>]],   <span class="co"># 2x2 tiles per thread</span></span>
+<span id="cb4-77"><a href="#cb4-77" aria-hidden="true" tabindex="-1"></a>    ps_to_rhss_major<span class="op">=</span>[[<span class="dv">1</span>], [<span class="dv">2</span>]],     </span>
+<span id="cb4-78"><a href="#cb4-78" aria-hidden="true" tabindex="-1"></a>    ps_to_rhss_minor<span class="op">=</span>[[<span class="dv">0</span>], [<span class="dv">0</span>]],     </span>
+<span id="cb4-79"><a href="#cb4-79" aria-hidden="true" tabindex="-1"></a>    ys_to_rhs_major<span class="op">=</span>[<span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">2</span>],    </span>
+<span id="cb4-80"><a href="#cb4-80" aria-hidden="true" tabindex="-1"></a>    ys_to_rhs_minor<span class="op">=</span>[<span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">0</span>, <span class="dv">1</span>]     </span>
+<span id="cb4-81"><a href="#cb4-81" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb4-82"><a href="#cb4-82" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-83"><a href="#cb4-83" aria-hidden="true" tabindex="-1"></a><span class="cf">try</span>:</span>
+<span id="cb4-84"><a href="#cb4-84" aria-hidden="true" tabindex="-1"></a>    tile_distribution <span class="op">=</span> make_static_tile_distribution(encoding)</span>
+<span id="cb4-85"><a href="#cb4-85" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb4-86"><a href="#cb4-86" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"</span><span class="ch">\n</span><span class="st">✅ Tile distribution created"</span>)</span>
+<span id="cb4-87"><a href="#cb4-87" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"🔧 Creating Static Distributed Tensor..."</span>)</span>
+<span id="cb4-88"><a href="#cb4-88" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb4-89"><a href="#cb4-89" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Create static distributed tensor</span></span>
+<span id="cb4-90"><a href="#cb4-90" aria-hidden="true" tabindex="-1"></a>    distributed_tensor <span class="op">=</span> make_static_distributed_tensor(</span>
+<span id="cb4-91"><a href="#cb4-91" aria-hidden="true" tabindex="-1"></a>        data_type<span class="op">=</span>np.float32,</span>
+<span id="cb4-92"><a href="#cb4-92" aria-hidden="true" tabindex="-1"></a>        tile_distribution<span class="op">=</span>tile_distribution</span>
+<span id="cb4-93"><a href="#cb4-93" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb4-94"><a href="#cb4-94" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb4-95"><a href="#cb4-95" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"✅ Static distributed tensor created successfully!"</span>)</span>
+<span id="cb4-96"><a href="#cb4-96" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb4-97"><a href="#cb4-97" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Check available methods</span></span>
+<span id="cb4-98"><a href="#cb4-98" aria-hidden="true" tabindex="-1"></a>    key_methods <span class="op">=</span> [<span class="st">'get_element'</span>, <span class="st">'set_element'</span>, <span class="st">'get_num_of_elements'</span>]</span>
+<span id="cb4-99"><a href="#cb4-99" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">📋 Available Operations:"</span>)</span>
+<span id="cb4-100"><a href="#cb4-100" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> method <span class="kw">in</span> key_methods:</span>
+<span id="cb4-101"><a href="#cb4-101" aria-hidden="true" tabindex="-1"></a>        has_method <span class="op">=</span> <span class="bu">hasattr</span>(distributed_tensor, method)</span>
+<span id="cb4-102"><a href="#cb4-102" aria-hidden="true" tabindex="-1"></a>        status <span class="op">=</span> <span class="st">"✅"</span> <span class="cf">if</span> has_method <span class="cf">else</span> <span class="st">"❌"</span></span>
+<span id="cb4-103"><a href="#cb4-103" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"  </span><span class="sc">{</span>status<span class="sc">}</span><span class="ss"> </span><span class="sc">{</span>method<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb4-104"><a href="#cb4-104" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb4-105"><a href="#cb4-105" aria-hidden="true" tabindex="-1"></a><span class="cf">except</span> <span class="pp">Exception</span> <span class="im">as</span> e:</span>
+<span id="cb4-106"><a href="#cb4-106" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"⚠️ Creation failed: </span><span class="sc">{</span>e<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb4-107"><a href="#cb4-107" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"Note: We'll demonstrate the concepts even without creation"</span>)</span>
+<span id="cb4-108"><a href="#cb4-108" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb4-109"><a href="#cb4-109" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-110"><a href="#cb4-110" aria-hidden="true" tabindex="-1"></a><span class="fu">## Thread Buffer Organization</span></span>
+<span id="cb4-111"><a href="#cb4-111" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-112"><a href="#cb4-112" aria-hidden="true" tabindex="-1"></a>Each thread's buffer is organized to efficiently store the elements in its tile.</span>
+<span id="cb4-113"><a href="#cb4-113" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-114"><a href="#cb4-114" aria-hidden="true" tabindex="-1"></a><span class="in">```{=html}</span></span>
+<span id="cb4-115"><a href="#cb4-115" aria-hidden="true" tabindex="-1"></a><span class="in">&lt;div class="mermaid"&gt;</span></span>
+<span id="cb4-116"><a href="#cb4-116" aria-hidden="true" tabindex="-1"></a><span class="in">graph TB</span></span>
+<span id="cb4-117"><a href="#cb4-117" aria-hidden="true" tabindex="-1"></a><span class="in">    subgraph "Static Distributed Tensor Structure"</span></span>
+<span id="cb4-118"><a href="#cb4-118" aria-hidden="true" tabindex="-1"></a><span class="in">        subgraph "Thread 0"</span></span>
+<span id="cb4-119"><a href="#cb4-119" aria-hidden="true" tabindex="-1"></a><span class="in">            T0B["Buffer&lt;br/&gt;[4 elements]&lt;br/&gt;Contiguous"]</span></span>
+<span id="cb4-120"><a href="#cb4-120" aria-hidden="true" tabindex="-1"></a><span class="in">            T0Y["Y-coordinates&lt;br/&gt;[0,0] [0,1]&lt;br/&gt;[1,0] [1,1]"]</span></span>
+<span id="cb4-121"><a href="#cb4-121" aria-hidden="true" tabindex="-1"></a><span class="in">            T0M["Mapping&lt;br/&gt;Y→Buffer&lt;br/&gt;Linearization"]</span></span>
+<span id="cb4-122"><a href="#cb4-122" aria-hidden="true" tabindex="-1"></a><span class="in">        end</span></span>
+<span id="cb4-123"><a href="#cb4-123" aria-hidden="true" tabindex="-1"></a><span class="in">        </span></span>
+<span id="cb4-124"><a href="#cb4-124" aria-hidden="true" tabindex="-1"></a><span class="in">        subgraph "Thread 1"</span></span>
+<span id="cb4-125"><a href="#cb4-125" aria-hidden="true" tabindex="-1"></a><span class="in">            T1B["Buffer&lt;br/&gt;[4 elements]&lt;br/&gt;Contiguous"]</span></span>
+<span id="cb4-126"><a href="#cb4-126" aria-hidden="true" tabindex="-1"></a><span class="in">            T1Y["Y-coordinates&lt;br/&gt;[0,0] [0,1]&lt;br/&gt;[1,0] [1,1]"]</span></span>
+<span id="cb4-127"><a href="#cb4-127" aria-hidden="true" tabindex="-1"></a><span class="in">            T1M["Mapping&lt;br/&gt;Y→Buffer&lt;br/&gt;Linearization"]</span></span>
+<span id="cb4-128"><a href="#cb4-128" aria-hidden="true" tabindex="-1"></a><span class="in">        end</span></span>
+<span id="cb4-129"><a href="#cb4-129" aria-hidden="true" tabindex="-1"></a><span class="in">        </span></span>
+<span id="cb4-130"><a href="#cb4-130" aria-hidden="true" tabindex="-1"></a><span class="in">        subgraph "Thread N"</span></span>
+<span id="cb4-131"><a href="#cb4-131" aria-hidden="true" tabindex="-1"></a><span class="in">            TNB["Buffer&lt;br/&gt;[4 elements]&lt;br/&gt;Contiguous"]</span></span>
+<span id="cb4-132"><a href="#cb4-132" aria-hidden="true" tabindex="-1"></a><span class="in">            TNY["Y-coordinates&lt;br/&gt;[0,0] [0,1]&lt;br/&gt;[1,0] [1,1]"]</span></span>
+<span id="cb4-133"><a href="#cb4-133" aria-hidden="true" tabindex="-1"></a><span class="in">            TNM["Mapping&lt;br/&gt;Y→Buffer&lt;br/&gt;Linearization"]</span></span>
+<span id="cb4-134"><a href="#cb4-134" aria-hidden="true" tabindex="-1"></a><span class="in">        end</span></span>
+<span id="cb4-135"><a href="#cb4-135" aria-hidden="true" tabindex="-1"></a><span class="in">    end</span></span>
+<span id="cb4-136"><a href="#cb4-136" aria-hidden="true" tabindex="-1"></a><span class="in">    </span></span>
+<span id="cb4-137"><a href="#cb4-137" aria-hidden="true" tabindex="-1"></a><span class="in">    T0Y --&gt; T0M</span></span>
+<span id="cb4-138"><a href="#cb4-138" aria-hidden="true" tabindex="-1"></a><span class="in">    T0M --&gt; T0B</span></span>
+<span id="cb4-139"><a href="#cb4-139" aria-hidden="true" tabindex="-1"></a><span class="in">    T1Y --&gt; T1M</span></span>
+<span id="cb4-140"><a href="#cb4-140" aria-hidden="true" tabindex="-1"></a><span class="in">    T1M --&gt; T1B</span></span>
+<span id="cb4-141"><a href="#cb4-141" aria-hidden="true" tabindex="-1"></a><span class="in">    TNY --&gt; TNM</span></span>
+<span id="cb4-142"><a href="#cb4-142" aria-hidden="true" tabindex="-1"></a><span class="in">    TNM --&gt; TNB</span></span>
+<span id="cb4-143"><a href="#cb4-143" aria-hidden="true" tabindex="-1"></a><span class="in">    </span></span>
+<span id="cb4-144"><a href="#cb4-144" aria-hidden="true" tabindex="-1"></a><span class="in">    style T0B fill:#e8f5e9,stroke:#388e3c,stroke-width:2px</span></span>
+<span id="cb4-145"><a href="#cb4-145" aria-hidden="true" tabindex="-1"></a><span class="in">    style T1B fill:#e8f5e9,stroke:#388e3c,stroke-width:2px</span></span>
+<span id="cb4-146"><a href="#cb4-146" aria-hidden="true" tabindex="-1"></a><span class="in">    style TNB fill:#e8f5e9,stroke:#388e3c,stroke-width:2px</span></span>
+<span id="cb4-147"><a href="#cb4-147" aria-hidden="true" tabindex="-1"></a><span class="in">&lt;/div&gt;</span></span>
+<span id="cb4-148"><a href="#cb4-148" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb4-149"><a href="#cb4-149" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-150"><a href="#cb4-150" aria-hidden="true" tabindex="-1"></a>**📊 Buffer Layout Principles:**</span>
+<span id="cb4-151"><a href="#cb4-151" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Contiguous memory for cache efficiency</span>
+<span id="cb4-152"><a href="#cb4-152" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Y coordinates provide logical indexing</span>
+<span id="cb4-153"><a href="#cb4-153" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Buffer positions provide physical indexing</span>
+<span id="cb4-154"><a href="#cb4-154" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Layout optimized for thread's access patterns</span>
+<span id="cb4-155"><a href="#cb4-155" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-156"><a href="#cb4-156" aria-hidden="true" tabindex="-1"></a>**📝 Example: [2, 2] Thread Tile**</span>
+<span id="cb4-157"><a href="#cb4-157" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-158"><a href="#cb4-158" aria-hidden="true" tabindex="-1"></a>Y coordinate to buffer position mapping:</span>
+<span id="cb4-159"><a href="#cb4-159" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Y=<span class="co">[</span><span class="ot">0,0</span><span class="co">]</span> → Buffer position 0</span>
+<span id="cb4-160"><a href="#cb4-160" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Y=<span class="co">[</span><span class="ot">0,1</span><span class="co">]</span> → Buffer position 1</span>
+<span id="cb4-161"><a href="#cb4-161" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Y=<span class="co">[</span><span class="ot">1,0</span><span class="co">]</span> → Buffer position 2</span>
+<span id="cb4-162"><a href="#cb4-162" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Y=<span class="co">[</span><span class="ot">1,1</span><span class="co">]</span> → Buffer position 3</span>
+<span id="cb4-163"><a href="#cb4-163" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-164"><a href="#cb4-164" aria-hidden="true" tabindex="-1"></a>**🔄 Visual Layout:**</span>
+<span id="cb4-165"><a href="#cb4-165" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb4-166"><a href="#cb4-166" aria-hidden="true" tabindex="-1"></a><span class="in">Logical (Y coordinates)    Physical (Buffer)</span></span>
+<span id="cb4-167"><a href="#cb4-167" aria-hidden="true" tabindex="-1"></a><span class="in">Y[0,0] Y[0,1]              Buffer[0] Buffer[1]</span></span>
+<span id="cb4-168"><a href="#cb4-168" aria-hidden="true" tabindex="-1"></a><span class="in">Y[1,0] Y[1,1]           →  Buffer[2] Buffer[3]</span></span>
+<span id="cb4-169"><a href="#cb4-169" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb4-170"><a href="#cb4-170" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-171"><a href="#cb4-171" aria-hidden="true" tabindex="-1"></a><span class="fu">## Element Access Patterns</span></span>
+<span id="cb4-172"><a href="#cb4-172" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-173"><a href="#cb4-173" aria-hidden="true" tabindex="-1"></a>Static distributed tensors provide efficient element access using Y coordinates.</span>
+<span id="cb4-174"><a href="#cb4-174" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-175"><a href="#cb4-175" aria-hidden="true" tabindex="-1"></a>**🎯 Access Methods:**</span>
+<span id="cb4-176"><a href="#cb4-176" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`get_element(y_indices)`</span>: Read value at Y coordinate</span>
+<span id="cb4-177"><a href="#cb4-177" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`set_element(y_indices, value)`</span>: Write value at Y coordinate</span>
+<span id="cb4-178"><a href="#cb4-178" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Y coordinates are logical (within thread's tile)</span>
+<span id="cb4-179"><a href="#cb4-179" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Internally maps to efficient buffer access</span>
+<span id="cb4-180"><a href="#cb4-180" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-181"><a href="#cb4-181" aria-hidden="true" tabindex="-1"></a>**📝 Element Access Example ([2, 2] tile):**</span>
+<span id="cb4-182"><a href="#cb4-182" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-183"><a href="#cb4-183" aria-hidden="true" tabindex="-1"></a>Setting values:</span>
+<span id="cb4-184"><a href="#cb4-184" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`tensor.set_element([0, 0], 11)`</span></span>
+<span id="cb4-185"><a href="#cb4-185" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`tensor.set_element([0, 1], 12)`</span></span>
+<span id="cb4-186"><a href="#cb4-186" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`tensor.set_element([1, 0], 21)`</span></span>
+<span id="cb4-187"><a href="#cb4-187" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`tensor.set_element([1, 1], 22)`</span></span>
+<span id="cb4-188"><a href="#cb4-188" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-189"><a href="#cb4-189" aria-hidden="true" tabindex="-1"></a>Reading values:</span>
+<span id="cb4-190"><a href="#cb4-190" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`tensor.get_element([0, 0])`</span> → 11</span>
+<span id="cb4-191"><a href="#cb4-191" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`tensor.get_element([0, 1])`</span> → 12</span>
+<span id="cb4-192"><a href="#cb4-192" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`tensor.get_element([1, 0])`</span> → 21</span>
+<span id="cb4-193"><a href="#cb4-193" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`tensor.get_element([1, 1])`</span> → 22</span>
+<span id="cb4-194"><a href="#cb4-194" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-195"><a href="#cb4-195" aria-hidden="true" tabindex="-1"></a>**🚀 Performance Benefits:**</span>
+<span id="cb4-196"><a href="#cb4-196" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Y coordinate lookup is O(1)</span>
+<span id="cb4-197"><a href="#cb4-197" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Buffer access is cache-friendly</span>
+<span id="cb4-198"><a href="#cb4-198" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>No bounds checking needed (static layout)</span>
+<span id="cb4-199"><a href="#cb4-199" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Compiler can optimize access patterns</span>
+<span id="cb4-200"><a href="#cb4-200" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-201"><a href="#cb4-201" aria-hidden="true" tabindex="-1"></a><span class="fu">## Memory Layout Details</span></span>
+<span id="cb4-202"><a href="#cb4-202" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-203"><a href="#cb4-203" aria-hidden="true" tabindex="-1"></a>Let's examine the internal memory organization in detail.</span>
+<span id="cb4-204"><a href="#cb4-204" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-205"><a href="#cb4-205" aria-hidden="true" tabindex="-1"></a><span class="in">```{=html}</span></span>
+<span id="cb4-206"><a href="#cb4-206" aria-hidden="true" tabindex="-1"></a><span class="in">&lt;div class="mermaid"&gt;</span></span>
+<span id="cb4-207"><a href="#cb4-207" aria-hidden="true" tabindex="-1"></a><span class="in">graph TB</span></span>
+<span id="cb4-208"><a href="#cb4-208" aria-hidden="true" tabindex="-1"></a><span class="in">    subgraph "Memory Layout Example: [3,2] Tile"</span></span>
+<span id="cb4-209"><a href="#cb4-209" aria-hidden="true" tabindex="-1"></a><span class="in">        subgraph "Logical View (Y-coordinates)"</span></span>
+<span id="cb4-210"><a href="#cb4-210" aria-hidden="true" tabindex="-1"></a><span class="in">            L00["Y[0,0]"]</span></span>
+<span id="cb4-211"><a href="#cb4-211" aria-hidden="true" tabindex="-1"></a><span class="in">            L01["Y[0,1]"]</span></span>
+<span id="cb4-212"><a href="#cb4-212" aria-hidden="true" tabindex="-1"></a><span class="in">            L10["Y[1,0]"]</span></span>
+<span id="cb4-213"><a href="#cb4-213" aria-hidden="true" tabindex="-1"></a><span class="in">            L11["Y[1,1]"]</span></span>
+<span id="cb4-214"><a href="#cb4-214" aria-hidden="true" tabindex="-1"></a><span class="in">            L20["Y[2,0]"]</span></span>
+<span id="cb4-215"><a href="#cb4-215" aria-hidden="true" tabindex="-1"></a><span class="in">            L21["Y[2,1]"]</span></span>
+<span id="cb4-216"><a href="#cb4-216" aria-hidden="true" tabindex="-1"></a><span class="in">        end</span></span>
+<span id="cb4-217"><a href="#cb4-217" aria-hidden="true" tabindex="-1"></a><span class="in">        </span></span>
+<span id="cb4-218"><a href="#cb4-218" aria-hidden="true" tabindex="-1"></a><span class="in">        subgraph "Physical Memory (Buffer)"</span></span>
+<span id="cb4-219"><a href="#cb4-219" aria-hidden="true" tabindex="-1"></a><span class="in">            P0["Addr 0&lt;br/&gt;Val: Y[0,0]"]</span></span>
+<span id="cb4-220"><a href="#cb4-220" aria-hidden="true" tabindex="-1"></a><span class="in">            P1["Addr 1&lt;br/&gt;Val: Y[0,1]"]</span></span>
+<span id="cb4-221"><a href="#cb4-221" aria-hidden="true" tabindex="-1"></a><span class="in">            P2["Addr 2&lt;br/&gt;Val: Y[1,0]"]</span></span>
+<span id="cb4-222"><a href="#cb4-222" aria-hidden="true" tabindex="-1"></a><span class="in">            P3["Addr 3&lt;br/&gt;Val: Y[1,1]"]</span></span>
+<span id="cb4-223"><a href="#cb4-223" aria-hidden="true" tabindex="-1"></a><span class="in">            P4["Addr 4&lt;br/&gt;Val: Y[2,0]"]</span></span>
+<span id="cb4-224"><a href="#cb4-224" aria-hidden="true" tabindex="-1"></a><span class="in">            P5["Addr 5&lt;br/&gt;Val: Y[2,1]"]</span></span>
+<span id="cb4-225"><a href="#cb4-225" aria-hidden="true" tabindex="-1"></a><span class="in">        end</span></span>
+<span id="cb4-226"><a href="#cb4-226" aria-hidden="true" tabindex="-1"></a><span class="in">        </span></span>
+<span id="cb4-227"><a href="#cb4-227" aria-hidden="true" tabindex="-1"></a><span class="in">        subgraph "Address Calculation"</span></span>
+<span id="cb4-228"><a href="#cb4-228" aria-hidden="true" tabindex="-1"></a><span class="in">            AC["addr = y0 * 2 + y1&lt;br/&gt;(row-major)"]</span></span>
+<span id="cb4-229"><a href="#cb4-229" aria-hidden="true" tabindex="-1"></a><span class="in">        end</span></span>
+<span id="cb4-230"><a href="#cb4-230" aria-hidden="true" tabindex="-1"></a><span class="in">    end</span></span>
+<span id="cb4-231"><a href="#cb4-231" aria-hidden="true" tabindex="-1"></a><span class="in">    </span></span>
+<span id="cb4-232"><a href="#cb4-232" aria-hidden="true" tabindex="-1"></a><span class="in">    L00 --&gt; P0</span></span>
+<span id="cb4-233"><a href="#cb4-233" aria-hidden="true" tabindex="-1"></a><span class="in">    L01 --&gt; P1</span></span>
+<span id="cb4-234"><a href="#cb4-234" aria-hidden="true" tabindex="-1"></a><span class="in">    L10 --&gt; P2</span></span>
+<span id="cb4-235"><a href="#cb4-235" aria-hidden="true" tabindex="-1"></a><span class="in">    L11 --&gt; P3</span></span>
+<span id="cb4-236"><a href="#cb4-236" aria-hidden="true" tabindex="-1"></a><span class="in">    L20 --&gt; P4</span></span>
+<span id="cb4-237"><a href="#cb4-237" aria-hidden="true" tabindex="-1"></a><span class="in">    L21 --&gt; P5</span></span>
+<span id="cb4-238"><a href="#cb4-238" aria-hidden="true" tabindex="-1"></a><span class="in">    </span></span>
+<span id="cb4-239"><a href="#cb4-239" aria-hidden="true" tabindex="-1"></a><span class="in">    L00 --&gt; AC</span></span>
+<span id="cb4-240"><a href="#cb4-240" aria-hidden="true" tabindex="-1"></a><span class="in">    L10 --&gt; AC</span></span>
+<span id="cb4-241"><a href="#cb4-241" aria-hidden="true" tabindex="-1"></a><span class="in">    L20 --&gt; AC</span></span>
+<span id="cb4-242"><a href="#cb4-242" aria-hidden="true" tabindex="-1"></a><span class="in">    AC --&gt; P0</span></span>
+<span id="cb4-243"><a href="#cb4-243" aria-hidden="true" tabindex="-1"></a><span class="in">    AC --&gt; P2</span></span>
+<span id="cb4-244"><a href="#cb4-244" aria-hidden="true" tabindex="-1"></a><span class="in">    AC --&gt; P4</span></span>
+<span id="cb4-245"><a href="#cb4-245" aria-hidden="true" tabindex="-1"></a><span class="in">    </span></span>
+<span id="cb4-246"><a href="#cb4-246" aria-hidden="true" tabindex="-1"></a><span class="in">    style L00 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px</span></span>
+<span id="cb4-247"><a href="#cb4-247" aria-hidden="true" tabindex="-1"></a><span class="in">    style L01 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px</span></span>
+<span id="cb4-248"><a href="#cb4-248" aria-hidden="true" tabindex="-1"></a><span class="in">    style L10 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px</span></span>
+<span id="cb4-249"><a href="#cb4-249" aria-hidden="true" tabindex="-1"></a><span class="in">    style L11 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px</span></span>
+<span id="cb4-250"><a href="#cb4-250" aria-hidden="true" tabindex="-1"></a><span class="in">    style L20 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px</span></span>
+<span id="cb4-251"><a href="#cb4-251" aria-hidden="true" tabindex="-1"></a><span class="in">    style L21 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px</span></span>
+<span id="cb4-252"><a href="#cb4-252" aria-hidden="true" tabindex="-1"></a><span class="in">    style P0 fill:#e8f5e9,stroke:#388e3c,stroke-width:2px</span></span>
+<span id="cb4-253"><a href="#cb4-253" aria-hidden="true" tabindex="-1"></a><span class="in">    style P1 fill:#e8f5e9,stroke:#388e3c,stroke-width:2px</span></span>
+<span id="cb4-254"><a href="#cb4-254" aria-hidden="true" tabindex="-1"></a><span class="in">    style P2 fill:#e8f5e9,stroke:#388e3c,stroke-width:2px</span></span>
+<span id="cb4-255"><a href="#cb4-255" aria-hidden="true" tabindex="-1"></a><span class="in">    style P3 fill:#e8f5e9,stroke:#388e3c,stroke-width:2px</span></span>
+<span id="cb4-256"><a href="#cb4-256" aria-hidden="true" tabindex="-1"></a><span class="in">    style P4 fill:#e8f5e9,stroke:#388e3c,stroke-width:2px</span></span>
+<span id="cb4-257"><a href="#cb4-257" aria-hidden="true" tabindex="-1"></a><span class="in">    style P5 fill:#e8f5e9,stroke:#388e3c,stroke-width:2px</span></span>
+<span id="cb4-258"><a href="#cb4-258" aria-hidden="true" tabindex="-1"></a><span class="in">    style AC fill:#fff3e0,stroke:#f57c00,stroke-width:2px</span></span>
+<span id="cb4-259"><a href="#cb4-259" aria-hidden="true" tabindex="-1"></a><span class="in">&lt;/div&gt;</span></span>
+<span id="cb4-260"><a href="#cb4-260" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb4-261"><a href="#cb4-261" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-262"><a href="#cb4-262" aria-hidden="true" tabindex="-1"></a>**🗃️ Example: [3, 2] tile (6 elements)**</span>
+<span id="cb4-263"><a href="#cb4-263" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-264"><a href="#cb4-264" aria-hidden="true" tabindex="-1"></a>Memory organization (row-major within tile):</span>
+<span id="cb4-265"><a href="#cb4-265" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-266"><a href="#cb4-266" aria-hidden="true" tabindex="-1"></a>**📊 Physical Memory Layout:**</span>
+<span id="cb4-267"><a href="#cb4-267" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Address 0: Y=<span class="co">[</span><span class="ot">0,0</span><span class="co">]</span> → Value at position 0</span>
+<span id="cb4-268"><a href="#cb4-268" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Address 1: Y=<span class="co">[</span><span class="ot">0,1</span><span class="co">]</span> → Value at position 1</span>
+<span id="cb4-269"><a href="#cb4-269" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Address 2: Y=<span class="co">[</span><span class="ot">1,0</span><span class="co">]</span> → Value at position 2</span>
+<span id="cb4-270"><a href="#cb4-270" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Address 3: Y=<span class="co">[</span><span class="ot">1,1</span><span class="co">]</span> → Value at position 3</span>
+<span id="cb4-271"><a href="#cb4-271" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Address 4: Y=<span class="co">[</span><span class="ot">2,0</span><span class="co">]</span> → Value at position 4</span>
+<span id="cb4-272"><a href="#cb4-272" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Address 5: Y=<span class="co">[</span><span class="ot">2,1</span><span class="co">]</span> → Value at position 5</span>
+<span id="cb4-273"><a href="#cb4-273" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-274"><a href="#cb4-274" aria-hidden="true" tabindex="-1"></a>**🔄 Address Calculation:**</span>
+<span id="cb4-275"><a href="#cb4-275" aria-hidden="true" tabindex="-1"></a>For Y<span class="co">[</span><span class="ot">y0, y1</span><span class="co">]</span> in row-major layout:</span>
+<span id="cb4-276"><a href="#cb4-276" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb4-277"><a href="#cb4-277" aria-hidden="true" tabindex="-1"></a><span class="in">address = y0 * width + y1</span></span>
+<span id="cb4-278"><a href="#cb4-278" aria-hidden="true" tabindex="-1"></a><span class="in">where width = tile_size[1]</span></span>
+<span id="cb4-279"><a href="#cb4-279" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb4-280"><a href="#cb4-280" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-281"><a href="#cb4-281" aria-hidden="true" tabindex="-1"></a>**📝 Example Calculations:**</span>
+<span id="cb4-282"><a href="#cb4-282" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Y<span class="co">[</span><span class="ot">0,0</span><span class="co">]</span> → address 0</span>
+<span id="cb4-283"><a href="#cb4-283" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Y<span class="co">[</span><span class="ot">0,1</span><span class="co">]</span> → address 1</span>
+<span id="cb4-284"><a href="#cb4-284" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Y<span class="co">[</span><span class="ot">1,0</span><span class="co">]</span> → address 2</span>
+<span id="cb4-285"><a href="#cb4-285" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Y<span class="co">[</span><span class="ot">1,1</span><span class="co">]</span> → address 3</span>
+<span id="cb4-286"><a href="#cb4-286" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Y<span class="co">[</span><span class="ot">2,0</span><span class="co">]</span> → address 4</span>
+<span id="cb4-287"><a href="#cb4-287" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Y<span class="co">[</span><span class="ot">2,1</span><span class="co">]</span> → address 5</span>
+<span id="cb4-288"><a href="#cb4-288" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-289"><a href="#cb4-289" aria-hidden="true" tabindex="-1"></a>**💡 Layout Benefits:**</span>
+<span id="cb4-290"><a href="#cb4-290" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Sequential access patterns are cache-friendly</span>
+<span id="cb4-291"><a href="#cb4-291" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Address calculation is simple and fast</span>
+<span id="cb4-292"><a href="#cb4-292" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Memory utilization is optimal</span>
+<span id="cb4-293"><a href="#cb4-293" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Vectorization opportunities are maximized</span>
+<span id="cb4-294"><a href="#cb4-294" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-295"><a href="#cb4-295" aria-hidden="true" tabindex="-1"></a><span class="fu">## Thread Coordination</span></span>
+<span id="cb4-296"><a href="#cb4-296" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-297"><a href="#cb4-297" aria-hidden="true" tabindex="-1"></a>Static distributed tensors enable efficient thread coordination.</span>
+<span id="cb4-298"><a href="#cb4-298" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-299"><a href="#cb4-299" aria-hidden="true" tabindex="-1"></a>**🤝 Coordination Mechanisms:**</span>
+<span id="cb4-300"><a href="#cb4-300" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Each thread has its own tensor instance</span>
+<span id="cb4-301"><a href="#cb4-301" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Threads coordinate through shared memory</span>
+<span id="cb4-302"><a href="#cb4-302" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Synchronization points ensure data consistency</span>
+<span id="cb4-303"><a href="#cb4-303" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Load balancing through work distribution</span>
+<span id="cb4-304"><a href="#cb4-304" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-305"><a href="#cb4-305" aria-hidden="true" tabindex="-1"></a>**📝 Example: [2, 2] threads, [2, 2] tiles**</span>
+<span id="cb4-306"><a href="#cb4-306" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-307"><a href="#cb4-307" aria-hidden="true" tabindex="-1"></a>Thread coordination pattern:</span>
+<span id="cb4-308"><a href="#cb4-308" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Thread 0 (P=<span class="co">[</span><span class="ot">0,0</span><span class="co">]</span>): Has 4 elements, tensor size <span class="co">[</span><span class="ot">2, 2</span><span class="co">]</span>, coordinates Y<span class="co">[</span><span class="ot">0,0</span><span class="co">]</span> to Y<span class="co">[</span><span class="ot">1,1</span><span class="co">]</span></span>
+<span id="cb4-309"><a href="#cb4-309" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Thread 1 (P=<span class="co">[</span><span class="ot">0,1</span><span class="co">]</span>): Has 4 elements, tensor size <span class="co">[</span><span class="ot">2, 2</span><span class="co">]</span>, coordinates Y<span class="co">[</span><span class="ot">0,0</span><span class="co">]</span> to Y<span class="co">[</span><span class="ot">1,1</span><span class="co">]</span></span>
+<span id="cb4-310"><a href="#cb4-310" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Thread 2 (P=<span class="co">[</span><span class="ot">1,0</span><span class="co">]</span>): Has 4 elements, tensor size <span class="co">[</span><span class="ot">2, 2</span><span class="co">]</span>, coordinates Y<span class="co">[</span><span class="ot">0,0</span><span class="co">]</span> to Y<span class="co">[</span><span class="ot">1,1</span><span class="co">]</span></span>
+<span id="cb4-311"><a href="#cb4-311" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Thread 3 (P=<span class="co">[</span><span class="ot">1,1</span><span class="co">]</span>): Has 4 elements, tensor size <span class="co">[</span><span class="ot">2, 2</span><span class="co">]</span>, coordinates Y<span class="co">[</span><span class="ot">0,0</span><span class="co">]</span> to Y<span class="co">[</span><span class="ot">1,1</span><span class="co">]</span></span>
+<span id="cb4-312"><a href="#cb4-312" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-313"><a href="#cb4-313" aria-hidden="true" tabindex="-1"></a>**🔄 Coordination Benefits:**</span>
+<span id="cb4-314"><a href="#cb4-314" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Each thread works independently on its tensor</span>
+<span id="cb4-315"><a href="#cb4-315" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>No contention for shared data structures</span>
+<span id="cb4-316"><a href="#cb4-316" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Synchronization only at coordination points</span>
+<span id="cb4-317"><a href="#cb4-317" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Scales efficiently with thread count</span>
+<span id="cb4-318"><a href="#cb4-318" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-319"><a href="#cb4-319" aria-hidden="true" tabindex="-1"></a><span class="fu">## Practical Usage Patterns</span></span>
+<span id="cb4-320"><a href="#cb4-320" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-321"><a href="#cb4-321" aria-hidden="true" tabindex="-1"></a>Static distributed tensors follow a common usage pattern in practice.</span>
+<span id="cb4-322"><a href="#cb4-322" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-323"><a href="#cb4-323" aria-hidden="true" tabindex="-1"></a>**🎯 Common Usage Pattern:**</span>
+<span id="cb4-324"><a href="#cb4-324" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>Create tensor from tile distribution</span>
+<span id="cb4-325"><a href="#cb4-325" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>Load data into tensor (from global memory)</span>
+<span id="cb4-326"><a href="#cb4-326" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>Perform computations on tensor elements</span>
+<span id="cb4-327"><a href="#cb4-327" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>Store results back to global memory</span>
+<span id="cb4-328"><a href="#cb4-328" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-329"><a href="#cb4-329" aria-hidden="true" tabindex="-1"></a>**📝 Conceptual Example:**</span>
+<span id="cb4-330"><a href="#cb4-330" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
+<span id="cb4-331"><a href="#cb4-331" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 1: Create tensor</span></span>
+<span id="cb4-332"><a href="#cb4-332" aria-hidden="true" tabindex="-1"></a>tensor <span class="op">=</span> make_static_distributed_tensor(distribution, dtype)</span>
+<span id="cb4-333"><a href="#cb4-333" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-334"><a href="#cb4-334" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 2: Load data</span></span>
+<span id="cb4-335"><a href="#cb4-335" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> y <span class="kw">in</span> all_y_coordinates:</span>
+<span id="cb4-336"><a href="#cb4-336" aria-hidden="true" tabindex="-1"></a>    value <span class="op">=</span> load_from_global_memory(p_coord, y_coord)</span>
+<span id="cb4-337"><a href="#cb4-337" aria-hidden="true" tabindex="-1"></a>    tensor.set_element(y, value)</span>
+<span id="cb4-338"><a href="#cb4-338" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-339"><a href="#cb4-339" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 3: Compute</span></span>
+<span id="cb4-340"><a href="#cb4-340" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> y <span class="kw">in</span> all_y_coordinates:</span>
+<span id="cb4-341"><a href="#cb4-341" aria-hidden="true" tabindex="-1"></a>    value <span class="op">=</span> tensor.get_element(y)</span>
+<span id="cb4-342"><a href="#cb4-342" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> compute_function(value)</span>
+<span id="cb4-343"><a href="#cb4-343" aria-hidden="true" tabindex="-1"></a>    tensor.set_element(y, result)</span>
+<span id="cb4-344"><a href="#cb4-344" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-345"><a href="#cb4-345" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 4: Store</span></span>
+<span id="cb4-346"><a href="#cb4-346" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> y <span class="kw">in</span> all_y_coordinates:</span>
+<span id="cb4-347"><a href="#cb4-347" aria-hidden="true" tabindex="-1"></a>    value <span class="op">=</span> tensor.get_element(y)</span>
+<span id="cb4-348"><a href="#cb4-348" aria-hidden="true" tabindex="-1"></a>    store_to_global_memory(p_coord, y_coord, value)</span>
+<span id="cb4-349"><a href="#cb4-349" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb4-350"><a href="#cb4-350" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-351"><a href="#cb4-351" aria-hidden="true" tabindex="-1"></a>**💡 Pattern Benefits:**</span>
+<span id="cb4-352"><a href="#cb4-352" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Clear separation of load/compute/store phases</span>
+<span id="cb4-353"><a href="#cb4-353" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Optimal memory access patterns</span>
+<span id="cb4-354"><a href="#cb4-354" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Easy to reason about and debug</span>
+<span id="cb4-355"><a href="#cb4-355" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Compiler can optimize each phase</span>
+<span id="cb4-356"><a href="#cb4-356" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-357"><a href="#cb4-357" aria-hidden="true" tabindex="-1"></a><span class="fu">## Testing Your Understanding</span></span>
+<span id="cb4-358"><a href="#cb4-358" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-359"><a href="#cb4-359" aria-hidden="true" tabindex="-1"></a>Let's verify your understanding of static distributed tensors:</span>
+<span id="cb4-360"><a href="#cb4-360" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-363"><a href="#cb4-363" aria-hidden="true" tabindex="-1"></a><span class="in">```{pyodide}</span></span>
+<span id="cb4-364"><a href="#cb4-364" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"🧪 Testing Static Distributed Tensor Understanding"</span>)</span>
+<span id="cb4-365"><a href="#cb4-365" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"="</span> <span class="op">*</span> <span class="dv">50</span>)</span>
+<span id="cb4-366"><a href="#cb4-366" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-367"><a href="#cb4-367" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> test_conceptual_element_access():</span>
+<span id="cb4-368"><a href="#cb4-368" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Test understanding of element access patterns."""</span></span>
+<span id="cb4-369"><a href="#cb4-369" aria-hidden="true" tabindex="-1"></a>    tile_size <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">3</span>]</span>
+<span id="cb4-370"><a href="#cb4-370" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb4-371"><a href="#cb4-371" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Test address calculation</span></span>
+<span id="cb4-372"><a href="#cb4-372" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> y0 <span class="kw">in</span> <span class="bu">range</span>(tile_size[<span class="dv">0</span>]):</span>
+<span id="cb4-373"><a href="#cb4-373" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> y1 <span class="kw">in</span> <span class="bu">range</span>(tile_size[<span class="dv">1</span>]):</span>
+<span id="cb4-374"><a href="#cb4-374" aria-hidden="true" tabindex="-1"></a>            expected_addr <span class="op">=</span> y0 <span class="op">*</span> tile_size[<span class="dv">1</span>] <span class="op">+</span> y1</span>
+<span id="cb4-375"><a href="#cb4-375" aria-hidden="true" tabindex="-1"></a>            actual_addr <span class="op">=</span> y0 <span class="op">*</span> tile_size[<span class="dv">1</span>] <span class="op">+</span> y1</span>
+<span id="cb4-376"><a href="#cb4-376" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> expected_addr <span class="op">!=</span> actual_addr:</span>
+<span id="cb4-377"><a href="#cb4-377" aria-hidden="true" tabindex="-1"></a>                <span class="cf">return</span> <span class="va">False</span></span>
+<span id="cb4-378"><a href="#cb4-378" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="va">True</span></span>
+<span id="cb4-379"><a href="#cb4-379" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-380"><a href="#cb4-380" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> test_memory_address_calculation():</span>
+<span id="cb4-381"><a href="#cb4-381" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Test memory address calculation."""</span></span>
+<span id="cb4-382"><a href="#cb4-382" aria-hidden="true" tabindex="-1"></a>    tile_size <span class="op">=</span> [<span class="dv">4</span>, <span class="dv">3</span>]</span>
+<span id="cb4-383"><a href="#cb4-383" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb4-384"><a href="#cb4-384" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Test specific cases</span></span>
+<span id="cb4-385"><a href="#cb4-385" aria-hidden="true" tabindex="-1"></a>    test_cases <span class="op">=</span> [</span>
+<span id="cb4-386"><a href="#cb4-386" aria-hidden="true" tabindex="-1"></a>        ([<span class="dv">0</span>, <span class="dv">0</span>], <span class="dv">0</span>),</span>
+<span id="cb4-387"><a href="#cb4-387" aria-hidden="true" tabindex="-1"></a>        ([<span class="dv">0</span>, <span class="dv">2</span>], <span class="dv">2</span>),</span>
+<span id="cb4-388"><a href="#cb4-388" aria-hidden="true" tabindex="-1"></a>        ([<span class="dv">1</span>, <span class="dv">0</span>], <span class="dv">3</span>),</span>
+<span id="cb4-389"><a href="#cb4-389" aria-hidden="true" tabindex="-1"></a>        ([<span class="dv">1</span>, <span class="dv">1</span>], <span class="dv">4</span>),</span>
+<span id="cb4-390"><a href="#cb4-390" aria-hidden="true" tabindex="-1"></a>        ([<span class="dv">3</span>, <span class="dv">2</span>], <span class="dv">11</span>)</span>
+<span id="cb4-391"><a href="#cb4-391" aria-hidden="true" tabindex="-1"></a>    ]</span>
+<span id="cb4-392"><a href="#cb4-392" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb4-393"><a href="#cb4-393" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> (y0, y1), expected <span class="kw">in</span> test_cases:</span>
+<span id="cb4-394"><a href="#cb4-394" aria-hidden="true" tabindex="-1"></a>        actual <span class="op">=</span> y0 <span class="op">*</span> tile_size[<span class="dv">1</span>] <span class="op">+</span> y1</span>
+<span id="cb4-395"><a href="#cb4-395" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> actual <span class="op">!=</span> expected:</span>
+<span id="cb4-396"><a href="#cb4-396" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> <span class="va">False</span></span>
+<span id="cb4-397"><a href="#cb4-397" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="va">True</span></span>
+<span id="cb4-398"><a href="#cb4-398" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-399"><a href="#cb4-399" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> test_thread_coordination_math():</span>
+<span id="cb4-400"><a href="#cb4-400" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Test thread coordination calculations."""</span></span>
+<span id="cb4-401"><a href="#cb4-401" aria-hidden="true" tabindex="-1"></a>    thread_grid <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">2</span>]</span>
+<span id="cb4-402"><a href="#cb4-402" aria-hidden="true" tabindex="-1"></a>    tile_size <span class="op">=</span> [<span class="dv">3</span>, <span class="dv">3</span>]</span>
+<span id="cb4-403"><a href="#cb4-403" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb4-404"><a href="#cb4-404" aria-hidden="true" tabindex="-1"></a>    total_threads <span class="op">=</span> thread_grid[<span class="dv">0</span>] <span class="op">*</span> thread_grid[<span class="dv">1</span>]</span>
+<span id="cb4-405"><a href="#cb4-405" aria-hidden="true" tabindex="-1"></a>    elements_per_thread <span class="op">=</span> tile_size[<span class="dv">0</span>] <span class="op">*</span> tile_size[<span class="dv">1</span>]</span>
+<span id="cb4-406"><a href="#cb4-406" aria-hidden="true" tabindex="-1"></a>    total_elements <span class="op">=</span> total_threads <span class="op">*</span> elements_per_thread</span>
+<span id="cb4-407"><a href="#cb4-407" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb4-408"><a href="#cb4-408" aria-hidden="true" tabindex="-1"></a>    expected_total <span class="op">=</span> <span class="dv">4</span> <span class="op">*</span> <span class="dv">9</span>  <span class="co"># 4 threads * 9 elements each</span></span>
+<span id="cb4-409"><a href="#cb4-409" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> total_elements <span class="op">==</span> expected_total</span>
+<span id="cb4-410"><a href="#cb4-410" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-411"><a href="#cb4-411" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> test_tensor_creation_concept():</span>
+<span id="cb4-412"><a href="#cb4-412" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Test tensor creation concept."""</span></span>
+<span id="cb4-413"><a href="#cb4-413" aria-hidden="true" tabindex="-1"></a>    <span class="co"># This tests the conceptual understanding</span></span>
+<span id="cb4-414"><a href="#cb4-414" aria-hidden="true" tabindex="-1"></a>    required_components <span class="op">=</span> [</span>
+<span id="cb4-415"><a href="#cb4-415" aria-hidden="true" tabindex="-1"></a>        <span class="st">'tile_distribution'</span>,  <span class="co"># Need distribution</span></span>
+<span id="cb4-416"><a href="#cb4-416" aria-hidden="true" tabindex="-1"></a>        <span class="st">'dtype'</span>,             <span class="co"># Need data type</span></span>
+<span id="cb4-417"><a href="#cb4-417" aria-hidden="true" tabindex="-1"></a>        <span class="st">'make_static_distributed_tensor'</span>  <span class="co"># Need creation function</span></span>
+<span id="cb4-418"><a href="#cb4-418" aria-hidden="true" tabindex="-1"></a>    ]</span>
+<span id="cb4-419"><a href="#cb4-419" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb4-420"><a href="#cb4-420" aria-hidden="true" tabindex="-1"></a>    <span class="co"># All components needed for creation</span></span>
+<span id="cb4-421"><a href="#cb4-421" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="bu">len</span>(required_components) <span class="op">==</span> <span class="dv">3</span></span>
+<span id="cb4-422"><a href="#cb4-422" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-423"><a href="#cb4-423" aria-hidden="true" tabindex="-1"></a><span class="co"># Run tests</span></span>
+<span id="cb4-424"><a href="#cb4-424" aria-hidden="true" tabindex="-1"></a>tests <span class="op">=</span> [</span>
+<span id="cb4-425"><a href="#cb4-425" aria-hidden="true" tabindex="-1"></a>    (<span class="st">"Element access patterns"</span>, test_conceptual_element_access),</span>
+<span id="cb4-426"><a href="#cb4-426" aria-hidden="true" tabindex="-1"></a>    (<span class="st">"Memory address calculation"</span>, test_memory_address_calculation),</span>
+<span id="cb4-427"><a href="#cb4-427" aria-hidden="true" tabindex="-1"></a>    (<span class="st">"Thread coordination math"</span>, test_thread_coordination_math),</span>
+<span id="cb4-428"><a href="#cb4-428" aria-hidden="true" tabindex="-1"></a>    (<span class="st">"Tensor creation concept"</span>, test_tensor_creation_concept)</span>
+<span id="cb4-429"><a href="#cb4-429" aria-hidden="true" tabindex="-1"></a>]</span>
+<span id="cb4-430"><a href="#cb4-430" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-431"><a href="#cb4-431" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Running static distributed tensor tests:"</span>)</span>
+<span id="cb4-432"><a href="#cb4-432" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> test_name, test_func <span class="kw">in</span> tests:</span>
+<span id="cb4-433"><a href="#cb4-433" aria-hidden="true" tabindex="-1"></a>    <span class="cf">try</span>:</span>
+<span id="cb4-434"><a href="#cb4-434" aria-hidden="true" tabindex="-1"></a>        result <span class="op">=</span> test_func()</span>
+<span id="cb4-435"><a href="#cb4-435" aria-hidden="true" tabindex="-1"></a>        status <span class="op">=</span> <span class="st">"✅ PASS"</span> <span class="cf">if</span> result <span class="cf">else</span> <span class="st">"❌ FAIL"</span></span>
+<span id="cb4-436"><a href="#cb4-436" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"  </span><span class="sc">{</span>status<span class="sc">}</span><span class="ss">: </span><span class="sc">{</span>test_name<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb4-437"><a href="#cb4-437" aria-hidden="true" tabindex="-1"></a>    <span class="cf">except</span> <span class="pp">Exception</span> <span class="im">as</span> e:</span>
+<span id="cb4-438"><a href="#cb4-438" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"  ❌ ERROR: </span><span class="sc">{</span>test_name<span class="sc">}</span><span class="ss"> - </span><span class="sc">{</span><span class="bu">str</span>(e)<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb4-439"><a href="#cb4-439" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb4-440"><a href="#cb4-440" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-441"><a href="#cb4-441" aria-hidden="true" tabindex="-1"></a><span class="fu">## Key Takeaways</span></span>
+<span id="cb4-442"><a href="#cb4-442" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-443"><a href="#cb4-443" aria-hidden="true" tabindex="-1"></a>Static distributed tensors are the efficient data containers that make tile distribution practical:</span>
+<span id="cb4-444"><a href="#cb4-444" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-445"><a href="#cb4-445" aria-hidden="true" tabindex="-1"></a>**🎯 Core Concepts:**</span>
+<span id="cb4-446"><a href="#cb4-446" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-447"><a href="#cb4-447" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>**Thread-Local Storage**: Each thread has its own tensor</span>
+<span id="cb4-448"><a href="#cb4-448" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>✅ No contention between threads</span>
+<span id="cb4-449"><a href="#cb4-449" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>✅ Optimal memory access patterns</span>
+<span id="cb4-450"><a href="#cb4-450" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>✅ Independent computation capability</span>
+<span id="cb4-451"><a href="#cb4-451" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>✅ Efficient coordination mechanisms</span>
+<span id="cb4-452"><a href="#cb4-452" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-453"><a href="#cb4-453" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>**Compile-Time Optimization**: Layout determined at compile time</span>
+<span id="cb4-454"><a href="#cb4-454" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>✅ No runtime overhead for layout decisions</span>
+<span id="cb4-455"><a href="#cb4-455" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>✅ Optimal memory organization</span>
+<span id="cb4-456"><a href="#cb4-456" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>✅ Maximum compiler optimization opportunities</span>
+<span id="cb4-457"><a href="#cb4-457" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>✅ Predictable performance characteristics</span>
+<span id="cb4-458"><a href="#cb4-458" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-459"><a href="#cb4-459" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>**Efficient Element Access**: Y coordinates provide logical indexing</span>
+<span id="cb4-460"><a href="#cb4-460" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>✅ O(1) element access time</span>
+<span id="cb4-461"><a href="#cb4-461" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>✅ Cache-friendly memory patterns</span>
+<span id="cb4-462"><a href="#cb4-462" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>✅ No bounds checking overhead</span>
+<span id="cb4-463"><a href="#cb4-463" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>✅ Vectorization opportunities</span>
+<span id="cb4-464"><a href="#cb4-464" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-465"><a href="#cb4-465" aria-hidden="true" tabindex="-1"></a>**🔧 Implementation Benefits:**</span>
+<span id="cb4-466"><a href="#cb4-466" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-467"><a href="#cb4-467" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Memory Efficiency**: Only stores data the thread needs</span>
+<span id="cb4-468"><a href="#cb4-468" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Cache Performance**: Contiguous memory layout optimized for access patterns</span>
+<span id="cb4-469"><a href="#cb4-469" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Scalability**: Performance scales with thread count</span>
+<span id="cb4-470"><a href="#cb4-470" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Simplicity**: Clean programming model with logical coordinates</span>
+<span id="cb4-471"><a href="#cb4-471" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-472"><a href="#cb4-472" aria-hidden="true" tabindex="-1"></a>**💡 Why This Matters:**</span>
+<span id="cb4-473"><a href="#cb4-473" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-474"><a href="#cb4-474" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Performance**: Optimal memory access patterns for GPU hardware</span>
+<span id="cb4-475"><a href="#cb4-475" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Productivity**: Easy to reason about and debug</span>
+<span id="cb4-476"><a href="#cb4-476" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Maintainability**: Clear separation between logical and physical layout</span>
+<span id="cb4-477"><a href="#cb4-477" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Extensibility**: Same pattern works for any tile distribution strategy</span>
+<span id="cb4-478"><a href="#cb4-478" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-479"><a href="#cb4-479" aria-hidden="true" tabindex="-1"></a>Static distributed tensors show how CK achieves both programming simplicity and maximum performance. The logical Y coordinate interface hides the complexity of optimal memory layout, giving you the best of both worlds! </span>
+</code><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></pre></div>
+</div></div></div></div></div>
+</div> <!-- /content -->
+<script src="font-cleanup.js"></script>
+
+
+
+
+</body></html>
