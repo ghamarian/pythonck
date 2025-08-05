@@ -79,44 +79,22 @@ Sweep operations are the final piece of the distributed computing puzzle:
 
 **The Solution**: Sweep operations provide clean iteration patterns that handle all the complex indexing automatically.
 
-## The Complete GPU Processing Pipeline
+**🔄 The Complete GPU Workflow:**
 
-```{mermaid}
-flowchart LR
-    subgraph "Data Distribution"
-        TD[Tile Distribution<br/>Work Assignment]
-        TW[Tile Window<br/>Data Loading]
-    end
-    
-    subgraph "Processing"
-        SW[Sweep Operations<br/>Element Iteration]
-        UC[User Computation<br/>Lambda Function]
-    end
-    
-    subgraph "Memory"
-        GM[Global Memory]
-        R[Registers]
-    end
-    
-    TD --> TW
-    TW --> |load()| R
-    R --> SW
-    SW --> |foreach| UC
-    UC --> |store()| GM
-    
-    style TD fill:#e3f2fd
-    style TW fill:#fff3e0
-    style SW fill:#e8f5e9
-    style UC fill:#fce4ec
-```
+1. TileDistribution: 'Here's how to divide work'
+2. TileWindow: 'Here's your data, loaded efficiently'
+3. Sweep Operations: 'Here's how to process every element'
+4. Your code: 'Thanks! *does computation*'
 
-### Without Sweep Operations
+**🎯 Without Sweep Operations:**
+
 - Manual nested loops over Y dimensions
 - Complex index calculations
 - Easy to miss elements or double-process
 - Different code for different access patterns
 
-### With Sweep Operations
+**🎯 With Sweep Operations:**
+
 - Elegant lambda-based iteration
 - Automatic handling of all elements
 - Same pattern for any distribution
@@ -191,7 +169,7 @@ graph TB
 
 ### 2. Code Example
 # Demonstrate sweep operation
-print("Sweeping over distributed tensor:")
+print("🔄 Sweeping over distributed tensor:")
 
 collected_values = []
 
@@ -205,70 +183,6 @@ def collect_value(y_indices):
 sweep_tile(distributed_tensor, collect_value)
 
 print(f"\nSweep completed! Visited {len(collected_values)} elements")
-```
-
-### C++ Implementation Reference
-
-The sweep operation pattern is implemented in CK using template functions:
-
-**File**: `include/ck_tile/core/tensor/sweep_tile.hpp`
-
-```cpp
-// Basic sweep over distributed tensor
-template <typename DistributedTensor, typename Func>
-__device__ void sweep_tile(const DistributedTensor& tensor, Func func)
-{
-    // Get Y-space spans for iteration
-    constexpr auto spans = DistributedTensor::get_distributed_spans();
-    
-    // Iterate over all Y indices
-    sweep_tile_spans(spans, [&](auto y_indices) {
-        // Call user function with current indices
-        func(y_indices);
-    });
-}
-
-// Example usage in kernel
-__device__ void process_tile(const auto& tile)
-{
-    // Sum all elements
-    float sum = 0.0f;
-    sweep_tile(tile, [&](auto y_idx) {
-        sum += tile(y_idx);
-    });
-}
-```
-
-### C++ Implementation Reference
-
-The sweep operation pattern is implemented in CK using template functions:
-
-**File**: `include/ck_tile/core/tensor/sweep_tile.hpp`
-
-```cpp
-// Basic sweep over distributed tensor
-template <typename DistributedTensor, typename Func>
-__device__ void sweep_tile(const DistributedTensor& tensor, Func func)
-{
-    // Get Y-space spans for iteration
-    constexpr auto spans = DistributedTensor::get_distributed_spans();
-    
-    // Iterate over all Y indices
-    sweep_tile_spans(spans, [&](auto y_indices) {
-        // Call user function with current indices
-        func(y_indices);
-    });
-}
-
-// Example usage in kernel
-__device__ void process_tile(const auto& tile)
-{
-    // Sum all elements
-    float sum = 0.0f;
-    sweep_tile(tile, [&](auto y_idx) {
-        sum += tile(y_idx);
-    });
-}
 ```
 
 **What happened?** `sweep_tile` automatically iterated over all Y indices in the distributed tensor and called our function for each element. No manual loops, no missed elements!
@@ -375,7 +289,7 @@ graph LR
 # Create result tensor
 result_tensor = make_static_distributed_tensor(np.float32, distributed_tensor.tile_distribution)
 
-print("Sweep with Computation")
+print("🔢 Sweep with Computation")
 print("=" * 30)
 print("Computing squares using sweep:")
 print()
@@ -391,7 +305,7 @@ def compute_square(y_indices):
 sweep_tile(distributed_tensor, compute_square)
 
 print()
-print("Results verification:")
+print("🔍 Results verification:")
 def verify_result(y_indices):
     original = distributed_tensor.get_element(y_indices)
     computed = result_tensor.get_element(y_indices)

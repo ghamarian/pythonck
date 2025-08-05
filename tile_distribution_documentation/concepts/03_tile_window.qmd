@@ -217,68 +217,6 @@ print(f"- Covers elements from (2,2) to (5,5)")
 ```
 
 ## Understanding Window Coordinates
-### C++ Implementation Reference
-
-The TileWindow creation pattern shown above corresponds to the following C++ implementation:
-
-**File**: `include/ck_tile/core/tensor/tile_window.hpp`
-
-```cpp
-// Creating a tile window in practice
-template <typename BlockTileShape, typename DataType>
-__device__ auto create_input_window(
-    const DataType* __restrict__ p_global,
-    index_t M, index_t N)
-{
-    // Create tensor view
-    auto tensor_view = make_tensor_view<AddressSpaceEnum::Global>(
-        p_global,
-        make_naive_tensor_descriptor_packed(make_tuple(M, N)));
-    
-    // Define window parameters
-    constexpr auto window_lengths = BlockTileShape{};
-    const auto origin = make_tuple(blockIdx.x * window_lengths[I0],
-                                   blockIdx.y * window_lengths[I1]);
-    
-    // Create window with distribution
-    return make_tile_window(
-        tensor_view,
-        window_lengths,
-        origin,
-        make_static_tile_distribution(TileDistribution{}));
-}
-```
-
-The window creation process demonstrates several important principles of the CK framework. First, the window dimensions (2×2 in this example) are chosen to match the tile distribution pattern, ensuring that each thread has work to do. Second, the origin coordinates allow the window to target specific regions of the tensor, enabling techniques like overlapped tiling for convolutions or sliding window operations. Third, the integration with tile distribution means that the window automatically knows how to map its data to the appropriate threads, eliminating the need for manual index calculations.
-
-In the C++ implementation, the tile window creation involves template instantiation that captures all these parameters at compile time:
-
-```cpp
-// From ck_tile/core/tensor/tile_window.hpp
-template <typename TensorView,
-          typename WindowLengths,
-          typename Origin,
-          typename Distribution>
-CK_TILE_HOST_DEVICE constexpr auto
-make_tile_window(const TensorView& tensor_view,
-                 const WindowLengths& window_lengths,
-                 const Origin& origin,
-                 const Distribution& distribution)
-{
-    // Create specialized window type based on distribution
-    using WindowType = tile_window_with_static_distribution<
-        TensorView, WindowLengths, Distribution>;
-    
-    // Construct window with all parameters
-    return WindowType{tensor_view, window_lengths, origin, distribution};
-}
-```
-
-## Loading Data with TileWindow
-
-The load operation represents one of the most critical performance-sensitive operations in GPU kernel development. TileWindow's load functionality transforms a high-level request ("load this tile of data") into a series of optimized memory transactions that respect GPU hardware constraints while maximizing bandwidth utilization. This transformation involves several sophisticated techniques working in concert to achieve near-optimal performance.
-
-The loading process begins with the tile window analyzing the distribution pattern to determine which data elements each thread needs to load. This analysis considers not just the logical mapping but also the physical memory layout, identifying opportunities for coalesced access where adjacent threads load from adjacent memory locations. The system then generates load instructions that take advantage of the GPU's memory subsystem capabilities, including vector loads that can fetch multiple elements in a single transaction.
 
 ```{pyodide}
 #| echo: true
