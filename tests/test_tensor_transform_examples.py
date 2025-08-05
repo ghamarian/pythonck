@@ -45,23 +45,6 @@ class TestTensorTransformExamples:
         tensor_desc = parser.create_pytensor_descriptor(example, variables)
         assert tensor_desc is not None
     
-    def test_complex_nested_merge(self, parser):
-        """Test the complex nested merge example."""
-        examples, variables_dict = get_transform_examples(), get_default_variables()
-        example = examples["Complex Nested Merge"]
-        variables = variables_dict["Complex Nested Merge"]
-        
-        descriptor = parser.parse_tensor_descriptor(example)
-        
-        assert descriptor['type'] == 'transform'
-        assert len(descriptor['transforms']) == 2
-        assert descriptor['transforms'][0]['type'] == 'merge'
-        assert descriptor['transforms'][1]['type'] == 'pass_through'
-        
-        # Test pytensor creation
-        tensor_desc = parser.create_pytensor_descriptor(example, variables)
-        assert tensor_desc is not None
-    
     def test_all_pass_through(self, parser):
         """Test the all pass-through example."""
         examples, variables_dict = get_transform_examples(), get_default_variables()

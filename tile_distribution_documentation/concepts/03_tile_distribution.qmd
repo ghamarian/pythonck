@@ -183,8 +183,6 @@ for i, (ps_coords, ys_coords, description) in enumerate(test_cases):
     print(f"Output: xs_coords={xs_coords}")
 ```
 
-
-
 **2D Thread Cooperation**: Notice how threads in different positions (M,N) get different X coordinates. Thread[0,0] handles different data than Thread[1,0] or Thread[0,1]. This creates a 2D grid of work distribution where:
 
 - **M dimension changes**: Thread[0,0] vs Thread[1,0] - different M positions
@@ -194,14 +192,127 @@ Each thread gets a unique partition index and automatically calculates which dat
 
 **The Magic**: Notice what you DON'T see: manual thread ID arithmetic, complex index calculations, or memory offset computations. TileDistribution handles all of that automatically!
 
-## ys_to_d_descriptor
+## The `ys_to_d_descriptor`: A Thread's Local Memory Map
 
-use `test_tile_window_ys_to_d.py` to see how the `ys_to_d_descriptor` works.
+After the `ps_ys_to_xs_adapter` assigns a large tile of work to a thread, the thread needs an efficient way to manage its local piece of that data. This is where the `ys_to_d_descriptor` comes in.
 
+- **What it is:** It's the bridge between the logical, multi-dimensional `Y` coordinate space (how a programmer thinks about the thread's data) and the physical, 1D `D` offset (how that data is actually laid out in a flat register file or thread-local memory).
+- **The Analogy:** It's a local filing system for each thread. A thread asks for data using a logical coordinate like `(y0=1, y1=0)`, and the descriptor instantly returns the shelf number (`D` offset) where that data is stored.
+
+### From a Large Window to a Small Buffer
+
+A key concept is that a large `TileWindow` (e.g., a 64x64 tile with 4096 elements) is loaded into a much smaller, thread-local buffer. The `Y` dimensions represent the small, repeating access pattern a single thread performs, and the buffer (the `D` space) only needs to be large enough to hold data for one unit of this pattern.
+
+The `TileWindow.load()` operation intelligently fetches data from the large global tensor and places it into the correct slot in this small, local buffer. This powerful data distribution is at the heart of the system's efficiency.
+
+### The Y-to-D Transformation in Action
+
+Let's see this in action. We'll create a distribution, load data from a global tensor into a thread's local buffer (`StaticDistributedTensor`), and then access that data using logical `Y` coordinates.
+
+```{pyodide}
+#| file: validation_scripts/validate_ys_to_d_descriptor.py
+#| echo: true
+#| autorun: true
+
+
+import sys
+import numpy as np
+import os
+
+from pytensor.tile_distribution import make_tile_distribution_encoding, make_static_tile_distribution
+from pytensor.static_distributed_tensor import StaticDistributedTensor
+from pytensor.tensor_view import make_naive_tensor_view_packed
+from pytensor.tile_window import TileWindowWithStaticDistribution
+
+def demonstrate_ys_to_d_descriptor():
+    """
+    A minimal demonstration of creating a distribution and accessing thread-local
+    data via Y coordinates, proving the function of ys_to_d_descriptor.
+    """
+    # 1. Create a realistic tile distribution
+    encoding = make_tile_distribution_encoding(
+        rs_lengths=[],
+        hs_lengthss=[
+            [2, 4, 4, 2],  # X0: 64 elements
+            [2, 4, 4, 2]   # X1: 64 elements
+        ],
+        ps_to_rhss_major=[[1, 2], [1, 2]],
+        ps_to_rhss_minor=[[1, 1], [2, 2]],
+        ys_to_rhs_major=[1, 1, 2, 2],
+        ys_to_rhs_minor=[0, 3, 0, 3]
+    )
+    distribution = make_static_tile_distribution(encoding)
+    ys_to_d_desc = distribution.ys_to_d_descriptor
+    y_lengths = ys_to_d_desc.get_lengths()
+
+    # 2. Create a global tensor and a TileWindow
+    x0_size = np.prod(encoding.hs_lengthss[0])  # 64
+    x1_size = np.prod(encoding.hs_lengthss[1])  # 64
+    global_shape = [x0_size, x1_size]
+    global_data = np.arange(np.prod(global_shape), dtype=np.float32).reshape(global_shape)
+    
+    global_view = make_naive_tensor_view_packed(
+        data=global_data.flatten(),
+        lengths=global_shape
+    )
+    
+    tile_window = TileWindowWithStaticDistribution(
+        bottom_tensor_view=global_view,
+        window_lengths=[x0_size, x1_size],
+        window_origin=[0, 0],
+        tile_distribution=distribution
+    )
+
+    # 3. Load data into the thread-local buffer (StaticDistributedTensor)
+    distributed_tensor = tile_window.load()
+
+    print("--- Conceptual Overview ---")
+    print(f"A large {x0_size}x{x1_size} ({np.prod(global_shape)} elements) TileWindow was loaded.")
+    print(f"The data for this thread is stored in a small {len(distributed_tensor.thread_buffer)}-element buffer (the 'D' space).")
+    print(f"The ys_to_d_descriptor maps a logical Y coordinate to an offset in this buffer.")
+    
+    print("\n--- Y-to-D Transformation ---")
+    print(f"Logical Y dimensions: {y_lengths}")
+    strides = [np.prod(y_lengths[i+1:]) if i+1 < len(y_lengths) else 1 for i in range(len(y_lengths))]
+    print(f"Calculated Strides: {strides}")
+    print(f"Formula: D = y0*{strides[0]} + y1*{strides[1]} + y2*{strides[2]} + y3*{strides[3]}")
+    
+    print("\n--- Access Examples ---")
+    
+    example_coords = [
+        ([0, 0, 0, 0], "Origin"),
+        ([1, 0, 0, 0], "Step in Y0"),
+        ([0, 1, 0, 0], "Step in Y1"),
+        ([1, 1, 1, 1], "Max coordinate")
+    ]
+
+    for y_coords, desc in example_coords:
+        # High-level access (what the programmer uses)
+        value = distributed_tensor.get_element(y_coords)
+        
+        # Low-level mapping (what happens internally)
+        d_offset = ys_to_d_desc.calculate_offset(y_coords)
+        
+        print(f"Logical Y coord: {str(y_coords):<15} | {desc:<18} | -> Maps to D offset: {d_offset:<2} | Fetches Value: {value}")
+
+demonstrate_ys_to_d_descriptor()
+```
+
+### Performance Insights: Why This Design is Fast
+
+The `ys_to_d_descriptor` is not just an organizational tool; it's a critical performance feature.
+
+- **Cache Efficiency:** The linear `D` memory layout is extremely cache-friendly, ensuring that once data is loaded, subsequent accesses are fast.
+- **No Synchronization:** Because each thread operates on its own local buffer, there is no need for slow synchronization primitives like locks or atomics between threads.
+- **Enables Vectorization:** A flat, contiguous memory layout is the ideal scenario for modern SIMD hardware, allowing the processor to operate on multiple data points in a single instruction.
+- **Predictable Access:** The static, well-defined layout allows the compiler to heavily optimize the memory access patterns into the most efficient machine code possible.
 
 ## Key Takeaways
 
 TileDistribution is the foundation of efficient GPU computation in Composable Kernels:
 
+- It separates the **logical problem** (`X` dimensions) from the **thread partitioning** (`P` dimensions) and the **local access pattern** (`Y` dimensions).
+- The `ps_ys_to_xs_adapter` assigns work to threads.
+- The `ys_to_d_descriptor` provides a high-performance map for threads to access their local data.
 
-Master TileDistribution, and you're ready to understand how it connects to actual data access through TileWindow in the next section! 
+Master TileDistribution, and you're ready to understand how it connects to actual data access through TileWindow in the next section!

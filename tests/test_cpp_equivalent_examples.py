@@ -118,7 +118,7 @@ class TestCppEquivalentExamples:
         
         # Create input descriptor
         input_desc = make_naive_tensor_descriptor_packed([
-            NumKLdsBuffers, kNPerBlock, kKPerBlock // kKVector, kKVector, kKPack
+            NumKLdsBuffers, kKPerBlock // kKVector, kKVector // kKPack, kNPerBlock, kKPack
         ])
         
         # Create transforms
@@ -163,7 +163,7 @@ class TestCppEquivalentExamples:
         
         # Create input descriptor
         input_desc = make_naive_tensor_descriptor_packed([
-            NumVLdsBuffers, kNPerBlock // NPerRow, NPerRow, kKPerBlock, kKPack
+            NumVLdsBuffers, kKPerBlock // kKPack, kNPerBlock // NPerRow, NPerRow, kKPack
         ])
         
         # Create transforms
