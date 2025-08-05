@@ -732,12 +732,7 @@ class LoadStoreTraits:
         Matches C++ scalars_per_access_ exactly.
         """
         # C++ pattern: (i == VectorDimY) ? ScalarPerVector : 1
-        scalars_per_access = []
-        for i in range(self.ndim_y):
-            if i == self.vector_dim_y:
-                scalars_per_access.append(self.scalar_per_vector)
-            else:
-                scalars_per_access.append(1)
+        scalars_per_access = [self.scalar_per_vector if i == self.vector_dim_y else 1 for i in range(self.ndim_y)]
         return scalars_per_access
     
     def _get_space_filling_curve(self):

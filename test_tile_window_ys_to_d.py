@@ -165,8 +165,7 @@ def demonstrate_load_and_access(distribution, tile_window, global_data, window_o
     print(f"✅ Data loaded into distributed tensor!")
     print(f"📊 Thread buffer info:")
     print(f"   Buffer length: {len(distributed_tensor.thread_buffer)}")
-    print(f"   Buffer sample (first 10): {distributed_tensor.thread_buffer[:10]}")
-    print(f"   Buffer sample (last 10): {distributed_tensor.thread_buffer[-10:]}")
+    print(f"   Buffer sample: {distributed_tensor.thread_buffer}")
     
     # Show what data we expect to have loaded (sample only due to large size)
     print(f"\n🔍 Expected data from global tensor:")
@@ -268,9 +267,9 @@ def demonstrate_ys_to_d_access(distribution, distributed_tensor):
         # Method 3: Manual calculation for verification
         manual_d = sum(y_coords[i] * strides[i] for i in range(len(y_coords)))
         value3 = distributed_tensor.thread_buffer[manual_d]
-        
+
         # Check consistency
-        consistent = value1 == value2 == value3
+        consistent = value1 == value2 == value3 
         status = "✅" if consistent else "❌"
         
         print(f"   Y{y_coords} -> D[{d_offset}] = {value1} {status} ({description})")

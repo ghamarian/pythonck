@@ -1528,13 +1528,13 @@ def create_single_stage_descriptor(input_desc, transforms, lower_dimension_old_t
 
 def make_merge_transform(lengths: Union[List[int], Tuple]) -> Transform:
     """
-    Create a merge transform - C++ equivalent with immediate flattening.
+    Create a merge transform - C++ equivalent behavior.
     
     Args:
-        lengths: List or tuple of integers (dimension lengths) or Transform objects
+        lengths: List or tuple of integers (dimension lengths only)
         
     Returns:
-        MergeTransform with flattened lengths (C++ equivalent behavior)
+        MergeTransform (C++ equivalent behavior)
     """
     # Convert tuple to list if needed (for make_tuple compatibility)
     if isinstance(lengths, tuple):
