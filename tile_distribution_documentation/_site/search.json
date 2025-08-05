@@ -1650,6 +1650,7 @@
     "title": "Tensor Adaptors - Chaining Transformations",
     "section": "Transform Addition: Extending Existing Adaptors",
     "text": "Transform Addition: Extending Existing Adaptors\nYou can add new transforms to existing adaptors using transform_tensor_adaptor. Important: The new_upper_dimension_new_top_idss parameter controls the final output dimensions of the adaptor.\n\n\n\n\n\n\n\nC++ Implementation\n// From composable_kernel - transform tensor adaptor pattern\n\n// Start with transposed descriptor\nauto base_desc = make_naive_tensor_descriptor(\n    make_tuple(3, 4),\n    make_tuple(1, 3)   // transposed strides\n);\n\n// Add padding to both dimensions\nauto padded_desc = transform_tensor_descriptor(\n    base_desc,\n    make_tuple(make_pad_transform(3, 1, 1),   // pad dim 0: 3 → 5\n               make_pad_transform(4, 0, 0)),   // keep dim 1: 4 → 4\n    make_tuple(sequence&lt;0&gt;{}, sequence&lt;1&gt;{}),  // input dims\n    make_tuple(sequence&lt;0&gt;{}, sequence&lt;1&gt;{})   // output dims (keep 2D)\n);\n\n// Access pattern\nmulti_index&lt;2&gt; padded_coord{1, 2};  // In padded space\n// Internally calculates: unpadded = [1-1, 2] = [0, 2]\n// Then applies transpose strides",
+<<<<<<< HEAD
     "crumbs": [
       "Transformation Engine",
       "Tensor Adaptors - Chaining Transformations"
@@ -1661,6 +1662,8 @@
     "title": "Tensor Adaptors - Chaining Transformations",
     "section": "Advanced C++ Patterns",
     "text": "Advanced C++ Patterns\n\nComplex Nested Transforms in C++\n// From composable_kernel - complex nested transform patterns\n\n// Example: 4D tensor with complex transformations\n// Shape: [A, B, C, D] with various transforms\n\n// 1. Create base descriptor\nauto base_desc = make_naive_tensor_descriptor_packed(\n    make_tuple(A, B, C, D)\n);\n\n// 2. Apply multiple transformations\n// First: merge first 3 dimensions\nauto step1_desc = transform_tensor_descriptor(\n    base_desc,\n    make_tuple(make_merge_transform(make_tuple(A, B, C)),\n               make_pass_through_transform(D)),\n    make_tuple(sequence&lt;0, 1, 2&gt;{}, sequence&lt;3&gt;{}),  // input mapping\n    make_tuple(sequence&lt;0&gt;{}, sequence&lt;1&gt;{})         // output: 2D\n);\n\n// 3. Then unmerge back but with different grouping\nauto step2_desc = transform_tensor_descriptor(\n    step1_desc,\n    make_tuple(make_unmerge_transform(make_tuple(A*B, C)),\n               make_pass_through_transform(D)),\n    make_tuple(sequence&lt;0&gt;{}, sequence&lt;1&gt;{}),        // from 2D\n    make_tuple(sequence&lt;0, 1&gt;{}, sequence&lt;2&gt;{})      // to 3D\n);\n\n// The adaptor chain is embedded in the descriptors\n// CK optimizes these at compile time\n\n\nGPU Memory Layout Example\n// From composable_kernel - typical GPU block descriptor pattern\n\n// Create descriptor for thread block tile: 64x64\n// With 8x8 vector loads per thread\nconstexpr auto BlockM = 64;\nconstexpr auto BlockN = 64;\nconstexpr auto VectorM = 8;\nconstexpr auto VectorN = 8;\n\n// Thread arrangement: 8x8 threads\nconstexpr auto ThreadM = BlockM / VectorM;  // 8\nconstexpr auto ThreadN = BlockN / VectorN;  // 8\n\n// Create block descriptor with proper layout\nauto block_desc = transform_tensor_descriptor(\n    make_naive_tensor_descriptor_packed(\n        make_tuple(number&lt;BlockM&gt;{}, number&lt;BlockN&gt;{})\n    ),\n    make_tuple(\n        make_unmerge_transform(make_tuple(\n            number&lt;ThreadM&gt;{}, number&lt;VectorM&gt;{}\n        )),\n        make_unmerge_transform(make_tuple(\n            number&lt;ThreadN&gt;{}, number&lt;VectorN&gt;{}\n        ))\n    ),\n    make_tuple(sequence&lt;0&gt;{}, sequence&lt;1&gt;{}),           // from 2D\n    make_tuple(sequence&lt;0, 2&gt;{}, sequence&lt;1, 3&gt;{})     // to 4D: [TM,TN,VM,VN]\n);\n\n// This creates the layout:\n// - Dimension 0,1: Thread indices\n// - Dimension 2,3: Vector indices within thread\n// Enables coalesced memory access on GPU",
+=======
+>>>>>>> df61344 (pushes the renderes after rebase)
     "crumbs": [
       "Transformation Engine",
       "Tensor Adaptors - Chaining Transformations"
@@ -2359,6 +2362,171 @@
     "crumbs": [
       "Coordinate Systems",
       "Coordinate Systems - The Mathematical Foundation"
+    ]
+  },
+  {
+    "objectID": "concepts/01_buffer_view.html#python-vs-c-key-differences",
+    "href": "concepts/01_buffer_view.html#python-vs-c-key-differences",
+    "title": "Buffer Views - Raw Memory Access",
+    "section": "",
+    "text": "C++: BufferView uses template metaprogramming with compile-time constants\n\nSize is encoded in the type: number&lt;8&gt;{}\nAddress space is a template parameter\nEnables aggressive compiler optimizations\n\nPython: Everything is runtime\n\nSize is a regular integer\nAddress space is an enum value\nDesigned for learning and experimentation\n\n\n\n\n\n\nC++: Direct pointer to GPU memory\n\nNo memory allocation - uses existing memory\nPointer arithmetic for addressing\nZero-copy access to device memory\n\nPython: NumPy array simulation\n\nUses host memory to simulate GPU memory\nPython manages memory lifetime\nEducational approximation of GPU behavior\n\n\n\n\n\n\nC++: Strong compile-time typing\nbuffer_view&lt;float*, address_space_enum::global&gt;  // Type encodes everything\nPython: Dynamic typing with runtime checks\nBufferView  # Generic class, properties stored as members",
+    "crumbs": [
+      "Foundation",
+      "Buffer Views - Raw Memory Access"
+    ]
+  },
+  {
+    "objectID": "concepts/01_buffer_view.html#creation-modes",
+    "href": "concepts/01_buffer_view.html#creation-modes",
+    "title": "Buffer Views - Raw Memory Access",
+    "section": "Creation Modes",
+    "text": "Creation Modes\n\nZero Value Mode\n// Basic buffer view creation with automatic zero for invalid elements\nvoid basic_creation_example() {\n    // Create data array\n    constexpr size_t buffer_size = 8;\n    float data[buffer_size] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f};\n    \n    // Create global memory buffer view\n    auto buffer_view = make_buffer_view&lt;address_space_enum::global&gt;(data, buffer_size);\n}\n\n\nCustom Value Mode\nvoid custom_invalid_value_example() {\n    constexpr size_t buffer_size = 8;\n    float data[buffer_size] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f};\n    float custom_invalid = 13.0f;\n    \n    // Create buffer view with custom invalid value\n    auto buffer_view = make_buffer_view&lt;address_space_enum::global&gt;(\n        data, buffer_size, custom_invalid);\n}",
+    "crumbs": [
+      "Foundation",
+      "Buffer Views - Raw Memory Access"
+    ]
+  },
+  {
+    "objectID": "concepts/01_buffer_view.html#scalar-access",
+    "href": "concepts/01_buffer_view.html#scalar-access",
+    "title": "Buffer Views - Raw Memory Access",
+    "section": "Scalar Access",
+    "text": "Scalar Access\nScalar Access Parameters:\n\ni (index): Base offset in terms of T elements\nlinear_offset: Additional offset to add to the base index\nis_valid_element: Boolean controlling whether the access is valid\n\nInvalid Value Modes:\nIs specified while making the buffer view as shown in the above example.\n\nZero mode (InvalidElementUseNumericalZeroValue = true): Returns zero for invalid accesses.\nCustom mode (InvalidElementUseNumericalZeroValue = false): Returns the specified invalid value\n\nOut-of-Bounds Handling: The buffer view automatically handles bounds checking when AMD buffer addressing is enabled.",
+    "crumbs": [
+      "Foundation",
+      "Buffer Views - Raw Memory Access"
+    ]
+  },
+  {
+    "objectID": "concepts/01_buffer_view.html#vector-access",
+    "href": "concepts/01_buffer_view.html#vector-access",
+    "title": "Buffer Views - Raw Memory Access",
+    "section": "Vector Access",
+    "text": "Vector Access\nVector operations use template parameters to specify the vector type (e.g., ext_vector_t&lt;float, N&gt; for N elements). The same parameters apply as scalar access, but the operation reads/writes multiple contiguous elements.",
+    "crumbs": [
+      "Foundation",
+      "Buffer Views - Raw Memory Access"
+    ]
+  },
+  {
+    "objectID": "concepts/01_buffer_view.html#scalar-vs-vectorized-memory-access",
+    "href": "concepts/01_buffer_view.html#scalar-vs-vectorized-memory-access",
+    "title": "Buffer Views - Raw Memory Access",
+    "section": "Scalar vs Vectorized Memory Access",
+    "text": "Scalar vs Vectorized Memory Access\n\ngraph LR\n    subgraph \"Scalar Access (4 instructions)\"\n        S1[\"Load float[0]\"] --&gt; R1[\"Register 1\"]\n        S2[\"Load float[1]\"] --&gt; R2[\"Register 2\"]\n        S3[\"Load float[2]\"] --&gt; R3[\"Register 3\"]\n        S4[\"Load float[3]\"] --&gt; R4[\"Register 4\"]\n    end\n    \n    subgraph \"Vectorized Access (1 instruction)\"\n        V1[\"Load float4[0]\"] --&gt; VR[\"Vector Register(4 floats)\"]\n    end\n    \n    subgraph \"Performance Impact\"\n        Perf[\"4x fewer instructionsBetter memory bandwidthReduced latency\"]\n    end\n    \n    R1 & R2 & R3 & R4 --&gt; Perf\n    VR --&gt; Perf\n    \n    style S1 fill:#fee2e2,stroke:#ef4444,stroke-width:2px\n    style S2 fill:#fee2e2,stroke:#ef4444,stroke-width:2px\n    style S3 fill:#fee2e2,stroke:#ef4444,stroke-width:2px\n    style S4 fill:#fee2e2,stroke:#ef4444,stroke-width:2px\n    style V1 fill:#d1fae5,stroke:#10b981,stroke-width:2px\n    style Perf fill:#fef3c7,stroke:#f59e0b,stroke-width:2px",
+    "crumbs": [
+      "Foundation",
+      "Buffer Views - Raw Memory Access"
+    ]
+  },
+  {
+    "objectID": "concepts/01_buffer_view.html#understanding-bufferview-indexing",
+    "href": "concepts/01_buffer_view.html#understanding-bufferview-indexing",
+    "title": "Buffer Views - Raw Memory Access",
+    "section": "Understanding BufferView Indexing",
+    "text": "Understanding BufferView Indexing\n\nflowchart LR\n    subgraph \"Input Parameters\"\n        Offset[\"Offset(e.g., 5)\"]\n        ValidFlag[\"Valid Flag(optional)\"]\n    end\n    \n    subgraph \"Processing\"\n        BoundsCheck{{\"Bounds Checkoffset &lt; buffer_size?\"}}\n        FlagCheck{{\"Flag Checkvalid_flag == True?\"}}\n        Access[\"Access Memorybuffer[offset]\"]\n    end\n    \n    subgraph \"Output\"\n        ValidResult[\"Valid ResultReturn value\"]\n        Invalid[\"Invalid ResultReturn 0 or default\"]\n    end\n    \n    Offset --&gt; BoundsCheck\n    ValidFlag --&gt; FlagCheck\n    \n    BoundsCheck --&gt;|Yes| FlagCheck\n    BoundsCheck --&gt;|No| Invalid\n    \n    FlagCheck --&gt;|Yes| Access\n    FlagCheck --&gt;|No| Invalid\n    \n    Access --&gt; ValidResult\n    \n    style Offset fill:#e0e7ff,stroke:#4338ca,stroke-width:2px\n    style ValidFlag fill:#e0e7ff,stroke:#4338ca,stroke-width:2px\n    style ValidResult fill:#d1fae5,stroke:#10b981,stroke-width:2px\n    style Invalid fill:#fee2e2,stroke:#ef4444,stroke-width:2px",
+    "crumbs": [
+      "Foundation",
+      "Buffer Views - Raw Memory Access"
+    ]
+  },
+  {
+    "objectID": "concepts/01_buffer_view.html#c-get-operations",
+    "href": "concepts/01_buffer_view.html#c-get-operations",
+    "title": "Buffer Views - Raw Memory Access",
+    "section": "C++ Get Operations",
+    "text": "C++ Get Operations\n__device__ void example_get_operations()\n{\n    // Create buffer view\n    float data[8] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f};\n    auto buffer_view = make_buffer_view&lt;address_space_enum::global&gt;(data, 8);\n\n    // Simple get - compile-time bounds checking when possible\n    auto value_buf = buffer_view.template get&lt;float&gt;(0,1,true); //get the buffer from the buffer view\n    float value = value_buf.get(0); //get the value from the buffer\n\n    // Get with valid flag - branchless conditional access\n    bool valid_flag = false;\n    value_buf = buffer_view.template get&lt;float&gt;(0,1,valid_flag);\n    value = value_buf.get(0);\n    // Returns 0 valid_flag is false\n\n    // vectorized get\n    using float2 = ext_vector_t&lt;float, 2&gt;;\n    auto vector_buf = buffer_view.template get&lt;float2&gt;(0, 0, true);\n    // Loads 2 floats in a single instruction\n    float val1 = vector_buf.get(0);\n    float val2 = vector_buf.get(1);\n}\n\nCustom Value Return Mode for OOB & Invalid Access\nvoid scalar_get_operations_example() {\n\n   // Create data array\n   constexpr size_t buffer_size = 8;\n   float data[buffer_size] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f};\n   float custom_invalid = 13.0f;\n   \n   // Create global memory buffer view with zero invalid value mode (default)\n   auto buffer_view = make_buffer_view&lt;address_space_enum::global&gt;(data, buffer_size, custom_invalid);\n   \n   // Invalid element access with is_valid_element=false\n   // Returns custom_invalid due to custom invalid value mode\n   auto invalid_value = buffer_view.template get&lt;float&gt;(0, 0, false);\n   printf(\"Invalid element: %.1f\\n\", invalid_value.get(0));\n   \n   // Out of bounds access - AMD buffer addressing handles bounds checking\n   // Will return custom_invalid when accessing beyond buffer_size\n   auto oob_value = buffer_view.template get&lt;float&gt;(0, 100, true);\n   printf(\"Out of bounds: %.1f\\n\", oob_value.get(0));\n}\nNOTE: Partial Out Of Bound (OOB) access during vector reads will return ‘junk’ values for the OOB access. Zero or custom invalid value is only returned for complete invalid/OOB access, i.e. when the first address of the vector is invalid.",
+    "crumbs": [
+      "Foundation",
+      "Buffer Views - Raw Memory Access"
+    ]
+  },
+  {
+    "objectID": "concepts/01_buffer_view.html#c-update-operations",
+    "href": "concepts/01_buffer_view.html#c-update-operations",
+    "title": "Buffer Views - Raw Memory Access",
+    "section": "C++ Update Operations",
+    "text": "C++ Update Operations\nvoid scalar_set_operations_example() {\n        \n    // Create data array\n    constexpr size_t buffer_size = 8;\n    float data[buffer_size] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f};\n    \n    // Create global memory buffer view\n    auto buffer_view = make_buffer_view&lt;address_space_enum::global&gt;(data, buffer_size);\n    \n    // Basic set: set&lt;T&gt;(i, linear_offset, is_valid_element, value)\n    // Sets element at position i + linear_offset = 0 + 2 = 2\n    buffer_view.template set&lt;float&gt;(0, 2, true, 99.0f);\n    \n    // Invalid write with is_valid_element=false (ignored)\n    buffer_view.template set&lt;float&gt;(0, 3, false, 777.0f);\n    \n    // Out of bounds write - handled safely by AMD buffer addressing\n    buffer_view.template set&lt;float&gt;(0, 100, true, 555.0f);\n\n    // Vector set\n    using float2 = ext_vector_t&lt;float, 2&gt;;\n    float2 pair_values{100.0f, 200.0f};\n    buffer_view.template set&lt;float2&gt;(0, 5, true, pair_values);\n}",
+    "crumbs": [
+      "Foundation",
+      "Buffer Views - Raw Memory Access"
+    ]
+  },
+  {
+    "objectID": "concepts/01_buffer_view.html#atomic-vs-non-atomic-operations",
+    "href": "concepts/01_buffer_view.html#atomic-vs-non-atomic-operations",
+    "title": "Buffer Views - Raw Memory Access",
+    "section": "Atomic vs Non-Atomic Operations",
+    "text": "Atomic vs Non-Atomic Operations\n\ngraph TB\n    subgraph \"Non-Atomic Operation (Race Condition)\"\n        NA1[\"Thread 1: Read value (10)\"] --&gt; NA2[\"Thread 1: Add 5 (15)\"]\n        NA3[\"Thread 2: Read value (10)\"] --&gt; NA4[\"Thread 2: Add 3 (13)\"]\n        NA2 --&gt; NA5[\"Thread 1: Write 15\"]\n        NA4 --&gt; NA6[\"Thread 2: Write 13\"]\n        NA5 & NA6 --&gt; NA7[\"Final value: 13 ❌(Lost update from Thread 1)\"]\n    end\n    \n    subgraph \"Atomic Operation (Thread-Safe)\"\n        A1[\"Thread 1: atomic_add(5)\"] --&gt; A2[\"Hardware ensuresserialization\"]\n        A3[\"Thread 2: atomic_add(3)\"] --&gt; A2\n        A2 --&gt; A4[\"Final value: 18 ✓(Both updates applied)\"]\n    end\n    \n    style NA7 fill:#fee2e2,stroke:#ef4444,stroke-width:2px\n    style A4 fill:#d1fae5,stroke:#10b981,stroke-width:2px",
+    "crumbs": [
+      "Foundation",
+      "Buffer Views - Raw Memory Access"
+    ]
+  },
+  {
+    "objectID": "concepts/01_buffer_view.html#c-atomic-operations",
+    "href": "concepts/01_buffer_view.html#c-atomic-operations",
+    "title": "Buffer Views - Raw Memory Access",
+    "section": "C++ Atomic Operations",
+    "text": "C++ Atomic Operations\n__device__ void example_atomic_operations()\n{\n    // Shared memory for workgroup-level reductions\n    __shared__ float shared_sum[256];\n    auto shared_buffer_view = make_buffer_view&lt;address_space_enum::lds&gt;(\n        shared_sum, 256\n    );\n\n    // Initialize shared memory\n    if (threadIdx.x &lt; 256) {\n        shared_buffer_view.template set&lt;float&gt;(threadIdx.x, 0.0f, true);\n    }\n    __syncthreads();\n\n    // Each thread atomically adds to shared memory\n    auto my_value = static_cast&lt;float&gt;(threadIdx.x);\n    shared_buffer_view.template update&lt;memory_operation_enum::atomic_add, float&gt;(0,0,true,my_value);\n    \n    // Atomic max for finding maximum value\n    shared_buffer_view.template update&lt;memory_operation_enum::atomic_max, float&gt;(0,1,true,my_value);\n    \n    __syncthreads();\n}",
+    "crumbs": [
+      "Foundation",
+      "Buffer Views - Raw Memory Access"
+    ]
+  },
+  {
+    "objectID": "concepts/01_tensor_view.html#flow-layouts-from-coordinates-to-memory",
+    "href": "concepts/01_tensor_view.html#flow-layouts-from-coordinates-to-memory",
+    "title": "Tensor Views - Multi-Dimensional Structure",
+    "section": "Flow & Layouts: From Coordinates to Memory",
+    "text": "Flow & Layouts: From Coordinates to Memory\n\nflowchart LR\n    subgraph \"User Input\"\n        Coord[\"Coordinate(1, 2)\"]\n    end\n    \n    subgraph \"TensorView Processing\"\n        Shape[\"Shape Checkrow &lt; 3?col &lt; 4?\"]\n        Stride[\"Apply Stridesoffset = 1×4 + 2×1\"]\n        Buffer[\"BufferView Accessbuffer[6]\"]\n    end\n    \n    subgraph \"Result\"\n        Value[\"Value: 6\"]\n    end\n    \n    Coord --&gt; Shape\n    Shape --&gt;|Valid| Stride\n    Stride --&gt; Buffer\n    Buffer --&gt; Value\n    \n    style Coord fill:#e0e7ff,stroke:#4338ca,stroke-width:2px\n    style Shape fill:#fef3c7,stroke:#f59e0b,stroke-width:2px\n    style Stride fill:#dcfce7,stroke:#10b981,stroke-width:2px\n    style Buffer fill:#dbeafe,stroke:#3b82f6,stroke-width:2px\n    style Value fill:#d1fae5,stroke:#10b981,stroke-width:2px\n\n\ngraph TB\n    subgraph \"Row-Major Layout (C-style)\"\n        RM[\"Memory: [0,1,2,3,4,5,6,7,8,9,10,11]Shape: (3,4)Strides: (4,1)\"]\n        RMMatrix[\"[[0, 1, 2, 3] [4, 5, 6, 7] [8, 9, 10, 11]]\"]\n        RM --&gt; RMMatrix\n    end\n    \n    subgraph \"Column-Major Layout (Fortran-style)\"\n        CM[\"Memory: [0,3,6,9,1,4,7,10,2,5,8,11]Shape: (3,4)Strides: (1,3)\"]\n        CMMatrix[\"[[0, 1, 2, 3] [4, 5, 6, 7] [8, 9, 10, 11]]\"]\n        CM --&gt; CMMatrix\n    end\n    \n    subgraph \"Custom Stride (Transposed View)\"\n        TV[\"Memory: [0,1,2,3,4,5,6,7,8,9,10,11]Shape: (4,3)Strides: (1,4)\"]\n        TVMatrix[\"[[0, 4, 8] [1, 5, 9] [2, 6, 10] [3, 7, 11]]\"]\n        TV --&gt; TVMatrix\n    end\n    \n    style RM fill:#e0f2fe,stroke:#0284c7,stroke-width:2px\n    style CM fill:#fef3c7,stroke:#f59e0b,stroke-width:2px\n    style TV fill:#f3e8ff,stroke:#9333ea,stroke-width:2px",
+    "crumbs": [
+      "Foundation",
+      "Tensor Views - Multi-Dimensional Structure"
+    ]
+  },
+  {
+    "objectID": "concepts/02_transforms.html#unmergetransform---multi-d-to-linear",
+    "href": "concepts/02_transforms.html#unmergetransform---multi-d-to-linear",
+    "title": "Individual Transforms",
+    "section": "2. UnmergeTransform - Multi-D to Linear",
+    "text": "2. UnmergeTransform - Multi-D to Linear\nConverts multi-dimensional coordinates to linear (1D) coordinates.\n\ngraph LR\n    subgraph \"Upper (3D)\"\n        U1[\"Shape: [3, 4, 2]Coord: (1, 3, 0)\"]\n    end\n    \n    subgraph \"Lower (1D)\"\n        L1[\"Linear index: 14\"]\n    end\n    \n    subgraph \"Calculation\"\n        C[\"14 = 1×(4×2) + 3×2 + 014 = 8 + 6 + 0\"]\n    end\n    \n    U1 --&gt; C\n    C --&gt; L1\n    \n    style U1 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px\n    style L1 fill:#fff3e0,stroke:#f57c00,stroke-width:2px\n\n\n\n\n\n\n\n\nC++ Implementation\n// From composable_kernel/include/ck_tile/core/algorithm/coordinate_transform.hpp\n\n// Create unmerge transform for 3x4x2 tensor\nauto transform = make_unmerge_transform(\n    make_tuple(3, 4, 2)  // upper lengths\n);\n\n// The unmerge transform inherits from base_transform&lt;1, UpLengths::size()&gt;\n// meaning 1 lower dimension → multiple upper dimensions\n\n// Forward: Multi-D → Linear\nmulti_index&lt;3&gt; upper_coord{1, 3, 0};\nmulti_index&lt;1&gt; lower_coord;\ntransform.calculate_lower_index(lower_coord, upper_coord);\n// Result: lower_coord[0] = 1*(4*2) + 3*2 + 0 = 14\n\n// Backward: Linear → Multi-D (unpacking)\nmulti_index&lt;1&gt; packed_idx{14};\nmulti_index&lt;3&gt; unpacked_coord;\n// This would compute: unpacked_coord = [1, 3, 0]\n\n// Use in tensor descriptor\nauto desc = make_naive_tensor_descriptor_packed(\n    make_tuple(number&lt;3&gt;{}, number&lt;4&gt;{}, number&lt;2&gt;{})\n);\n// UnmergeTransform is used internally for packed layouts",
+    "crumbs": [
+      "Transformation Engine",
+      "Individual Transforms"
+    ]
+  },
+  {
+    "objectID": "concepts/02_transforms.html#mergetransform---linear-to-multi-d",
+    "href": "concepts/02_transforms.html#mergetransform---linear-to-multi-d",
+    "title": "Individual Transforms",
+    "section": "3. MergeTransform - Linear to Multi-D",
+    "text": "3. MergeTransform - Linear to Multi-D\nInverse of UnmergeTransform - expands linear coordinates to multi-dimensional.\n\ngraph LR\n    subgraph \"Upper (1D)\"\n        U1[\"Linear index: 13\"]\n    end\n    \n    subgraph \"Lower (2D)\"\n        L1[\"Shape: [4, 5]Coord: (2, 3)\"]\n    end\n    \n    subgraph \"Calculation\"\n        C[\"13 = 2×5 + 3row=13÷5=2, col=13%5=3\"]\n    end\n    \n    U1 --&gt; C\n    C --&gt; L1\n    \n    style U1 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px\n    style L1 fill:#fff3e0,stroke:#f57c00,stroke-width:2px\n\n\n\n\n\n\n\n\nC++ Implementation\n// From composable_kernel/include/ck_tile/core/algorithm/coordinate_transform.hpp\n\n// Create merge transform for 4x5 tensor\nauto transform = make_merge_transform(\n    make_tuple(4, 5)  // lower lengths\n);\n\n// The merge transform inherits from base_transform&lt;LowLengths::size(), 1&gt;\n// meaning multiple lower dimensions → 1 upper dimension\n\n// Forward: Linear → Multi-D (splitting)\nmulti_index&lt;1&gt; upper_coord{13};\nmulti_index&lt;2&gt; lower_coord;\ntransform.calculate_lower_index(lower_coord, upper_coord);\n// Result: lower_coord[0] = 13 / 5 = 2 (row)\n//         lower_coord[1] = 13 % 5 = 3 (col)\n\n// CK provides two merge implementations:\n// 1. merge_v2_magic_division (default) - uses magic number division\n// 2. merge_v3_division_mod - for power-of-2 dimensions\n\n// Common usage: dimension reduction\nauto desc = transform_tensor_descriptor(\n    input_desc,\n    make_tuple(make_merge_transform(make_tuple(M, N))),\n    make_tuple(sequence&lt;0, 1&gt;{}),  // merge dims 0,1\n    make_tuple(sequence&lt;0&gt;{})      // to single dim 0\n);",
+    "crumbs": [
+      "Transformation Engine",
+      "Individual Transforms"
+    ]
+  },
+  {
+    "objectID": "concepts/02_transforms.html#additional-transforms-in-composable-kernel",
+    "href": "concepts/02_transforms.html#additional-transforms-in-composable-kernel",
+    "title": "Individual Transforms",
+    "section": "Additional Transforms in Composable Kernel",
+    "text": "Additional Transforms in Composable Kernel\n\n8. XorTransform - 2D XOR Mapping\n// From composable_kernel - special 2D coordinate transform\nauto transform = make_xor_transform(make_tuple(4, 8));  // 4x8 dimensions\n\n// The xor_t transform inherits from base_transform&lt;2, 2&gt;\n// Special mapping: lower[1] = upper[1] ^ (upper[0] % lengths[1])\n\nmulti_index&lt;2&gt; upper_coord{2, 5};\nmulti_index&lt;2&gt; lower_coord;\ntransform.calculate_lower_index(lower_coord, upper_coord);\n// Result: lower[0] = 2, lower[1] = 5 ^ (2 % 8) = 5 ^ 2 = 7\n\n// Used for specialized memory access patterns in some algorithms\n\n\n9. SliceTransform - Extract Sub-region\n// From composable_kernel - extract a slice from a dimension\nauto transform = make_slice_transform(\n    10,    // low_length (total dimension)\n    2,     // slice_begin\n    7      // slice_end\n);\n\n// Maps upper range [0, 5) to lower range [2, 7)\nmulti_index&lt;1&gt; upper_coord{3};\nmulti_index&lt;1&gt; lower_coord;\ntransform.calculate_lower_index(lower_coord, upper_coord);\n// Result: lower_coord[0] = 3 + 2 = 5\n\n\n10. ModuloTransform - Cyclic Wrapping\n// From composable_kernel - modulo operation for cyclic access\nauto transform = make_modulo_transform(\n    4,     // modulus\n    16     // up_length\n);\n\n// Maps coordinates cyclically\nmulti_index&lt;1&gt; upper_coord{13};\nmulti_index&lt;1&gt; lower_coord;\ntransform.calculate_lower_index(lower_coord, upper_coord);\n// Result: lower_coord[0] = 13 % 4 = 1",
+    "crumbs": [
+      "Transformation Engine",
+      "Individual Transforms"
+    ]
+  },
+  {
+    "objectID": "concepts/02_adaptors.html#advanced-c-patterns",
+    "href": "concepts/02_adaptors.html#advanced-c-patterns",
+    "title": "Tensor Adaptors - Chaining Transformations",
+    "section": "Advanced C++ Patterns",
+    "text": "Advanced C++ Patterns\n\nComplex Nested Transforms in C++\n// From composable_kernel - complex nested transform patterns\n\n// Example: 4D tensor with complex transformations\n// Shape: [A, B, C, D] with various transforms\n\n// 1. Create base descriptor\nauto base_desc = make_naive_tensor_descriptor_packed(\n    make_tuple(A, B, C, D)\n);\n\n// 2. Apply multiple transformations\n// First: merge first 3 dimensions\nauto step1_desc = transform_tensor_descriptor(\n    base_desc,\n    make_tuple(make_merge_transform(make_tuple(A, B, C)),\n               make_pass_through_transform(D)),\n    make_tuple(sequence&lt;0, 1, 2&gt;{}, sequence&lt;3&gt;{}),  // input mapping\n    make_tuple(sequence&lt;0&gt;{}, sequence&lt;1&gt;{})         // output: 2D\n);\n\n// 3. Then unmerge back but with different grouping\nauto step2_desc = transform_tensor_descriptor(\n    step1_desc,\n    make_tuple(make_unmerge_transform(make_tuple(A*B, C)),\n               make_pass_through_transform(D)),\n    make_tuple(sequence&lt;0&gt;{}, sequence&lt;1&gt;{}),        // from 2D\n    make_tuple(sequence&lt;0, 1&gt;{}, sequence&lt;2&gt;{})      // to 3D\n);\n\n// The adaptor chain is embedded in the descriptors\n// CK optimizes these at compile time\n\n\nGPU Memory Layout Example\n// From composable_kernel - typical GPU block descriptor pattern\n\n// Create descriptor for thread block tile: 64x64\n// With 8x8 vector loads per thread\nconstexpr auto BlockM = 64;\nconstexpr auto BlockN = 64;\nconstexpr auto VectorM = 8;\nconstexpr auto VectorN = 8;\n\n// Thread arrangement: 8x8 threads\nconstexpr auto ThreadM = BlockM / VectorM;  // 8\nconstexpr auto ThreadN = BlockN / VectorN;  // 8\n\n// Create block descriptor with proper layout\nauto block_desc = transform_tensor_descriptor(\n    make_naive_tensor_descriptor_packed(\n        make_tuple(number&lt;BlockM&gt;{}, number&lt;BlockN&gt;{})\n    ),\n    make_tuple(\n        make_unmerge_transform(make_tuple(\n            number&lt;ThreadM&gt;{}, number&lt;VectorM&gt;{}\n        )),\n        make_unmerge_transform(make_tuple(\n            number&lt;ThreadN&gt;{}, number&lt;VectorN&gt;{}\n        ))\n    ),\n    make_tuple(sequence&lt;0&gt;{}, sequence&lt;1&gt;{}),           // from 2D\n    make_tuple(sequence&lt;0, 2&gt;{}, sequence&lt;1, 3&gt;{})     // to 4D: [TM,TN,VM,VN]\n);\n\n// This creates the layout:\n// - Dimension 0,1: Thread indices\n// - Dimension 2,3: Vector indices within thread\n// Enables coalesced memory access on GPU",
+    "crumbs": [
+      "Transformation Engine",
+      "Tensor Adaptors - Chaining Transformations"
     ]
   }
 ]
