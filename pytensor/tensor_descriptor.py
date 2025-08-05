@@ -348,24 +348,26 @@ class UnmergeTransform(Transform):
                           idx_upper_new: MultiIndex) -> Tuple[MultiIndex, MultiIndex]:
         """Update lower index using incremental calculation.
         
-        Following C++ unmerge pattern: calculate new lower from new upper,
-        then compute differences.
+        Following C++ unmerge pattern: calculate lower diff from upper diff,
+        then add to current lower index.
         """
-        if len(idx_upper_diff) != 1 or len(idx_lower_current) != self.ndim:
-            raise ValueError(f"UnmergeTransform expects 1D upper and {self.ndim}D lower indices")
+        if len(idx_upper_diff) != self.ndim or len(idx_lower_current) != 1:
+            raise ValueError(f"UnmergeTransform expects {self.ndim}D upper and 1D lower indices")
         
-        # Calculate new lower index from new upper index
-        idx_lower_new = self.calculate_lower_index(idx_upper_new)
+        # Match C++ unmerge update_lower_index: calculate_lower_index(idx_diff_low, idx_diff_up)
+        # Then: idx_low += idx_diff_low
         
-        # Calculate difference: new - current
-        lower_diff_values = []
+        # Calculate lower diff from upper diff using the same logic as calculate_lower_index
+        lower_diff = 0
         for i in range(self.ndim):
-            diff = idx_lower_new[i] - idx_lower_current[i]
-            lower_diff_values.append(diff)
+            lower_diff += idx_upper_diff[i] * self.strides[i]
         
-        idx_lower_diff = MultiIndex(self.ndim, lower_diff_values)
+        idx_lower_diff = MultiIndex(1, [lower_diff])
         
-        return idx_lower_diff, idx_lower_new
+        # Update: lower_new = lower_current + lower_diff
+        idx_lower_updated = MultiIndex(1, [idx_lower_current[0] + idx_lower_diff[0]])
+        
+        return idx_lower_diff, idx_lower_updated
 
 
 class OffsetTransform(Transform):
@@ -1835,4 +1837,4 @@ def sequence(*values):
     Returns:
         List of values
     """
-    return list(values)
+    return list(values) 
