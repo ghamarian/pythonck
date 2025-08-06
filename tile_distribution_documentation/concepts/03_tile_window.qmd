@@ -240,7 +240,7 @@ for i in range(4):
 ## Load Operation Architecture
 
 ```{=html}
-<div class="mermaid">
+<div class="mermaid" style="margin: 0 auto; display: block; width: 60%;">
 graph TB
     subgraph "Load Analysis"
         Analyze["Analyze access pattern<br/>Detect coalescing opportunities"]
@@ -392,7 +392,7 @@ windows = create_overlapping_windows([8, 8], window_size=3, overlap=1)
 ## Computation Architecture
 
 ```{=html}
-<div class="mermaid">
+<div class="mermaid" style="margin: 0 auto; display: block; width: 30%;">
 graph TB
     subgraph "Load Phase"
         LW["Load Window<br/>Global → Registers"]
@@ -533,7 +533,7 @@ flowchart LR
 ## Pipeline Optimization
 
 ```{=html}
-<div class="mermaid">
+<div class="mermaid" style="margin: 0 auto; display: block; width: 60%;">
 graph TB
     subgraph "Basic Pipeline"
         B1["Load"] --> B2["Compute"] --> B3["Store"]
@@ -570,7 +570,7 @@ graph TB
 ## Window Configuration Space
 
 ```{=html}
-<div class="mermaid">
+<div class="mermaid" style="margin: 0 auto; display: block; width: 60%;">
 graph TB
     subgraph "Window Parameters"
         Size["Window Size<br/>Trade-off: registers vs reuse"]
@@ -692,6 +692,7 @@ optimize_access_pattern(
 ## Summary
 
 TileWindow provides:
+
 - **Automatic optimization**: Generates optimal memory access patterns
 - **Distribution awareness**: Works seamlessly with TileDistribution
 - **Flexible windowing**: Supports various access patterns and window configurations
@@ -699,6 +700,7 @@ TileWindow provides:
 - **Safety**: Automatic boundary handling
 
 Key benefits:
+
 1. **Performance**: Achieves peak memory bandwidth through coalescing and vectorization
 2. **Productivity**: Eliminates manual memory management code
 3. **Correctness**: Automatic boundary checking and handling

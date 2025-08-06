@@ -24,7 +24,7 @@ await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/mas
 ## Basic Sweep Mechanism
 
 ```{=html}
-<div class="mermaid">
+<div class="mermaid" style="margin: 0 auto; display: block; width: 60%;">
 flowchart LR
     subgraph "X-Tile (Reused)"
         XT["X data loaded once<br/>Stays in registers"]
@@ -53,6 +53,11 @@ flowchart LR
 ```
 
 The key insight: Load X data once, then sweep through Y positions while keeping X in fast memory.
+
+```{pyodide}
+#| echo: true
+#| output: true
+#| autorun: false
 
 # Setup pytensor path for pyodide environment
 import sys
@@ -169,6 +174,11 @@ graph TB
 
 ### 2. Code Example
 # Demonstrate sweep operation
+```{pyodide}
+#| echo: true
+#| output: true
+#| autorun: false
+
 print("🔄 Sweeping over distributed tensor:")
 
 collected_values = []
@@ -272,20 +282,33 @@ __device__ void gemm_sweep_tile(
 ### Pattern 1: Simple Linear Sweep
 
 ```{=html}
-<div class="mermaid">
+<div class="mermaid" style="margin: 0 auto; display: block; width: 30%;">
 graph LR
     subgraph "Linear Sweep"
-        S0["Start"] --> P0["Y[0]"]
-        P0 --> P1["Y[1]"]
-        P1 --> P2["Y[2]"]
-        P2 --> P3["Y[3]"]
-        P3 --> E["End"]
+        S0["Start"] 
+        P0["Y[0]"]
+        P1["Y[1]"]
+        P2["Y[2]"]
+        P3["Y[3]"]
+        E["End"]
     end
+
+        S0 --> P0
+        P0 --> P1
+        P1 --> P2
+        P2 --> P3
+        P3 --> E
     
     style S0 fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
     style E fill:#ffebee,stroke:#d32f2f,stroke-width:2px
 </div>
 ```
+
+```{pyodide}
+#| echo: true
+#| output: true
+#| autorun: false
+
 # Create result tensor
 result_tensor = make_static_distributed_tensor(np.float32, distributed_tensor.tile_distribution)
 
@@ -469,6 +492,14 @@ graph TB
     
     style Performance fill:#d1fae5,stroke:#10b981,stroke-width:3px
 </div>
+```
+
+```{pyodide}
+#| echo: true
+#| output: true
+#| autorun: false
+
+
 def complete_tile_processing(input_data, window_origin, window_size, operation_name, compute_func):
     """Complete tile processing with sweep operations."""
     print(f"🚀 {operation_name} Processing")
@@ -643,18 +674,26 @@ flowchart TB
 ## Summary
 
 SweepTile provides:
+
 - **Efficiency**: Load once, use many times
 - **Simplicity**: Clean iteration abstraction
 - **Performance**: Zero overhead, perfect patterns
 - **Flexibility**: Various sweep patterns for different algorithms
 
 Key benefits:
+
 1. **Memory bandwidth**: Optimal reuse of loaded data
 2. **Register pressure**: Keep hot data in fastest memory
 3. **Code clarity**: Express algorithms naturally
 4. **Compiler optimization**: Enable aggressive optimizations
 
 The sweep pattern is fundamental to high-performance GPU kernels, turning complex iteration patterns into simple, efficient operations.
+
+```{pyodide}
+#| echo: true
+#| output: true
+#| autorun: false
+
 print("⚖️ Sweep Pattern Comparison")
 print("=" * 35)
 
@@ -715,6 +754,10 @@ print(f"Results match: {manual_sum == sweep_sum}")
 Let's verify that sweep operations work correctly:
 
 ```{pyodide}
+#| echo: true
+#| output: true
+#| autorun: false
+
 print("🧪 Testing Sweep Operations")
 print("=" * 30)
 

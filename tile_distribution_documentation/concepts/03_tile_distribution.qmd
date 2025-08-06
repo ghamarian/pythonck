@@ -158,7 +158,8 @@ struct tile_distribution
 ## Problem Space Mapping
 
 ```{=html}
-<div class="mermaid">
+<div class="mermaid" style="margin: 0 auto; display: block; width: 60%;">
+
 graph TB
     subgraph "Problem Space (256×256 Matrix)"
         M["Full Matrix<br/>65,536 elements"]
@@ -260,7 +261,7 @@ for tid in range(4):
 ## Hierarchical Decomposition
 
 ```{=html}
-<div class="mermaid">
+<div class="mermaid" style="margin: 0 auto; display: block; width: 45%;">
 graph TB
     subgraph "Level 1: Block Distribution"
         B["Thread Block<br/>256 threads"]
@@ -328,7 +329,7 @@ print(f"Total tile size: {4*2*8*4}×{4*2*8*4} = {(4*2*8*4)**2} elements")
 ## Work Distribution Pattern
 
 ```{=html}
-<div class="mermaid">
+<div class="mermaid" style="margin: 0 auto; display: block; width: 30%;">
 flowchart TB
     subgraph "Matrix C (128×128)"
         C["16,384 elements"]
@@ -459,7 +460,7 @@ __global__ void gemm_kernel(
 ## Transformation Pipeline
 
 ```{=html}
-<div class="mermaid">
+<div class="mermaid" style="margin: 0 auto; display: block; width: 100%;">
 graph LR
     subgraph "Input"
         TID["Thread ID<br/>(0-1023)"]
@@ -533,6 +534,7 @@ graph TB
 ## Summary
 
 TileDistribution provides:
+
 - **Automatic work distribution**: Maps threads to data efficiently
 - **Optimal memory patterns**: Ensures coalesced access and minimal conflicts
 - **Hierarchical decomposition**: Handles complex tiling strategies
@@ -540,6 +542,7 @@ TileDistribution provides:
 - **Portability**: Same code works across different GPU architectures
 
 Key benefits:
+
 1. **Correctness**: Eliminates manual index calculation errors
 2. **Performance**: Achieves hand-tuned performance automatically
 3. **Productivity**: Reduces code from hundreds of lines to just a few
