@@ -1,5 +1,5 @@
 ---
-title: "Basic Coordinates"
+title: "Individual Transform Coordinates"
 format:
   live-html:
     mermaid:
@@ -10,7 +10,7 @@ pyodide:
     - micropip
 ---
 
-Before diving into transforms and adaptors, we need to understand the basic coordinate system. MultiIndex is the fundamental building block used throughout the pytensor system.
+Before diving into transforms and adaptors, we need to understand the basic coordinate system. MultiIndex is the fundamental building block used throughout the pytensor system. It is a container in CKTile that extends the c++ array with additional operations for multi-dimensional indexing.
 
 ## What is MultiIndex?
 
@@ -27,23 +27,16 @@ MultiIndex represents a position in N-dimensional space - think of it as GPS coo
 graph TB
     subgraph "MultiIndex Structure"
         MI["MultiIndex<br/>Container for N integers"]
-        D0["Dimension 0<br/>X coordinate"]
-        D1["Dimension 1<br/>Y coordinate"]
-        D2["Dimension 2<br/>Z coordinate"]
-        DN["Dimension N-1<br/>..."]
+        D0["Dimension 0"]
+        D1["Dimension 1"]
+        D2["Dimension 2"]
+        DN["Dimension N-1"]
     end
 
     subgraph "Usage Context"
-        T["Transforms<br/>Input/Output"]
-        A["Adaptors<br/>Position Tracking"]
-        TV["Tensors<br/>Element Access"]
-    end
-
-    subgraph "Operations"
-        Create["Create: MultiIndex(size, values)"]
-        Access["Access: coord[i]"]
-        Modify["Modify: coord[i] = value"]
-        Convert["Convert: to_list()"]
+        T["Transforms<br/>"]
+        A["Adaptors<br/>"]
+        TV["Tensors<br/>"]
     end
 
     MI --> D0
@@ -126,36 +119,6 @@ for i, value in enumerate(coord):
     print(f"  Dimension {i}: {value}")
 ```
 
-## Coordinate Operations
-
-```{pyodide}
-#| echo: true
-#| output: true
-
-# Create coordinates for comparison
-coord1 = MultiIndex(size=3, values=[1, 2, 3])
-coord2 = MultiIndex(size=3, values=[1, 2, 3])
-coord3 = MultiIndex(size=3, values=[4, 5, 6])
-
-# Equality comparison
-print(f"coord1: {coord1}")
-print(f"coord2: {coord2}")
-print(f"coord3: {coord3}")
-print(f"\ncoord1 == coord2: {coord1 == coord2}")
-print(f"coord1 == coord3: {coord1 == coord3}")
-
-# Copy operation
-coord_copy = coord1.copy()
-print(f"\nOriginal: {coord1}")
-print(f"Copy: {coord_copy}")
-print(f"Are they equal? {coord1 == coord_copy}")
-
-# Modify copy to show independence
-coord_copy[0] = 99
-print(f"\nAfter modifying copy:")
-print(f"Original: {coord1}")
-print(f"Copy: {coord_copy}")
-```
 
 ### C++ Implementation Reference
 
@@ -202,16 +165,18 @@ __device__ void example_multiindex_usage()
 MultiIndex serves as the common currency between different coordinate spaces:
 
 ```{=html}
-<div class="mermaid" style="margin: 0 auto; display: block; width: 20%;>
-flowchart LR
-    subgraph "Coordinate Flow"
+<div class="mermaid">
+flowchart TB
+    subgraph CF ["Coordinate Flow"]
+        direction LR
         UI["User Input<br/>[1, 2, 3]"] --> MI["MultiIndex<br/>Storage"]
         MI --> TR["Transform<br/>Processing"]
         TR --> MO["MultiIndex<br/>Output"]
         MO --> TA["Tensor Access<br/>element(coord)"]
     end
 
-    subgraph "Example: 3D Tensor Access"
+    subgraph EX ["Example: 3D Tensor Access"]
+        direction LR
         T3D["3D Tensor<br/>shape=[4,5,6]"] --> COORD["MultiIndex(3, [1,2,3])"]
         COORD --> ELEM["Element at<br/>position [1,2,3]"]
     end
@@ -223,40 +188,7 @@ flowchart LR
 </div>
 ```
 
-## Working with Different Tensor Ranks
-
-```{pyodide}
-#| echo: true
-#| output: true
-
-# Function to demonstrate MultiIndex for different tensor types
-def show_tensor_access(shape, coord_values):
-    coord = MultiIndex(size=len(shape), values=coord_values)
-
-    # Calculate linear offset (row-major order)
-    offset = 0
-    stride = 1
-    for i in reversed(range(len(shape))):
-        offset += coord[i] * stride
-        stride *= shape[i]
-
-    print(f"Tensor shape: {shape}")
-    print(f"Coordinate: {coord.to_list()}")
-    print(f"Linear offset: {offset}")
-    print()
-
-# 1D Vector
-show_tensor_access([10], [5])
-
-# 2D Matrix
-show_tensor_access([4, 5], [2, 3])
-
-# 3D Tensor
-show_tensor_access([3, 4, 5], [1, 2, 3])
-
-# 4D Tensor (common in deep learning: batch, channel, height, width)
-show_tensor_access([2, 3, 32, 32], [1, 2, 15, 20])
-```
+<!--
 
 ## MultiIndex Patterns
 
@@ -348,7 +280,7 @@ strides = [4, 1, 1]
 after_stride = apply_stride(after_offset, strides)
 print(f"After stride {strides}: {after_stride}")
 ```
-
+-->
 
 ## Summary
 
