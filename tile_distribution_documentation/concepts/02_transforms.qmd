@@ -1,5 +1,5 @@
 ---
-title: "Individual Transforms"
+title: "Individual Transform Operations"
 format: 
   live-html:
     mermaid:
@@ -20,25 +20,67 @@ Explore transformation concepts interactively:
 
 ## What Are Transforms?
 
-Each transform type converts coordinates between different spaces:
+Transform operations are the fundamental building blocks that convert coordinates between different dimensional spaces. Each transform operates between two coordinate spaces:
 
-- **Forward**: Upper coordinates → Lower coordinates  
-- **Backward**: Lower coordinates → Upper coordinates
+- **Lower Dimension Space**: The source coordinate system
+- **Upper Dimension Space**: The target coordinate system
+
+### Transform Direction
+
+Transforms work bidirectionally:
+
+- **Forward Transform**: Converts coordinates from the lower dimension to the upper dimension
+- **Inverse Transform**: Converts coordinates back from the upper dimension to the lower dimension
+
+### Zero-Copy Logical Operations
+
+**Critical Understanding**: All transform operations happen in **logical coordinate space** only. There is **no data copying or movement** involved - this is a zero-copy system.
+
+- **Data Storage**: The actual tensor data remains stored in memory in linear fashion, exactly as specified by the original tensor shape and strides at creation time
+- **Logical Mapping**: Transforms only change how we interpret and access coordinates - they create different logical views of the same underlying data
+
+```{=html}
+<div class="mermaid">
+graph TB
+    subgraph "Tensor Coordinate Transformation"
+        US["Lower Dimension Space<br/>Source coordinate system"]
+        LS["Upper Dimension Space<br/>Target coordinate system"]
+        
+        DATA["Linear Data in Memory<br/>Layout determined by tensor<br/>shape & strides"]
+    end
+    
+    US -->|"Forward Transform"| LS
+    LS -->|"Inverse Transform"| US
+    
+    DATA -.->|"Same data,<br/>different views"| US
+    DATA -.->|"Same data,<br/>different views"| LS
+    
+    style US fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
+    style LS fill:#fff3e0,stroke:#f57c00,stroke-width:3px
+    style DATA fill:#f0f9ff,stroke:#0284c7,stroke-width:2px,stroke-dasharray: 5 5
+</div>
+```
+
+### Index Calculation Operations
+
+The transform system provides two fundamental operations for coordinate conversion:
+
+- **`calculate_lower_index()`**: Takes a coordinate from the **upper dimension space** and transforms it to get the corresponding index/coordinate in the **lower dimension space**. This calculates where to find the actual tensor element using the transformed coordinate system.
+
+- **`calculate_upper_index()`**: Takes a coordinate from the **lower dimension space** and transforms it back to get the corresponding coordinate in the **upper dimension space**. This performs the inverse transformation to recover the original coordinate representation.
+
+These operations enable bidirectional navigation between different coordinate representations of the same underlying tensor data.
 
 ### Transform System Architecture
 
 ```{=html}
 <div class="mermaid">
 graph TB
-    subgraph "Coordinate Spaces"
-        US["Upper Space<br/>Logical Coordinates"]
-        LS["Lower Space<br/>Physical Coordinates"]
-    end
     
     subgraph "Transform Types"
         EMB["EmbedTransform<br/>Shape + Strides"]
-        UNM["UnmergeTransform<br/>Multi-D → Linear"]
-        MRG["MergeTransform<br/>Linear → Multi-D"]
+        UNM["MergeTransform<br/>Multi-D → Linear"]
+        MRG["UnmergeTransform<br/>Linear → Multi-D"]
         REP["ReplicateTransform<br/>Broadcast"]
         OFF["OffsetTransform<br/>Translation"]
         PAS["PassThroughTransform<br/>Identity"]
@@ -51,9 +93,6 @@ graph TB
         UPD["Update<br/>update_lower_index()"]
     end
     
-    US -->|Transform| LS
-    LS -->|Inverse| US
-    
     EMB --> FWD
     UNM --> FWD
     MRG --> FWD
@@ -62,8 +101,6 @@ graph TB
     PAS --> FWD
     PAD --> FWD
     
-    style US fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
-    style LS fill:#fff3e0,stroke:#f57c00,stroke-width:3px
     style FWD fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
 </div>
 ```
@@ -165,7 +202,7 @@ auto desc = make_naive_tensor_descriptor(
 // Internally uses EmbedTransform for strided access
 ```
 
-## 2. UnmergeTransform - Multi-D to Linear
+## 2. MergeTransform - Multi-D to Linear
 
 Converts multi-dimensional coordinates to linear (1D) coordinates.
 
@@ -250,7 +287,7 @@ auto desc = make_naive_tensor_descriptor_packed(
 // UnmergeTransform is used internally for packed layouts
 ```
 
-## 3. MergeTransform - Linear to Multi-D
+## 3. UnmergeTransform - Linear to Multi-D
 
 Inverse of UnmergeTransform - expands linear coordinates to multi-dimensional.
 
