@@ -63,6 +63,5 @@ pytensor/rocm.md
 pytensor/sweep_tile_faithful.py
 pytensor/tensor_coordinate_faithful.py
 tile_distribution_documentation_plan.md
-
-
- tensor_transforms/__pycache__/**/*.pyc
+tensor_transforms/__pycache__/**/*.pyc
+tile_distribution_documentation/_site
