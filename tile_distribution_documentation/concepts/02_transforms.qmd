@@ -115,224 +115,54 @@ import micropip
 await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl")
 ```
 
-## 1. EmbedTransform - View into Larger Space
+## 1. MergeTransform
 
-The most fundamental transform - creates a view of shape into a larger buffer.
+MergeTransform collapses multiple dimensions from the lower coordinate space into a single dimension in the upper coordinate space, effectively reducing the dimensionality of the tensor representation while preserving all data relationships.
 
 ```{=html}
 <div class="mermaid">
-graph LR
-    subgraph "Upper Space"
-        U["Shape: [2, 3]<br/>Coords: (0,0) to (1,2)"]
+graph TB
+    subgraph "MergeTransform: Multi-D → Linear"
+        LS["Lower Coordinate Space<br/>2D: [4, 5]<br/>Coord: (2, 3)"]
+        US["Upper Coordinate Space<br/>1D Linear<br/>Index: 13"]
+        
+        DATA["Same Tensor Data<br/>Layout: row-major<br/>Size: 20 elements"]
     end
     
-    subgraph "Lower Space"
-        L["Buffer: 24 elements<br/>Strides: [12, 1]"]
-    end
+    LS -->|"Forward Transform<br/>2×5 + 3 = 13"| US
+    US -->|"Inverse Transform<br/>13÷5=2, 13%5=3"| LS
     
-    subgraph "Mapping"
-        M["(i,j) → i*12 + j*1"]
-    end
+    DATA -.->|"Multi-dimensional<br/>view"| LS
+    DATA -.->|"Linear<br/>view"| US
     
-    U --> M
-    M --> L
-    
-    style U fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
-    style L fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style LS fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
+    style US fill:#fff3e0,stroke:#f57c00,stroke-width:3px
+    style DATA fill:#f0f9ff,stroke:#0284c7,stroke-width:2px,stroke-dasharray: 5 5
 </div>
 ```
 
 ```{pyodide}
 #| echo: true
 #| output: true
-import numpy
-from pytensor.tensor_descriptor import EmbedTransform
+
+import numpy as np
+from pytensor.tensor_descriptor import MergeTransform
 from pytensor.tensor_coordinate import MultiIndex
 
-# Create a 2x3 view with custom strides
-transform = EmbedTransform(
-    lengths=[2, 3],     # View shape
-    strides=[12, 1]     # Row-major with padding
-)
-
-print(f"Lengths: {transform.lengths}")
-print(f"Strides: {transform.strides}")
-print(f"Dimensions: {transform.ndim}")
-
-# Forward transform: logical → physical
-upper_coord = MultiIndex(size=2, values=[1, 2])
-lower_coord = transform.calculate_lower_index(upper_coord)
-print(f"\nForward: {upper_coord.to_list()} → offset {lower_coord.to_list()[0]}")
-print(f"Calculation: 1×12 + 2×1 = {lower_coord.to_list()[0]}")
-
-# Backward transform: physical → logical
-lower_idx = MultiIndex(size=1, values=[14])
-upper_recovered = transform.calculate_upper_index(lower_idx)
-print(f"\nBackward: offset {lower_idx.to_list()[0]} → {upper_recovered.to_list()}")
-
-# This creates a 2x3 matrix view at position (0,0) in the buffer
-# Useful for: sub-matrix views, sliding windows, padded layouts
-```
-
-### C++ Implementation
-
-```cpp
-// From composable_kernel/include/ck_tile/core/algorithm/coordinate_transform.hpp
-
-// Create embed transform for 2x3 matrix with strides [12, 1]
-auto transform = make_embed_transform(
-    make_tuple(2, 3),      // upper lengths
-    make_tuple(12, 1)      // strides/coefficients
-);
-
-// Forward transformation: 2D → 1D
-multi_index<2> upper_coord{1, 2};  // Row 1, Column 2
-multi_index<1> lower_coord;
-transform.calculate_lower_index(lower_coord, upper_coord);
-// Result: lower_coord[0] = 1*12 + 2*1 = 14
-
-// The embed transform inherits from base_transform<1, UpLengths::size()>
-// meaning 1 lower dimension → multiple upper dimensions
-
-// Usage in tensor descriptor
-auto desc = make_naive_tensor_descriptor(
-    make_tuple(number<3>{}, number<4>{}),   // shape
-    make_tuple(number<8>{}, number<1>{})    // strides
-);
-// Internally uses EmbedTransform for strided access
-```
-
-## 2. MergeTransform - Multi-D to Linear
-
-Converts multi-dimensional coordinates to linear (1D) coordinates.
-
-```{=html}
-<div class="mermaid">
-graph LR
-    subgraph "Upper (3D)"
-        U1["Shape: [3, 4, 2]<br/>Coord: (1, 3, 0)"]
-    end
-    
-    subgraph "Lower (1D)"
-        L1["Linear index: 14"]
-    end
-    
-    subgraph "Calculation"
-        C["14 = 1×(4×2) + 3×2 + 0<br/>14 = 8 + 6 + 0"]
-    end
-    
-    U1 --> C
-    C --> L1
-    
-    style U1 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
-    style L1 fill:#fff3e0,stroke:#f57c00,stroke-width:2px
-</div>
-```
-
-```{pyodide}
-#| echo: true
-#| output: true
-
-from pytensor.tensor_descriptor import UnmergeTransform
-
-# Convert multi-dimensional coordinates to linear index
-transform = UnmergeTransform(lengths=[3, 4, 2])
-
-print(f"Lengths: {transform.lengths}")
-print(f"Strides: {transform.strides}")
-
-# Forward: 3D → 1D
-coord_3d = MultiIndex(size=3, values=[1, 3, 0])
-linear_idx = transform.calculate_lower_index(coord_3d)
-print(f"\n3D coord {coord_3d.to_list()} → Linear index {linear_idx.to_list()[0]}")
-
-# Verify the calculation
-idx = coord_3d.to_list()[0] * (4*2) + coord_3d.to_list()[1] * 2 + coord_3d.to_list()[2]
-print(f"Verification: {coord_3d.to_list()[0]}×8 + {coord_3d.to_list()[1]}×2 + {coord_3d.to_list()[2]} = {idx}")
-
-# Backward: 1D → 3D
-linear_input = MultiIndex(size=1, values=[14])
-coord_3d_result = transform.calculate_upper_index(linear_input)
-print(f"\nLinear index {linear_input.to_list()[0]} → 3D coord {coord_3d_result.to_list()}")
-```
-
-### C++ Implementation
-
-```cpp
-// From composable_kernel/include/ck_tile/core/algorithm/coordinate_transform.hpp
-
-// Create unmerge transform for 3x4x2 tensor
-auto transform = make_unmerge_transform(
-    make_tuple(3, 4, 2)  // upper lengths
-);
-
-// The unmerge transform inherits from base_transform<1, UpLengths::size()>
-// meaning 1 lower dimension → multiple upper dimensions
-
-// Forward: Multi-D → Linear
-multi_index<3> upper_coord{1, 3, 0};
-multi_index<1> lower_coord;
-transform.calculate_lower_index(lower_coord, upper_coord);
-// Result: lower_coord[0] = 1*(4*2) + 3*2 + 0 = 14
-
-// Backward: Linear → Multi-D (unpacking)
-multi_index<1> packed_idx{14};
-multi_index<3> unpacked_coord;
-// This would compute: unpacked_coord = [1, 3, 0]
-
-// Use in tensor descriptor
-auto desc = make_naive_tensor_descriptor_packed(
-    make_tuple(number<3>{}, number<4>{}, number<2>{})
-);
-// UnmergeTransform is used internally for packed layouts
-```
-
-## 3. UnmergeTransform - Linear to Multi-D
-
-Inverse of UnmergeTransform - expands linear coordinates to multi-dimensional.
-
-```{=html}
-<div class="mermaid">
-graph LR
-    subgraph "Upper (1D)"
-        U1["Linear index: 13"]
-    end
-    
-    subgraph "Lower (2D)"
-        L1["Shape: [4, 5]<br/>Coord: (2, 3)"]
-    end
-    
-    subgraph "Calculation"
-        C["13 = 2×5 + 3<br/>row=13÷5=2, col=13%5=3"]
-    end
-    
-    U1 --> C
-    C --> L1
-    
-    style U1 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
-    style L1 fill:#fff3e0,stroke:#f57c00,stroke-width:2px
-</div>
-```
-
-```{pyodide}
-#| echo: true
-#| output: true
-
-from pytensor.tensor_descriptor import MergeTransform
-
-# Expand linear coordinate to 2D
+# Create MergeTransform for 4x5 tensor (20 elements total)
 transform = MergeTransform(lengths=[4, 5])
 
-# Forward: 1D → 2D
-linear = MultiIndex(size=1, values=[13])
-coord_2d = transform.calculate_lower_index(linear)
-print(f"Linear index {linear.to_list()[0]} → 2D coord {coord_2d.to_list()}")
-print(f"Calculation: 13 = 2×5 + 3, so coord is [2, 3]")
+# Forward: Lower (2D) → Upper (1D) 
+lower_2d = MultiIndex(size=2, values=[2, 3])
+upper_linear = transform.calculate_upper_index(lower_2d)
+print(f"2D coord {lower_2d.to_list()} → Linear index {upper_linear.to_list()[0]}")
+print(f"Calculation: {lower_2d.to_list()[0]}×5 + {lower_2d.to_list()[1]} = {upper_linear.to_list()[0]}")
 
-# Backward: 2D → 1D  
-coord_2d_input = MultiIndex(size=2, values=[2, 3])
-linear_result = transform.calculate_upper_index(coord_2d_input)
-print(f"\n2D coord {coord_2d_input.to_list()} → Linear index {linear_result.to_list()[0]}")
+# Inverse: Upper (1D) → Lower (2D)
+upper_input = MultiIndex(size=1, values=[13])
+lower_result = transform.calculate_lower_index(upper_input)
+print(f"\nLinear index {upper_input.to_list()[0]} → 2D coord {lower_result.to_list()}")
+print(f"Calculation: 13 ÷ 5 = {lower_result.to_list()[0]} remainder {lower_result.to_list()[1]}")
 ```
 
 ### C++ Implementation
@@ -366,6 +196,170 @@ auto desc = transform_tensor_descriptor(
     make_tuple(sequence<0, 1>{}),  // merge dims 0,1
     make_tuple(sequence<0>{})      // to single dim 0
 );
+```
+
+
+## 2. UnmergeTransform
+
+UnmergeTransform expands coordinates from a single dimension in the lower coordinate space into multiple dimensions in the upper coordinate space, effectively increasing the dimensionality of the tensor representation while preserving all data relationships.
+
+```{=html}
+<div class="mermaid">
+graph TB
+    subgraph "UnmergeTransform: Linear → Multi-D"
+        LS["Lower Coordinate Space<br/>1D Linear<br/>Index: 14"]
+        US["Upper Coordinate Space<br/>3D: [3, 4, 2]<br/>Coord: (1, 3, 0)"]
+        
+        DATA["Same Tensor Data<br/>Layout: row-major<br/>Size: 24 elements"]
+    end
+    
+    LS -->|"Forward Transform<br/>14 = 1×8 + 3×2 + 0"| US
+    US -->|"Inverse Transform<br/>linearize back"| LS
+    
+    DATA -.->|"Linear<br/>view"| LS
+    DATA -.->|"Multi-dimensional<br/>view"| US
+    
+    style LS fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
+    style US fill:#fff3e0,stroke:#f57c00,stroke-width:3px
+    style DATA fill:#f0f9ff,stroke:#0284c7,stroke-width:2px,stroke-dasharray: 5 5
+</div>
+```
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+import numpy as np
+from pytensor.tensor_descriptor import UnmergeTransform
+from pytensor.tensor_coordinate import MultiIndex
+
+# Create UnmergeTransform for 3x4x2 tensor (24 elements total)
+transform = UnmergeTransform(lengths=[3, 4, 2])
+
+# Forward: Lower (1D) → Upper (3D)
+lower_linear = MultiIndex(size=1, values=[14])
+upper_3d = transform.calculate_upper_index(lower_linear)
+print(f"Linear index {lower_linear.to_list()[0]} → 3D coord {upper_3d.to_list()}")
+print(f"Calculation: 14 = {upper_3d.to_list()[0]}×8 + {upper_3d.to_list()[1]}×2 + {upper_3d.to_list()[2]}")
+
+# Inverse: Upper (3D) → Lower (1D)
+upper_input = MultiIndex(size=3, values=[1, 3, 0])
+lower_result = transform.calculate_lower_index(upper_input)
+print(f"\n3D coord {upper_input.to_list()} → Linear index {lower_result.to_list()[0]}")
+print(f"Calculation: {upper_input.to_list()[0]}×8 + {upper_input.to_list()[1]}×2 + {upper_input.to_list()[2]} = {lower_result.to_list()[0]}")
+```
+
+### C++ Implementation
+
+```cpp
+// From composable_kernel/include/ck_tile/core/algorithm/coordinate_transform.hpp
+
+// Create unmerge transform for 3x4x2 tensor
+auto transform = make_unmerge_transform(
+    make_tuple(3, 4, 2)  // upper lengths
+);
+
+// The unmerge transform inherits from base_transform<1, UpLengths::size()>
+// meaning 1 lower dimension → multiple upper dimensions
+
+// Forward: Multi-D → Linear
+multi_index<3> upper_coord{1, 3, 0};
+multi_index<1> lower_coord;
+transform.calculate_lower_index(lower_coord, upper_coord);
+// Result: lower_coord[0] = 1*(4*2) + 3*2 + 0 = 14
+
+// Backward: Linear → Multi-D (unpacking)
+multi_index<1> packed_idx{14};
+multi_index<3> unpacked_coord;
+// This would compute: unpacked_coord = [1, 3, 0]
+
+// Use in tensor descriptor
+auto desc = make_naive_tensor_descriptor_packed(
+    make_tuple(number<3>{}, number<4>{}, number<2>{})
+);
+// UnmergeTransform is used internally for packed layouts
+```
+
+
+## 3. EmbedTransform
+
+EmbedTransform expands linear indices from the lower coordinate space into multi-dimensional coordinates in the upper coordinate space using configurable strides, enabling flexible strided tensor layouts and sub-tensor views within larger buffers.
+
+```{=html}
+<div class="mermaid">
+graph TB
+    subgraph "EmbedTransform: Linear → Multi-D Strided"
+        LS["Lower Coordinate Space<br/>1D Linear<br/>Index: 14"]
+        US["Upper Coordinate Space<br/>2D: [2, 3]<br/>Coord: (1, 2)"]
+        
+        DATA["Linear Buffer in Memory<br/>Strides: [12, 1]<br/>Custom layout"]
+    end
+    
+    LS -->|"Forward Transform<br/>14 ÷ 12 = 1, 14 % 12 = 2"| US
+    US -->|"Inverse Transform<br/>1×12 + 2×1 = 14"| LS
+    
+    DATA -.->|"Linear<br/>index view"| LS
+    DATA -.->|"Multi-dimensional<br/>strided view"| US
+    
+    style LS fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
+    style US fill:#fff3e0,stroke:#f57c00,stroke-width:3px
+    style DATA fill:#f0f9ff,stroke:#0284c7,stroke-width:2px,stroke-dasharray: 5 5
+</div>
+```
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+import numpy as np
+from pytensor.tensor_descriptor import EmbedTransform
+from pytensor.tensor_coordinate import MultiIndex
+
+# Create EmbedTransform for 2x3 tensor with custom strides  
+transform = EmbedTransform(
+    lengths=[2, 3],     # Shape: 2 rows, 3 columns
+    strides=[12, 1]     # Row stride=12, column stride=1
+)
+
+# Forward: Lower (1D) → Upper (2D)
+lower_linear = MultiIndex(size=1, values=[14])
+upper_coord = transform.calculate_upper_index(lower_linear)
+print(f"Linear index {lower_linear.to_list()[0]} → 2D coord {upper_coord.to_list()}")
+print(f"Calculation: 14 ÷ 12 = {upper_coord.to_list()[0]}, remainder = {upper_coord.to_list()[1]}")
+
+# Inverse: Upper (2D) → Lower (1D)
+upper_input = MultiIndex(size=2, values=[1, 2])
+lower_result = transform.calculate_lower_index(upper_input)
+print(f"\n2D coord {upper_input.to_list()} → Linear index {lower_result.to_list()[0]}")
+print(f"Calculation: {upper_input.to_list()[0]}×12 + {upper_input.to_list()[1]}×1 = {lower_result.to_list()[0]}")
+```
+
+### C++ Implementation
+
+```cpp
+// From composable_kernel/include/ck_tile/core/algorithm/coordinate_transform.hpp
+
+// Create embed transform for 2x3 matrix with strides [12, 1]
+auto transform = make_embed_transform(
+    make_tuple(2, 3),      // upper lengths
+    make_tuple(12, 1)      // strides/coefficients
+);
+
+// Forward transformation: 2D → 1D
+multi_index<2> upper_coord{1, 2};  // Row 1, Column 2
+multi_index<1> lower_coord;
+transform.calculate_lower_index(lower_coord, upper_coord);
+// Result: lower_coord[0] = 1*12 + 2*1 = 14
+
+// The embed transform inherits from base_transform<1, UpLengths::size()>
+// meaning 1 lower dimension → multiple upper dimensions
+
+// Usage in tensor descriptor
+auto desc = make_naive_tensor_descriptor(
+    make_tuple(number<3>{}, number<4>{}),   // shape
+    make_tuple(number<8>{}, number<1>{})    // strides
+);
+// Internally uses EmbedTransform for strided access
 ```
 
 ## 4. ReplicateTransform - Broadcasting
