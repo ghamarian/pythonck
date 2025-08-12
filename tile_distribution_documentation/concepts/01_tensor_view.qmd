@@ -1,11 +1,50 @@
 ---
 title: "Tensor Views - Multi-Dimensional Structure"
-format: live-html
+format: 
+  live-html:
+    mermaid:
+      theme: default
 ---
 
 ## Overview
 
 TensorView adds multi-dimensional structure to raw memory. While BufferView provides linear access, TensorView enables coordinate-based access to matrices, tensors, and higher-dimensional data structures.
+
+### TensorView Architecture
+
+```{=html}
+<div class="mermaid"  style="margin: 0 auto; display: block; width: 60%;">
+graph TB
+    subgraph "Memory Foundation"
+        Memory["Flat Memory Array<br/>0 1 2 3 4 5 6 7 8 9 10 11"]
+    end
+    
+    subgraph "Access Layer"
+        BufferView["BufferView<br/>Linear Memory Access"]
+        Descriptor["TensorDescriptor<br/>Shape & Stride Info"]
+    end
+    
+    subgraph "Tensor Layer"
+        TensorView["TensorView<br/>Multi-dimensional Access"]
+    end
+    
+    subgraph "Logical View"
+        Matrix["2D Matrix View<br/>[3×4]<br/>[[0,1,2,3]<br/>[4,5,6,7]<br/>[8,9,10,11]]"]
+    end
+    
+    Memory --> BufferView
+    Memory --> Descriptor
+    BufferView --> TensorView
+    Descriptor --> TensorView
+    TensorView --> Matrix
+    
+    style Memory fill:#d1fae5,stroke:#10b981,stroke-width:2px
+    style BufferView fill:#dbeafe,stroke:#3b82f6,stroke-width:2px
+    style Descriptor fill:#fed7aa,stroke:#f59e0b,stroke-width:2px
+    style TensorView fill:#fce7f3,stroke:#ec4899,stroke-width:2px
+    style Matrix fill:#e9d5ff,stroke:#9333ea,stroke-width:2px
+</div>
+```
 
 ```{pyodide}
 #| echo: false
@@ -15,263 +54,366 @@ TensorView adds multi-dimensional structure to raw memory. While BufferView prov
 # Auto-install pythonck package
 import micropip
 await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl")
-
-
-def print_tensor(tensor_view, title="Tensor"):
-    """Print tensor as a formatted matrix."""
-    if title:
-        print(f"\n{title}:")
-    
-    lengths = tensor_view.get_tensor_descriptor().get_lengths()
-    
-    if len(lengths) == 2:
-        # 2D tensor - print as matrix
-        rows, cols = lengths
-        for i in range(rows):
-            row_values = []
-            for j in range(cols):
-                value = tensor_view[i, j]
-                row_values.append(f"{value:6.1f}")
-            print(" ".join(row_values))
-    else:
-        # Higher dimensional - print shape and some elements
-        print(f"Shape: {lengths}")
-        print(f"Sample elements: {tensor_view[0] if len(lengths) > 0 else 'N/A'}")
-
-def print_windows_tiled(tensor_view, title="Tiled View"):
-    """
-    Print 4D tensor view as a tiled 2D layout using tensor view get methods.
-    Expects tensor_view to have shape [out_h, out_w, K, K].
-    """
-    if title:
-        print(f"\n{title}:")
-    
-    lengths = tensor_view.get_tensor_descriptor().get_lengths()
-    if len(lengths) != 4:
-        print(f"Error: Expected 4D tensor, got {len(lengths)}D with shape {lengths}")
-        return
-        
-    out_h, out_w, K, K2 = lengths
-    if K != K2:
-        print(f"Error: Expected square windows, got {K}x{K2}")
-        return
-        
-    window_width = 3 * K + (K - 1)
-    row_sep = "-" * window_width
-    col_sep = " | "
-    
-    for window_row in range(out_h):
-        for k_row in range(K):
-            line_parts = []
-            for window_col in range(out_w):
-                window_data_parts = []
-                for k_col in range(K):
-                    value = tensor_view[window_row, window_col, k_row, k_col]
-                    window_data_parts.append(f"{value:3.0f}")
-                window_data = " ".join(window_data_parts)
-                line_parts.append(window_data)
-            print(col_sep.join(line_parts))
-        
-        if window_row < out_h - 1:
-            sep_parts = [row_sep] * out_w
-            sep_line = (" + ").join(sep_parts)
-            print(sep_line)
 ```
 
-## Basic Creation and Element Access
+## Creation and Basic Usage
 
 ```{pyodide}
 #| echo: true
 #| output: true
 
-from pytensor.tensor_view import make_naive_tensor_view_packed
-from pytensor.tensor_coordinate import MultiIndex
 import numpy as np
+from pytensor.buffer_view import make_buffer_view, AddressSpaceEnum
+from pytensor.tensor_view import make_naive_tensor_view_packed, make_tensor_view
+from pytensor.tensor_descriptor import make_naive_tensor_descriptor_packed
 
-# Create 2D data and tensor view
-data = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], dtype=np.float32)
-tensor_view = make_naive_tensor_view_packed(data, [3, 4])  # 3x4 matrix
+# Create data
+data = np.arange(12, dtype=np.float32)
 
-print(f"Data: {data}")
-print(f"Tensor shape: {tensor_view.get_tensor_descriptor().get_lengths()}")
-print(f"Element space size: {tensor_view.get_tensor_descriptor().get_element_space_size()}")
+# Method 1: Using naive tensor view with packed layout
+tensor_view = make_naive_tensor_view_packed(data, lengths=[3, 4])
+print("Number of dimensions:", tensor_view.get_num_of_dimension())
+print("Element space size:", tensor_view.get_tensor_descriptor().get_element_space_size())
 
-print_tensor(tensor_view)
+# Access elements
+print("\nData as 3x4 matrix:")
+for i in range(3):
+    for j in range(4):
+        print(f"{tensor_view.get_element([i, j]):4.0f}", end=" ")
+    print()
 ```
 
-### Element Access Methods
+### C++ Implementation Reference
+
+**File**: `include/ck_tile/core/tensor/tensor_view.hpp`
+
+```cpp
+#include <ck_tile/core/tensor/tensor_view.hpp>
+
+__device__ void example_tensor_creation()
+{
+    // Create a 3x4 matrix in global memory
+    float data[12] = {0,1,2,3,4,5,6,7,8,9,10,11};
+    
+    // Method 1: Create buffer and descriptor separately
+    auto buffer = make_buffer_view<address_space_enum::global>(data, 12);
+    auto desc = make_tensor_descriptor(make_tuple(3, 4), make_tuple(4, 1));
+    
+    // Create tensor view
+    auto tensor = make_tensor_view<address_space_enum::global>(buffer, desc);
+    
+    // Method 2: Use convenience function
+    auto tensor2 = make_naive_tensor_view<address_space_enum::global>(
+        data,           // pointer
+        make_tuple(3, 4),  // shape
+        make_tuple(4, 1)   // strides
+    );
+    
+    // Access element at (1, 2)
+    float value = tensor.get_element(make_tuple(1, 2));  // Returns 6
+    
+    // Update element
+    tensor.set_element(make_tuple(2, 1), 99.0f);
+}
+```
+
+## Flow & Layouts: From Coordinates to Memory
+
+```{=html}
+<div class="mermaid">
+flowchart LR
+    subgraph "User Input"
+        Coord["Coordinate<br/>(1, 2)"]
+    end
+    
+    subgraph "TensorView Processing"
+        Shape["Shape Check<br/>row < 3?<br/>col < 4?"]
+        Stride["Apply Strides<br/>offset = 1×4 + 2×1"]
+        Buffer["BufferView Access<br/>buffer[6]"]
+    end
+    
+    subgraph "Result"
+        Value["Value: 6"]
+    end
+    
+    Coord --> Shape
+    Shape -->|Valid| Stride
+    Stride --> Buffer
+    Buffer --> Value
+    
+    style Coord fill:#e0e7ff,stroke:#4338ca,stroke-width:2px
+    style Shape fill:#fef3c7,stroke:#f59e0b,stroke-width:2px
+    style Stride fill:#dcfce7,stroke:#10b981,stroke-width:2px
+    style Buffer fill:#dbeafe,stroke:#3b82f6,stroke-width:2px
+    style Value fill:#d1fae5,stroke:#10b981,stroke-width:2px
+</div>
+```
+
+```{=html}
+<div class="mermaid">
+graph TB
+    subgraph "Row-Major Layout (C-style)"
+        RM["Memory: [0,1,2,3,4,5,6,7,8,9,10,11]<br/>Shape: (3,4)<br/>Strides: (4,1)"]
+        RMMatrix["[[0, 1, 2, 3]<br/> [4, 5, 6, 7]<br/> [8, 9, 10, 11]]"]
+        RM --> RMMatrix
+    end
+    
+    subgraph "Column-Major Layout (Fortran-style)"
+        CM["Memory: [0,3,6,9,1,4,7,10,2,5,8,11]<br/>Shape: (3,4)<br/>Strides: (1,3)"]
+        CMMatrix["[[0, 1, 2, 3]<br/> [4, 5, 6, 7]<br/> [8, 9, 10, 11]]"]
+        CM --> CMMatrix
+    end
+    
+    subgraph "Custom Stride (Transposed View)"
+        TV["Memory: [0,1,2,3,4,5,6,7,8,9,10,11]<br/>Shape: (4,3)<br/>Strides: (1,4)"]
+        TVMatrix["[[0, 4, 8]<br/> [1, 5, 9]<br/> [2, 6, 10]<br/> [3, 7, 11]]"]
+        TV --> TVMatrix
+    end
+    
+    style RM fill:#e0f2fe,stroke:#0284c7,stroke-width:2px
+    style CM fill:#fef3c7,stroke:#f59e0b,stroke-width:2px
+    style TV fill:#f3e8ff,stroke:#9333ea,stroke-width:2px
+</div>
+```
 
 ```{pyodide}
 #| echo: true
 #| output: true
 
-print("🔍 Element Access")
+# Demonstrate different memory layouts
+data = np.arange(12, dtype=np.float32)
 
-# Method 1: Using MultiIndex coordinates
-coord_11 = MultiIndex(2, [1, 1])
-value = tensor_view.get_element(coord_11)
-print(f"Element at [1,1] using MultiIndex: {value}")
+# Row-major (C-style) - default
+row_major = make_naive_tensor_view_packed(data, lengths=[3, 4])
+print("Row-major layout:")
+for i in range(3):
+    for j in range(4):
+        print(f"{row_major.get_element([i, j]):4.0f}", end=" ")
+    print()
 
-# Method 2: Using array indexing syntax
-value = tensor_view[1, 2]
-print(f"Element at [1,2] using indexing: {value}")
-
-# Method 3: Using linear offset
-offset_value = tensor_view.get_element_by_offset(5)
-print(f"Element at linear offset 5: {offset_value}")
-```
-
-### Element Modification
-
-```{pyodide}
-#| echo: true
-#| output: true
-
-print("✏️ Element Modification")
-
-# Copy data for modification
-data_copy = data.copy()
-write_tensor = make_naive_tensor_view_packed(data_copy, [3, 4])
-print_tensor(write_tensor, 'Before modification')
-
-
-# Set using coordinates
-coord = MultiIndex(2, [0, 1])
-write_tensor.set_element(coord, 99.0)
-print(f"After setting [0,1] to 99: {data_copy}")
-
-# Set using indexing syntax
-write_tensor[2, 3] = 88.0
-print(f"After setting [2,3] to 88: {data_copy}")
-print_tensor(write_tensor, 'After modification')
-```
-
-## Vectorized Operations
-
-```{pyodide}
-#| echo: true
-#| output: true
-
-print("🔄 Vectorized Get/Set Operations")
-
-# Reset data
-data_copy = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], dtype=np.float32)
-vector_tensor = make_naive_tensor_view_packed(data_copy, [3, 4])
-
-# Vectorized get: read multiple elements starting from coordinate  
-from pytensor.tensor_coordinate import make_tensor_coordinate
-tensor_desc = vector_tensor.get_tensor_descriptor()
-coord = make_tensor_coordinate(tensor_desc, MultiIndex(2, [1, 0]))
-vector_data = vector_tensor.get_vectorized_elements(coord, vector_size=3)
-print(f"Vector read (3 elements from [1,0]): {vector_data}")
-
-
-print_tensor(vector_tensor)
-
-# Vectorized set: write multiple elements
-new_values = np.array([100, 200, 300], dtype=np.float32)
-vector_tensor.set_vectorized_elements(coord, new_values, vector_size=3)
-print(f"After vector write: {data_copy}")
-
-# Vectorized update with ADD operation
-from pytensor.buffer_view import MemoryOperationEnum
-vector_tensor.dst_in_mem_op = MemoryOperationEnum.ADD
-add_values = np.array([10, 20, 30], dtype=np.float32)
-vector_tensor.update_vectorized_elements(coord, add_values, vector_size=3)
-print(f"After vector ADD: {data_copy}")
-```
-
-
-## Tiled Views
-Behind the scenes, `make_naive_tensor_view` uses an `EmbedTransform`, which we explain in detail in the next chapter. In the meantime, we can get a taste of the power of these transformations through the `tensor_descriptor` of each tensor view. For example, just by providing additional dimensions for tile lengths, we can convert a tensor to a tiled tensor.
-
-```{pyodide}
-#| echo: true
-#| output: true
-
-print("🔲 Non-Overlapping Tiled View with TensorView")
-
-# Create tiled view (non-overlapping 2x2 blocks)
-data_6x6 = np.arange(1, 37, dtype=np.float32)
-matrix_6x6 = make_naive_tensor_view_packed(data_6x6, [6, 6])
-print_tensor(matrix_6x6, "Original 6×6 Matrix")
-
-# Create non-overlapping 2x2 tiles using strides
-# For 6x6 input with 2x2 tiles: out_h=3, out_w=3 (stepping by tile size)
-H, W = 6, 6
-tile_h, tile_w = 2, 2
-out_h, out_w = H // tile_h, W // tile_w  # 3, 3
-
-# Stride pattern for non-overlapping tiles: step by tile size
-non_overlapping_tensor = make_naive_tensor_view(
-    data_6x6,
-    lengths=[out_h, out_w, tile_h, tile_w],  # [3, 3, 2, 2]  
-    strides=[W * tile_h, tile_w, W, 1]       # [12, 2, 6, 1] - non-overlapping strides
-)
-print_windows_tiled(non_overlapping_tensor, "Non-Overlapping 2×2 Tiles (TensorView)")
-```
-
-## Overlapping Windows
-When using `make_naive_tensor_view`, we can additionally provide `strides` parameters. These strides enable us to create overlapping tile views of our data.
-
-```{pyodide}
-#| echo: true
-#| output: true
-
-print("🔍 Overlapping Windows with TensorView")
-
-# Create overlapping 3x3 windows from 5x5 matrix
-data_5x5 = np.arange(1, 26, dtype=np.float32)
-matrix_5x5 = make_naive_tensor_view_packed(data_5x5, [5, 5])
-print_tensor(matrix_5x5, "Original 5×5 Matrix")
-
-# Create overlapping 3x3 windows using strides
-# For 5x5 input with 3x3 windows: out_h=3, out_w=3
-H, W = 5, 5
-K = 3
-out_h, out_w = H - K + 1, W - K + 1  # 3, 3
-
-# Stride pattern [W, 1, W, 1] for overlapping windows
+# Create transposed view using strides (no data copy!)
 from pytensor.tensor_view import make_naive_tensor_view
-windows_tensor = make_naive_tensor_view(
-    data_5x5, 
-    lengths=[out_h, out_w, K, K],  # [3, 3, 3, 3]
-    strides=[W, 1, W, 1]           # [5, 1, 5, 1] - overlapping strides
-)
-print_windows_tiled(windows_tensor, "Overlapping 3×3 Windows (TensorView)")
+transposed = make_naive_tensor_view(data, lengths=[4, 3], strides=[1, 4])
+print("\nTransposed view (same memory):")
+for i in range(4):
+    for j in range(3):
+        print(f"{transposed.get_element([i, j]):4.0f}", end=" ")
+    print()
 
-print("\nNotice how adjacent windows share elements - this is the basis for convolution!")
+# Verify it's the same memory
+print("\nElement (1,2) in original:", row_major.get_element([1, 2]))
+print("Element (2,1) in transposed:", transposed.get_element([2, 1]))
+print("Both access the same memory location!")
 ```
 
-## Multi-Dimensional Tensors
+## Coordinate Mapping
+
+```{=html}
+<div class="mermaid">
+graph LR
+    subgraph "2D Coordinate"
+        C2D["(row=2, col=1)"]
+    end
+    
+    subgraph "Offset Calculation"
+        Calc["offset = row × row_stride + col × col_stride<br/>offset = 2 × 4 + 1 × 1 = 9"]
+    end
+    
+    subgraph "1D Memory"
+        Mem["[0,1,2,3,4,5,6,7,8,<mark>9</mark>,10,11]"]
+    end
+    
+    C2D --> Calc
+    Calc --> Mem
+    
+    style C2D fill:#e0e7ff,stroke:#4338ca,stroke-width:2px
+    style Calc fill:#fef3c7,stroke:#f59e0b,stroke-width:2px
+    style Mem fill:#d1fae5,stroke:#10b981,stroke-width:2px
+</div>
+```
 
 ```{pyodide}
 #| echo: true
 #| output: true
 
-print("📐 Higher Dimensional Tensors")
+# Interactive coordinate mapping
+tensor = make_naive_tensor_view_packed(np.arange(12, dtype=np.float32), lengths=[3, 4])
 
-# 3D tensor
-data_3d = np.arange(1, 25, dtype=np.float32)
-tensor_3d = make_naive_tensor_view_packed(data_3d, [2, 3, 4])
-print(f"3D tensor shape: {tensor_3d.get_tensor_descriptor().get_lengths()}")
-print(f"Element [1,2,1]: {tensor_3d[1, 2, 1]}")
+# Function to show mapping
+def show_coordinate_mapping(row, col):
+    # For packed layout, calculate offset manually
+    # Row-major: offset = row * num_cols + col
+    offset = row * 4 + col
+    value = tensor.get_element([row, col])
+    print(f"Coordinate ({row}, {col}) -> Offset {offset} -> Value {value}")
 
-# 4D tensor  
-tensor_4d = make_naive_tensor_view_packed(data_3d, [2, 2, 3, 2])
-print(f"4D tensor shape: {tensor_4d.get_tensor_descriptor().get_lengths()}")
-print(f"Element [1,1,2,1]: {tensor_4d[1, 1, 2, 1]}")
+# Examples
+show_coordinate_mapping(0, 0)  # Top-left
+show_coordinate_mapping(1, 2)  # Middle
+show_coordinate_mapping(2, 3)  # Bottom-right
+
+# Demonstrate bounds checking
+try:
+    tensor.get_element([3, 0])  # Out of bounds
+except Exception as e:
+    print(f"\nBounds checking works: Index out of bounds")
 ```
 
-## Key Features
+## Advanced Operations
 
-- **Coordinate Access**: Multi-dimensional indexing with `tensor[i, j, k]` syntax
-- **Vectorized Operations**: Read/write multiple elements efficiently
-- **Layout Flexibility**: Same data can be viewed as different tensor shapes
-- **Memory Views**: Zero-copy operations on existing BufferView data
-- **Tiling Support**: Extract overlapping and non-overlapping windows
-- **Higher Dimensions**: Support for tensors of any dimensionality
+### Slicing and Subviews
 
-## What's Next
+```{pyodide}
+#| echo: true
+#| output: true
 
-TensorView provides structured access to multi-dimensional data. Next, learn about [Tensor Adaptors](02_adaptors.qmd) which enable powerful transformations and coordinate mappings on top of TensorView. 
+# Create a larger tensor
+data = np.arange(20, dtype=np.float32)
+tensor = make_naive_tensor_view_packed(data, lengths=[4, 5])
+
+print("Original 4x5 tensor:")
+for i in range(4):
+    for j in range(5):
+        print(f"{tensor.get_element([i, j]):4.0f}", end=" ")
+    print()
+
+# Create a 2x3 subview starting at (1, 1)
+# In C++ this would be done with transforms
+print("\n2x3 subview starting at (1, 1):")
+for i in range(2):
+    for j in range(3):
+        value = tensor.get_element([i + 1, j + 1])
+        print(f"{value:4.0f}", end=" ")
+    print()
+```
+
+### Broadcasting and Padding
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+# Demonstrate padding (conceptual - actual implementation uses PadTransform)
+small_data = np.array([1, 2, 3, 4], dtype=np.float32)
+small_tensor = make_naive_tensor_view_packed(small_data, lengths=[2, 2])
+
+print("Original 2x2 tensor:")
+for i in range(2):
+    for j in range(2):
+        print(f"{small_tensor.get_element([i, j]):4.0f}", end=" ")
+    print()
+
+# Access with padding (returns 0 for out-of-bounds)
+print("\nAccessing with conceptual padding:")
+for i in range(-1, 3):
+    for j in range(-1, 3):
+        if 0 <= i < 2 and 0 <= j < 2:
+            value = small_tensor.get_element([i, j])
+        else:
+            value = 0  # Padding value
+        print(f"{value:4.0f}", end=" ")
+    print()
+```
+
+## TensorView vs BufferView
+
+```{=html}
+<div class="mermaid">
+graph TB
+    subgraph "BufferView"
+        BV1["Linear indexing only"]
+        BV2["buffer[5]"]
+        BV3["No shape information"]
+        BV4["Direct memory access"]
+    end
+    
+    subgraph "TensorView"
+        TV1["Multi-dimensional indexing"]
+        TV2["tensor[1, 2]"]
+        TV3["Shape-aware operations"]
+        TV4["Coordinate transformations"]
+    end
+    
+    subgraph "Use Cases"
+        UC1["BufferView: Low-level memory ops"]
+        UC2["TensorView: Matrix/tensor algorithms"]
+    end
+    
+    BV1 --> UC1
+    TV1 --> UC2
+    
+    style BV1 fill:#dbeafe,stroke:#3b82f6,stroke-width:2px
+    style TV1 fill:#fce7f3,stroke:#ec4899,stroke-width:2px
+</div>
+```
+
+### C++ Advanced Features
+
+```cpp
+__device__ void advanced_tensor_operations()
+{
+    // Create a 4x6 matrix
+    float data[24];
+    auto tensor = make_naive_tensor_view<address_space_enum::global>(
+        data, make_tuple(4, 6), make_tuple(6, 1)
+    );
+    
+    // Slicing and windowing require tile_window
+    // Create a tile window for block access
+    auto window = make_tile_window(
+        tensor,
+        make_tuple(2, 3),    // window shape
+        make_tuple(1, 2)     // window origin
+    );
+    
+    // Vectorized access using coordinates
+    auto coord = make_tensor_coordinate(
+        tensor.get_tensor_descriptor(),
+        make_tuple(1, 0)
+    );
+    // Load 4 consecutive elements as float4
+    using float4 = ck_tile::vector_type<float, 4>::type;
+    auto vec4 = tensor.get_vectorized_elements<float4>(coord, 0);
+}
+```
+
+## Performance Considerations
+
+```{=html}
+<div class="mermaid"  style="margin: 0 auto; display: block; width:70%;">
+graph LR
+    subgraph "Memory Access Patterns"
+        Seq["Sequential Access<br/>(Good cache usage)"]
+        Stride["Strided Access<br/>(May cause cache misses)"]
+        Random["Random Access<br/>(Poor cache usage)"]
+    end
+    
+    subgraph "Optimization Strategies"
+        Opt1["Use row-major for row iteration"]
+        Opt2["Use col-major for column iteration"]
+        Opt3["Minimize stride between accesses"]
+        Opt4["Vectorize when possible"]
+    end
+    
+    Seq --> Opt1
+    Stride --> Opt2
+    Stride --> Opt3
+    Random --> Opt4
+    
+    style Seq fill:#d1fae5,stroke:#10b981,stroke-width:2px
+    style Stride fill:#fef3c7,stroke:#f59e0b,stroke-width:2px
+    style Random fill:#fee2e2,stroke:#ef4444,stroke-width:2px
+</div>
+```
+
+## Summary
+
+TensorView provides:
+
+- **Multi-dimensional indexing**: Natural coordinate-based access
+- **Flexible memory layouts**: Row-major, column-major, custom strides
+- **Zero-copy views**: Transpose, slice, reshape without copying data
+- **Type safety**: Dimensions encoded in type (C++)
+- **Integration**: Works seamlessly with BufferView and transforms
+
+The abstraction enables writing dimension-agnostic algorithms while maintaining high performance through compile-time optimizations.

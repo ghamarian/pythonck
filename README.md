@@ -2,7 +2,7 @@
 
 This repository provides educational Python implementations of tensor operations and concepts from the AMD Composable Kernels library. The implementations focus on clarity and understanding rather than performance, making them ideal for learning GPU programming concepts.
 
-## 🎯 **Core Components**
+## Core Components
 
 ### **PyTensor** - Core Library
 Python implementation of CK Tile tensor primitives including:
@@ -44,7 +44,7 @@ Comprehensive Quarto-based documentation with interactive examples:
 - **Complete learning path**: Structured 10-step progression
 - **Interactive code execution**: Run examples directly in browser
 
-## 🚀 **Quick Start**
+## Quick Start
 
 ### Running the Applications
 
@@ -70,7 +70,7 @@ cd documentation
 quarto serve
 ```
 
-## 📁 **Repository Structure**
+## Repository Structure
 
 ```
 ├── pytensor/                       # Core Python implementation
@@ -108,7 +108,7 @@ quarto serve
 └── tile_distr_thread_mapping.py   # Command line example
 ```
 
-## 🎓 **Learning Path**
+## Learning Path
 
 ### 1. **Start with Documentation**
 Visit the interactive documentation to understand core concepts:
@@ -126,7 +126,7 @@ Visit the interactive documentation to understand core concepts:
 - Examine test cases for usage patterns
 - Analyze the command line example
 
-## 🔑 **Key Concepts**
+## Key Concepts
 
 ### **Tensor Operations**
 - **Buffer Views**: Abstract memory access with different address spaces (GLOBAL, LDS, VGPR)
@@ -146,17 +146,49 @@ Visit the interactive documentation to understand core concepts:
 - **Transform Pipeline**: Chain multiple tensor layout transformations
 - **Thread Coordination**: Understanding GPU execution patterns
 
-## 🛠 **Installation**
+## Installation
+
+### Using Poetry (Recommended)
 
 ```bash
-# Install dependencies
-pip install -r requirements.txt
+# Install Poetry if you haven't already
+curl -sSL https://install.python-poetry.org | python3 -
 
-# For documentation (optional)
-# Install Quarto from https://quarto.org
+# Clone the repository
+git clone https://github.com/ROCm/composable_kernel.git
+cd composable_kernel/pythonck
+
+# Install dependencies
+poetry install
+
+# Install with visualization support
+poetry install -E visualization
+
+# Install with Streamlit apps support
+poetry install -E streamlit
 ```
 
-## 📊 **Features**
+### Using pip
+
+```bash
+# Install from requirements.txt
+pip install -r requirements.txt
+
+# Or install the package directly
+pip install -e .
+```
+
+### Documentation
+
+To build and serve the documentation locally:
+
+```bash
+# Install Quarto from https://quarto.org
+cd tile_distribution_documentation
+quarto serve
+```
+
+## Features
 
 ### **Interactive Visualization**
 - Real-time parameter adjustment
@@ -176,15 +208,15 @@ pip install -r requirements.txt
 - Extensive test coverage
 - Cross-referenced documentation
 
-## 🤝 **Contributing**
+## Contributing
 
 This project serves as an educational resource for understanding Composable Kernels concepts. Contributions that improve clarity, add examples, or enhance documentation are welcome.
 
-## 📄 **License**
+## License
 
 This project is provided under the same license as the Composable Kernels library.
 
-## 🙏 **Acknowledgments**
+## Acknowledgments
 
 - AMD Composable Kernels team for the original concepts
 - Streamlit for the interactive application framework

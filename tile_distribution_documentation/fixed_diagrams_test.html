@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fixed D3 Diagrams Test</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link rel="stylesheet" href="diagram-sizing-fixes.css">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #fafafa;
+            color: #212121;
+        }
+        h1 {
+            color: #1976d2;
+            margin-bottom: 30px;
+        }
+        .diagram-section {
+            background: white;
+            border: 1px solid #e0e0e0;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-radius: 4px;
+        }
+        .diagram-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #424242;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-left: 10px;
+        }
+        .status.success {
+            background: #e8f5e8;
+            color: #388e3c;
+        }
+        .status.error {
+            background: #ffebee;
+            color: #d32f2f;
+        }
+        .improvements {
+            background: #f5f5f5;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .improvements h3 {
+            margin-top: 0;
+            color: #616161;
+        }
+        .improvements ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .improvements li {
+            margin: 5px 0;
+            color: #757575;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+        @media (max-width: 1024px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Fixed D3 Diagrams - Professional Scientific Visualization</h1>
+    
+    <div class="improvements">
+        <h3>✅ Improvements Applied</h3>
+        <ul>
+            <li><strong>Auto-sizing boxes:</strong> Text now properly fits within boxes</li>
+            <li><strong>Better arrows:</strong> Smart edge-to-edge connections with curved options</li>
+            <li><strong>Consistent colors:</strong> Beautiful palette from BufferView/TileWindow</li>
+            <li><strong>No animations:</strong> Static diagrams for scientific clarity</li>
+            <li><strong>Proper text centering:</strong> Multi-line text is properly aligned</li>
+            <li><strong>Responsive design:</strong> Diagrams scale with container width</li>
+        </ul>
+    </div>
+
+    <div class="grid">
+        <div class="diagram-section">
+            <div class="diagram-title">
+                BufferView Architecture
+                <span class="status success" id="bufferview-status">Loading...</span>
+            </div>
+            <div id="bufferview-test"></div>
+        </div>
+
+        <div class="diagram-section">
+            <div class="diagram-title">
+                MultiIndex Structure
+                <span class="status success" id="multiindex-status">Loading...</span>
+            </div>
+            <div id="multiindex-test"></div>
+        </div>
+    </div>
+
+    <div class="diagram-section">
+        <div class="diagram-title">
+            Transform System
+            <span class="status success" id="transform-status">Loading...</span>
+        </div>
+        <div id="transform-test"></div>
+    </div>
+
+    <div class="diagram-section">
+        <div class="diagram-title">
+            Tile Window System
+            <span class="status success" id="tilewindow-status">Loading...</span>
+        </div>
+        <div id="tilewindow-test"></div>
+    </div>
+
+    <!-- Load diagram scripts -->
+    <script src="diagrams/diagrams.js"></script>
+    <script src="diagrams/buffer_view/bufferview_architecture.js"></script>
+    <script src="diagrams/tensor_coordinates/multiindex_structure.js"></script>
+    <script src="diagrams/transforms/transform_system_architecture.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Testing fixed D3 diagrams with improved rendering...');
+            
+            const tests = [
+                {
+                    name: 'BufferView',
+                    containerId: '#bufferview-test',
+                    statusId: '#bufferview-status',
+                    createFn: window.createBufferViewArchitecture
+                },
+                {
+                    name: 'MultiIndex',
+                    containerId: '#multiindex-test',
+                    statusId: '#multiindex-status',
+                    createFn: window.createMultiIndexStructure
+                },
+                {
+                    name: 'Transform',
+                    containerId: '#transform-test',
+                    statusId: '#transform-status',
+                    createFn: window.createTransformSystemArchitecture
+                },
+                {
+                    name: 'TileWindow',
+                    containerId: '#tilewindow-test',
+                    statusId: '#tilewindow-status',
+                    createFn: () => {
+                        if (window.TileWindowDiagrams && window.TileWindowDiagrams.systemOverview) {
+                            window.TileWindowDiagrams.systemOverview('#tilewindow-test');
+                        } else {
+                            throw new Error('TileWindow diagram not found');
+                        }
+                    }
+                }
+            ];
+
+            let successCount = 0;
+            
+            tests.forEach(test => {
+                const statusEl = document.querySelector(test.statusId);
+                try {
+                    if (typeof test.createFn === 'function') {
+                        test.createFn(test.containerId);
+                        statusEl.textContent = 'Loaded';
+                        statusEl.className = 'status success';
+                        successCount++;
+                        console.log(`✅ ${test.name} loaded successfully`);
+                    } else {
+                        throw new Error('Function not found');
+                    }
+                } catch (error) {
+                    statusEl.textContent = 'Error';
+                    statusEl.className = 'status error';
+                    console.error(`❌ ${test.name} failed:`, error);
+                }
+            });
+
+            // Validate improvements
+            setTimeout(() => {
+                console.log('\n📊 Validation Results:');
+                
+                // Check text fitting
+                const overflowingText = Array.from(document.querySelectorAll('svg text')).filter(text => {
+                    const bbox = text.getBBox();
+                    const parent = text.parentNode.querySelector('rect');
+                    if (parent) {
+                        const parentBox = parent.getBBox();
+                        return bbox.width > parentBox.width || bbox.height > parentBox.height;
+                    }
+                    return false;
+                });
+                
+                console.log(`Text overflow issues: ${overflowingText.length === 0 ? '✅ None' : '❌ ' + overflowingText.length}`);
+                
+                // Check arrow rendering
+                const arrows = document.querySelectorAll('line[marker-end], path[marker-end]');
+                console.log(`Arrows rendered: ${arrows.length > 0 ? '✅ ' + arrows.length : '❌ None'}`);
+                
+                // Check color consistency
+                const colorfulBoxes = Array.from(document.querySelectorAll('rect')).filter(rect => {
+                    const fill = rect.getAttribute('fill');
+                    return fill && fill !== 'white' && fill !== '#ffffff';
+                });
+                console.log(`Colored boxes: ${colorfulBoxes.length > 0 ? '✅ ' + colorfulBoxes.length : '❌ None'}`);
+                
+                // Check no animations
+                const hasTransitions = Array.from(document.querySelectorAll('*')).some(el => {
+                    const style = window.getComputedStyle(el);
+                    return style.transition !== 'none 0s ease 0s' || style.animation !== 'none 0s ease 0s normal none 1 running';
+                });
+                console.log(`Static (no animations): ${!hasTransitions ? '✅ Yes' : '❌ No'}`);
+                
+                console.log(`\n🎉 Overall: ${successCount}/${tests.length} diagrams loaded successfully`);
+            }, 2000);
+        });
+    </script>
+</body>
+</html>

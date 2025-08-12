@@ -52,6 +52,23 @@ print(f"  Lower dimensions: [1] (linear memory)")
 print("✅ EmbedTransform created")
 ```
 
+<details>
+<summary>📝 C++ Equivalent (Composable Kernel)</summary>
+
+```cpp
+// From composable_kernel/include/ck_tile/core/algorithm/coordinate_transform.hpp
+// Create embed transform: 2D → 1D with strides [6, 1]
+auto embed = make_embed_transform(make_tuple(2, 3), make_tuple(6, 1));
+
+// Forward transformation: 2D → 1D
+multi_index<2> upper_coord{1, 2};  // Row 1, Column 2
+multi_index<1> lower_coord;
+embed.calculate_lower_index(lower_coord, upper_coord);
+// Result: lower_coord[0] = 1*6 + 2*1 = 8
+```
+
+</details>
+
 #### Forward Transformation (to_lower)
 
 ```{pyodide}
@@ -125,6 +142,26 @@ print(f"  Packing: row-major order (row*3 + col)")
 print("✅ UnmergeTransform created")
 ```
 
+<details>
+<summary>📝 C++ Equivalent (Composable Kernel)</summary>
+
+```cpp
+// From composable_kernel/include/ck_tile/core/algorithm/coordinate_transform.hpp
+// Create unmerge transform: 1D → 2D (unpack linear to 2x3)
+auto unmerge = make_unmerge_transform(make_tuple(2, 3));
+
+// The C++ unmerge inherits from base_transform<1, UpLengths::size()>
+// This means 1 lower dimension → multiple upper dimensions
+
+// Forward transformation: 2D → 1D (packing)
+multi_index<2> upper_coord{1, 2};  // Row 1, Column 2
+multi_index<1> lower_coord;
+unmerge.calculate_lower_index(lower_coord, upper_coord);
+// Result: lower_coord[0] = 1*3 + 2 = 5
+```
+
+</details>
+
 #### Forward Transformation (to_lower)
 
 ```{pyodide}
@@ -159,13 +196,13 @@ print(f"  Verification: {recovered_coord.to_list() == upper_coord.to_list()}")
 print("✅ Backward transformation demonstrated")
 ```
 
-### **3. MergeTransform: Dimension Merging**
+### **3. MergeTransform: Dimension Splitting**
 
-**Purpose**: Merges multiple dimensions into a single dimension.
+**Purpose**: Splits a single dimension into multiple dimensions.
 
 **Key Difference from EmbedTransform**: 
 - **EmbedTransform**: Maps multi-dimensional coordinates to linear memory with custom strides (preserves the original coordinate structure)
-- **MergeTransform**: Collapses multiple dimensions into a single dimension (changes the coordinate structure)
+- **MergeTransform**: Splits a single dimension into multiple dimensions (changes the coordinate structure)
 
 ```{pyodide}
 #| echo: true
@@ -182,6 +219,31 @@ print(f"  Lower dimensions: [2, 3] (split into 2x3)")
 print(f"  Splitting: first dimension → row, second dimension → column")
 print("✅ MergeTransform created")
 ```
+
+<details>
+<summary>📝 C++ Equivalent (Composable Kernel)</summary>
+
+```cpp
+// From composable_kernel/include/ck_tile/core/algorithm/coordinate_transform.hpp
+// Create merge transform: 2D → 1D (merge 2x3 into single dimension)
+auto merge = make_merge_transform(make_tuple(2, 3));
+
+// The C++ merge inherits from base_transform<LowLengths::size(), 1>
+// This means multiple lower dimensions → 1 upper dimension
+
+// Forward transformation: 1D → 2D (splitting)
+multi_index<1> upper_coord{5};  // Single index 5
+multi_index<2> lower_coord;
+merge.calculate_lower_index(lower_coord, upper_coord);
+// Result: lower_coord[0] = 5 / 3 = 1 (row)
+//         lower_coord[1] = 5 % 3 = 2 (col)
+
+// Note: C++ has multiple merge implementations:
+// - merge_v2_magic_division: Uses magic number division (default)
+// - merge_v3_division_mod: Uses division/modulo for power-of-2 sizes
+```
+
+</details>
 
 #### Forward Transformation (to_lower)
 
@@ -238,6 +300,32 @@ print(f"  Lower dimensions: [0] (no lower dimensions - broadcasting)")
 print(f"  Broadcasting: single value repeated to fill 6 positions")
 print("✅ ReplicateTransform created")
 ```
+
+<details>
+<summary>📝 C++ Equivalent (Composable Kernel)</summary>
+
+```cpp
+// From composable_kernel/include/ck_tile/core/algorithm/coordinate_transform.hpp
+// Create replicate transform: broadcast to 6 positions
+auto replicate = make_replicate_transform(make_tuple(6));
+
+// The C++ replicate inherits from base_transform<0, UpLengths::size()>
+// This means 0 lower dimensions → multiple upper dimensions
+
+// Forward transformation: upper → lower (empty)
+multi_index<1> upper_coord{4};  // Index 4 in upper dimension
+multi_index<0> lower_coord;     // Empty multi_index
+replicate.calculate_lower_index(lower_coord, upper_coord);
+// Result: lower_coord is empty (no lower dimensions)
+
+// Backward transformation: lower → upper (always returns zeros)
+multi_index<0> source_coord{};  // Empty
+multi_index<1> broadcast_coord;
+replicate.calculate_upper_index(broadcast_coord, source_coord);
+// Result: broadcast_coord[0] = 0 (always)
+```
+
+</details>
 
 #### Forward Transformation (to_lower)
 
@@ -345,4 +433,4 @@ Now that you understand the individual transforms, you can explore:
 
 ---
 
-*Tensor Transforms are the mathematical building blocks that make all coordinate operations possible. Master these four transform types to understand how PythonCK maps between different coordinate spaces.* 
+*Tensor Transforms are the mathematical building blocks that make all coordinate operations possible. Master these four transform types to understand how PythonCK maps between different coordinate spaces.*

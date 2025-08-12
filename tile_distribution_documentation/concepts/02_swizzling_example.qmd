@@ -1,7 +1,6 @@
 ---
 title: "Memory Swizzling with Morton Ordering"
-format: html
-jupyter: python3
+format: live-html
 ---
 
 # Introduction
@@ -25,13 +24,21 @@ Morton ordering interleaves the bits of 2D coordinates to create a 1D ordering t
 
 This creates a Z-shaped traversal pattern within each tile, which is **exactly what MergeTransform enables us to express mathematically**.
 
-```{python}
+```{pyodide}
+#| echo: false
+#| output: false
+#| autorun: true
+
+# Auto-install pythonck package
+import micropip
+await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl")
+```
+
+```{pyodide}
 #| echo: false
 # Utility functions - hidden from user
 import numpy as np
-import sys
-sys.path.append('../..')
-from pytensor import (
+from pytensor.tensor_descriptor import (
     make_naive_tensor_descriptor_packed,
     UnmergeTransform, MergeTransform,
     MultiIndex,
@@ -82,7 +89,7 @@ def create_test_data():
     return texture, H, W
 ```
 
-```{python}
+```{pyodide}
 #| echo: true
 def morton_encode_2d(y, x):
     """Encode 2D coordinates to Morton order."""
@@ -108,7 +115,7 @@ def morton_decode_2d(morton_idx):
 
 Let's first understand the Morton ordering pattern and why it's beneficial:
 
-```{python}
+```{pyodide}
 # Create test data
 texture, H, W = create_test_data()
 
@@ -142,7 +149,7 @@ for y in range(2):
 
 Let's create our 8×8 test texture and visualize the data organization:
 
-```{python}
+```{pyodide}
 # Show original texture and tiled layout
 print_matrix(texture, f"Original {H}×{W} Texture")
 print_tiles_layout(texture, 4, "Tiled Layout Visualization")
@@ -152,7 +159,7 @@ print_tiles_layout(texture, 4, "Tiled Layout Visualization")
 
 First, we split our 8×8 texture into 4×4 tiles using tensor descriptors. This creates a hierarchical structure: (Y_blk, y_in, X_blk, x_in).
 
-```{python}
+```{pyodide}
 TILE = 4
 
 # Create basic descriptor
@@ -180,7 +187,7 @@ print("Dimensions: (Y_blk, y_in, X_blk, x_in)")
 
 **Why do we need the coordinate conversion code?** Let's examine what the tensor descriptor returns:
 
-```{python}
+```{pyodide}
 # Let's check what format the bottom index is in
 print("Understanding Bottom Index Format:")
 print("================================")
@@ -207,7 +214,7 @@ print("\nThis is why we need the coordinate conversion code!")
 
 Now let's verify the Stage 1 coordinate transformation and **see the resulting matrix**:
 
-```{python}
+```{pyodide}
 print("\nVerifying Stage 1 coordinate transformation:")
 print("(Y_blk, y_in, X_blk, x_in) → Original (Y, X) → Value")
 
@@ -281,7 +288,7 @@ Now for the key insight: **MergeTransform is essential for Morton ordering**. We
 1. Split coordinates into individual bits using `UnmergeTransform`
 2. **Reorder and merge bits using `MergeTransform`** to create the Morton index
 
-```{python}
+```{pyodide}
 print("Stage 2: Morton ordering transformation using MergeTransform")
 print("Transform sequence:")
 print("1. UnmergeTransform: y_in (4) → (y₁, y₀) each 2 values")
@@ -301,7 +308,7 @@ print("- Merge Morton: (y₀,x₀,y₁,x₁) → Morton index")
 
 **Why MergeTransform is Essential for Morton Ordering:**
 
-```{python}
+```{pyodide}
 print("\nWhy MergeTransform is Essential for Morton Ordering:")
 print()
 print("Morton ordering requires specific bit interleaving:")
@@ -333,7 +340,7 @@ for y in range(4):
 
 Now let's attempt the tensor descriptor implementation:
 
-```{python}
+```{pyodide}
 try:
     # Apply Stage 2 to DESC1
     DESC2 = transform_tensor_descriptor(
@@ -456,7 +463,7 @@ print("- MergeTransform shows the theoretical foundation")
 
 Let's visualize the complete swizzling transformation with tiled matrix layouts:
 
-```{python}
+```{pyodide}
 print("Complete Transformation Visualization")
 print("=" * 40)
 
@@ -535,7 +542,7 @@ print("(Y,X)     → (Y_blk,y_in,X_blk,x_in) → (Y_blk,Morton,X_blk)")
 
 Let's analyze the benefits of Morton ordering for memory access patterns using our **working manual implementation**:
 
-```{python}
+```{pyodide}
 print("\nMemory Access Pattern Analysis")
 print("=" * 40)
 
@@ -597,7 +604,7 @@ print(f"Perfect match: {'🎉' if str(working_morton_sequence) == str([1, 2, 9, 
 
 ## Key Insights and Applications
 
-```{python}
+```{pyodide}
 print("\nKey Insights:")
 print("=" * 20)
 print("✅ MergeTransform IS essential for Morton ordering")
@@ -635,7 +642,7 @@ else:
 
 **The answer lies in how `make_naive_tensor_descriptor_packed` works:**
 
-```{python}
+```{pyodide}
 print("Technical Explanation: Coordinate Conversion")
 print("=" * 45)
 
@@ -674,7 +681,7 @@ print("Without it, we can't interpret the tensor descriptor results correctly.")
 
 This comprehensive example demonstrates both the power and complexity of tensor descriptors for memory transformations:
 
-```{python}
+```{pyodide}
 print("MORTON ORDERING WITH TENSOR DESCRIPTORS - SUMMARY")
 print("=" * 55)
 

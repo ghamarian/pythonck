@@ -1,60 +1,57 @@
-[build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[project]
+[tool.poetry]
 name = "pythonck"
-version = "0.1.0"
-description = "Python implementation of Composable Kernels tensor operations"
+version = "0.2.0"
+description = "Python implementation and tutorials for the Composable Kernel (CK) Tile programming model"
+authors = ["CK Development Team"]
 readme = "README.md"
 license = "MIT"
-authors = [
-    {name = "Amir", email = "amir@example.com"}
-]
-keywords = ["tensor", "gpu", "composable-kernels", "cuda", "hip"]
+homepage = "https://github.com/ROCm/composable_kernel"
+repository = "https://github.com/ROCm/composable_kernel"
+documentation = "https://github.com/ROCm/composable_kernel/tree/develop/pythonck"
+keywords = ["gpu", "hpc", "tensor", "composable-kernel", "rocm", "amd"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
-requires-python = ">=3.8"
-dependencies = [
-    "sympy>=1.9",
+packages = [
+    { include = "pytensor" },
+    { include = "tensor_transforms" },
+    { include = "tile_distribution" },
 ]
 
-[project.optional-dependencies]
-dev = [
-    "pytest>=6.0",
-    "pytest-cov",
-    "black",
-    "isort",
-    "flake8",
-    "build>=0.7.0",
-]
-streamlit = [
-    "streamlit>=1.20.0",
-    "matplotlib",
-    "numpy",
-    "pandas",
-]
+[tool.poetry.dependencies]
+python = ">=3.11,<4.0"
+sympy = "^1.9"
+numpy = ">=1.21.0,<3.0.0"
+matplotlib = "^3.4.0"
+streamlit = "^1.20.0"
+pandas = "^2.0.0"
+quarto = "^0.1.0"
+seaborn = "^0.13.2"
+networkx = "^3.5"
+jupyter = "^1.1.1"
 
-[project.urls]
-Homepage = "https://github.com/ghamarian/pythonck"
-Repository = "https://github.com/ghamarian/pythonck"
-Documentation = "https://github.com/ghamarian/pythonck/blob/main/README.md"
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.0.0"
+pytest-cov = "^4.0.0"
+black = "^23.0.0"
+isort = "^5.12.0"
+flake8 = "^6.0.0"
+mypy = "^1.0.0"
 
-[tool.setuptools]
-packages = ["pytensor", "tensor_transforms", "tile_distribution"]
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
 
-[tool.setuptools.package-data]
-pytensor = ["*.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -69,7 +66,7 @@ markers = [
 
 [tool.black]
 line-length = 88
-target-version = ['py38']
+target-version = ['py311']
 include = '\.pyi?$'
 extend-exclude = '''
 /(
@@ -88,4 +85,4 @@ extend-exclude = '''
 [tool.isort]
 profile = "black"
 multi_line_output = 3
-line_length = 88 
+line_length = 88

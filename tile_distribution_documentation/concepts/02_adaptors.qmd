@@ -23,6 +23,55 @@ await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/mas
 
 Let's start by understanding what a TensorAdaptor is and how it works:
 
+```{=html}
+<div class="mermaid">
+graph TB
+    subgraph "Adaptor Composition"
+        subgraph "Single Transform"
+            T1["Transform<br/>(e.g., Transpose)"]
+            I1["Input Coords<br/>[0,1,2]"]
+            O1["Output Coords<br/>[2,0,1]"]
+        end
+        
+        subgraph "Chained Transforms"
+            T2A["Transform A<br/>(e.g., Merge)"]
+            T2B["Transform B<br/>(e.g., Pad)"]
+            I2["Input<br/>2D"]
+            M2["Intermediate<br/>1D"]
+            O2["Output<br/>1D Padded"]
+        end
+        
+        subgraph "Complex Pipeline"
+            T3A["Transpose"]
+            T3B["Unmerge"]
+            T3C["Pad"]
+            I3["Input"]
+            O3["Output"]
+        end
+    end
+    
+    I1 --> T1
+    T1 --> O1
+    
+    I2 --> T2A
+    T2A --> M2
+    M2 --> T2B
+    T2B --> O2
+    
+    I3 --> T3A
+    T3A --> T3B
+    T3B --> T3C
+    T3C --> O3
+    
+    style T1 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style T2A fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style T2B fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style T3A fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style T3B fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style T3C fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+</div>
+```
+
 ```{pyodide}
 #| echo: true
 #| output: true
@@ -99,6 +148,29 @@ for coord_list in test_coords:
     print(f"    {coord_list} → {bottom_coord.to_list()}")
 ```
 
+### C++ Implementation
+
+```cpp
+// From composable_kernel - create transpose adaptor
+// Transpose adaptor example: [0, 1, 2] → [2, 0, 1]
+auto transpose_adaptor = make_identity_tensor_adaptor<3>();  // Start with identity
+
+// Apply transpose using transform_tensor_adaptor
+// In CK, transpose is typically done through tensor descriptor transformations
+auto transposed_desc = transform_tensor_descriptor(
+    original_desc,
+    make_tuple(make_pass_through_transform(original_desc.get_length(2)),
+               make_pass_through_transform(original_desc.get_length(0)),
+               make_pass_through_transform(original_desc.get_length(1))),
+    make_tuple(sequence<2>{}, sequence<0>{}, sequence<1>{}),  // old dims
+    make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{})   // new dims
+);
+
+// Alternative: Direct coordinate transformation
+multi_index<3> top_coord{0, 1, 2};
+// After transpose [2, 0, 1]: coord becomes [2, 0, 1]
+```
+
 ## Single-Stage Adaptors: Custom Transform Chains
 
 You can create custom adaptors by specifying exactly which transforms to use and how they connect, the API for that is called `make_single_stage_tensor_adaptor`:
@@ -133,11 +205,72 @@ for idx in test_indices:
     print(f"    [{idx}] → {bottom_coord.to_list()} (expected: [{expected_row}, {expected_col}])")
 ```
 
+### C++ Implementation
+
+```cpp
+// From composable_kernel - create single-stage tensor adaptor
+// Note: In CK, adaptors are typically created through tensor descriptors
+
+// Create a descriptor that merges 2x3 dimensions into single dimension
+auto base_desc = make_naive_tensor_descriptor_packed(make_tuple(2, 3));
+
+// Apply merge transform
+auto merged_desc = transform_tensor_descriptor(
+    base_desc,
+    make_tuple(make_merge_transform(make_tuple(2, 3))),
+    make_tuple(sequence<0, 1>{}),  // merge dims 0,1
+    make_tuple(sequence<0>{})      // to single dim 0
+);
+
+// The adaptor is embedded in the descriptor
+// To use it:
+multi_index<1> top_coord{5};  // 1D coordinate
+// This internally calculates: row = 5/3 = 1, col = 5%3 = 2
+```
+
 Now that we saw how we can create an adaptor, let's see how we can combine a few of them together.
 
 ## Chaining Adaptors: Building Complex Transformations
 
 The real power comes from chaining multiple adaptors together to create sophisticated transformations. Below we try some trivial example of combining merge and unmerge just to show how these transformations combine.
+
+```{=html}
+<div class="mermaid">
+graph LR
+    subgraph "Adaptor Chaining Flow"
+        subgraph "Adaptor 1"
+            A1I["Bottom Dims<br/>[0,1]"]
+            A1T["Transform:<br/>Merge[2,3]"]
+            A1O["Top Dims<br/>[0]"]
+        end
+        
+        subgraph "Adaptor 2"
+            A2I["Bottom Dims<br/>[0]"]
+            A2T["Transform:<br/>Unmerge[2,3]"]
+            A2O["Top Dims<br/>[0,1]"]
+        end
+        
+        subgraph "Chained Result"
+            CI["Input 2D<br/>Bottom[0,1]"]
+            CO["Output 2D<br/>Top[0,1]"]
+        end
+    end
+    
+    A1I --> A1T
+    A1T --> A1O
+    A1O --> A2I
+    A2I --> A2T
+    A2T --> A2O
+    
+    CI --> A1I
+    A2O --> CO
+    
+    style A1T fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style A2T fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style CI fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style CO fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+</div>
+```
 
 ```{pyodide}
 #| echo: true
@@ -175,6 +308,34 @@ for coord_list in test_coords:
     top_coord = MultiIndex(2, coord_list)  # 2D input
     bottom_coord = chained_adaptor.calculate_bottom_index(top_coord)
     print(f"    {coord_list} → {bottom_coord.to_list()}")
+```
+
+### C++ Implementation
+
+```cpp
+// From composable_kernel - chaining adaptors through descriptors
+
+// Start with a 2D descriptor
+auto desc1 = make_naive_tensor_descriptor_packed(make_tuple(2, 3));
+
+// First transformation: merge 2D to 1D
+auto merged_desc = transform_tensor_descriptor(
+    desc1,
+    make_tuple(make_merge_transform(make_tuple(2, 3))),
+    make_tuple(sequence<0, 1>{}),  // merge dims 0,1
+    make_tuple(sequence<0>{})      // to dim 0
+);
+
+// Second transformation: unmerge 1D back to 2D
+auto final_desc = transform_tensor_descriptor(
+    merged_desc,
+    make_tuple(make_unmerge_transform(make_tuple(2, 3))),
+    make_tuple(sequence<0>{}),     // from dim 0
+    make_tuple(sequence<0, 1>{})   // to dims 0,1
+);
+
+// The chained transformation is embedded in final_desc
+// Result should be identity transformation
 ```
 
 ## Transform Addition: Extending Existing Adaptors
@@ -220,6 +381,109 @@ print("\n  ⚠️  Common mistake: Using [[0]] for new_upper_dimension_new_top_i
 print("     This creates 1D output, losing the second dimension!")
 ```
 
+### C++ Implementation
+
+```cpp
+// From composable_kernel - transform tensor adaptor pattern
+
+// Start with transposed descriptor
+auto base_desc = make_naive_tensor_descriptor(
+    make_tuple(3, 4),
+    make_tuple(1, 3)   // transposed strides
+);
+
+// Add padding to both dimensions
+auto padded_desc = transform_tensor_descriptor(
+    base_desc,
+    make_tuple(make_pad_transform(3, 1, 1),   // pad dim 0: 3 → 5
+               make_pad_transform(4, 0, 0)),   // keep dim 1: 4 → 4
+    make_tuple(sequence<0>{}, sequence<1>{}),  // input dims
+    make_tuple(sequence<0>{}, sequence<1>{})   // output dims (keep 2D)
+);
+
+// Access pattern
+multi_index<2> padded_coord{1, 2};  // In padded space
+// Internally calculates: unpadded = [1-1, 2] = [0, 2]
+// Then applies transpose strides
+```
+
+## Advanced C++ Patterns
+
+### Complex Nested Transforms in C++
+
+```cpp
+// From composable_kernel - complex nested transform patterns
+
+// Example: 4D tensor with complex transformations
+// Shape: [A, B, C, D] with various transforms
+
+// 1. Create base descriptor
+auto base_desc = make_naive_tensor_descriptor_packed(
+    make_tuple(A, B, C, D)
+);
+
+// 2. Apply multiple transformations
+// First: merge first 3 dimensions
+auto step1_desc = transform_tensor_descriptor(
+    base_desc,
+    make_tuple(make_merge_transform(make_tuple(A, B, C)),
+               make_pass_through_transform(D)),
+    make_tuple(sequence<0, 1, 2>{}, sequence<3>{}),  // input mapping
+    make_tuple(sequence<0>{}, sequence<1>{})         // output: 2D
+);
+
+// 3. Then unmerge back but with different grouping
+auto step2_desc = transform_tensor_descriptor(
+    step1_desc,
+    make_tuple(make_unmerge_transform(make_tuple(A*B, C)),
+               make_pass_through_transform(D)),
+    make_tuple(sequence<0>{}, sequence<1>{}),        // from 2D
+    make_tuple(sequence<0, 1>{}, sequence<2>{})      // to 3D
+);
+
+// The adaptor chain is embedded in the descriptors
+// CK optimizes these at compile time
+```
+
+### GPU Memory Layout Example
+
+```cpp
+// From composable_kernel - typical GPU block descriptor pattern
+
+// Create descriptor for thread block tile: 64x64
+// With 8x8 vector loads per thread
+constexpr auto BlockM = 64;
+constexpr auto BlockN = 64;
+constexpr auto VectorM = 8;
+constexpr auto VectorN = 8;
+
+// Thread arrangement: 8x8 threads
+constexpr auto ThreadM = BlockM / VectorM;  // 8
+constexpr auto ThreadN = BlockN / VectorN;  // 8
+
+// Create block descriptor with proper layout
+auto block_desc = transform_tensor_descriptor(
+    make_naive_tensor_descriptor_packed(
+        make_tuple(number<BlockM>{}, number<BlockN>{})
+    ),
+    make_tuple(
+        make_unmerge_transform(make_tuple(
+            number<ThreadM>{}, number<VectorM>{}
+        )),
+        make_unmerge_transform(make_tuple(
+            number<ThreadN>{}, number<VectorN>{}
+        ))
+    ),
+    make_tuple(sequence<0>{}, sequence<1>{}),           // from 2D
+    make_tuple(sequence<0, 2>{}, sequence<1, 3>{})     // to 4D: [TM,TN,VM,VN]
+);
+
+// This creates the layout:
+// - Dimension 0,1: Thread indices
+// - Dimension 2,3: Vector indices within thread
+// Enables coalesced memory access on GPU
+```
+
 ## Summary
 
 TensorAdaptors are the coordination layer that makes complex tensor operations possible:
@@ -248,7 +512,7 @@ We successfully created the **true C++ equivalent** of complex nested transforms
 # C++ nested transform equivalent
 cpp_equivalent = make_single_stage_tensor_adaptor(
     transforms=[
-        UnmergeTransform([A, B, C]),  # Merges A,B,C dimensions  
+        UnmergeTransform([A, B, C]),  # Converts 3D (A,B,C) to 1D linear  
         PassThroughTransform(D)       # Passes through D dimension
     ],
     lower_dimension_old_top_idss=[[0], [1]],          # Transform inputs
@@ -258,10 +522,46 @@ cpp_equivalent = make_single_stage_tensor_adaptor(
 
 **Key insights:**
 - **Transform direction**: Names refer to lower→higher, but `calculate_lower_index()` goes higher→lower
-- **UnmergeTransform**: Performs merging when used with `calculate_lower_index()`
+- **UnmergeTransform**: Converts multi-D to linear when used with `calculate_lower_index()`
 - **Parameter mapping**: Controls the coordinate flow between dimensions
 - **Mathematical equivalence**: Exact same results as C++ nested structure
 
 TensorAdaptors bridge the gap between low-level transforms and high-level tensor operations, providing the flexibility to create sophisticated data layouts and access patterns that are essential for efficient GPU computing.
 
-Next, we'll see how TensorAdaptors are combined with element space information to create complete **TensorDescriptors**. 
+### Key C++ Patterns in Composable Kernel
+
+1. **Descriptor-Based Adaptors**: In CK, adaptors are typically embedded within tensor descriptors rather than created separately
+2. **Compile-Time Optimization**: All transformations are resolved at compile time for zero overhead
+3. **Type Safety**: Template metaprogramming ensures coordinate transformations are type-safe
+4. **GPU Optimization**: Transform chains are designed for efficient GPU memory access patterns
+
+### Common C++ Transform Chains
+
+```cpp
+// Padding for convolution
+auto padded = transform_tensor_descriptor(
+    input, 
+    make_tuple(make_pad_transform(H, pad_h, pad_h),
+               make_pad_transform(W, pad_w, pad_w)),
+    make_tuple(sequence<0>{}, sequence<1>{}),
+    make_tuple(sequence<0>{}, sequence<1>{})
+);
+
+// Dimension merging for GEMM
+auto merged = transform_tensor_descriptor(
+    input,
+    make_tuple(make_merge_transform(make_tuple(M, K))),
+    make_tuple(sequence<0, 1>{}),
+    make_tuple(sequence<0>{})
+);
+
+// Broadcasting for elementwise ops
+auto broadcast = transform_tensor_descriptor(
+    scalar,
+    make_tuple(make_replicate_transform(make_tuple(M, N))),
+    make_tuple(sequence<>{}),
+    make_tuple(sequence<0, 1>{})
+);
+```
+
+Next, we'll see how TensorAdaptors are combined with element space information to create complete **TensorDescriptors**.
