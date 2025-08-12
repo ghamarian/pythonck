@@ -198,8 +198,9 @@ update_documentation_urls() {
     sed -i.bak "s|${PACKAGE_NAME}-[0-9]\+\.[0-9]\+\.[0-9]\+-py3-none-any\.whl|${PACKAGE_NAME}-${VERSION}-py3-none-any.whl|g" documentation/index.qmd
     
     # Update concept files
-    sed -i.bak "s|${PACKAGE_NAME}-[0-9]\+\.[0-9]\+\.[0-9]\+-py3-none-any\.whl|${PACKAGE_NAME}-${VERSION}-py3-none-any.whl|g" documentation/concepts/tensor-coordinate.qmd
-    sed -i.bak "s|${PACKAGE_NAME}-[0-9]\+\.[0-9]\+\.[0-9]\+-py3-none-any\.whl|${PACKAGE_NAME}-${VERSION}-py3-none-any.whl|g" documentation/concepts/buffer-view.qmd
+    for file in documentation/concepts/*; do
+        sed -i.bak "s|${PACKAGE_NAME}-[0-9]\+\.[0-9]\+\.[0-9]\+-py3-none-any\.whl|${PACKAGE_NAME}-${VERSION}-py3-none-any.whl|g" $file
+    done
     
     # Remove backup files
     rm -f documentation/*.bak documentation/concepts/*.bak
