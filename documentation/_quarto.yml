@@ -1,9 +1,7 @@
 project:
   type: website
-  title: "Composable-Kernels Docs"
+  title: "Tile Distribution Documentation"
   output-dir: _site
-  resources:
-    - pythonck-0.1.0-py3-none-any.whl
 
 extensions: [r-wasm/live]
 
@@ -15,51 +13,40 @@ website:
       - section: "Getting Started"
         contents:
           - index.qmd
-          - tutorials/index.qmd
       - section: "Foundation"
         contents:
-          - concepts/buffer-view.qmd
-          - concepts/tensor-transforms.qmd
-          - concepts/tensor-adaptor.qmd
-          - concepts/tensor-descriptor.qmd
-          - concepts/tensor-adaptor-coordinate.qmd
-          - concepts/tensor-coordinate.qmd
-      - section: "Advanced Indexing"
+          - concepts/00_introduction_motivation.qmd
+          - concepts/01_buffer_view.qmd
+          - concepts/01_tensor_view.qmd
+      - section: "Transformation Engine"
         contents:
-          - concepts/tensor-coordinate-advanced.qmd
-          - concepts/tensor-view.qmd
-      - section: "Distribution"
+          - concepts/02_tensor_coordinates.qmd
+          - concepts/02_transforms.qmd
+          - concepts/02_adaptors.qmd
+          - concepts/02_descriptors.qmd
+          - concepts/02_convolution_example.qmd
+          - concepts/02_coordinate_movement.qmd
+      - section: "Distribution API"
         contents:
-          - concepts/tile-distribution-encoding.qmd
-          - concepts/tile-distribution.qmd
-          - concepts/static-distributed-tensor.qmd
-      - section: "Advanced Operations"
+          - concepts/03_tile_distribution.qmd
+          - concepts/03_tile_window.qmd
+          - concepts/03_sweep_tile.qmd
+      - section: "Coordinate Systems"
         contents:
-          - concepts/tile-window.qmd
-          - concepts/sweep-tile.qmd
-          - concepts/thread-mapping.qmd
-      - section: "Reference"
+          - concepts/04_coordinate_systems.qmd
+      - section: "Implementation Deep Dive"
         contents:
-          - concepts/learning-path.qmd
-      - section: "API Reference"
+          - concepts/05_encoding_internals.qmd
+          - concepts/05_static_distributed_tensor.qmd
+      - section: "Thread Mapping"
         contents:
-          - api/index.qmd
-  navbar:
-    background: primary
-    search: true
-    right:
-      - icon: github
-        href: https://github.com/rocm/composable-kernels
-      - text: Docs Home
-        file: index.qmd
-      - text: Tutorials
-        file: tutorials/index.qmd
+          - concepts/06_thread_mapping.qmd
 
 format:
   live-html:
     theme:
-      light: litera
-      dark: slate
+      light: [litera, custom-theme.scss]
+      dark: [slate, custom-theme.scss]
     toc: true
     code-tools: true
     execute:
@@ -67,8 +54,16 @@ format:
     link-external-newwindow: true
     code-copy: true
     anchor-sections: true
-    grid:
-      margin-width: 250px
+    mermaid:
+      theme: default
+    css: 
+      - global-font-override.css
+      - diagram-sizing-fixes.css
+    include-in-header:
+      - mermaid-include.html
+    include-after-body:
+      - text: |
+          <script src="font-cleanup.js"></script>
 
 pyodide:
   packages:
@@ -77,5 +72,4 @@ pyodide:
     - sympy
     - micropip
   cell-options:
-    autorun: false
-  base-url: "/" 
+    autorun: false 

@@ -1,7 +1,9 @@
 ---
-title: "Composable-Kernels Python Documentation"
+title: "Tile Distribution Documentation"
 format: live-html
 ---
+
+Welcome to the complete tile distribution documentation! This is a standalone learning journey from basic memory concepts to advanced GPU optimization techniques.
 
 ```{pyodide}
 #| echo: false
@@ -13,125 +15,93 @@ import micropip
 await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.1.0-py3-none-any.whl")
 ```
 
-Welcome to PythonCK, a Python implementation of tensor operations and concepts from the AMD Composable Kernels library. This package provides educational implementations that focus on clarity and understanding rather than performance.
+## Complete Learning Journey
 
-## 🎓 **Recommended Learning Path**
+Follow our structured 8-part learning path:
 
-**New to PythonCK?** Follow our structured learning path to understand all concepts:
+### **Introduction and Motivation**
+- **[Introduction and Motivation](concepts/00_introduction_motivation.qmd)** - Why tile distribution matters, GPU memory challenges, and the solution overview
 
-### **[📚 Complete Learning Path](concepts/learning-path.qmd)**
-A step-by-step guide that builds from basic concepts to advanced GPU thread coordination, culminating in understanding the complete `tile_distr_thread_mapping.py` example.
+### **Foundation** 
+- **[Buffer Views](concepts/01_buffer_view.qmd)** - Raw memory access
+- **[Tensor Views](concepts/01_tensor_view.qmd)** - Multi-dimensional structure
 
-## 📖 **Learning by Topic**
+### **Transformation Engine** 
+- **[Basic Coordinates](concepts/02_tensor_coordinates.qmd)** - MultiIndex fundamentals
+- **[Individual Transforms](concepts/02_transforms.qmd)** - Building blocks (EmbedTransform, UnmergeTransform, etc.)
+- **[Chaining Adaptors](concepts/02_adaptors.qmd)** - Combining transforms into complex operations
+- **[Complete Descriptors](concepts/02_descriptors.qmd)** - Full tensor specifications with layouts
+- **[Convolution Example](concepts/02_convolution_example.qmd)** - Practical convolution implementation
+- **[Swizzling Example](concepts/02_swizzling_example.qmd)** - Morton ordering and memory patterns
+- **[Advanced Coordinates](concepts/02_coordinate_movement.qmd)** - TensorCoordinate and movement operations
 
-### 1. **Foundation Concepts**
-- [Buffer Views](concepts/buffer-view.qmd) - Memory buffer abstraction
-- [Tensor Coordinates](concepts/tensor-coordinate.qmd) - Multi-dimensional indexing
-- [Tensor Descriptors](concepts/tensor-descriptor.qmd) - Layout transformations
-- [Tensor Views](concepts/tensor-view.qmd) - Unified tensor access
+### **Distribution API** 
+- **[Tile Distribution](concepts/03_tile_distribution.qmd)** - The core API for work assignment
+- **[Tile Window](concepts/03_tile_window.qmd)** - Data access gateway with windowing
+- **[Sweep Tile](concepts/03_sweep_tile.qmd)** - Elegant iteration patterns
 
-### 2. **Distribution Concepts**
-- [Tile Distribution Encoding](concepts/tile-distribution-encoding.qmd) - How data is distributed
-- [Tile Distribution](concepts/tile-distribution.qmd) - Parallel processing coordination
-- [Static Distributed Tensors](concepts/static-distributed-tensor.qmd) - Thread-local data
+### **Coordinate Systems** 
+- **[Coordinate Systems](concepts/04_coordinate_systems.qmd)** - The mathematical foundation (P, Y, X, R, D spaces)
 
-### 3. **Advanced Operations**
-- [Tile Windows](concepts/tile-window.qmd) - Windowed tensor access
-- [Sweep Operations](concepts/sweep-tile.qmd) - Iterating over distributed data
-- [Thread Mapping](concepts/thread-mapping.qmd) - Understanding the complete pipeline
+### **Implementation Deep Dive** 
+- **[Encoding Internals](concepts/05_encoding_internals.qmd)** - How mathematical encoding creates transformation components
+- **[Static Distributed Tensor](concepts/05_static_distributed_tensor.qmd)** - Thread-local data containers and organization
 
-## 📦 **Package Structure**
+### **Thread Mapping** 
+- **[Thread Mapping](concepts/06_thread_mapping.qmd)** - Connecting to hardware, thread cooperation patterns
 
-```
-pytensor/                    # Core tensor operations
-├── buffer_view.py          # Memory abstraction
-├── tensor_coordinate.py    # Multi-dimensional indexing
-├── tensor_descriptor.py    # Layout transformations  
-├── tensor_view.py          # Unified access interface
-├── tile_distribution.py    # Data distribution
-├── tile_window.py          # Windowed access
-├── sweep_tile.py           # Coordinated iteration
-└── ...
+### **Reference** 
+- **[Terminology](concepts/terminology.qmd)** - Comprehensive glossary of all CK concepts, coordinate spaces, and operations
 
-tensor_transforms/          # Analysis tools
-├── parser.py              # Descriptor parsing
-├── analyzer.py            # Transformation analysis
-└── ...
+### **Coming Soon**
+- **Advanced Topics** - Performance optimization and debugging
 
-tile_distribution/          # Visualization tools
-├── parser.py              # C++ encoding parsing
-├── visualizer.py          # Interactive visualization
-└── ...
-```
+## Interactive Applications
 
-## 🔑 **Key Concepts**
+Explore tile distribution concepts through interactive web applications:
 
-**PythonCK** implements several interconnected concepts:
+### **Tile Distribution Visualizer**
+Interactive visualization of tile distribution structures and GPU memory layouts. Perfect for understanding how data is distributed across parallel processing elements.
+- **Run locally**: `streamlit run ../app.py`
 
-1. **Tensors** are multi-dimensional arrays with flexible layouts
-2. **Coordinates** provide multi-dimensional indexing with transformations
-3. **Distributions** define how data is spread across parallel processing elements
-4. **Tiles** represent chunks of data processed by individual threads/warps
-5. **Sweeps** iterate over distributed data in a coordinated manner
+### **Tensor Transform Visualizer**  
+Explore tensor descriptor transformations with visual graphs and mathematical formulas. See how data layouts change through various transformations.
+- **Run locally**: `streamlit run ../tensor_transform_app.py`
 
-The ultimate goal is understanding how GPU threads coordinate to process large tensors efficiently, as demonstrated in the complete example at `tile_distr_thread_mapping.py`.
+### **Thread Visualization App**
+Visualize GPU thread coordinate mapping and access patterns. Understand how individual threads access distributed tensor data.
+- **Run locally**: `streamlit run ../thread_visualization_app.py`
 
-## 🚀 **Quick Start**
+### **GPU Hierarchy Visualizer** (NEW!)
+Visualize how work is distributed across vectors, warps, blocks, and tiles on a GPU with interactive controls.
+- **Run locally**: `streamlit run ../gpu_hierarchy_visualizer.py`
 
-Jump right in with interactive examples:
+## Quick Test
+
+Let's verify everything is working:
 
 ```{pyodide}
 #| echo: true
 #| output: true
 
-# PythonCK is now available - let's explore!
-import pytensor
-from pytensor.tensor_coordinate import MultiIndex, TensorCoordinate
+import numpy as np
+from pytensor.buffer_view import make_buffer_view, AddressSpaceEnum
 
-# Create a simple multi-dimensional index
-multi_idx = MultiIndex(3, [2, 1, 0])
-print(f"3D index: {multi_idx}")
+# Quick test
+data = np.array([1, 2, 3, 4], dtype=np.float32)
+buffer_view = make_buffer_view(data, len(data), AddressSpaceEnum.GLOBAL)
 
-# Create a tensor coordinate
-coord = TensorCoordinate(multi_idx)
-print(f"Tensor coordinate: {coord}")
-
-print("✅ PythonCK is ready for exploration!")
+print("PythonCK loaded successfully!")
+print(f"Buffer view created: size = {buffer_view.buffer_size}")
+print(f"Data type: {buffer_view.dtype}")
+print("Ready to explore tile distribution!")
 ```
 
-## 🎮 **Interactive Applications**
+## How to Use This Documentation
 
-Explore PythonCK concepts through three interactive web applications:
+1. **Follow the learning path** - Each part builds on the previous ones
+2. **Run the code** - All examples are interactive and executable
+3. **Experiment** - Modify the code to deepen your understanding
+4. **Test yourself** - Each section includes validation exercises
 
-### **[📊 Tile Distribution Visualizer](/tile-distribution/)**
-Interactive visualization of tile distribution structures and GPU memory layouts. Perfect for understanding how data is distributed across parallel processing elements.
-
-### **[🔄 Tensor Transform Visualizer](/tensor-transform/)**  
-Explore tensor descriptor transformations with visual graphs and mathematical formulas. See how data layouts change through various transformations.
-
-### **[🧵 Thread Visualization App](/thread-visualization/)**
-Visualize GPU thread coordinate mapping and access patterns. Understand how individual threads access distributed tensor data.
-
-## 🎯 **Learning Paths**
-
-Choose your learning approach:
-
-- **🎓 [Structured Path](concepts/learning-path.qmd)** - Follow the complete 10-step progression
-- **🔍 [Concept-Driven](concepts/buffer-view.qmd)** - Explore individual concepts as needed
-- **💻 [Code-First](api/index.qmd)** - Jump into the API documentation
-- **🎮 [Interactive](tutorials/index.qmd)** - Try hands-on tutorials
-
-## ✨ **Interactive Features**
-
-This documentation includes:
-
-- 🏃 **Live Code Execution** - Run Python code directly in your browser
-- 📱 **Responsive Design** - Works on desktop and mobile
-- 🌓 **Dark/Light Mode** - Toggle between themes
-- 🔍 **Full-Text Search** - Find what you need quickly
-- 📋 **Copy Code** - One-click code copying
-- 🔗 **Deep Linking** - Share links to specific sections
-
----
-
-*Ready to dive deeper? Start with our [Complete Learning Path](concepts/learning-path.qmd) or jump to any concept that interests you.*
+Ready to start? Begin with [Part 0: Introduction and Motivation](concepts/00_introduction_motivation.qmd)! 
