@@ -2,58 +2,148 @@ project:
   type: website
   title: "Tile Distribution Documentation"
   output-dir: _site
+  resources:
+    - "pythonck-0.2.0-py3-none-any.whl"
 
 extensions: [r-wasm/live]
 
+highlight-style: a11y
+
 website:
+  title: "PythonCK Tile Distribution"
+  site-url: https://ghamarian.github.io/pythonck
+  repo-url: https://github.com/ghamarian/pythonck
+  repo-actions: [edit, issue]
+  page-navigation: true
+  bread-crumbs: true
+  search:
+    show-item-context: true
+    type: overlay
+  
+  page-footer:
+    left: |
+      Part of the **PythonCK** tensor computation framework
+    center:
+      - text: "GitHub"
+        href: https://github.com/ghamarian/pythonck
+      - text: "Issues"
+        href: https://github.com/ghamarian/pythonck/issues
+      - text: "License"
+        href: https://github.com/ghamarian/pythonck/blob/master/LICENSE
+    right:
+      - icon: github
+        href: https://github.com/ghamarian/pythonck
+        aria-label: PythonCK GitHub
+
+  navbar:
+    background: primary
+    title: "PythonCK"
+    logo-alt: "PythonCK Tile Distribution Documentation"
+    collapse-below: lg
+    left:
+      - text: "Home"
+        href: index.qmd
+      - text: "Documentation"
+        href: index.qmd
+      - text: "Examples"
+        menu:
+          - text: "Interactive Apps"
+            icon: "play-circle"
+            href: index.qmd#interactive-applications
+          - text: "Tensor Transforms"
+            href: concepts/02_convolution_example.qmd
+          - text: "Coordinate Movement"
+            href: concepts/02_coordinate_movement.qmd
+      - text: "Reference"
+        menu:
+          - text: "API Reference"
+            icon: "book"
+            href: concepts/terminology.qmd
+          - text: "Coordinate Systems"
+            href: concepts/04_coordinate_systems.qmd
+          - text: "Thread Mapping"
+            href: concepts/06_thread_mapping.qmd
+    tools:
+      - icon: github
+        href: https://github.com/ghamarian/pythonck
+        text: GitHub Repository
+
   sidebar:
-    style: "docked"
-    collapse-level: 2
-    contents:
-      - section: "Getting Started"
-        contents:
-          - index.qmd
-      - section: "Foundation"
-        contents:
-          - concepts/00_introduction_motivation.qmd
-          - concepts/01_buffer_view.qmd
-          - concepts/01_tensor_view.qmd
-      - section: "Transformation Engine"
-        contents:
-          - concepts/02_tensor_coordinates.qmd
-          - concepts/02_transforms.qmd
-          - concepts/02_adaptors.qmd
-          - concepts/02_descriptors.qmd
-          - concepts/02_convolution_example.qmd
-          - concepts/02_coordinate_movement.qmd
-      - section: "Distribution API"
-        contents:
-          - concepts/03_tile_distribution.qmd
-          - concepts/03_tile_window.qmd
-          - concepts/03_sweep_tile.qmd
-      - section: "Coordinate Systems"
-        contents:
-          - concepts/04_coordinate_systems.qmd
-      - section: "Implementation Deep Dive"
-        contents:
-          - concepts/05_encoding_internals.qmd
-          - concepts/05_static_distributed_tensor.qmd
-      - section: "Thread Mapping"
-        contents:
-          - concepts/06_thread_mapping.qmd
+    - id: main
+      style: "docked"
+      collapse-level: 2
+      align: left
+      contents:
+        - section: "Getting Started"
+          contents:
+            - index.qmd
+            - text: "Quick Start Tutorial"
+              href: concepts/00_introduction_motivation.qmd
+        - section: "Foundation"
+          contents:
+            - text: "Buffer Views"
+              href: concepts/01_buffer_view.qmd
+            - text: "Tensor Views" 
+              href: concepts/01_tensor_view.qmd
+        - section: "Transformation Engine"
+          contents:
+            - text: "Tensor Coordinates"
+              href: concepts/02_tensor_coordinates.qmd
+            - text: "Individual Transforms"
+              href: concepts/02_transforms.qmd
+            - text: "Chaining Adaptors"
+              href: concepts/02_adaptors.qmd
+            - text: "Complete Descriptors"
+              href: concepts/02_descriptors.qmd
+            - section: "Examples"
+              contents:
+                - text: "Convolution Implementation"
+                  href: concepts/02_convolution_example.qmd
+                - text: "Swizzling Patterns"
+                  href: concepts/02_swizzling_example.qmd
+                - text: "Coordinate Movement"
+                  href: concepts/02_coordinate_movement.qmd
+        - section: "Distribution API"
+          contents:
+            - text: "Tile Distribution"
+              href: concepts/03_tile_distribution.qmd
+            - text: "Tile Window"
+              href: concepts/03_tile_window.qmd
+            - text: "Sweep Tile"
+              href: concepts/03_sweep_tile.qmd
+        - section: "Advanced Topics"
+          contents:
+            - text: "Coordinate Systems"
+              href: concepts/04_coordinate_systems.qmd
+            - text: "Encoding Internals"
+              href: concepts/05_encoding_internals.qmd
+            - text: "Static Distributed Tensor"
+              href: concepts/05_static_distributed_tensor.qmd
+            - text: "Thread Mapping"
+              href: concepts/06_thread_mapping.qmd
+        - section: "Reference"
+          contents:
+            - text: "Terminology"
+              href: concepts/terminology.qmd
 
 format:
   live-html:
-    theme:
-      light: [litera, custom-theme.scss]
-      dark: [slate, custom-theme.scss]
+    theme: 
+      light: [cosmo, custom-theme.scss]
+      dark: [cosmo, custom-theme.scss]
     toc: true
-    code-tools: true
+    toc-depth: 3
+    code-tools: 
+      source: true
+      toggle: false
+      caption: none
+    code-copy: true
+    code-overflow: wrap
+    anchor-sections: true
+    smooth-scroll: true
     execute:
       eval: false
     link-external-newwindow: true
-    code-copy: true
-    anchor-sections: true
     mermaid:
       theme: default
     css: 
@@ -61,9 +151,17 @@ format:
       - diagram-sizing-fixes.css
     include-in-header:
       - mermaid-include.html
+      - text: |
+          <link rel="preconnect" href="https://fonts.googleapis.com">
+          <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+          <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     include-after-body:
       - text: |
-          <script src="font-cleanup.js"></script>
+          <script src="/font-cleanup.js"></script>
+    grid:
+      sidebar-width: 280px
+      body-width: 900px
+      margin-width: 320px
 
 pyodide:
   packages:
@@ -72,4 +170,6 @@ pyodide:
     - sympy
     - micropip
   cell-options:
-    autorun: false 
+    autorun: false
+
+freeze: false 
