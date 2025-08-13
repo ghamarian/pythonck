@@ -140,6 +140,9 @@ but also remember that in practice this will require additional LDS storage. The
 is necessary.
 
 ```{pyodide}
+#| autorun: false
+#| code-fold: true
+
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap

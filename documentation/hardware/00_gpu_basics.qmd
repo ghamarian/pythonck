@@ -21,7 +21,38 @@ This design breaks the GPU into smaller, modular chiplets.
 Each XCD contains a portion of the GPU's compute resources and a dedicated 
 slice of the L2 cache. This modular approach allows for greater manufacturing 
 flexibility, higher yields, and improved scalability, as multiple XCDs can be 
-connected together to form a single, powerful GPU.
+connected together to form a single, powerful GPU. 
+MI300 incorporates 8 accelerator complex dies (XCD)  with 40 compute units (CUs)
+per XCD, however 2 of them stay disabled which brings total to 304 CUs.
+
+![Conceptual block diagram of an accelerator complex die (XCD)](01-xcd.png)
+
+## L2
+L2 cache is chared across CUs on XCD.
+On Mi300 The L2 is a 4MB and 16-way set associative cache that is massively parallel with 16 channels that are each
+256KB. 
+
+On the read side each channel can read out a 128-byte cache line and the L2
+cache can sustain four requests from different CUs per cycle for a combined throughput of 2KBytes/clock for
+each XCD. The 16 channels only support a half-line 64-byte write each with one fill request from the Infinity
+Fabric per clock. AMD CDNA 3 architecture has collectively up to eight instances across it's 16 channels
+ and up to 34.4 TB/s aggregate read bandwidth.  The L2 itself is coherent
+within an XCD but XCD has a snoop filter to  L2 of all the XCD, so that the vast
+majority of coherent requests from other other XCDs will be resolved at the Infinity Cache without disturbing .
+
+## Infinity Cache
+Infinity cache is an LLC ( Last Level Cache). It has a size of 256MB and boosts 
+generational performance and efficiency by increasing cache bandwidth and reducing 
+the number of off-chip memory accesses. 
+On Mi300, just like the L2 cache, the AMD Infinity Cache is 16-way set-associative, and it is 
+built around the concept of channels. 
+Each stack of HBM memory is associated with 16 parallel channels. 
+A channel is 64-bytes wide and connects to 2 MB of data arrays that are banked 
+to sustain simultaneous reads and writes. In total, there are
+eight stacks of HBM across the four IODs, for 128 channels or 256MB of data. 
+The peak bandwidth from the
+Infinity Cache is an astounding 17.2 TB/s, which is nearly as much as the total
+ from the previous generation L2 caches and a welcome addition to the overall memory hierarchy.
 
 ## CUs (Compute Units)
 Each XCD is composed of multiple **Compute Units (CUs)**. 
