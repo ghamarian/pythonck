@@ -1,0 +1,407 @@
+---
+title: "Understanding AMD GPU LDS and Bank Conflicts"
+format:
+  live-html:
+    mermaid:
+      theme: default
+---
+
+# Introduction
+
+Local Data Share (**LDS**) is AMD's shared memory within a compute unit.
+It is organized into **32 banks**, each serving 4 bytes per cycle.
+Understanding how memory addresses map to banks is key to avoiding **bank conflicts**.
+
+---
+
+# Bank Mapping
+
+For AMD GCN architecture, the LDS bank mapping is typically:
+
+$$\text{bank} = \left( \frac{\text{address in bytes}}{4} \right) \bmod 32$$
+
+This means:
+- Addresses that differ by multiples of `32 * 4 bytes = 128 bytes` map to the same bank.
+- Conflicts occur when multiple threads in the same wave access the same bank **in the same cycle**. 
+
+Not all the lanes can produce bank conflics. HW divides access to LDS from wavefront into phases.
+Which lanes would be considered in each phase depends on the width of the instruction.
+Let us consider `ds_write_b128` as an example. Here access will be divided into 8 phased for 64 lane wavefront
+
+- lane0~lane7;
+- lane8~lane15;
+- lane16-lane23;
+- lane24~lane31; 
+- lane32~lane39;
+- lane40~lane47;
+- lane48~lane55;
+- lane56~lane63;
+
+If within each group of lanes there is no conflict it is an LDS bank conflict free write access.
+
+---
+
+# Python Examples: Simulating Banks Access
+
+We can simulate LDS bank access for a given set of thread addresses. 
+Let us consider a 32 bank LDS with 4 bytes per bank. Each thead will be writing 8 elements, consuming 4 banks in LDS.
+With the phase access pattern like above by default it is a bank conflict free LDS access pattern.
+One can change `stride_bytes` to break LDS access free pattern.
+
+```{pyodide}
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
+
+# Parameters
+wave_size = 64
+op_bytes = 16
+stride_bytes = 16  # Change as needed
+banks = 32
+bank_width = 4
+
+# Phase colors (8 phases for 64 lanes)
+phase_colors = [
+    "#264653", "#2a9d8f", "#e9c46a", "#f4a261",
+    "#e76f51", "#6a4c93", "#8ab17d", "#577590"
+]
+phase_cmap = ListedColormap(phase_colors)
+
+# Prepare a grid: rows = 8 (phases), columns = banks
+phase_grid = -np.ones((8, banks), dtype=int)
+lane_labels = [["" for _ in range(banks)] for _ in range(8)]
+
+for lane in range(wave_size):
+    phase = lane // 8
+    row = phase
+    addr = lane * stride_bytes
+    start_bank = (addr // bank_width) % banks
+    for i in range(op_bytes // bank_width):
+        b = (start_bank + i) % banks
+        phase_grid[row, b] = phase
+        if lane_labels[row][b]:
+            lane_labels[row][b] += "/"
+        lane_labels[row][b] += str(lane)
+
+# Plot
+fig, ax = plt.subplots(figsize=(14, 3))
+im = ax.imshow(phase_grid, cmap=phase_cmap, aspect='auto', vmin=0, vmax=7)
+
+ax.set_title(
+    f"LDS bank mapping: stride={stride_bytes}B, op={op_bytes}B, 64 lanes\n"
+    "Rows = phase (8 lanes per row), Color = phase, Label = lane(s) writing each bank"
+)
+ax.set_xlabel("Bank index (0..31)")
+ax.set_ylabel("Phase (row)")
+
+ax.set_xticks(range(0, banks, 2))
+ax.set_yticks(range(8))
+ax.set_yticklabels([f"P{p}" for p in range(8)])
+
+# Add lane labels
+for row in range(8):
+    for b in range(banks):
+        if lane_labels[row][b]:
+            ax.text(b, row, lane_labels[row][b], ha='center', va='center', color='white', fontsize=15, weight='bold')
+
+# Minor grid
+ax.set_xticks(np.arange(-0.5, banks, 1), minor=True)
+ax.set_yticks(np.arange(-0.5, 8, 1), minor=True)
+ax.grid(which="minor", color=(0,0,0,0.1), linewidth=0.5)
+
+# Colorbar
+cbar = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04, ticks=range(8))
+cbar.ax.set_ylabel("Phase")
+cbar.set_ticklabels([f"P{p}" for p in range(8)])
+
+plt.tight_layout()
+plt.show()
+```
+
+Similarly for LDS read instruction `ds_read_b128`, when there is no bank conflict in these 8 lane groups: 
+
+- 0:3+20:23; 
+- 4:7+16:19; 
+- 8:11+28:31; 
+- 12:15+24:27; 
+- 32:35+52:55; 
+- 36:39+48:51;
+- 40:43+60:63; 
+- 44:47+56:59; 
+
+then it’s bank conflict-free for LDS reading.
+
+The LDS read access pattern illustrated in the Python example below is typical for LDS usage in machine learning workloads. 
+The plot does not depict actual LDS memory layouts; it only shows how wavefront lanes map to LDS banks. 
+You can experiment with `row_padding` ( padding in a number of banks ) to see if problem can be solved this way, 
+but also remember that in practice this will require additional LDS storage. The bigger is padding the more additional storage
+is necessary.
+
+```{pyodide}
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
+
+# Hardware constants
+banks = 32
+bank_width = 4
+instr_bytes = 16
+num_lanes = 64
+banks_per_instr = instr_bytes // bank_width
+
+# Read-phase mapping for ds_read_b128
+read_phase_lanes = {
+    0: list(range(0, 4)) + list(range(20, 24)),
+    1: list(range(4, 8)) + list(range(16, 20)),
+    2: list(range(8, 12)) + list(range(28, 32)),
+    3: list(range(12, 16)) + list(range(24, 28)),
+    4: list(range(32, 36)) + list(range(52, 56)),
+    5: list(range(36, 40)) + list(range(48, 52)),
+    6: list(range(40, 44)) + list(range(60, 64)),
+    7: list(range(44, 48)) + list(range(56, 60)),
+}
+
+# Reverse map: lane -> phase
+lane_to_phase = {}
+for p, lanes in read_phase_lanes.items():
+    for l in lanes:
+        lane_to_phase[l] = p
+
+# Phase colors
+phase_colors = [
+    "#264653", "#2a9d8f", "#e9c46a", "#f4a261",
+    "#e76f51", "#6a4c93", "#8ab17d", "#577590"
+]
+phase_cmap = ListedColormap(phase_colors)
+
+def lane_start_bank(lane_id):
+    """Bank start for ds_read_b128 row-based rule."""
+    row_id = lane_id // 8
+    row_padding = 0  # padding in banks, try 0, 4, 8 ...
+    phys_row = lane_id % 8
+    p = row_padding * phys_row
+
+    start_bank = (row_id * banks_per_instr) % banks
+    start_bank = (start_bank + p ) % banks
+    return start_bank
+
+# Grid: rows = 8 (lane % 8), columns = banks
+row_bank_grid = -np.ones((8, banks), dtype=int)
+row_labels = [[[] for _ in range(banks)] for _ in range(8)]
+
+for lane in range(num_lanes):
+    row = lane % 8  # row position on Y-axis
+    sb = lane_start_bank(lane)
+    phase = lane_to_phase[lane]
+    for i in range(banks_per_instr):
+        b = (sb + i) % banks
+        row_bank_grid[row, b] = phase
+        row_labels[row][b].append(lane)
+
+# Plot
+fig, ax = plt.subplots(figsize=(14, 3))
+bg = np.ones_like(row_bank_grid, dtype=float)
+ax.imshow(bg, cmap=ListedColormap(["#efefef"]),
+          extent=(-0.5, banks-0.5, 7.5, -0.5))
+im = ax.imshow(np.where(row_bank_grid >= 0, row_bank_grid, 0),
+               cmap=phase_cmap, interpolation='nearest', aspect='auto')
+
+ax.set_title(
+    "LDS bank access layout for ds_read_b128 (Row = lane%8)\n"
+    "Color = Phase; Label = lane IDs accessing each bank"
+)
+ax.set_xlabel("Bank index (0..31)")
+ax.set_ylabel("Row (lane % 8)")
+
+ax.set_xticks(range(0, banks, 2))
+ax.set_yticks(range(8))
+ax.set_yticklabels([f"Row {r}" for r in range(8)])
+
+# Light grid
+ax.set_xticks(np.arange(-0.5, banks, 1), minor=True)
+ax.set_yticks(np.arange(-0.5, 8, 1), minor=True)
+ax.grid(which="minor", color=(0,0,0,0.1), linewidth=0.5)
+
+# Add lane ID labels
+for r in range(8):
+    for b in range(banks):
+        if row_labels[r][b]:
+            text = "/".join(str(x) for x in sorted(row_labels[r][b]))
+            ax.text(b, r, text, ha='center', va='center', color='white', fontsize=15, weight='bold')
+
+# Colorbar
+cbar = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04, ticks=range(len(read_phase_lanes)))
+cbar.ax.set_ylabel("Phase")
+cbar.set_ticklabels([f"P{p}" for p in range(len(read_phase_lanes))])
+
+plt.tight_layout()
+plt.show()
+
+```
+
+---
+
+# XOR Preshuffle: An Alternative to Padding
+
+Another technique to reduce LDS bank conflicts is **XOR preshuffling**.  
+Instead of adding padding between rows, we can permute the column indices for each row using XOR.  
+This method can help to avoid bank conflicts without allocating extra storage in LDS.
+
+For a wavefront of 64 threads, if each thread writes a vector of 8 fp16 elements (16 bytes), and the row size is 64 elements,  
+the column index for each element in a row is adjusted as follows:
+
+- `byte_per_element = 2`
+- `RowStride = 64`  // 64 elements per row
+- `thread_vector = 8`  // 8 elements per thread
+
+The adjusted column position for element `(x, y)` is:
+
+$$
+x' = \left( y \bmod \frac{\text{RowStride}}{\text{thread\_vector}} \right) \oplus x
+$$
+
+where $\oplus$ is the bitwise XOR, and $x, y$ are the original positions of a vector element with respect to the LDS banks.
+
+Below is a Python example that visualizes how XOR preshuffling works for LDS reads:
+
+```{pyodide}
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
+
+# -------------------------
+# Parameters
+# -------------------------
+banks = 32
+bank_width = 4
+instr_bytes = 16
+num_lanes = 64
+banks_per_instr = instr_bytes // bank_width  # 4
+
+elem_size_bytes = 2
+thread_elements = 8
+RowStride = 64  # elements
+
+# Derived
+num_cols = RowStride // thread_elements   # columns in thread-space = 8
+num_rows = num_lanes // num_cols         # 8
+
+# Read-phase mapping (kept identical to your original)
+read_phase_lanes = {
+    0: list(range(0, 4)) + list(range(20, 24)),
+    1: list(range(4, 8)) + list(range(16, 20)),
+    2: list(range(8, 12)) + list(range(28, 32)),
+    3: list(range(12, 16)) + list(range(24, 28)),
+    4: list(range(32, 36)) + list(range(52, 56)),
+    5: list(range(36, 40)) + list(range(48, 52)),
+    6: list(range(40, 44)) + list(range(60, 64)),
+    7: list(range(44, 48)) + list(range(56, 60)),
+}
+lane_to_phase = {l: p for p, ls in read_phase_lanes.items() for l in ls}
+
+phase_colors = [
+    "#264653", "#2a9d8f", "#e9c46a", "#f4a261",
+    "#e76f51", "#6a4c93", "#8ab17d", "#577590"
+]
+phase_cmap = ListedColormap(phase_colors)
+
+mapping_choice = 'A'  # 'A' or 'B'
+
+def lane_xy(lane, mapping='A'):
+    if mapping == 'A':
+        x = lane // num_rows
+        y = lane % num_rows
+    else:
+        x = lane % num_cols
+        y = lane // num_cols
+    return int(x), int(y)
+
+def recomposed_lane_from_xy(x, y, mapping='A'):
+    if mapping == 'A':
+        return int(x * num_rows + y)
+    else:
+        return int(y * num_cols + x)
+
+def start_bank_from_laneid(laneid):
+    row_id = laneid // 8
+    # row_padding/p parameter kept 0 to match your code
+    start_bank = (row_id * banks_per_instr) % banks
+    return start_bank
+
+# Build original grid (what you had before)
+orig_grid = -np.ones((num_rows, banks), dtype=int)   # rows = phys_row (0..7), cols = bank indices
+orig_labels = [[[] for _ in range(banks)] for _ in range(num_rows)]
+
+for lane in range(num_lanes):
+    # place label in row = phys_row (same as your plot: row = lane % 8)
+    phys_row_plot = lane % num_rows
+    start_bank = start_bank_from_laneid(lane)
+    phase = lane_to_phase.get(lane, -1)
+    for i in range(banks_per_instr):
+        b = (start_bank + i) % banks
+        orig_grid[phys_row_plot, b] = phase
+        orig_labels[phys_row_plot][b].append(lane)
+
+# Build XOR-preshuffled grid
+shuf_grid = -np.ones((num_rows, banks), dtype=int)
+shuf_labels = [[[] for _ in range(banks)] for _ in range(num_rows)]
+
+for lane in range(num_lanes):
+    x, y = lane_xy(lane, mapping=mapping_choice)
+    xprime = (y % num_cols) ^ x
+    shuffled_lane = recomposed_lane_from_xy(xprime, y, mapping=mapping_choice)
+    start_orig = start_bank_from_laneid(lane)
+    start_shuf = start_bank_from_laneid(shuffled_lane)
+    phase = lane_to_phase.get(lane, -1)
+    # plot at the original phys-row (so the lane's Y stays visually the same),
+    # but the bank columns are taken from the shuffled start address.
+    phys_row_plot = lane % num_rows
+    for i in range(banks_per_instr):
+        b_shuf = (start_shuf + i) % banks
+        shuf_grid[phys_row_plot, b_shuf] = phase
+        shuf_labels[phys_row_plot][b_shuf].append(lane)
+
+plt.rcParams.update({
+    "axes.labelsize": 14,
+    "axes.titlesize": 16,
+    "xtick.labelsize": 12,
+    "ytick.labelsize": 12,
+    "legend.fontsize": 12
+})
+
+# Plot original vs shuffled side-by-side
+fig, axs = plt.subplots(2, 1, figsize=(25, 10), constrained_layout=True)
+
+
+def draw(ax, grid, labels, title):
+    bg = np.ones_like(grid, dtype=float)
+    ax.imshow(bg, cmap=ListedColormap(["#efefef"]),
+              extent=(-0.5, banks-0.5, num_rows-0.5, -0.5))
+    im = ax.imshow(np.where(grid >= 0, grid, 0), cmap=phase_cmap,
+                   interpolation='nearest', aspect='auto')
+    ax.set_title(title)
+    ax.set_xlabel("Bank index (0..31)")
+    ax.set_ylabel("Phys row (lane % 8)")
+    ax.set_xticks(range(0, banks, 2))
+    ax.set_yticks(range(num_rows))
+    ax.set_yticklabels([f"Row {r}" for r in range(num_rows)])
+    ax.set_xticks(np.arange(-0.5, banks, 1), minor=True)
+    ax.set_yticks(np.arange(-0.5, num_rows, 1), minor=True)
+    ax.grid(which="minor", color=(0,0,0,0.08), linewidth=0.5)
+    for r in range(num_rows):
+        for b in range(banks):
+            if labels[r][b]:
+                ax.text(b, r, "/".join(map(str, sorted(labels[r][b]))),
+                        ha='center', va='center', color='white', fontsize=15, weight='bold')
+    return im
+
+im0 = draw(axs[0], orig_grid, orig_labels, "Original bank layout (no preshuffle)")
+im1 = draw(axs[1], shuf_grid, shuf_labels, f"XOR preshuffled layout (mapping {mapping_choice})")
+
+# colorbar
+cbar = fig.colorbar(im1, ax=axs, fraction=0.046, pad=0.02, ticks=range(len(read_phase_lanes)))
+cbar.ax.set_ylabel("Phase")
+cbar.set_ticklabels([f"P{p}" for p in range(len(read_phase_lanes))])
+
+plt.show()
+```

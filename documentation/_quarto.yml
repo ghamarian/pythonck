@@ -79,6 +79,9 @@ website:
             - index.qmd
             - text: "Quick Start Tutorial"
               href: concepts/00_introduction_motivation.qmd
+      - section: "GPU Hardware"
+        contents:
+          - hardware/00_lds.qmd
         - section: "Foundation"
           contents:
             - text: "Buffer Views"
