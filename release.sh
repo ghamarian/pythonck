@@ -91,35 +91,35 @@ clean_build() {
 
 # Build the wheel
 build_wheel() {
-    log_info "Building wheel package..."
-    
-    # Debug: Show Python version and path
-    log_info "Python version: $(python --version)"
-    log_info "Python path: $(which python)"
-    
-    # Ensure build module is installed
-    if ! python -c "import build" 2>/dev/null; then
-        log_warning "Build module not found. Installing..."
-        pip install 'build>=0.7.0'
-        
-        # Verify installation
-        if ! python -c "import build" 2>/dev/null; then
-            log_error "Failed to install build module"
-            exit 1
-        fi
-        log_success "Build module installed successfully"
-    else
-        log_info "Build module is already available"
-    fi
-    
-    python -m build --wheel --outdir dist
-    
-    WHEEL_FILE="dist/${PACKAGE_NAME}-${VERSION}-py3-none-any.whl"
-    if [[ ! -f "$WHEEL_FILE" ]]; then
-        log_error "Wheel file not created: $WHEEL_FILE"
-        exit 1
-    fi
-    log_success "Wheel built: $WHEEL_FILE"
+	log_info "Building wheel package with Poetry..."
+
+	# Ensure Poetry is available
+	if ! command -v poetry >/dev/null 2>&1; then
+		log_error "Poetry is not installed or not on PATH."
+		echo "  Install: https://python-poetry.org/docs/#installation"
+		exit 1
+	fi
+
+	log_info "Poetry version: $(poetry --version)"
+
+	# Clean dist directory to avoid stale artifacts
+	rm -rf dist/
+
+	# Build wheel with Poetry
+	poetry build -f wheel
+
+	# Locate built wheel
+	WHEEL_FILE="dist/${PACKAGE_NAME}-${VERSION}-py3-none-any.whl"
+	if [[ ! -f "$WHEEL_FILE" ]]; then
+		# Fallback: pick the first wheel if naming differs
+		WHEEL_FILE=$(ls -1 dist/*.whl 2>/dev/null | head -n 1)
+	fi
+
+	if [[ -z "$WHEEL_FILE" || ! -f "$WHEEL_FILE" ]]; then
+		log_error "Wheel file not created in dist/"
+		exit 1
+	fi
+	log_success "Wheel built: $WHEEL_FILE"
 }
 
 # Update wheel in documentation folder
