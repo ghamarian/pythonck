@@ -71,12 +71,12 @@ such as the VALU (Vector ALU), SALU (Scalar ALU), Local Data Share (LDS),
 ### SIMD
 SIMD (Single Instruction, Multiple Data) units allow a single instruction to operate on multiple data points simultaneously.
  In a CDNA Compute Unit, each SIMD typically consists of 16 lanes, and four SIMDs work together to process a wavefront of 64 threads 
- in parallel. Modern architectures, such as Mi300, support multiple concurrent wavefronts per CU and provide 512 vector registers (VGPRs) shared among them.
+ in parallel. Modern architectures, such as Mi300, support 4 concurrent wavefronts per CU and provide 512 vector registers (VGPRs) shared among them.
 
 ### VGPR
 VGPRs (Vector General Purpose Registers) are one dword wide registers assigned to each thread in a wavefront. 
 The number of VGPRs available per wavefront limits how many threads can be active at once. If a kernel requires more than 512 VGPRs per thread,
- the compiler will spill excess data to scratch memory in HBM, which is much slower due to higher latency.
+ the compiler will spill excess data to scratch memory in DRAM, which is much slower due to higher latency.
  This is primary motivation behind hughly templated CK design, the API is aiming to perform as many computations 
  at compile time as possible without allocating  GPU registers at runtime.
 
