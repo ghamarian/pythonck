@@ -84,7 +84,7 @@ for lane in range(wave_size):
         lane_labels[row][b] += str(lane)
 
 # Plot
-fig, ax = plt.subplots(figsize=(14, 3))
+fig, ax = plt.subplots(figsize=(25, 10))
 im = ax.imshow(phase_grid, cmap=phase_cmap, aspect='auto', vmin=0, vmax=7)
 
 ax.set_title(
@@ -199,7 +199,7 @@ for lane in range(num_lanes):
         row_labels[row][b].append(lane)
 
 # Plot
-fig, ax = plt.subplots(figsize=(14, 3))
+fig, ax = plt.subplots(figsize=(25, 10))
 bg = np.ones_like(row_bank_grid, dtype=float)
 ax.imshow(bg, cmap=ListedColormap(["#efefef"]),
           extent=(-0.5, banks-0.5, 7.5, -0.5))
