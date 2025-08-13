@@ -289,7 +289,9 @@ for warp, thread in itertools.product(range(MAX_WARPS), range(MAX_THREADS)):
     print(f"Partition index: (warp={warp_id}, thread={thread_id})")
 
     sweep_tile(distributed_tensor, process_element)
-    print(f"Collected values: {collected_values}\n")
+    for v in collected_values:
+        print(f"{v:.0f}", end="\t")
+    print()
 
 ```
 
