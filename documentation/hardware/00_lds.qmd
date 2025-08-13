@@ -44,11 +44,12 @@ If within each group of lanes there is no conflict it is an LDS bank conflict fr
 # Python Examples: Simulating Banks Access
 
 We can simulate LDS bank access for a given set of thread addresses. 
-Let us consider a 32 bank LDS with 4 bytes per bank. Each thead will be writing 8 elements, consuming 4 banks in LDS.
-With the phase access pattern like above by default it is a bank conflict free LDS access pattern.
-One can change `stride_bytes` to break LDS access free pattern.
+Let us consider a 32 bank LDS with 4 bytes per bank. Each thead will be writing 8 2-byte elements ( 16 bytes total), 
+consuming 4 banks in LDS. fp16 or bf16 are the common formats  GPU kernels have to deal with.
+With the phase access pattern like above by default it is a bank conflict free LDS write access.
 
 ```{pyodide}
+#| echo: false
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
@@ -133,6 +134,7 @@ then it’s bank conflict-free for LDS reading.
 
 The LDS read access pattern illustrated in the Python example below is typical for LDS usage in machine learning workloads. 
 The plot does not depict actual LDS memory layouts; it only shows how wavefront lanes map to LDS banks. 
+This read pattern generates 4-way bank conflict in every phase of access.
 You can experiment with `row_padding` ( padding in a number of banks ) to see if problem can be solved this way, 
 but also remember that in practice this will require additional LDS storage. The bigger is padding the more additional storage
 is necessary.
@@ -148,6 +150,7 @@ bank_width = 4
 instr_bytes = 16
 num_lanes = 64
 banks_per_instr = instr_bytes // bank_width
+row_padding = 0  # padding in banks, try 0, 4, 8 ...
 
 # Read-phase mapping for ds_read_b128
 read_phase_lanes = {
@@ -160,7 +163,6 @@ read_phase_lanes = {
     6: list(range(40, 44)) + list(range(60, 64)),
     7: list(range(44, 48)) + list(range(56, 60)),
 }
-
 # Reverse map: lane -> phase
 lane_to_phase = {}
 for p, lanes in read_phase_lanes.items():
@@ -177,7 +179,6 @@ phase_cmap = ListedColormap(phase_colors)
 def lane_start_bank(lane_id):
     """Bank start for ds_read_b128 row-based rule."""
     row_id = lane_id // 8
-    row_padding = 0  # padding in banks, try 0, 4, 8 ...
     phys_row = lane_id % 8
     p = row_padding * phys_row
 
@@ -239,6 +240,8 @@ plt.show()
 
 ```
 
+You may find it hard to make LDS read access a fully bank-conflict free by applying a padding strategy.
+
 ---
 
 # XOR Preshuffle: An Alternative to Padding
@@ -262,9 +265,11 @@ $$
 
 where $\oplus$ is the bitwise XOR, and $x, y$ are the original positions of a vector element with respect to the LDS banks.
 
-Below is a Python example that visualizes how XOR preshuffling works for LDS reads:
+Below is an example that visualizes how XOR preshuffling works for LDS reads. Without preshuffling it is a 4-way
+LDS read conflict, applying XOR preshuffle makes read access conflict free.
 
 ```{pyodide}
+#| echo: false
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
