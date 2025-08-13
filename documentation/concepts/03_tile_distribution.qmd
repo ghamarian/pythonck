@@ -351,24 +351,10 @@ struct TileDistributionExample
         }
         block_sync_lds();
 
-        // Print buffer contents (only from one thread to avoid flooding)
-        if(threadIdx.x == 0 && blockIdx.x == 0) {
-            printf("\nGlobal data (from global memory) shape=(%d,%d):\n\n", static_cast<int>(global_shape_0), static_cast<int>(global_shape_1));
-            for(index_t i = 0; i < global_shape_0; i++) {
-                for(index_t j = 0; j < global_shape_1; j++) {
-                    printf("%.0f\t", global_data[i * global_shape_1 + j]);
-                }
-                printf("\n");
-            }
-            printf("\n");
-        }
-        block_sync_lds();
-
-        // Create tensor view
-        auto global_view = make_naive_tensor_view<address_space_enum::global>(
+        // Create packed tensor view (contiguous row-major) using helper
+        auto global_view = make_naive_tensor_view_packed<address_space_enum::global>(
             global_data,
-            make_tuple(global_shape_0, global_shape_1),
-            make_tuple(global_shape_1, 1));
+            make_tuple(global_shape_0, global_shape_1));
         
         // Window configuration
         auto window_lengths = make_tuple(x0_size, x1_size);
@@ -404,7 +390,6 @@ struct TileDistributionExample
             }
         });
         
-
         // Serialize printing in a fixed order for selected threads only.
         static constexpr int print_thread_ids[] = {0, 1, 64, 65};
         for(int sel : print_thread_ids) {
@@ -442,6 +427,17 @@ int main()
 
     ck_tile::DeviceMem d_global_data(sizeof(float) * total_elems);
     d_global_data.ToDevice(h_global_data.data());
+
+    std::cout << "\nGlobal data (host print, to be used by device) shape=("
+              << static_cast<int>(global_shape_0) << "," << static_cast<int>(global_shape_1) << ")\n\n";
+    for(ck_tile::index_t i = 0; i < global_shape_0; ++i) {
+        for(ck_tile::index_t j = 0; j < global_shape_1; ++j) {
+            std::cout << h_global_data[i * global_shape_1 + j];
+            if(j + 1 < global_shape_1) std::cout << "\t";
+        }
+        std::cout << '\n';
+    }
+    std::cout << '\n';
 
     constexpr ck_tile::index_t kBlockSize  = 128;
     constexpr ck_tile::index_t kBlockPerCu = 1;
