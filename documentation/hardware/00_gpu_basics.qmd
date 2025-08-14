@@ -76,7 +76,7 @@ SIMD (Single Instruction, Multiple Data) units allow a single instruction to ope
 ### VGPR
 VGPRs (Vector General Purpose Registers) are one dword wide registers assigned to each thread in a wavefront. 
 The number of VGPRs available per wavefront limits how many threads can be active at once. If a kernel requires more than 512 VGPRs per thread,
- the compiler will spill excess data to scratch memory in DRAM, which is much slower due to higher latency.
+ the compiler will spill excess data to scratch memory in LDS (if available ) or DRAM. The latter is much slower due to higher latency.
  This is primary motivation behind highly templated CK design, the API is aiming to perform as many computations 
  at compile time as possible without allocating  GPU registers at runtime.
 

@@ -140,12 +140,9 @@ but also remember that in practice this will require additional LDS storage. The
 is necessary.
 
 ```{pyodide}
-#| autorun: false
-#| code-fold: true
-
+from matplotlib.colors import ListedColormap
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.colors import ListedColormap
 
 # Hardware constants
 banks = 32
@@ -268,6 +265,45 @@ $$
 
 where $\oplus$ is the bitwise XOR, and $x, y$ are the original positions of a vector element with respect to the LDS banks.
 
+```{pyodide}
+import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
+
+# Parameters
+num_rows = 8    # y values (row IDs)
+num_cols = 8    # x values (columns)
+cell_w = 1.0
+cell_h = 1.0
+
+fig, axes = plt.subplots(num_rows, 1, figsize=(10, 2 * num_rows))
+
+for r in range(num_rows):
+    ax = axes[r]
+    
+    # Original x row
+    for x in range(num_cols):
+        ax.add_patch(Rectangle((x, 0), cell_w, cell_h, fill=False))
+        ax.text(x + 0.5, 0.5, f"{x}", ha="center", va="center", fontsize=12)
+    
+    # Shuffled x' row
+    for x in range(num_cols):
+        xprime = r ^ x
+        ax.add_patch(Rectangle((x, -1), cell_w, cell_h, fill=False))
+        ax.text(x + 0.5, -0.5, f"{xprime}", ha="center", va="center", fontsize=12)
+    
+    # Row labels
+    ax.text(-1.5, 0.5, "x", ha="center", va="center", fontsize=12, fontweight="bold")
+    ax.text(-1.5, -0.5, "x'", ha="center", va="center", fontsize=12, fontweight="bold")
+    ax.text(num_cols + 1, -0.25, f"row r={r}", ha="left", va="center", fontsize=12, fontweight="bold")
+    
+    # Formatting
+    ax.set_xlim(-2, num_cols + 2)
+    ax.set_ylim(-1.5, 1)
+    ax.axis("off")
+
+fig.suptitle("XOR preshuffle mapping per row  (x' = r XOR x)", fontsize=16, y=0.92)
+plt.show()
+```
 Below is an example that visualizes how XOR preshuffling works for LDS reads. Without preshuffling it is a 4-way
 LDS read conflict, applying XOR preshuffle makes read access conflict free.
 
