@@ -256,14 +256,14 @@ This method can help to avoid bank conflicts without allocating extra storage in
 For a wavefront of 64 threads, if each thread writes a vector of 8 fp16 elements (16 bytes), and the row size is 64 elements,  
 the column index for each element in a row is adjusted as follows:
 
-- `byte_per_element = 2`
-- `RowStride = 64`  // 64 elements per row
-- `thread_vector = 8`  // 8 elements per thread
+- `KTypeSize = 2`
+- `KPerBlock=64`  // 64 elements per row
+- `KPack = 8`  // 8 elements per thread
 
 The adjusted column position for element `(x, y)` is:
 
 $$
-x' = \left( y \bmod \frac{\text{RowStride}}{\text{thread\_vector}} \right) \oplus x
+x' = \left( y \bmod \frac{\text{KPerBlock}}{\text{KPack}} \right) \oplus x
 $$
 
 where $\oplus$ is the bitwise XOR, and $x, y$ are the original positions of a vector element with respect to the LDS banks.
@@ -287,11 +287,11 @@ num_lanes = 64
 banks_per_instr = instr_bytes // bank_width  # 4
 
 elem_size_bytes = 2
-thread_elements = 8
+KPack = 8
 RowStride = 64  # elements
 
 # Derived
-num_cols = RowStride // thread_elements   # columns in thread-space = 8
+num_cols = RowStride // KPack   # columns in thread-space = 8
 num_rows = num_lanes // num_cols         # 8
 
 # Read-phase mapping (kept identical to your original)
