@@ -560,6 +560,7 @@ __device__ void example_atomic_operations()
 # Summary
 
 BufferView provides:
+
 - **Unified Interface**: Same API for all memory spaces
 - **Type Safety**: Address space encoded in type (C++)
 - **Performance**: Vectorized operations and optimal access patterns
