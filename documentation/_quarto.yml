@@ -1,6 +1,6 @@
 project:
   type: website
-  title: "Tile Distribution Documentation"
+  title: "PythonCK Documentation"
   output-dir: _site
   resources:
     - "pythonck-0.2.0-py3-none-any.whl"
@@ -10,7 +10,7 @@ extensions: [r-wasm/live]
 highlight-style: a11y
 
 website:
-  title: "PythonCK Tile Distribution"
+  title: "PythonCK Documentation"
   site-url: https://ghamarian.github.io/pythonck
   repo-url: https://github.com/ghamarian/pythonck
   repo-actions: [edit, issue]
@@ -24,10 +24,6 @@ website:
     left: |
       Part of the **PythonCK** tensor computation framework
     center:
-      - text: "GitHub"
-        href: https://github.com/ghamarian/pythonck
-      - text: "Issues"
-        href: https://github.com/ghamarian/pythonck/issues
       - text: "License"
         href: https://github.com/ghamarian/pythonck/blob/master/LICENSE
     right:
@@ -38,35 +34,11 @@ website:
   navbar:
     background: primary
     title: "PythonCK"
-    logo-alt: "PythonCK Tile Distribution Documentation"
+    logo-alt: "PythonCK Documentation"
     collapse-below: lg
     left:
       - text: "Home"
         href: index.qmd
-      - text: "Documentation"
-        href: index.qmd
-      - text: "Examples"
-        menu:
-          - text: "Interactive Apps"
-            icon: "play-circle"
-            href: index.qmd#interactive-applications
-          - text: "Tensor Transforms"
-            href: concepts/02_convolution_example.qmd
-          - text: "Coordinate Movement"
-            href: concepts/02_coordinate_movement.qmd
-      - text: "Reference"
-        menu:
-          - text: "API Reference"
-            icon: "book"
-            href: concepts/terminology.qmd
-          - text: "Coordinate Systems"
-            href: concepts/04_coordinate_systems.qmd
-          - text: "Thread Mapping"
-            href: concepts/06_thread_mapping.qmd
-    tools:
-      - icon: github
-        href: https://github.com/ghamarian/pythonck
-        text: GitHub Repository
 
   sidebar:
     - id: main
@@ -130,7 +102,6 @@ format:
   live-html:
     theme: 
       light: [cosmo, custom-theme.scss]
-      dark: [cosmo, custom-theme.scss]
     toc: true
     toc-depth: 3
     code-tools: 
@@ -146,15 +117,12 @@ format:
     link-external-newwindow: true
     mermaid:
       theme: default
-    css: 
+    css:
       - global-font-override.css
       - diagram-sizing-fixes.css
+      - cpp-only-enhancement.css
     include-in-header:
       - mermaid-include.html
-      - text: |
-          <link rel="preconnect" href="https://fonts.googleapis.com">
-          <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-          <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     include-after-body:
       - text: |
           <script src="/font-cleanup.js"></script>
