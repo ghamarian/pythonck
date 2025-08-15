@@ -59,25 +59,22 @@ p, div, span, li, td, th {
     font-weight: var(--font-weight-normal) !important;
 }
 
-/* Code and pre elements */
+/* Code and pre elements - base settings (enhanced by code-enhancement.css) */
 code, pre, kbd, samp, tt,
 .sourceCode, .code, .monospace {
     font-family: var(--font-monospace) !important;
-    font-size: 0.875em !important;
     font-weight: var(--font-weight-normal) !important;
 }
 
-/* Pre blocks */
+/* Pre blocks - base settings */
 pre {
     font-family: var(--font-monospace) !important;
-    font-size: 0.875rem !important;
     line-height: 1.5 !important;
 }
 
-/* Inline code */
+/* Inline code - base settings */
 :not(pre) > code {
     font-family: var(--font-monospace) !important;
-    font-size: 0.875em !important;
     font-weight: var(--font-weight-normal) !important;
     padding: 0.125em 0.25em;
     background-color: rgba(0, 0, 0, 0.04);

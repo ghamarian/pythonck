@@ -1,0 +1,63 @@
+/* Simple C++ Code Enhancement - White Background with Border */
+
+/* Target only C++ code blocks */
+div.sourceCode:has(code.language-cpp),
+div.sourceCode:has(code.cpp) {
+    background-color: #fafbfc !important;  /* Subtle off-white */
+    border: 1px solid rgba(0, 0, 0, 0.15) !important;
+    border-radius: 6px !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+    margin: 1rem 0 !important;
+}
+
+/* C++ pre elements */
+div.sourceCode:has(code.language-cpp) pre,
+div.sourceCode:has(code.cpp) pre {
+    background-color: #fafbfc !important;  /* Match container background */
+    border: none !important;
+    margin: 0 !important;
+    padding: 0.75rem 1rem !important;
+    font-size: 0.95rem !important;
+}
+
+/* C++ code elements - keep original font size and styling from a11y theme */
+code.language-cpp,
+code.cpp {
+    background-color: transparent !important;
+    font-size: 0.95rem !important;
+    line-height: 1.5 !important;
+}
+
+/* C++ pre elements - increase font size */
+div.sourceCode:has(code.language-cpp) pre,
+div.sourceCode:has(code.cpp) pre {
+    font-size: 0.95rem !important;
+}
+
+/* Alternative selectors for different rendering patterns */
+.sourceCode.language-cpp,
+pre.language-cpp {
+    background-color: #fafbfc !important;  /* Consistent off-white background */
+    border: 1px solid rgba(0, 0, 0, 0.15) !important;
+    border-radius: 6px !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+    font-size: 0.95rem !important;
+}
+
+/* C++ specific comment styling - make comments more distinguishable */
+code.language-cpp .co,  /* Comments in C++ */
+code.cpp .co,
+.sourceCode.language-cpp .co,
+pre.language-cpp .co {
+    color: #6a737d !important;  /* GitHub-style gray */
+    font-style: italic !important;
+}
+
+/* Alternative comment selectors for different syntax highlighting patterns */
+code.language-cpp .comment,
+code.cpp .comment,
+.sourceCode.language-cpp .comment,
+pre.language-cpp .comment {
+    color: #6a737d !important;
+    font-style: italic !important;
+}
