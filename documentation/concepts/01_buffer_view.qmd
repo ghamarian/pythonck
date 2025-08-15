@@ -164,38 +164,6 @@ __device__ void example_buffer_creation()
 }
 ```
 
-### Python vs C++ Key Differences
-
-#### 1. **Compile-Time vs Runtime**
-- **C++**: BufferView uses template metaprogramming with compile-time constants
-  - Size is encoded in the type: `number<8>{}`
-  - Address space is a template parameter
-  - Enables aggressive compiler optimizations
-- **Python**: Everything is runtime
-  - Size is a regular integer
-  - Address space is an enum value
-  - Designed for learning and experimentation
-
-#### 2. **Memory Management**
-- **C++**: Direct pointer to GPU memory
-  - No memory allocation - uses existing memory
-  - Pointer arithmetic for addressing
-  - Zero-copy access to device memory
-- **Python**: NumPy array simulation
-  - Uses host memory to simulate GPU memory
-  - Python manages memory lifetime
-  - Educational approximation of GPU behavior
-
-#### 3. **Type System**
-- **C++**: Strong compile-time typing
-  ```cpp
-  buffer_view<float*, address_space_enum::global>  // Type encodes everything
-  ```
-- **Python**: Dynamic typing with runtime checks
-  ```python
-  BufferView  # Generic class, properties stored as members
-  ```
-
 ### Zero Value Mode
 ```cpp
 // Basic buffer view creation with automatic zero for invalid elements
