@@ -250,34 +250,36 @@ Is specified while making the buffer view as shown in the above example.
 Vector operations use template parameters to specify the vector type (e.g., `ext_vector_t<float, N>` for N elements). The same parameters apply as scalar access, but the operation reads/writes multiple contiguous elements.
 
 ## Scalar vs Vectorized Memory Access
+Compared to scalar access, vectorized access:
+
+- Uses fewer instructions
+- Has better memory bandwidth
+- Has reduced latency
+
+In the figure below, we see that in the vectorized case, there are 4x fewer instructions compared to using scalar access.
 
 ```{=html}
 <div class="mermaid">
-graph LR
-    subgraph "Scalar Access (4 instructions)"
+graph TD
+    subgraph "Scalar Access"
         S1["Load float[0]"] --> R1["Register 1"]
         S2["Load float[1]"] --> R2["Register 2"]
         S3["Load float[2]"] --> R3["Register 3"]
         S4["Load float[3]"] --> R4["Register 4"]
     end
     
-    subgraph "Vectorized Access (1 instruction)"
+    subgraph "Vectorized Access"
         V1["Load float4[0]"] --> VR["Vector Register<br/>(4 floats)"]
     end
-    
-    subgraph "Performance Impact"
-        Perf["4x fewer instructions<br/>Better memory bandwidth<br/>Reduced latency"]
-    end
-    
-    R1 & R2 & R3 & R4 --> Perf
-    VR --> Perf
+
+    R1 & R2 & R3 & R4 
+    VR
     
     style S1 fill:#fee2e2,stroke:#ef4444,stroke-width:2px
     style S2 fill:#fee2e2,stroke:#ef4444,stroke-width:2px
     style S3 fill:#fee2e2,stroke:#ef4444,stroke-width:2px
     style S4 fill:#fee2e2,stroke:#ef4444,stroke-width:2px
     style V1 fill:#d1fae5,stroke:#10b981,stroke-width:2px
-    style Perf fill:#fef3c7,stroke:#f59e0b,stroke-width:2px
 </div>
 ```
 
