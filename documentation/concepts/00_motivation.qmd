@@ -1,0 +1,197 @@
+---
+title: "Motivation: Why a Python Emulator for Composable Kernels?"
+---
+
+## Overview
+
+The Python emulator (pytensor) implements Composable Kernel's tensor manipulation operations in Python. This motivation page explains the rationale for creating a Python emulation version of the CK library, its intended use cases, and its limitations compared to the production CK library.
+
+In short, the emulator serves three main purposes: education, debugging, and prototyping. It does not aim to replace CK for production use but rather to provide a complementary tool for specific development tasks.
+
+## The Steep Learning Curve Challenge
+
+### Understanding Complex Meta-Programming Concepts
+
+GPU kernel development for large-scale machine learning represents one of the most challenging areas in modern computing, requiring developers to master multiple interconnected domains (algorithms, math, hardware, HPC programming) simultaneously. The Composable Kernels library is especially complicated, overcoming some of the needs of a robust linear algebra template library for machine learning through advanced C++ template metaprogramming techniques. These templates, while powerful for generating efficient code, create a significant barrier to understanding. A single misplaced angle bracket or incorrect type parameter can trigger cascading compiler errors that span hundreds of lines, often obscuring the actual issue beneath layers of template instantiation traces.
+
+Beyond the language complexity lies the intricate nature of GPU architecture itself. AMD GPUs organize computation hierarchically across work-items (threads), wavefronts (warps), and compute units (blocks), each with different memory access patterns and synchronization capabilities. Developers must understand how global memory, shared memory, and registers interact, how memory coalescing affects performance, and how bank conflicts can silently degrade throughput. This architectural knowledge must be combined with an understanding of thread coordination mechanisms to avoid race conditions and ensure correct parallel execution.
+
+The mathematical foundations of tensor operations add another layer of complexity. Unlike explicit layout algebras, Composable Kernels utilizes implicit layout algebra executed through complex computational graphs and primitive operations called coordinate transformations. Coordinate transformations, which form the core of CK's approach to efficient memory access, require understanding how multi-dimensional indices map through various mathematical operations. These transformations involve concepts like embedding, merging, and reordering dimensions, each with specific mathematical properties that must be preserved to maintain correctness.
+
+When developers attempt to learn these concepts directly through C++ implementation, they face a convergence of challenges. The feedback loop is slow, requiring compilation, execution, and often careful instrumentation just to understand what the code is doing. Runtime behavior remains opaque, hidden behind the abstractions necessary for performance. The Python emulator addresses these challenges by providing an environment where concepts can be explored interactively, errors are immediately apparent and clearly explained, and the internal workings of algorithms can be inspected step by step.
+
+### The Compilation Wall
+
+The compilation wall represents one of the most significant barriers to learning and developing with CK. When working with the C++ implementation, even minor errors can trigger cascading template compilation failures that produce hundreds or thousands of lines of error messages. These error messages often provide little indication of the actual problem, as they expose the internal template instantiation process rather than the conceptual issue at hand.
+
+Consider a typical scenario where a developer makes a simple mistake in template parameters or function arguments. In C++, this might result in pages of compiler output detailing template instantiation failures, type mismatches across multiple levels of abstraction, and references to internal implementation details that have no bearing on the actual error. The developer must then parse through this output, mentally reconstructing the template instantiation chain to identify where their usage diverged from expectations.
+
+The Python emulator eliminates this compilation wall by providing immediate, actionable feedback. When an error occurs, the developer receives a clear message that directly identifies the problem and often suggests a solution. This difference transforms the learning experience from one of frustration and confusion to one of exploration and understanding.
+
+This immediate feedback loop is particularly valuable during the learning phase, where developers are still building mental models of how different components interact. Instead of spending time deciphering compiler errors, they can focus on understanding the concepts and experimenting with different approaches. The Python environment's error messages serve as teaching tools, explaining not just what went wrong but why it went wrong in terms of the conceptual model.
+
+## The Role of Python in Learning Complex Systems
+
+### Interactive Exploration
+
+Consider the process of understanding tensor descriptors, which define how multi-dimensional data is laid out in memory. In the Python emulator, a developer can create a simple tensor view and immediately inspect its properties. The code snippet below demonstrates this process, starting with the creation of a NumPy array containing 24 elements arranged in a 6x4 matrix. The `make_naive_tensor_view` function takes this data along with shape and stride information to create a tensor view that provides structured access to the underlying memory.
+
+```python
+# Create a tensor and explore interactively
+import numpy as np
+from pytensor import *
+
+# Start simple
+data = np.arange(24).reshape(6, 4)
+tensor = make_naive_tensor_view(data, [6, 4], [4, 1])
+
+# Visualize the layout
+print("Tensor shape:", tensor.descriptor.shape)
+print("Strides:", tensor.descriptor.get_strides())
+print("Data:\n", data)
+
+# Experiment with transformations
+transformed = transform_tensor_view(tensor, 
+    [MergeTransform([6, 4], [24], [0, 1], [0])])
+
+# See the effect immediately
+print("After merge:", transformed.descriptor.shape)
+```
+
+The strides `[4, 1]` in this example tell us that moving one position along the first dimension (rows) requires jumping 4 elements in memory, while moving along the second dimension (columns) requires jumping just 1 element. This row-major layout is immediately visible and understandable. When we apply a `MergeTransform` to combine the two dimensions into one, we can instantly see how the shape changes from `[6, 4]` to `[24]`. This transformation is a fundamental operation in CK that allows efficient access patterns by reshaping how we view the same underlying data.
+
+In a Jupyter notebook or interactive Python session, developers can modify these parameters on the fly, trying different stride patterns, shapes, and transformations to build intuition about how data layouts affect memory access patterns. This exploratory approach is impossible with the compile-run-debug cycle of C++, where each experiment requires modifying source files, recompiling, and running the entire program again.
+
+### Visualization of Operations
+
+One of the most challenging aspects of understanding CK's approach to tensor operations is visualizing how mathematical transformations affect data access patterns. In the C++ implementation, these transformations happen through layers of template instantiation, making it nearly impossible to see what's actually happening at runtime. The Python emulator changes this by making every transformation visible and traceable. It is also easy to create interactive Streamlit applications around this - and some examples are provided in the introduction section.
+
+### Algorithm Inspection
+
+The complexity of CK's tile distribution algorithm lies in how it maps work across multiple coordinate spaces. In the C++ implementation, this mapping happens through compile-time calculations that are invisible at runtime. The Python emulator exposes these internal mechanisms, allowing developers to understand exactly how threads are assigned to data elements and how different distribution strategies affect memory access patterns.
+
+Tile distribution encoding represents one of the most sophisticated concepts in CK. It defines how a multi-dimensional tensor is distributed across a hierarchy of processing elements, from individual threads up through warps and blocks. The encoding captures several critical pieces of information: the hierarchical structure of the distribution (hs_lengthss), how thread positions map to this hierarchy (ps_to_rhss), and how local tile coordinates map to global tensor coordinates (ys_to_rhs).
+
+```python
+# Step through tile distribution algorithm
+encoding = make_tile_distribution_encoding(
+    hs_lengthss=[[2, 3], [4]],
+    ps_to_rhss_major=[[1]],
+    ps_to_rhss_minor=[[0]],
+    ys_to_rhs_major=[1, 2],
+    ys_to_rhs_minor=[0, 0]
+)
+
+# Inspect internal state
+print("Encoding details:")
+print(f"  P-space dims: {encoding.ps_to_rhss_major}")
+print(f"  Y-space mapping: {encoding.ys_to_rhs_major}")
+print(f"  Hierarchical structure: {encoding.hs_lengthss}")
+
+# Trace through a specific thread's data
+thread_p = [0]  # Thread 0
+for y in range(8):  # Y-space iteration
+    x = encoding.ps_ys_to_xs(thread_p, [y])
+    print(f"Thread {thread_p} accessing Y[{y}] → X{x}")
+```
+
+In this example, the hierarchical structure `[[2, 3], [4]]` defines a two-level hierarchy where the first level has dimensions 2×3 and the second level has dimension 4. This might represent a distribution where 6 warps (2×3) each handle 4 elements. The ps_to_rhss mappings determine how thread positions map to this hierarchy, while ys_to_rhs mappings define how local tile coordinates relate to the hierarchical structure.
+
+By tracing through specific thread accesses, developers can see exactly which global tensor elements each thread will access. This visibility is crucial for understanding memory access patterns and identifying potential performance issues. For example, if adjacent threads access memory locations that are far apart, this would indicate poor memory coalescing. The ability to print and examine these mappings interactively allows developers to experiment with different distribution strategies and immediately see their effects.
+
+## In-Situ Visualization and Debugging
+
+### Memory Access Pattern Analysis
+
+Understanding memory access patterns is crucial for GPU performance optimization. On GPUs, when threads within a warp access memory, the hardware can coalesce these accesses into fewer memory transactions if the addresses are contiguous and aligned. Poor access patterns can result in multiple memory transactions per warp, significantly degrading performance. The Python emulator provides tools to analyze these patterns without needing to run on actual GPU hardware.
+
+### Performance Bottleneck Identification
+
+While the Python emulator cannot match the performance of GPU execution, it can simulate performance-critical behaviors to help identify potential bottlenecks before they become problems in production code. By instrumenting the emulator's operations, developers can gather metrics about memory access patterns, cache behavior, and resource utilization that would be difficult or impossible to obtain from the optimized C++ implementation.
+
+The instrumentation approach involves creating wrapper classes that track key performance indicators as operations execute. These instrumented versions maintain counters and statistics about various aspects of execution, from simple access counts to more complex metrics like cache hit rates and bank conflict detection. This information provides insights into how well a particular algorithm or data distribution strategy will perform on actual hardware.
+
+The metrics gathered through emulated instrumentation can guide optimization decisions. A low cache hit rate might indicate that the data access pattern doesn't exhibit good temporal or spatial locality, suggesting the need for different tiling strategies. High bank conflict counts point to shared memory access patterns that could benefit from padding or different data layouts. By identifying these issues in the Python emulator, developers can iterate on solutions quickly before investing time in C++ implementation.
+
+### Correctness Verification
+
+One of the most critical aspects of developing new tile distribution strategies or coordinate transformations is ensuring correctness. A subtle error in how coordinates map between spaces can lead to data races, incorrect results, or accessing out-of-bounds memory. The Python emulator provides a safe environment to verify algorithmic correctness before moving to GPU implementation where such errors could cause crashes or silent data corruption.
+
+Correctness verification in the context of tile distribution involves ensuring that every element of the input tensor is accessed exactly once across all threads. This property must hold regardless of the complexity of the distribution strategy or the number of coordinate transformations applied. The Python emulator can systematically check this property by tracking which elements each thread accesses and verifying complete coverage without overlaps.
+
+This verification function creates a coverage map with the same shape as the input tensor, initialized to zeros. It then iterates through all possible thread positions (P-space) and all possible local tile positions (Y-space), computing the corresponding global tensor position (X-space) for each combination. Each access increments the corresponding position in the coverage map. After all accesses are tracked, the function verifies that every position in the coverage map has been accessed exactly once.
+
+The beauty of this approach is that it can catch subtle errors that might be missed in manual analysis. For example, if a distribution strategy accidentally maps two different thread-tile combinations to the same global position, this would show up as a value greater than 1 in the coverage map. Similarly, if some positions are never accessed, they would remain at 0. These kinds of systematic checks are invaluable when developing new distribution strategies or debugging existing ones, providing confidence that the algorithm is correct before investing time in optimization.
+
+## Prototyping and Experimentation
+
+### Algorithm Development
+
+The Python environment fundamentally changes the economics of algorithm development. In the C++ CK library, implementing a new transformation or distribution strategy requires understanding complex template hierarchies, dealing with type constraints, and navigating compile-time programming techniques. A simple conceptual change might require hours of implementation work, only to discover that the idea doesn't work as expected. The Python emulator reduces this overhead from hours to minutes, enabling rapid experimentation with new ideas.
+
+Algorithm development in the emulator follows a natural progression from concept to implementation. Developers can start with a mathematical idea for how coordinates should transform, implement it in straightforward Python code, and immediately test its behavior. The dynamic nature of Python means that implementation details can be adjusted on the fly, parameters can be tuned interactively, and edge cases can be explored without recompilation. This rapid iteration cycle is particularly valuable when exploring novel approaches that might not have been considered practical in a compile-time environment.
+
+The immediate testing capabilities are particularly powerful. This kind of rapid feedback enables developers to iterate on their algorithms, adjusting the swizzling logic or parameters based on observed behavior rather than theoretical analysis alone.
+
+## Capabilities and Limitations
+
+### What pytensor CAN Do
+
+The educational capabilities of pytensor represent its primary strength. The emulator enables step-by-step algorithm understanding by exposing every operation and transformation in a way that would be impossible in the optimized C++ implementation. Interactive exploration in Jupyter notebooks allows developers to experiment with concepts in real-time, modifying parameters and immediately seeing results. When errors occur, the Python environment provides clear, readable error messages that explain exactly what went wrong and where, rather than the cryptic template instantiation errors common in C++ development.
+
+Visualization and analysis capabilities form another core strength of the emulator. Memory access patterns can be visualized to show exactly how threads access data, revealing whether accesses are coalesced or strided. Coordinate transformation tracing allows developers to follow how multi-dimensional indices map through various transformations, providing insight into the mathematical operations that underlie CK's efficiency. Performance characteristic analysis, while not measuring actual GPU performance, can identify algorithmic inefficiencies such as poor memory access patterns or excessive bank conflicts.
+
+The prototyping capabilities enable rapid algorithm experimentation without the overhead of C++ development. New ideas can be implemented and tested in minutes rather than hours, allowing developers to explore a broader design space. Design space exploration tools can systematically evaluate different configurations and parameters to find optimal settings. Correctness verification ensures that algorithms behave as expected before investing time in optimization, catching subtle bugs that might otherwise lead to data corruption or incorrect results.
+
+Algorithm development benefits from Python's dynamic nature and clear syntax. New transformations can be developed with focus on the mathematical concepts rather than implementation details. Custom distribution patterns can be explored to find novel ways of mapping work to processing elements. Mathematical validation ensures that transformations maintain necessary properties such as bijectivity and that composed transformations behave correctly.
+
+### What pytensor CANNOT Do
+
+The performance limitations of pytensor are fundamental to its nature as a Python implementation. The emulator provides no GPU execution capability, running entirely on the CPU in interpreted Python code. This results in performance that is orders of magnitude slower than the optimized C++ implementation. The emulator is not suitable for production workloads or performance benchmarking, as its execution characteristics bear no resemblance to actual GPU performance.
+
+Hardware features that are critical to CK's performance are absent from the emulator. There is no actual memory hierarchy simulation beyond basic caching models. The emulator cannot utilize warp-level primitives such as shuffle operations or warp-wide reductions. Hardware-specific optimizations like tensor cores or special function units are not available. These limitations mean that while the emulator can help understand algorithms conceptually, it cannot predict actual hardware performance.
+
+Scale limitations restrict the emulator to educational and prototyping use cases. Problem sizes are limited by Python's memory constraints and the overhead of Python objects. The sequential execution model means that large-scale parallel algorithms cannot be efficiently simulated. The emulator is best suited for small to medium problem sizes that demonstrate concepts without requiring significant computational resources.
+
+## When to Use Pytensor 
+
+The pytensor emulator is most valuable during the learning phase of working with Composable Kernels. When developers are first encountering concepts like tile distribution, the ability to step through operations and see immediate results accelerates understanding. Debugging coordinate transformations becomes tractable when you can print intermediate values and trace how indices map through each transformation layer. Visualizing memory patterns helps build intuition about why certain distributions lead to better performance than others. The interactive nature of Python allows learners to experiment freely without the friction of compilation cycles.
+
+Algorithm development represents another key use case for pytensor. When prototyping new transformations or distribution strategies, the Python environment allows rapid iteration on ideas. Mathematical correctness can be validated through systematic testing before committing to C++ implementation. The ability to explore design alternatives quickly means developers can try multiple approaches and compare their characteristics. This experimentation phase often leads to insights that would be too expensive to discover through C++ development alone.
+
+Teaching and documentation benefit significantly from pytensor's clarity and accessibility. Interactive tutorials can be created using Jupyter notebooks that allow students to modify code and immediately see results. Concepts can be demonstrated visually through plotting and animation libraries available in the Python ecosystem. Building mental models becomes easier when abstract mathematical operations can be traced step by step. The emulator serves as a bridge between theoretical understanding and practical implementation.
+
+
+## The Development Workflow
+
+A typical development cycle using both pytensor and CK follows a natural progression from learning to deployment. The process begins with learning the fundamental concepts using the Python emulator, where developers can understand algorithms and data structures without the complexity of C++ templates. This learning phase establishes the mental models necessary for effective GPU programming, allowing developers to experiment with different approaches and see immediate results.
+
+Once the concepts are understood, the workflow moves to prototyping new algorithms in Python. This phase leverages the emulator's rapid development capabilities to explore different approaches, test hypotheses, and refine ideas. The ability to modify code and immediately see results enables a level of experimentation that would be impractical in C++. During this phase, developers often discover edge cases, optimization opportunities, and potential issues that inform the final implementation.
+
+Validation of correctness follows naturally from prototyping. The Python environment allows systematic testing of algorithms to ensure they produce correct results across various input configurations. This validation phase often reveals subtle bugs or conceptual errors that can be fixed before moving to C++ implementation. The ability to trace through operations step by step and verify intermediate results provides confidence in the algorithm's correctness.
+
+The implementation phase involves porting the validated algorithm to the CK C++ library. At this stage, developers translate the Python prototype into the template-based C++ framework, adapting to the constraints and idioms of the production environment. The clarity gained from prototyping in Python often leads to cleaner, more efficient C++ implementations, as the developer already understands the algorithm's structure and requirements.
+
+Performance optimization represents a critical phase where the C++ implementation is fine-tuned for specific hardware architectures. This involves leveraging hardware-specific features, optimizing memory access patterns, and ensuring efficient resource utilization. The insights gained from the Python emulator's analysis tools often guide these optimization efforts, highlighting areas where performance improvements are most likely to yield benefits.
+
+The final deployment phase integrates the optimized implementation into production applications. This involves ensuring compatibility with existing systems, meeting performance requirements, and maintaining stability under production workloads. The development workflow is iterative rather than strictly linear. When issues are discovered during validation or optimization, developers can return to the prototyping phase in Python to explore solutions before implementing changes in C++. This iterative approach reduces the cost of experimentation and leads to better final implementations.
+
+## Summary
+
+The pytensor Python emulator provides an alternative implementation of Composable Kernels' tensor operations for educational and development purposes. It addresses specific needs in the CK development process without attempting to match the performance of the C++ library.
+
+The emulator serves three primary functions:
+
+First, it reduces the time needed to learn CK concepts by providing clear error messages and interactive debugging capabilities. Template compilation errors in C++ can be difficult to interpret, while Python provides immediate, readable feedback.
+
+Second, it allows developers to inspect internal algorithm behavior through step-by-step execution and visualization. This visibility helps in understanding how coordinate transformations work and how memory is accessed.
+
+Third, it supports algorithm prototyping in a simpler environment. Developers can test ideas quickly in Python before implementing them in C++, which can reduce overall development time.
+
+The pytensor emulator is designed as a complementary tool for specific tasks in the CK development workflow, not as a replacement for the production library.
+
+## Next Steps
+
+- **For Learners**: Start with [Introduction](00_introduction.qmd) to understand tile distribution concepts
+- **For Developers**: Explore the [Buffer Views](01_buffer_view.qmd) to begin prototyping
+- **For Researchers**: Dive into [Coordinate Systems](04_coordinate_systems.qmd) for advanced algorithms

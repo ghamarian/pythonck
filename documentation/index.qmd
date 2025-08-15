@@ -20,7 +20,8 @@ await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/mas
 Follow our structured 8-part learning path:
 
 ### **Introduction and Motivation**
-- **[Introduction and Motivation](concepts/00_introduction_motivation.qmd)** - Why tile distribution matters, GPU memory challenges, and the solution overview
+- **[Motivation](concepts/00_motivation.qmd)** - Why a Python emulator for Composable Kernels? Learning tool, debugging capabilities, and CK vs pytensor comparison
+- **[Introduction](concepts/00_introduction.qmd)** - Why tile distribution matters, GPU memory challenges, and the solution overview
 
 ### **Foundation** 
 - **[Buffer Views](concepts/01_buffer_view.qmd)** - Raw memory access
@@ -104,4 +105,4 @@ print("Ready to explore tile distribution!")
 3. **Experiment** - Modify the code to deepen your understanding
 4. **Test yourself** - Each section includes validation exercises
 
-Ready to start? Begin with [Part 0: Introduction and Motivation](concepts/00_introduction_motivation.qmd)! 
+Ready to start? Begin with [Motivation - Why a Python Emulator?](concepts/00_motivation.qmd)!
