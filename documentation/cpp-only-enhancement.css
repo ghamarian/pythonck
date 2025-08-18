@@ -28,12 +28,6 @@ code.cpp {
     line-height: 1.5 !important;
 }
 
-/* C++ pre elements - increase font size */
-div.sourceCode:has(code.language-cpp) pre,
-div.sourceCode:has(code.cpp) pre {
-    font-size: 0.95rem !important;
-}
-
 /* Alternative selectors for different rendering patterns */
 .sourceCode.language-cpp,
 pre.language-cpp {
