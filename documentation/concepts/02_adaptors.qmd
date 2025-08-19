@@ -24,7 +24,7 @@ await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/mas
 Let's start by understanding what a TensorAdaptor is and how it works:
 
 ```{=html}
-<div class="mermaid">
+<div class="mermaid" style="margin: 0 auto; display: block; width: 40%;">
 graph TB
     subgraph "Adaptor Composition"
         subgraph "Single Transform"
@@ -235,7 +235,7 @@ Now that we saw how we can create an adaptor, let's see how we can combine a few
 The real power comes from chaining multiple adaptors together to create sophisticated transformations. Below we try some trivial example of combining merge and unmerge just to show how these transformations combine.
 
 ```{=html}
-<div class="mermaid">
+<div class="mermaid" style="margin: 0 auto; display: block; width: 50%;">
 graph LR
     subgraph "Adaptor Chaining Flow"
         subgraph "Adaptor 1"
@@ -374,7 +374,7 @@ for coord_list in test_coords:
     top_coord = MultiIndex(2, coord_list)
     bottom_coord = padded_transpose_2d.calculate_bottom_index(top_coord)
     # Manual verification: [i,j] → transpose → [j,i] → pad first → [j-1,i]
-    expected = [coord_list[1] - 1, coord_list[0]]
+    expected = [coord_list[0], coord_list[1] - 1]
     print(f"    {coord_list} → {bottom_coord.to_list()} (expected: {expected})")
 
 print("\n  ⚠️  Common mistake: Using [[0]] for new_upper_dimension_new_top_idss")
@@ -498,6 +498,7 @@ TensorAdaptors are the coordination layer that makes complex tensor operations p
 - **C++ Equivalents**: **True working equivalent** of complex nested C++ transforms
 
 Key concepts:
+
 - **Bottom/Top Dimensions**: Input and output coordinate spaces
 - **Hidden Dimensions**: Internal coordinate mappings between transforms
 - **Transform Chains**: Sequential application of multiple transforms
@@ -521,6 +522,7 @@ cpp_equivalent = make_single_stage_tensor_adaptor(
 ```
 
 **Key insights:**
+
 - **Transform direction**: Names refer to lower→higher, but `calculate_lower_index()` goes higher→lower
 - **UnmergeTransform**: Converts multi-D to linear when used with `calculate_lower_index()`
 - **Parameter mapping**: Controls the coordinate flow between dimensions
