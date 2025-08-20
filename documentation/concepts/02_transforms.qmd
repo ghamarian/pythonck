@@ -165,37 +165,34 @@ print(f"\nLinear index {upper_input.to_list()[0]} → 2D coord {lower_result.to_
 print(f"Calculation: 13 ÷ 5 = {lower_result.to_list()[0]} remainder {lower_result.to_list()[1]}")
 ```
 
-### C++ Implementation
+#### C++ Implementation
 
 ```cpp
-// From composable_kernel/include/ck_tile/core/algorithm/coordinate_transform.hpp
+using namespace ck_tile;
 
-// Create merge transform for 4x5 tensor
-auto transform = make_merge_transform(
-    make_tuple(4, 5)  // lower lengths
-);
+// Create MergeTransform for 4x5 tensor (20 elements total)
+auto transform = make_merge_transform(make_tuple(4, 5));
 
-// The merge transform inherits from base_transform<LowLengths::size(), 1>
-// meaning multiple lower dimensions → 1 upper dimension
+// Forward: Lower (2D) → Upper (1D) - Manual calculation
+int row = 2, col = 3;
+int linear_index = row * 5 + col;  // Result: 13
+printf("2D coord [%d, %d] → Linear index %d\n", row, col, linear_index);
+printf("Calculation: %d×5 + %d = %d\n", row, col, linear_index);
 
-// Forward: Linear → Multi-D (splitting)
-multi_index<1> upper_coord{13};
+// Inverse: Upper (1D) → Lower (2D) - Using transform
+multi_index<1> upper_coord;
+upper_coord[number<0>{}] = 13;
+
 multi_index<2> lower_coord;
 transform.calculate_lower_index(lower_coord, upper_coord);
-// Result: lower_coord[0] = 13 / 5 = 2 (row)
-//         lower_coord[1] = 13 % 5 = 3 (col)
 
-// CK provides two merge implementations:
-// 1. merge_v2_magic_division (default) - uses magic number division
-// 2. merge_v3_division_mod - for power-of-2 dimensions
-
-// Common usage: dimension reduction
-auto desc = transform_tensor_descriptor(
-    input_desc,
-    make_tuple(make_merge_transform(make_tuple(M, N))),
-    make_tuple(sequence<0, 1>{}),  // merge dims 0,1
-    make_tuple(sequence<0>{})      // to single dim 0
-);
+printf("Linear index %d → 2D coord [%d, %d]\n", 
+       static_cast<int>(upper_coord[number<0>{}]),
+       static_cast<int>(lower_coord[number<0>{}]), 
+       static_cast<int>(lower_coord[number<1>{}]));
+printf("Calculation: 13 ÷ 5 = %d remainder %d\n",
+       static_cast<int>(lower_coord[number<0>{}]),
+       static_cast<int>(lower_coord[number<1>{}]));
 ```
 
 
@@ -249,35 +246,44 @@ print(f"\n3D coord {upper_input.to_list()} → Linear index {lower_result.to_lis
 print(f"Calculation: {upper_input.to_list()[0]}×8 + {upper_input.to_list()[1]}×2 + {upper_input.to_list()[2]} = {lower_result.to_list()[0]}")
 ```
 
-### C++ Implementation
+#### C++ Implementation
 
 ```cpp
-// From composable_kernel/include/ck_tile/core/algorithm/coordinate_transform.hpp
+using namespace ck_tile;
 
-// Create unmerge transform for 3x4x2 tensor
-auto transform = make_unmerge_transform(
-    make_tuple(3, 4, 2)  // upper lengths
-);
+// Create UnmergeTransform for 3x4x2 tensor (24 elements total)
+auto transform = make_unmerge_transform(make_tuple(3, 4, 2));
 
-// The unmerge transform inherits from base_transform<1, UpLengths::size()>
-// meaning 1 lower dimension → multiple upper dimensions
+// Forward: Lower (1D) → Upper (3D) - Manual calculation
+int linear_index = 14;
+int dim0 = linear_index / (4 * 2);      // 14 / 8 = 1
+int remainder = linear_index % (4 * 2);  // 14 % 8 = 6
+int dim1 = remainder / 2;               // 6 / 2 = 3
+int dim2 = remainder % 2;               // 6 % 2 = 0
 
-// Forward: Multi-D → Linear
-multi_index<3> upper_coord{1, 3, 0};
+printf("Linear index %d → 3D coord [%d, %d, %d]\n", 
+       linear_index, dim0, dim1, dim2);
+printf("Calculation: 14 = %d×8 + %d×2 + %d\n", dim0, dim1, dim2);
+
+// Inverse: Upper (3D) → Lower (1D) - Using transform
+multi_index<3> upper_coord;
+upper_coord[number<0>{}] = 1;
+upper_coord[number<1>{}] = 3;
+upper_coord[number<2>{}] = 0;
+
 multi_index<1> lower_coord;
 transform.calculate_lower_index(lower_coord, upper_coord);
-// Result: lower_coord[0] = 1*(4*2) + 3*2 + 0 = 14
 
-// Backward: Linear → Multi-D (unpacking)
-multi_index<1> packed_idx{14};
-multi_index<3> unpacked_coord;
-// This would compute: unpacked_coord = [1, 3, 0]
-
-// Use in tensor descriptor
-auto desc = make_naive_tensor_descriptor_packed(
-    make_tuple(number<3>{}, number<4>{}, number<2>{})
-);
-// UnmergeTransform is used internally for packed layouts
+printf("3D coord [%d, %d, %d] → Linear index %d\n",
+       static_cast<int>(upper_coord[number<0>{}]),
+       static_cast<int>(upper_coord[number<1>{}]),
+       static_cast<int>(upper_coord[number<2>{}]),
+       static_cast<int>(lower_coord[number<0>{}]));
+printf("Calculation: %d×8 + %d×2 + %d = %d\n",
+       static_cast<int>(upper_coord[number<0>{}]),
+       static_cast<int>(upper_coord[number<1>{}]),
+       static_cast<int>(upper_coord[number<2>{}]),
+       static_cast<int>(lower_coord[number<0>{}]));
 ```
 
 
@@ -292,10 +298,10 @@ graph TB
         LS["Lower Coordinate Space<br/>1D Linear<br/>Index: 14"]
         US["Upper Coordinate Space<br/>2D: [2, 3]<br/>Coord: (1, 2)"]
         
-        DATA["Linear Buffer in Memory<br/>Strides: [12, 1]<br/>Custom layout"]
+        DATA["Linear Buffer in Memory"]
     end
     
-    LS -->|"Forward Transform<br/>14 ÷ 12 = 1, 14 % 12 = 2"| US
+    LS -->|"Forward Transform <br/>Strides: [12, 1] <br/>14 ÷ 12 = 1, 14 % 12 = 2"| US
     US -->|"Inverse Transform<br/>1×12 + 2×1 = 14"| LS
     
     DATA -.->|"Linear<br/>index view"| LS
@@ -334,32 +340,32 @@ print(f"\n2D coord {upper_input.to_list()} → Linear index {lower_result.to_lis
 print(f"Calculation: {upper_input.to_list()[0]}×12 + {upper_input.to_list()[1]}×1 = {lower_result.to_list()[0]}")
 ```
 
-### C++ Implementation
+#### C++ Implementation
 
 ```cpp
-// From composable_kernel/include/ck_tile/core/algorithm/coordinate_transform.hpp
+using namespace ck_tile;
 
-// Create embed transform for 2x3 matrix with strides [12, 1]
-auto transform = make_embed_transform(
-    make_tuple(2, 3),      // upper lengths
-    make_tuple(12, 1)      // strides/coefficients
-);
+// Create embed transform for 2x3 tensor with strides [12, 1]
+auto transform = make_embed_transform(make_tuple(2, 3), make_tuple(12, 1));
 
-// Forward transformation: 2D → 1D
-multi_index<2> upper_coord{1, 2};  // Row 1, Column 2
+// Forward: Linear → 2D (Manual calculation)
+int linear_idx = 14;
+int row = linear_idx / 12;        // 14 / 12 = 1
+int remainder = linear_idx % 12;  // 14 % 12 = 2  
+int col = remainder / 1;          // 2 / 1 = 2
+printf("Linear index %d → 2D coord [%d, %d]\n", linear_idx, row, col);
+
+// Inverse: 2D → Linear (Using transform)
+multi_index<2> upper_coord;
+upper_coord[number<0>{}] = 1;
+upper_coord[number<1>{}] = 2;
+
 multi_index<1> lower_coord;
 transform.calculate_lower_index(lower_coord, upper_coord);
-// Result: lower_coord[0] = 1*12 + 2*1 = 14
-
-// The embed transform inherits from base_transform<1, UpLengths::size()>
-// meaning 1 lower dimension → multiple upper dimensions
-
-// Usage in tensor descriptor
-auto desc = make_naive_tensor_descriptor(
-    make_tuple(number<3>{}, number<4>{}),   // shape
-    make_tuple(number<8>{}, number<1>{})    // strides
-);
-// Internally uses EmbedTransform for strided access
+printf("2D coord [%d, %d] → Linear index %d\n",
+       static_cast<int>(upper_coord[number<0>{}]),
+       static_cast<int>(upper_coord[number<1>{}]),
+       static_cast<int>(lower_coord[number<0>{}]));
 ```
 
 ## 4. ReplicateTransform
@@ -417,58 +423,44 @@ for coord in test_coordinates:
 
 ```
 
-### C++ Implementation
+#### C++ Implementation
 
 ```cpp
-// From composable_kernel/include/ck_tile/core/algorithm/coordinate_transform.hpp
+using namespace ck_tile;
 
 // Create replicate transform for 3x4 broadcasting
-auto transform = make_replicate_transform(
-    make_tuple(3, 4)  // upper lengths
-);
+auto transform = make_replicate_transform(make_tuple(3, 4));
 
-// The replicate transform inherits from base_transform<0, UpLengths::size()>
-// meaning 0 lower dimensions → multiple upper dimensions
+// Inverse: Upper (2D) → Lower (0D) - Using transform
+// Any 2D coordinate maps to empty scalar coordinate
+multi_index<2> upper_coord;
+upper_coord[number<0>{}] = 1;
+upper_coord[number<1>{}] = 2;
 
-// Forward: Lower (empty) → Upper (any valid coordinate)
-multi_index<0> lower_coord;  // Empty coordinate
-multi_index<2> upper_coord{1, 2};
-// Any upper coordinate is valid - no actual transformation needed
+multi_index<0> lower_coord;  // Empty coordinate (0 dimensions)
+transform.calculate_lower_index(lower_coord, upper_coord);
+printf("2D [%d, %d] → Empty scalar [] (always empty)\n",
+       static_cast<int>(upper_coord[number<0>{}]),
+       static_cast<int>(upper_coord[number<1>{}]));
 
-// Inverse: Upper → Lower (always empty)
-multi_index<2> coord1{0, 0};
-multi_index<2> coord2{2, 3};
-multi_index<0> lower1, lower2;
-transform.calculate_lower_index(lower1, coord1);
-transform.calculate_lower_index(lower2, coord2);
-// Both lower1 and lower2 are empty (no lower dimensions)
+// Forward: Scalar → 2D (Conceptual - no coordinate calculation needed)
+// Broadcasting: Single scalar value appears at ALL positions
+printf("Broadcasting: Scalar value appears at every [i,j] where 0≤i<3, 0≤j<4\n");
+printf("Total positions: 3×4 = 12 positions, all contain same scalar value\n");
 
-// Always returns true for validity checks
-bool is_valid = transform.is_valid_upper_index_mapped_to_valid_lower_index(coord1);
-// Result: is_valid = true (always valid for replicate)
-
-// Common usage patterns:
-
-// 1. Broadcasting scalar in GEMM
-auto broadcast_desc = transform_tensor_descriptor(
-    make_naive_tensor_descriptor_packed(make_tuple()),  // 0D scalar
-    make_tuple(make_replicate_transform(make_tuple(M, N))),
-    make_tuple(sequence<>{}),         // no lower dims
-    make_tuple(sequence<0, 1>{})      // create upper dims 0,1
-);
-
-// 2. Bias term broadcasting in neural networks
-auto bias_broadcast = make_replicate_transform(
-    make_tuple(batch_size, hidden_dim)
-);
-// Maps single bias value to all batch and hidden positions
-
-auto broadcast_desc = transform_tensor_descriptor(
-    scalar_desc,  // 0D tensor
-    make_tuple(make_replicate_transform(make_tuple(M, N))),
-    make_tuple(sequence<>{}),     // no lower dims
-    make_tuple(sequence<0, 1>{})  // create 2 upper dims
-);
+// Test multiple coordinates - all map to empty scalar
+int test_coords[][2] = {{0, 0}, {1, 2}, {2, 3}};
+for(int i = 0; i < 3; i++)
+{
+    multi_index<2> test_upper;
+    test_upper[number<0>{}] = test_coords[i][0];
+    test_upper[number<1>{}] = test_coords[i][1];
+    
+    multi_index<0> test_lower;
+    transform.calculate_lower_index(test_lower, test_upper);
+    printf("2D [%d, %d] → Empty scalar []\n", 
+           test_coords[i][0], test_coords[i][1]);
+}
 ```
 
 
@@ -489,8 +481,8 @@ graph TB
     LS -->|"Forward Transform<br/>idx → idx + 16"| US
     US -->|"Inverse Transform<br/>idx + 16 → idx"| LS
     
-    DATA -.->|"Larger buffer<br/>view"| LS
-    DATA -.->|"Translated<br/>view"| US
+    DATA -.->|"Lower<br/>view"| LS
+    DATA -.->|"Upper<br/>view"| US
     
     style LS fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
     style US fill:#fff3e0,stroke:#f57c00,stroke-width:3px
@@ -501,33 +493,86 @@ graph TB
 ```{pyodide}
 #| echo: true
 #| output: true
-
+import numpy as np
 from pytensor.tensor_descriptor import OffsetTransform
 from pytensor.tensor_coordinate import MultiIndex
 
-# OffsetTransform adds a constant offset
-low_length = 48         # Size of the sub-region
-offset_value = 16       # Starting offset in buffer
-
+# Create OffsetTransform for coordinate translation
+# CK Tile offset: lower = upper + offset (adds offset to coordinates)
 transform = OffsetTransform(
-    low_length=low_length,
-    offset=offset_value
+    element_space_size=48,  # Size of the coordinate space (48 elements)
+    offset=16              # Offset value to add
 )
 
-print(f"Low length: {low_length}")
-print(f"Offset: {offset_value}")
-
-# Forward transform: add offset
+# Inverse: Upper (original) → Lower (translated) using transform
 upper_coord = MultiIndex(size=1, values=[5])
 lower_coord = transform.calculate_lower_index(upper_coord)
-print(f"\nForward: index {upper_coord.to_list()[0]} → index {lower_coord.to_list()[0]}")
-print(f"Calculation: {upper_coord.to_list()[0]} + {offset_value} = {lower_coord.to_list()[0]}")
+print(f"Original index {upper_coord.to_list()[0]} → Translated index {lower_coord.to_list()[0]}")
+print(f"Calculation: {upper_coord.to_list()[0]} + {16} = {lower_coord.to_list()[0]}")
 
-# Show offset behavior
+# Forward: Lower (translated) → Upper (original) using transform  
+lower_input = MultiIndex(size=1, values=[21])
+upper_result = transform.calculate_upper_index(lower_input)
+print(f"\nTranslated index {lower_input.to_list()[0]} → Original index {upper_result.to_list()[0]}")
+print(f"Calculation: {lower_input.to_list()[0]} - {16} = {upper_result.to_list()[0]}")
+
+# Show additional examples
+print("\nAdditional offset examples:")
+test_original_indices = [0, 10, 20, 47]  # Test boundary and middle values
+for idx in test_original_indices:
+    original = MultiIndex(size=1, values=[idx])
+    translated = transform.calculate_lower_index(original)
+    print(f"  Original {idx} → Translated {translated.to_list()[0]} (offset +{16})")
+
 print("\nOffset transform behavior:")
-print(f"  Maps coordinates to buffer starting at offset {offset_value}")
-print("  Used for accessing sub-regions of buffers")
-print("  Essential for tile-based algorithms")
+print(f"  Maps original space [0, 47] to translated space [16, 63]")
+print("  Used for translating logical coordinates to buffer positions")
+print("  Essential for tile-based algorithms and memory management")
+```
+
+#### C++ Implementation
+
+```cpp
+using namespace ck_tile;
+
+// Create offset transform for coordinate translation
+// CK Tile formula: lower = upper + offset
+auto transform = make_offset_transform(48, 16);
+
+// Using Transform: Original → Translated (adds offset)
+multi_index<1> upper_coord;
+upper_coord[number<0>{}] = 5;  // Original index 5
+
+multi_index<1> lower_coord;
+transform.calculate_lower_index(lower_coord, upper_coord);
+printf("Original index %d → Translated index %d
+",
+       static_cast<int>(upper_coord[number<0>{}]),
+       static_cast<int>(lower_coord[number<0>{}]));
+printf("Calculation: %d + 16 = %d
+",
+       static_cast<int>(upper_coord[number<0>{}]),
+       static_cast<int>(lower_coord[number<0>{}]));
+
+// Manual Reverse: Translated → Original (subtract offset)
+int translated_idx = 21;
+int original_idx = translated_idx - 16;
+printf("Translated index %d → Original index %d
+", translated_idx, original_idx);
+
+// Test multiple coordinates
+int test_indices[] = {0, 10, 20, 47};
+for(int i = 0; i < 4; i++)
+{
+    multi_index<1> test_upper;
+    test_upper[number<0>{}] = test_indices[i];
+    
+    multi_index<1> test_lower;
+    transform.calculate_lower_index(test_lower, test_upper);
+    printf("Original %d → Translated %d
+", 
+           test_indices[i], static_cast<int>(test_lower[number<0>{}]));
+}
 ```
 
 ## 6. PassThroughTransform - Identity
@@ -563,44 +608,57 @@ graph TB
 from pytensor.tensor_descriptor import PassThroughTransform
 from pytensor.tensor_coordinate import MultiIndex
 
-# Identity transform - no change
-low_length = 60  # Size of dimension
+length = 60
 
-transform = PassThroughTransform(low_length=low_length)
+transform = PassThroughTransform(length=length)
 
-print(f"Low length: {low_length}")
+print(f"Length: {length}")
 
-# Forward transform: identity
+# Forward: Upper → Lower (identity)
 upper_coord = MultiIndex(size=1, values=[25])
 lower_coord = transform.calculate_lower_index(upper_coord)
 print(f"\nForward: {upper_coord.to_list()} → {lower_coord.to_list()} (unchanged)")
 
-# Show pass-through behavior
-print("\nPassThroughTransform behavior:")
-print("  Input index = Output index (identity)")
-print("  Used when no transformation needed")
-print("  Optimized away at compile time")
+# Reverse: Lower → Upper (identity)
+lower_input = MultiIndex(size=1, values=[42])
+upper_result = transform.calculate_upper_index(lower_input)
+print(f"Reverse: {lower_input.to_list()} → {upper_result.to_list()} (unchanged)")
 ```
 
-### C++ Implementation
+#### C++ Implementation
 
 ```cpp
-// From composable_kernel/include/ck_tile/core/algorithm/coordinate_transform.hpp
+using namespace ck_tile;
 
-// Create pass-through transform
-auto transform = make_pass_through_transform(60);  // low_length
+// Identity transform - no change
+int length = 60;
 
-// The pass_through transform inherits from base_transform<1, 1>
-// meaning 1 lower dimension → 1 upper dimension (identity)
+auto transform = make_pass_through_transform(length);
 
-// Forward transformation: no change
-multi_index<1> upper_coord{25};
+printf("Length: %d\n", length);
+
+// Forward: Upper → Lower (identity)
+multi_index<1> upper_coord;
+upper_coord[number<0>{}] = 25;
+
 multi_index<1> lower_coord;
 transform.calculate_lower_index(lower_coord, upper_coord);
-// Result: lower_coord[0] = upper_coord[0] = 25
 
-// Often optimized away at compile time
-// Used as placeholder in transform chains
+printf("\nForward: [%d] → [%d] (unchanged)\n",
+       static_cast<int>(upper_coord[number<0>{}]),
+       static_cast<int>(lower_coord[number<0>{}]));
+
+// Reverse: Lower → Upper (identity)  
+multi_index<1> lower_input;
+lower_input[number<0>{}] = 42;
+
+multi_index<1> upper_result;
+// Note: PassThrough is bidirectional identity, so we can use same function
+transform.calculate_lower_index(upper_result, lower_input);
+
+printf("Reverse: [%d] → [%d] (unchanged)\n",
+       static_cast<int>(lower_input[number<0>{}]),
+       static_cast<int>(upper_result[number<0>{}]));
 ```
 
 ## 7. PadTransform
@@ -636,13 +694,13 @@ graph TB
 from pytensor.tensor_descriptor import PadTransform
 from pytensor.tensor_coordinate import MultiIndex
 
-# PadTransform handles boundary conditions
+# PadTransform for coordinate padding
 low_length = 3        # Original dimension length
 left_pad = 1          # Padding on left
 right_pad = 1         # Padding on right
 
 transform = PadTransform(
-    low_length=low_length,
+    lower_length=low_length,
     left_pad=left_pad,
     right_pad=right_pad
 )
@@ -652,50 +710,50 @@ print(f"Left pad: {left_pad}")
 print(f"Right pad: {right_pad}")
 print(f"Upper length: {low_length + left_pad + right_pad} (total with padding)")
 
-# Test various coordinates
-test_coords = [0, 1, 2, 3, 4]  # 0 is left pad, 1-3 are valid, 4 is right pad
+# Test coordinate mapping
+test_coords = [0, 1, 2, 3, 4]
 for idx in test_coords:
     upper = MultiIndex(size=1, values=[idx])
     lower = transform.calculate_lower_index(upper)
     adjusted_idx = lower.to_list()[0]
     is_valid = 0 <= adjusted_idx < low_length
     print(f"Upper {idx} → Lower {adjusted_idx} ({'valid' if is_valid else 'padding'})")
-
-# Show padding behavior
-print("\nPadTransform behavior:")
-print("  Maps padded coordinates to valid/invalid regions")
-print("  Handles out-of-bounds access gracefully")
-print("  Essential for convolution and stencil operations")
 ```
 
-### C++ Implementation
+#### C++ Implementation
 
 ```cpp
-// From composable_kernel/include/ck_tile/core/algorithm/coordinate_transform.hpp
+using namespace ck_tile;
 
-// Create pad transform
-auto transform = make_pad_transform(
-    3,    // low_length
-    1,    // left_pad
-    1     // right_pad
-);
+// PadTransform for coordinate padding
+int low_length = 3;   // Original dimension length
+int left_pad = 1;     // Padding on left
+int right_pad = 1;    // Padding on right
 
-// The pad transform inherits from base_transform<1, 1>
-// meaning 1 lower dimension → 1 upper dimension (with padding)
+auto transform = make_pad_transform(low_length, left_pad, right_pad);
 
-// Forward: upper (padded) → lower (original)
-multi_index<1> upper_coord{2};
-multi_index<1> lower_coord;
-transform.calculate_lower_index(lower_coord, upper_coord);
-// Result: lower_coord[0] = upper_coord[0] - left_pad = 2 - 1 = 1
+printf("Low length: %d\n", low_length);
+printf("Left pad: %d\n", left_pad);
+printf("Right pad: %d\n", right_pad);
+printf("Upper length: %d (total with padding)\n", low_length + left_pad + right_pad);
 
-// Common usage: convolution boundary handling
-auto padded_desc = transform_tensor_descriptor(
-    input_desc,
-    make_tuple(make_pad_transform(Hi_, InLeftPadH_, InRightPadH_)),
-    make_tuple(sequence<0>{}),
-    make_tuple(sequence<0>{})
-);
+// Test coordinate mapping
+int test_coords[] = {0, 1, 2, 3, 4};
+for(int i = 0; i < 5; i++)
+{
+    multi_index<1> upper;
+    upper[number<0>{}] = test_coords[i];
+    
+    multi_index<1> lower;
+    transform.calculate_lower_index(lower, upper);
+    
+    int adjusted_idx = static_cast<int>(lower[number<0>{}]);
+    bool is_valid = (adjusted_idx >= 0 && adjusted_idx < low_length);
+    
+    printf("Upper %d → Lower %d (%s)\n", 
+           test_coords[i], adjusted_idx, 
+           is_valid ? "valid" : "padding");
+}
 ```
 
 ## 8. XorTransform
@@ -724,21 +782,6 @@ graph TB
 </div>
 ```
 
-```cpp
-// From composable_kernel - special 2D coordinate transform
-auto transform = make_xor_transform(make_tuple(4, 8));  // 4x8 dimensions
-
-// The xor_t transform inherits from base_transform<2, 2>
-// Special mapping: lower[1] = upper[1] ^ (upper[0] % lengths[1])
-
-multi_index<2> upper_coord{2, 5};
-multi_index<2> lower_coord;
-transform.calculate_lower_index(lower_coord, upper_coord);
-// Result: lower[0] = 2, lower[1] = 5 ^ (2 % 8) = 5 ^ 2 = 7
-
-// Used for specialized memory access patterns in some algorithms
-```
-
 ## 9. SliceTransform
 
 SliceTransform extracts a sub-region from a tensor dimension.
@@ -763,20 +806,6 @@ graph TB
     style US fill:#fff3e0,stroke:#f57c00,stroke-width:3px
     style DATA fill:#f0f9ff,stroke:#0284c7,stroke-width:2px,stroke-dasharray: 5 5
 </div>
-```
-```cpp
-// From composable_kernel - extract a slice from a dimension
-auto transform = make_slice_transform(
-    10,    // low_length (total dimension)
-    2,     // slice_begin
-    7      // slice_end
-);
-
-// Maps upper range [0, 5) to lower range [2, 7)
-multi_index<1> upper_coord{3};
-multi_index<1> lower_coord;
-transform.calculate_lower_index(lower_coord, upper_coord);
-// Result: lower_coord[0] = 3 + 2 = 5
 ```
 
 ## 10. ModuloTransform
@@ -803,21 +832,6 @@ graph TB
     style US fill:#fff3e0,stroke:#f57c00,stroke-width:3px
     style DATA fill:#f0f9ff,stroke:#0284c7,stroke-width:2px,stroke-dasharray: 5 5
 </div>
-```
-
-
-```cpp
-// From composable_kernel - modulo operation for cyclic access
-auto transform = make_modulo_transform(
-    4,     // modulus
-    16     // up_length
-);
-
-// Maps coordinates cyclically
-multi_index<1> upper_coord{13};
-multi_index<1> lower_coord;
-transform.calculate_lower_index(lower_coord, upper_coord);
-// Result: lower_coord[0] = 13 % 4 = 1
 ```
 
 ## Summary
