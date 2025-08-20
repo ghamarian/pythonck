@@ -83,6 +83,7 @@ website:
           contents:
             - hardware/00_gpu_basics.qmd
             - hardware/01_lds.qmd
+            - hardware/02_gemm.qmd
         - section: "Foundation"
           contents:
             - text: "Buffer Views"
