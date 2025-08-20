@@ -78,10 +78,10 @@ These operations enable bidirectional navigation between different coordinate re
 graph TB
     
     subgraph "Transform Types"
-        EMB["EmbedTransform<br/>Shape + Strides"]
+        EMB["EmbedTransform<br/>Linear → Multi-D Strided"]
         UNM["MergeTransform<br/>Multi-D → Linear"]
         MRG["UnmergeTransform<br/>Linear → Multi-D"]
-        REP["ReplicateTransform<br/>Broadcast"]
+        REP["ReplicateTransform<br/>0D → Multi-D Broadcast"]
         OFF["OffsetTransform<br/>Translation"]
         PAS["PassThroughTransform<br/>Identity"]
         PAD["PadTransform<br/>Boundaries"]
@@ -362,23 +362,29 @@ auto desc = make_naive_tensor_descriptor(
 // Internally uses EmbedTransform for strided access
 ```
 
-## 4. ReplicateTransform - Broadcasting
+## 4. ReplicateTransform
 
-Broadcasts coordinates by ignoring certain dimensions.
+ReplicateTransform creates a higher-dimensional tensor by replicating (broadcasting) a lower-dimensional tensor. It's essentially a broadcasting operation that takes a tensor with fewer dimensions and logically replicates it across new dimensions without data duplication. An example is taking a scalar (0-dimensional) input and broadcasting it across multiple dimensions, enabling efficient broadcasting patterns where a single value appears at every position in a multi-dimensional coordinate space.
 
 ```{=html}
 <div class="mermaid">
 graph TB
-    subgraph "Broadcasting Example"
-        U2D["Upper: [3, 4]<br/>(2D matrix)"]
-        L1D["Lower: [4]<br/>(1D vector)"]
-        B["Broadcast:<br/>All rows see same vector"]
+    subgraph "ReplicateTransform: 0D → Multi-D Broadcasting"
+        LS["Lower Coordinate Space<br/>0D: Scalar<br/>Empty coordinate []"]
+        US["Upper Coordinate Space<br/>2D: [3, 4]<br/>All coords: (i, j)"]
+        
+        DATA["Single Scalar Value"]
     end
     
-    U2D -->|"Ignore dim 0"| L1D
+    LS -->|"Forward Transform<br/>[] → (i,j) for any i,j"| US
+    US -->|"Inverse Transform<br/>(i,j) → [] for any i,j"| LS
     
-    style U2D fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
-    style L1D fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    DATA -.->|"One scalar<br/>value"| LS
+    DATA -.->|"Broadcasted view<br/>at all positions"| US
+    
+    style LS fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
+    style US fill:#fff3e0,stroke:#f57c00,stroke-width:3px
+    style DATA fill:#f0f9ff,stroke:#0284c7,stroke-width:2px,stroke-dasharray: 5 5
 </div>
 ```
 
@@ -386,24 +392,29 @@ graph TB
 #| echo: true
 #| output: true
 
+import numpy as np
 from pytensor.tensor_descriptor import ReplicateTransform
+from pytensor.tensor_coordinate import MultiIndex
 
-# ReplicateTransform creates broadcast dimensions
+# Create ReplicateTransform for 3x4 broadcasted dimensions
 transform = ReplicateTransform(upper_lengths=[3, 4])
 
-# Show behavior
 print(f"Upper lengths: {transform.upper_lengths}")
 print(f"Lower dimensions: {transform.get_num_of_lower_dimension()}")
 print(f"Upper dimensions: {transform.get_num_of_upper_dimension()}")
 
-# All upper coordinates map to empty lower space
-upper_coord = MultiIndex(size=2, values=[1, 2])
-lower_coord = transform.calculate_lower_index(upper_coord)
-print(f"\nUpper {upper_coord.to_list()} → Lower {lower_coord.to_list()} (empty)")
+# Forward: Lower (0D) → Upper (2D) - all map to zeros
+lower_empty = MultiIndex(size=0, values=[])
+upper_coord = transform.calculate_upper_index(lower_empty)
+print(f"\nForward: Empty lower → Upper {upper_coord.to_list()}")
 
-print("\nBroadcasting pattern:")
-print("  All upper coordinates map to the same (empty) lower space")
-print("  Enables efficient data reuse across threads")
+# Inverse: Upper (2D) → Lower (0D) - all map to empty
+test_coordinates = [(0, 0), (1, 2), (2, 3)]
+for coord in test_coordinates:
+    upper_input = MultiIndex(size=2, values=list(coord))
+    lower_result = transform.calculate_lower_index(upper_input)
+    print(f"Upper {upper_input.to_list()} → Lower {lower_result.to_list()} (empty)")
+
 ```
 
 ### C++ Implementation
@@ -411,7 +422,7 @@ print("  Enables efficient data reuse across threads")
 ```cpp
 // From composable_kernel/include/ck_tile/core/algorithm/coordinate_transform.hpp
 
-// Create replicate transform for broadcasting
+// Create replicate transform for 3x4 broadcasting
 auto transform = make_replicate_transform(
     make_tuple(3, 4)  // upper lengths
 );
@@ -419,7 +430,12 @@ auto transform = make_replicate_transform(
 // The replicate transform inherits from base_transform<0, UpLengths::size()>
 // meaning 0 lower dimensions → multiple upper dimensions
 
-// All upper coordinates map to empty lower space
+// Forward: Lower (empty) → Upper (any valid coordinate)
+multi_index<0> lower_coord;  // Empty coordinate
+multi_index<2> upper_coord{1, 2};
+// Any upper coordinate is valid - no actual transformation needed
+
+// Inverse: Upper → Lower (always empty)
 multi_index<2> coord1{0, 0};
 multi_index<2> coord2{2, 3};
 multi_index<0> lower1, lower2;
@@ -427,7 +443,26 @@ transform.calculate_lower_index(lower1, coord1);
 transform.calculate_lower_index(lower2, coord2);
 // Both lower1 and lower2 are empty (no lower dimensions)
 
-// Common usage: broadcasting in GEMM
+// Always returns true for validity checks
+bool is_valid = transform.is_valid_upper_index_mapped_to_valid_lower_index(coord1);
+// Result: is_valid = true (always valid for replicate)
+
+// Common usage patterns:
+
+// 1. Broadcasting scalar in GEMM
+auto broadcast_desc = transform_tensor_descriptor(
+    make_naive_tensor_descriptor_packed(make_tuple()),  // 0D scalar
+    make_tuple(make_replicate_transform(make_tuple(M, N))),
+    make_tuple(sequence<>{}),         // no lower dims
+    make_tuple(sequence<0, 1>{})      // create upper dims 0,1
+);
+
+// 2. Bias term broadcasting in neural networks
+auto bias_broadcast = make_replicate_transform(
+    make_tuple(batch_size, hidden_dim)
+);
+// Maps single bias value to all batch and hidden positions
+
 auto broadcast_desc = transform_tensor_descriptor(
     scalar_desc,  // 0D tensor
     make_tuple(make_replicate_transform(make_tuple(M, N))),
@@ -436,9 +471,32 @@ auto broadcast_desc = transform_tensor_descriptor(
 );
 ```
 
-## 5. OffsetTransform - Translation
 
-Shifts coordinates by a fixed offset - useful for padding and boundaries.
+## 5. OffsetTransform
+
+OffsetTransform shifts coordinates by a fixed offset, creating a translated view of the coordinate space. It performs simple translation operations where each coordinate in the upper space is mapped to a coordinate in the lower space by adding a constant offset.
+
+```{=html}
+<div class="mermaid">
+graph TB
+    subgraph "OffsetTransform: 1D → 1D Translation"
+        LS["Lower Coordinate Space<br/>1D: [0, 63]<br/>Coord: index + offset"]
+        US["Upper Coordinate Space<br/>1D: [0, 47]<br/>Coord: index"]
+        
+        DATA["Linear Buffer in Memory"]
+    end
+    
+    LS -->|"Forward Transform<br/>idx → idx + 16"| US
+    US -->|"Inverse Transform<br/>idx + 16 → idx"| LS
+    
+    DATA -.->|"Larger buffer<br/>view"| LS
+    DATA -.->|"Translated<br/>view"| US
+    
+    style LS fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
+    style US fill:#fff3e0,stroke:#f57c00,stroke-width:3px
+    style DATA fill:#f0f9ff,stroke:#0284c7,stroke-width:2px,stroke-dasharray: 5 5
+</div>
+```
 
 ```{pyodide}
 #| echo: true
@@ -474,7 +532,29 @@ print("  Essential for tile-based algorithms")
 
 ## 6. PassThroughTransform - Identity
 
-No-op transform that passes coordinates unchanged.
+No-op transform that passes coordinates unchanged. The PassThrough transform is the simplest coordinate transformation in CK Tile, implementing a perfect identity mapping where input coordinates are passed through unchanged to the output. This transform is essential as a placeholder in transformation chains and for dimensions that require no modification.
+
+```{=html}
+<div class="mermaid">
+graph TB
+    subgraph "PassThroughTransform: 1D → 1D Identity"
+        LS["Lower Coordinate Space<br/>1D: [0, 59]<br/>Coord: index"]
+        US["Upper Coordinate Space<br/>1D: [0, 59]<br/>Coord: index"]
+        
+        DATA["Linear Buffer in Memory"]
+    end
+    
+    LS -.->|"Perfect Identity<br/>idx → idx"| US
+    US -.->|"Perfect Identity<br/>idx → idx"| LS
+    
+    DATA -->|"Same buffer<br/>same view"| LS
+    DATA -->|"Same buffer<br/>same view"| US
+    
+    style LS fill:#e8f5e8,stroke:#2e7d32,stroke-width:3px
+    style US fill:#e8f5e8,stroke:#2e7d32,stroke-width:3px
+    style DATA fill:#f0f9ff,stroke:#0284c7,stroke-width:2px,stroke-dasharray: 5 5
+</div>
+```
 
 ```{pyodide}
 #| echo: true
@@ -523,9 +603,31 @@ transform.calculate_lower_index(lower_coord, upper_coord);
 // Used as placeholder in transform chains
 ```
 
-## 7. PadTransform - Smart Boundaries
+## 7. PadTransform
 
-Handles out-of-bounds access with padding values.
+PadTransform adds padding to tensor dimensions, mapping coordinates from upper dimension space (with padding) to lower dimension space (original data).
+
+```{=html}
+<div class="mermaid">
+graph TB
+    subgraph "PadTransform: 1D → 1D with Padding"
+        LS["Lower Coordinate Space<br/>1D: [0, 2] (original data)"]
+        US["Upper Coordinate Space<br/>1D: [0, 4] (with padding)"]
+        
+        DATA["Tensor Data in Memory"]
+    end
+    
+    LS -->|"Forward Transform<br/>idx + left_pad"| US
+    US -->|"Inverse Transform<br/>idx - left_pad"| LS
+    
+    DATA -.->|"Original view"| LS
+    DATA -.->|"Padded view"| US
+    
+    style LS fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
+    style US fill:#fff3e0,stroke:#f57c00,stroke-width:3px
+    style DATA fill:#f0f9ff,stroke:#0284c7,stroke-width:2px,stroke-dasharray: 5 5
+</div>
+```
 
 ```{pyodide}
 #| echo: true
@@ -566,149 +668,61 @@ print("  Handles out-of-bounds access gracefully")
 print("  Essential for convolution and stencil operations")
 ```
 
-## Transform Composition
-
-Transforms can be chained to create complex coordinate mappings:
-
-```{=html}
-<div class="mermaid">
-graph LR
-    subgraph "Transform Chain Example"
-        I["Input Coord<br/>(1, 2)"]
-        T1["Embed<br/>Strides [10, 1]"]
-        T2["Offset<br/>+20"]
-        O["Output Index<br/>32"]
-    end
-    
-    I --> T1
-    T1 -->|"12"| T2
-    T2 --> O
-    
-    subgraph "Calculation"
-        C["1×10 + 2×1 = 12<br/>12 + 20 = 32"]
-    end
-    
-    style I fill:#e0e7ff,stroke:#4338ca,stroke-width:2px
-    style O fill:#d1fae5,stroke:#10b981,stroke-width:2px
-    style C fill:#f3f4f6,stroke:#6b7280,stroke-width:1px
-</div>
-```
-
-```{pyodide}
-#| echo: true
-#| output: true
-
-# Example: Composing transforms
-# In practice, transforms are composed at compile time in C++
-# Here we show the conceptual pattern
-
-# 1. Offset transform adds a base offset
-offset_transform = OffsetTransform(
-    element_space_size=100,
-    offset=20  # Start at position 20
-)
-
-# 2. Embed transform for strided access
-embed_transform = EmbedTransform(
-    lengths=[5, 5],
-    strides=[10, 1]  # Row-major with stride 10
-)
-
-print("Transform composition example:")
-print(f"  Offset: {offset_transform.offset}")
-print(f"  Embed strides: {embed_transform.strides}")
-
-# Conceptual: coordinate [1,2] would map to:
-# embed: 1*10 + 2*1 = 12
-# offset: 12 + 20 = 32
-print("\nExample mapping:")
-print("  Coordinate [1,2] → embed offset 12 → final offset 32")
-print("\nIn C++, these transforms compose at compile time for zero overhead!")
-```
-
-## Performance Considerations
-
-```{=html}
-<div class="mermaid">
-graph TB
-    subgraph "Transform Costs"
-        Pass["PassThrough<br/>Zero cost"]
-        Off["Offset<br/>Addition only"]
-        Emb["Embed<br/>Multiply + Add"]
-        Merge["Merge/Unmerge<br/>Multiple ops"]
-        Pad["Pad<br/>Bounds check"]
-    end
-    
-    Pass -->|Fastest| Performance
-    Off --> Performance
-    Emb --> Performance
-    Merge --> Performance
-    Pad -->|Slowest| Performance
-    
-    Performance["Performance Impact"]
-    
-    style Pass fill:#d1fae5,stroke:#10b981,stroke-width:2px
-    style Pad fill:#fee2e2,stroke:#ef4444,stroke-width:2px
-</div>
-```
-
-### C++ Transform Chain Example
-
-```cpp
-// Complex transform composition in CK
-// Transforms are composed through tensor descriptors
-
-// Create base descriptor
-auto base_desc = make_naive_tensor_descriptor(
-    make_tuple(number<3>{}, number<3>{}),  // shape
-    make_tuple(number<3>{}, number<1>{})   // strides
-);
-
-// Apply padding transform
-auto padded_desc = transform_tensor_descriptor(
-    base_desc,
-    make_tuple(make_pad_transform(number<3>{}, number<1>{}, number<1>{}),  // dim 0
-               make_pad_transform(number<3>{}, number<1>{}, number<1>{})), // dim 1
-    make_tuple(sequence<0>{}, sequence<1>{}),      // lower dim mapping
-    make_tuple(sequence<0>{}, sequence<1>{})       // upper dim mapping
-);
-
-// CK composes transforms at compile time for zero overhead!
-// The resulting descriptor incorporates all transformations
-```
-
 ### C++ Implementation
 
 ```cpp
 // From composable_kernel/include/ck_tile/core/algorithm/coordinate_transform.hpp
 
-// Create pad transform with left and right padding
+// Create pad transform
 auto transform = make_pad_transform(
-    3,   // low_length (original dimension)
-    1,   // left_pad
-    1    // right_pad
+    3,    // low_length
+    1,    // left_pad
+    1     // right_pad
 );
 
 // The pad transform inherits from base_transform<1, 1>
-// Total upper length = low_length + left_pad + right_pad = 5
+// meaning 1 lower dimension → 1 upper dimension (with padding)
 
-// Forward transformation: adjust for padding
-multi_index<1> upper_coord{1};  // First valid element (after left pad)
+// Forward: upper (padded) → lower (original)
+multi_index<1> upper_coord{2};
 multi_index<1> lower_coord;
 transform.calculate_lower_index(lower_coord, upper_coord);
-// Result: lower_coord[0] = upper_coord[0] - left_pad = 1 - 1 = 0
+// Result: lower_coord[0] = upper_coord[0] - left_pad = 2 - 1 = 1
 
-// Check if coordinate is in valid region
-bool is_valid = transform.is_valid_upper_index_mapped_to_valid_lower_index(upper_coord);
-
-// Variants available:
-auto left_pad_only = make_left_pad_transform(3, 1);   // Only left padding
-auto right_pad_only = make_right_pad_transform(3, 1); // Only right padding
+// Common usage: convolution boundary handling
+auto padded_desc = transform_tensor_descriptor(
+    input_desc,
+    make_tuple(make_pad_transform(Hi_, InLeftPadH_, InRightPadH_)),
+    make_tuple(sequence<0>{}),
+    make_tuple(sequence<0>{})
+);
 ```
 
-## Additional Transforms in Composable Kernel
+## 8. XorTransform
 
-### 8. XorTransform - 2D XOR Mapping
+XorTransform applies a 2D XOR mapping for specialized memory access patterns. It performs XOR operations on coordinates to create transformed memory layouts for specific algorithmic optimizations.
+
+```{=html}
+<div class="mermaid">
+graph TB
+    subgraph "XorTransform: 2D → 2D XOR Mapping"
+        LS["Lower Coordinate Space<br/>2D: [4, 8]<br/>XOR-transformed coords"]
+        US["Upper Coordinate Space<br/>2D: [4, 8]<br/>Normal coords"]
+        
+        DATA["Same Tensor Data"]
+    end
+    
+    LS -->|"Forward Transform<br/>apply XOR reverse"| US
+    US -->|"Inverse Transform<br/>apply XOR mapping"| LS
+    
+    DATA -.->|"XOR pattern<br/>view"| LS
+    DATA -.->|"Normal<br/>view"| US
+    
+    style LS fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
+    style US fill:#fff3e0,stroke:#f57c00,stroke-width:3px
+    style DATA fill:#f0f9ff,stroke:#0284c7,stroke-width:2px,stroke-dasharray: 5 5
+</div>
+```
 
 ```cpp
 // From composable_kernel - special 2D coordinate transform
@@ -725,8 +739,31 @@ transform.calculate_lower_index(lower_coord, upper_coord);
 // Used for specialized memory access patterns in some algorithms
 ```
 
-### 9. SliceTransform - Extract Sub-region
+## 9. SliceTransform
 
+SliceTransform extracts a sub-region from a tensor dimension.
+
+```{=html}
+<div class="mermaid">
+graph TB
+    subgraph "SliceTransform: 1D → 1D Sub-region"
+        LS["Lower Coordinate Space<br/>1D: [0, 9] (original range)"]
+        US["Upper Coordinate Space<br/>1D: [0, 4] (slice range)"]
+        
+        DATA["Tensor Data in Memory"]
+    end
+    
+    LS -->|"Forward Transform<br/>idx + slice_begin"| US
+    US -->|"Inverse Transform<br/>idx - slice_begin"| LS
+    
+    DATA -.->|"Full tensor<br/>view"| LS
+    DATA -.->|"Sub-region<br/>view"| US
+    
+    style LS fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
+    style US fill:#fff3e0,stroke:#f57c00,stroke-width:3px
+    style DATA fill:#f0f9ff,stroke:#0284c7,stroke-width:2px,stroke-dasharray: 5 5
+</div>
+```
 ```cpp
 // From composable_kernel - extract a slice from a dimension
 auto transform = make_slice_transform(
@@ -742,7 +779,32 @@ transform.calculate_lower_index(lower_coord, upper_coord);
 // Result: lower_coord[0] = 3 + 2 = 5
 ```
 
-### 10. ModuloTransform - Cyclic Wrapping
+## 10. ModuloTransform
+
+ModuloTransform applies cyclic wrapping to coordinates using modulo operations.
+
+```{=html}
+<div class="mermaid">
+graph TB
+    subgraph "ModuloTransform: 1D → 1D Cyclic"
+        LS["Lower Coordinate Space<br/>1D: [0, 3] (modulus range)"]
+        US["Upper Coordinate Space<br/>1D: [0, 15] (full range)"]
+        
+        DATA["Tensor Data in Memory"]
+    end
+    
+    LS -->|"Forward Transform<br/>idx * cycle_count"| US
+    US -->|"Inverse Transform<br/>idx % modulus"| LS
+    
+    DATA -.->|" "| LS
+    DATA -.->|" "| US
+    
+    style LS fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
+    style US fill:#fff3e0,stroke:#f57c00,stroke-width:3px
+    style DATA fill:#f0f9ff,stroke:#0284c7,stroke-width:2px,stroke-dasharray: 5 5
+</div>
+```
+
 
 ```cpp
 // From composable_kernel - modulo operation for cyclic access
@@ -761,18 +823,21 @@ transform.calculate_lower_index(lower_coord, upper_coord);
 ## Summary
 
 Individual transforms provide:
+
 - **Modularity**: Each transform does one thing well
 - **Composability**: Chain transforms for complex mappings
 - **Efficiency**: Compile-time optimization in C++
 - **Flexibility**: Handle any coordinate conversion need
 
 Understanding these building blocks enables you to:
+
 1. Create custom tensor views
 2. Implement efficient data access patterns
 3. Handle padding and boundaries correctly
 4. Optimize memory layouts for GPU access
 
 The C++ implementations in Composable Kernel provide:
+
 - Zero-overhead abstractions through templates
 - Compile-time composition and optimization
 - Support for complex coordinate transformations
