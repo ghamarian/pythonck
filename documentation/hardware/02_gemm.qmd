@@ -41,7 +41,7 @@ Our input will be uniformly distributed random data on the interval [-1, 1].
         initializeMatrix(B.data(), N, K, -1.0, 1.0);
 ```
 
-# Simple Mutmul
+# Simple Matmul
 
 On the AMD **MI300** GPU architecture, each Compute Unit (CU) contains **four SIMD units**.  
 Each SIMD unit can execute a single **wavefront** of 64 threads in parallel.  
@@ -57,8 +57,6 @@ of blocks covers the entire output matrix.
 
 Consider a baseline matrix multiplication kernel where **each thread computes one output element** of `C`.  
 The CUDA/HIP launch configuration can be defined as:
-
----
 
 
 ```{cpp}
@@ -113,7 +111,7 @@ from global memory:
 
 This means:
 
-- Number of threads in a 16×16 block = \( 16 \times 16 = 256 \)  
+- Number of threads in a 16×16 block is 256.  
 - Each thread performs \( 2K \) global loads  
 - **Total global loads** = \( 256 \times 2K = 512K \)  
 - **Total global stores** = 256 (one per output element in `C`)  
@@ -132,7 +130,8 @@ If we were able to reuse each element of `A` and `B` perfectly (loading each onl
 - **Naïve kernel**: \( 512K \) global loads + 256 stores  
 - **Ideal reuse**: \( 32K \) global loads + 256 stores  
 
-This illustrates a **16× difference in memory traffic** for the same computation.  
+This illustrates a **16× difference in memory traffic** for the same computation on a small,
+16x16 block. It gets worse if we consider bigger block sizes.
 
 Of course, this is a simplified analysis — in reality, GPUs fetch data in **cache lines** 
 rather than individual elements, and caches may reduce some redundant fetches. 
@@ -228,22 +227,62 @@ plt.show()
 ```
 How many elements of matrices A and B need to be loaded with the tiling approach ?
 
-**Tiled, cooperative reuse (tile size TILE_K=16 along K):**  
-- For one K-step we load:  
-  - `A_tile` : \(16 \times TILE\_K\) values  
-  - `B_tile` : \(16 \times TILE\_K\) values  
-- Loads per K-step = \(16\cdot TILE\_K + 16\cdot TILE\_K = 32\cdot TILE\_K\)  
-- Number of K-steps = \(K / TILE\_K\)
-- **Total loads (values)** = \((32\cdot TILE\_K) \times (K / TILE\_K) = 32K\)  
+For a thread block computing a `TILE_M × TILE_N` output tile with K-blocking:
 
+- Elements of **A** loaded per block:  
+  $$
+  \text{A\_loads} = \mathrm{TILE\_M} \cdot K
+  $$
 
-**Reduction factor:**  
-\[
-512K/32K = 16
-\]
-So tiling gives a **16× reduction** in the number of element loads (values).
+- Elements of **B** loaded per block:  
+  $$
+  \text{B\_loads} = \mathrm{TILE\_N} \cdot K
+  $$
 
----
+- Total outputs produced per block:  
+  $$
+  \text{outputs} = \mathrm{TILE\_M} \cdot \mathrm{TILE\_N}
+  $$
+
+The **average loads per output element** (ignoring C traffic) are:
+
+$$
+\text{loads per output}
+= \frac{\mathrm{TILE\_M}\cdot K + \mathrm{TILE\_N}\cdot K}{\mathrm{TILE\_M} \cdot \mathrm{TILE\_N}}
+= K \left(\frac{1}{\mathrm{TILE\_M}} + \frac{1}{\mathrm{TILE\_N}}\right).
+$$
+
+If elements are `s` bytes wide:
+
+$$
+\text{bytes per output} = s \cdot K \left(\frac{1}{\mathrm{TILE\_M}} + \frac{1}{\mathrm{TILE\_N}}\right).
+$$
+
+To simplify the formula, if we consider a square tile of a size T, to compute one value in C we need:
+
+- Naïve (no tiling) = \(2K\) loads per output.  
+- With tiling = (2K/T).  
+- **Reduction factor = \(T\)**.
+
+Example: \(T=16\)
+
+$$
+\text{loads per output} = \frac{2K}{16} = \frac{K}{8}.
+$$
+
+So compared to the naïve \(2K\), this gives a **16× reduction** in global memory traffic per output element.
+
+### Why this doesn’t mean tiling = global ideal
+Even with perfect reuse *inside* each block, different blocks still need overlapping parts of \(A\) or \(B\). 
+That creates **inter-block duplication** that the block-local tile can’t eliminate. 
+The true **global ideal** (each \(A\) and \(B\) element loaded *once* for the entire GEMM) would give:
+
+$$
+\text{loads per output (global ideal)} = K \!\left(\tfrac{1}{M} + \tfrac{1}{N}\right)
+$$
+
+which is typically **much smaller** than $\tfrac{2K}{T}$ for large $M,N$. It is **unattainable** in practice with 
+independent blocks because you can’t share all data perfectly across the whole grid.
 
 ## LDS Usage and Tiling Efficiency
 
@@ -502,6 +541,8 @@ __device__ void loadDataBlock(T* __restrict__ storage, const s_type* __restrict_
 Here is a python script that illustrates how each thread loads data. Each thread's load layouts are color-coded.
 
 ```{pyodide}
+#| echo: false
+
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
@@ -668,7 +709,7 @@ ax.set_xlabel("Column Index (elements)")
 ax.set_ylabel("Row Index ")
 plt.colorbar(cax, ax=ax, fraction=0.02, pad=0.04, label="Thread ID")
 
-plt.tight_layout()
+plt.tight_layout(pad=0)
 plt.show()
 ```
 
@@ -701,7 +742,7 @@ $$
 
 Fortunately, we have **4 wavefronts**, so we can split the work such that each 
 wavefront computes a **64×64 block**.  
-- This reduces the VGPR usage to **64 per operand (A and B)**.  
+- This reduces the VGPR usage to 64 down from 128.  
 - However, since we pipeline computations, we still require **2 buffers**, 
 so the effective register pressure remains 128 VGPRs.
 
@@ -751,4 +792,771 @@ __device__ inline void shuffleDataBlock16x16x16(T* dst_regA, T* dst_regB, const 
             *dst_regB++ = *(data+1);
     });
 }
+```
+
+### Run mfma
+
+If intrinsic function in not available for *bf16* format specifically it can be defined as an assembler 
+wrapper:
+
+```{cpp}
+__device__ __forceinline__
+float4vec  run_mfma16x16x16bf16(const float4bf16vec& a, const float4bf16vec& b, float4vec &accum)
+{
+    // accum is the first float4vec register; next 3 registers assumed consecutive
+    asm volatile(
+        "v_mfma_f32_16x16x16_bf16 %0, %1, %2, %0\n"
+        : "+v"(accum)    // first accumulator vector
+        : "v"(a), "v"(b) // input vectors
+    );
+
+    return accum;
+}
+```
+
+And then we can define our mfma compute function based on the layouts that were discussed before
+
+```{cpp}
+template <typename T_IN, typename T_OUT, const int KRepeats,  const int NRepeats, const int MRepeats>
+__device__  void run_mfma16x16x16fp16(const T_IN* __restrict__ A, const  T_IN* __restrict__ B, T_OUT* __restrict__ out_f/*, T_OUT* __restrict__ out_f_tail*/)
+{
+       static_for<0, MRepeats>([&](auto m) {
+            static_for<0, NRepeats>([&](auto n) {
+                constexpr int mi = m.value;
+                constexpr int ni = n.value;
+                    
+                out_f[ni + NRepeats * mi] =
+                    run_mfma16x16x16bf16(
+                        A[2 * mi],
+                        B[2 * ni],
+                        out_f[ni + NRepeats * mi]);
+
+                out_f[ni + NRepeats * mi] =
+                    run_mfma16x16x16bf16(
+                        A[2 * mi + 1],
+                        B[2 * ni + 1],
+                        out_f[ni + NRepeats * mi]);
+            });
+    });
+}
+```
+
+## Clang compiler
+
+Unfortunately, for this logic to be efficient, **all operations — global memory loads, LDS load/store, and register loads for compute — must happen in parallel** so that global memory latency is hidden behind computation.
+
+However, the **order of instructions** as written in heavily inlined code may tempt the compiler to rearrange operations according to its own optimization logic. 
+In theory, this can be controlled using **LLVM scheduling hints**, which allow the compiler to preserve the order of specific types of instructions.
+
+For more details, the reader can refer to the LLVM documentation, particularly:
+
+- `__builtin_amdgcn_sched_barrier`  
+- `__builtin_amdgcn_sched_group_barrier`  
+
+This topic is quite advanced for a simple GEMM introduction, but CK is using exactly those scheduling barriers for global load, lds and mfma to ensure they will run in a specific order for the best performance.
+ **For now, we switch to assembler from HIP** to ensure that instructions are executed in exactly the order we intend them to excute in.
+
+<details>
+<summary>Show ASM code</summary>
+
+```asm
+.text
+.section	.text.
+.global	gemm_16x16x16
+.p2align	8
+.type	gemm_16x16x16,@function
+
+.set N, 4096
+.set M, 4864
+.set K, 8192
+.set TILE_SIZE_MN, 128 ; logical tile is 128x64, actual tile is 256x64
+.set TILE_SIZE_K, 64
+
+.set COL_ELEMENTS, TILE_SIZE_K/4
+.set ROW_ELEMENTS, TILE_SIZE_MN
+.set smem_size, ROW_ELEMENTS * COL_ELEMENTS
+
+.set KRepeats, TILE_SIZE_K/32
+.set MRepeats, TILE_SIZE_MN/32
+.set NRepeats, TILE_SIZE_MN/32
+
+;64 bytes or 16 registers for staging for A and B twice
+.set v_stagingA0,  4
+.set v_stagingA1,  20
+.set v_stagingB0,  36
+.set v_stagingB1,  52
+
+.set v_startOffset   ,   68
+.set v_stride        ,   69
+.set v_k_xor           ,   70
+.set v_ldsReadBaseAM  ,   66
+.set v_ldsReadBaseBM  ,   67
+.set v_startOffsetNext  ,   2   ; next 128x64 block
+.set v_strideAccum      ,   1 
+
+; KRepeats * NRepeats vecfp16 for compute registers
+.set v_compA0, 72
+.set v_compA1, 104
+.set v_compB0, 136
+.set v_compB1, 168
+
+.set v_ldsWriteBaseM  ,   62
+.set v_ldsWriteBaseK  ,   63
+.set v_ldsReadBaseAK  ,   64
+.set v_ldsReadBaseBK  ,   65
+.set v_scratch0  ,   3
+.set v_scratch1  ,   71
+.set v_scratch2  ,   200
+.set v_scratch3  ,   201
+.set v_readA     ,   202
+.set v_readB     ,   210
+.set v_writeAB     ,   218
+
+
+.set A, 16
+.set B, 20
+
+.set ldsA0, 0
+.set ldsB0, 16*1024
+.set ldsA1, 16*1024*2
+.set ldsB1, 16*1024*3
+
+; STRIDE_AB for A and B is K because B is col-major
+
+.macro XOR_K_128 vm vk
+    v_and_b32            v[v_k_xor], v[\vm], 7
+    v_xor_b32            v[v_k_xor], v[v_k_xor], v[\vk]
+.endm
+
+.macro MK_TO_BYTE_OFFSET_SK01 vm vres
+      v_lshlrev_b32_e32 v[v_scratch1], 7, v[\vm] ; row stride is 128 bytes
+      v_lshlrev_b32_e32 v[v_scratch0], 4, v[v_k_xor] ; 16*k'
+      v_add_u32  v[\vres], v[v_scratch1], v[v_scratch0]
+.endm
+
+
+.macro DS_WRITE_COMPUTE
+    .set i, 0
+    .rept 4
+      v_add_u32 v[v_scratch2], v[v_ldsWriteBaseM], i
+      v_and_b32 v[v_scratch3], v[v_scratch2], 7
+      XOR_K_128 vm=v_scratch3, vk=v_ldsWriteBaseK
+      MK_TO_BYTE_OFFSET_SK01 vm=v_ldsWriteBaseM, vres=v_writeAB+i
+      i = i + 1
+    .endr
+.endm
+
+.macro DS_WRITE lds  base
+    .set v_staging, \base
+    .set lds, \lds
+
+    ;.set i,0
+    ;.rept 16
+    ;  v_mov_b32 v[v_staging+i] 0x2a362a36 ;0x3c003c00
+    ;  i = i + 1
+    ;.endr
+
+    .set i, 0
+    .rept 4
+      ds_write_b128 v[v_writeAB+i], v[v_staging+4*i:v_staging+4*i+3] offset:lds + TILE_SIZE_K*i*2
+      i = i + 1
+    .endr
+.endm
+
+
+.macro DS_READ_A_COMPUTE
+  .set mi, 0
+  .set ki, 0
+  .rept KRepeats
+    mi = 0
+    .rept MRepeats
+      v_add_u32  v[v_scratch0],  v[v_ldsReadBaseAM], mi*16
+      v_and_b32  v[v_scratch2], v[v_scratch0], 7 ; scratch2 is now m
+      v_add_u32  v[v_scratch3],  v[v_ldsReadBaseAK], ki*4 ; scratch3 is now k
+
+      XOR_K_128 vm=v_scratch2, vk=v_scratch3
+      v_add_u32  v[v_scratch3],  v[v_ldsReadBaseAM], mi*16
+      MK_TO_BYTE_OFFSET_SK01 vm=v_scratch3, vres=v_readA + MRepeats*ki + mi
+      mi = mi + 1
+    .endr
+    ki = ki + 1
+  .endr
+.endm
+
+.macro DS_READ_A buffer_id
+  .set mi, 0
+  .set ki, 0
+  .rept KRepeats
+    mi = 0
+    .rept MRepeats
+      .set v_start , v_compA0 + 32*\buffer_id + 4*mi + 16*ki
+      .set offst , ldsA0 + (32*1024)*\buffer_id ;+ mi*(16*128) + ki*64
+
+      ;.set i,0
+      ;.rept 4
+      ; v_mov_b32 v[v_start+i] 0x2a362a36 ;0x3c003c00
+      ; i = i + 1
+      ;.endr
+
+      ds_read_b128 v[v_start: v_start+3],  v[v_readA + MRepeats*ki + mi] offset: offst
+      mi = mi + 1
+    .endr
+    ki = ki + 1
+  .endr
+.endm
+
+.macro DS_READ_B_COMPUTE
+  .set ni, 0
+  .set ki, 0
+  .rept KRepeats
+     ni = 0
+     .rept NRepeats
+        v_add_u32  v[v_scratch0],  v[v_ldsReadBaseBM], ni*16
+        v_and_b32  v[v_scratch2], v[v_scratch0], 7 ; scratch2 is now m
+        v_add_u32  v[v_scratch3],  v[v_ldsReadBaseBK], ki*4 ; scratch3 is now k
+
+        XOR_K_128  vm=v_scratch2, vk=v_scratch3
+        v_add_u32  v[v_scratch3],  v[v_ldsReadBaseBM], ni*16
+        MK_TO_BYTE_OFFSET_SK01 vm=v_scratch3, vres=v_readB + NRepeats*ki + ni
+       ni = ni + 1
+     .endr
+     ki = ki + 1
+  .endr
+.endm
+
+.macro DS_READ_B buffer_id
+  .set ni, 0
+  .set ki, 0
+  .rept KRepeats
+     ni = 0
+     .rept NRepeats
+       .set v_start , v_compB0 + 32*\buffer_id + 4*ni + 16*ki
+       .set offst , ldsB0 + (32*1024)*\buffer_id ;+ ni*(16*128) + ki*64
+
+       ;.set i,0
+       ;.rept 4
+       ; v_mov_b32 v[v_start+i] 0x2a362a36 ;0x3c003c00
+       ; i = i + 1
+       ;.endr
+
+       ds_read_b128 v[v_start: v_start+3],  v[v_readB + NRepeats*ki + ni] offset: offst
+       ni = ni + 1
+     .endr
+     ki = ki + 1
+  .endr
+.endm
+
+.macro GLOBAL_READ_64 AB base_reg base_offset vstride
+    .set v_staging, \base_reg
+    .set AB, \AB
+    
+    buffer_load_dwordx4 v[v_staging:v_staging+3], v[\vstride], s[AB:AB+3], 0, offen  offset:\base_offset
+    v_add_u32 v[v_strideAccum], v[v_stride], v[\vstride]
+    
+    .set i, 1
+    .rept 3
+      buffer_load_dwordx4 v[v_staging+4*i:v_staging+4*i+3], v[v_strideAccum], s[AB:AB+3], 0, offen offset:\base_offset
+      v_add_u32 v[v_strideAccum], v[v_stride], v[v_strideAccum]
+      i = i + 1
+    .endr
+.endm
+
+.macro RUN_MFMA_0  buffer_idA, buffer_idB, set
+    .set v_compA , v_compA0 + 32 * \buffer_idA
+    .set v_compB , v_compB0 + 32 * \buffer_idB
+    .set mi, 0
+    .set ni, 0
+    .set ki, 0
+
+    .rept MRepeats/2
+        ki = 0
+        .rept KRepeats
+          ni = 0
+          .rept NRepeats
+              .set idxA , v_compA+2*(MRepeats * ki + mi)*2 + 2*\set
+              .set idxB , v_compB+2*(NRepeats * ki + ni)*2 + 2*\set
+              .set accum , 4*(ni + NRepeats * mi) + 128*\buffer_idA + 64*\buffer_idB
+              v_mfma_f32_16x16x16_bf16 a[accum:accum+3], v[idxA:idxA+1], v[idxB:idxB+1], a[accum:accum+3]
+              ni = ni + 1
+          .endr
+          ki = ki + 1
+        .endr
+        mi = mi + 1
+    .endr
+.endm
+
+.macro RUN_MFMA_1  buffer_idA, buffer_idB, set
+
+    .set v_compA , v_compA0 + 32 * \buffer_idA
+    .set v_compB , v_compB0 + 32 * \buffer_idB
+    .set mi, MRepeats/2
+    .set ni, 0
+    .set ki, 0
+
+    .rept MRepeats/2
+        ki = 0
+        .rept KRepeats
+          ni = 0
+          .rept NRepeats
+              .set idxA , v_compA+2*(MRepeats * ki + mi)*2 + 2*\set
+              .set idxB , v_compB+2*(NRepeats * ki + ni)*2 + 2*\set
+              .set accum , 4*(ni + NRepeats * mi) + 128*\buffer_idA + 64*\buffer_idB
+              v_mfma_f32_16x16x16_bf16 a[accum:accum+3], v[idxA:idxA+1], v[idxB:idxB+1], a[accum:accum+3]
+              ni = ni + 1
+          .endr
+          ki = ki + 1
+        .endr
+        mi = mi + 1
+    .endr
+.endm
+
+.macro WRITE_256x256_BLOCK
+      .set x, 0
+      .rept NRepeats; for x
+        .set y, 0
+
+          ; --- compute output index ---
+          ; pos_col = wave_col * 64 + x*16 + laneCol
+          v_mov_b32_e32 v7, x*16
+          v_add_u32_e32 v7, v7, v5        ; x*16 + laneCol
+          v_add_u32_e32 v7, v7, v8        ; v7 = wave_col * write_stride + x*16 + laneCol
+          v_add_u32_e32 v7, v7, v11       ; v7 = col + pos_col
+
+          .rept MRepeats ; for y
+              v_mov_b32_e32 v134, s0
+              v_mov_b32_e32 v135, s1
+
+              ; pos_row = wave_row * 64 + y*16 + laneRow4
+              v_mov_b32_e32 v9, y*16
+              v_add_u32_e32 v9, v9, v6        ; y*16 + (tIdx / 16) * 4
+              v_add_u32_e32 v9, v9, v10       ; v9 = wave_row * write_stride + y*16 + (tIdx / 16) * 4
+              v_add_u32_e32 v9, v9, v18       ; v9 = pos_row + row
+
+              ; --- offset = (row + pos_row) * row_stride + (col + pos_col) ---
+              v_lshlrev_b32_e32 v20, 12, v9         ; row_offset = (pos_row + row) * row_stride(N)
+              v_add_u32_e32 v20, v20, v7            ; global_index = row_offset + (pos_col + col)
+              v_lshlrev_b32_e32 v20, 2, v20         ; convert float index to byte offset (×4)
+              v_mov_b32_e32 v21, 0
+
+              v_lshl_add_u64 v[134:135],  v[134:135], 0, v[20:21]
+
+              ; bottom pair of 128x128 blocks
+              v_lshl_add_u64 v[136:137],  v[134:135], 0, v[100:101]
+
+                ; --- load from accum ---
+                ; accum_idx  in  floatvec4
+                .set acc_idx, 4*(y * MRepeats + x)
+
+                ; --- write to global memory ---
+                .set i, 0
+                .rept 4
+                    global_store_dword v[134:135],  a[acc_idx + i], off
+                    global_store_dword v[134:135],  a[acc_idx + i + 64], off offset:128*4
+                    v_lshl_add_u64 v[134:135], v[134:135], 0, v[14:15]
+
+                    global_store_dword v[136:137],  a[acc_idx + i + 128], off
+                    global_store_dword v[136:137],  a[acc_idx + i + 192], off offset:128*4
+                    v_lshl_add_u64 v[136:137], v[136:137], 0, v[14:15]
+                    i = i + 1
+                .endr
+                y = y + 1
+        .endr
+        x = x + 1
+    .endr
+.endm
+
+gemm_16x16x16:
+; %bb.0:                                ; %entry
+    s_load_dwordx4 s[4:7], s[0:1], 0x0
+    # blockIdx.x will be in s2
+    # blockIdx.y will be in s3
+    # v0 contains threadIdx.x
+    s_waitcnt vmcnt(0)
+    s_waitcnt lgkmcnt(0)
+
+    s_load_dwordx2 s[0:1], s[0:1], 0x10 ; Load matrix C into s0,s1
+
+    s_waitcnt vmcnt(0)
+    s_waitcnt lgkmcnt(0)
+
+    cnt=0
+    .rept 256
+        v_accvgpr_write_b32 a[cnt], 0
+        cnt = cnt + 1
+    .endr
+
+    s_lshl_b32 s8, s2, 8         ; since blockIdx.x * 2* tile_size
+    s_lshl_b32 s9, s8, 14        ; * K * 2
+    s_add_u32    s[B], s6, s9
+    s_addc_u32   s[B+1],  s7, 0
+    s_mov_b32 s[B+2], N*K*2 ; size
+    s_mov_b32 s[B+3], 0x00020000 ; flags
+    s_waitcnt lgkmcnt(0)
+
+    s_lshl_b32 s8, s3, 8         ; since blockIdx.y * 2 * tile_size
+    s_lshl_b32 s9, s8, 14        ; * K * 2
+    s_add_u32    s[A], s4, s9
+    s_addc_u32   s[A+1], s5, 0
+    s_mov_b32 s[A+2], M*K*2 ; size
+    s_mov_b32 s[A+3], 0x00020000 ; flags
+    s_waitcnt lgkmcnt(0)
+
+    s_waitcnt vmcnt(0)
+  
+    v_lshrrev_b32_e32 v35, 6, v0         ; wave0101 = (tIdx / 64) % 2
+    v_and_b32_e32 v35, 1, v35
+    v_lshlrev_b32_e32 v35, 6, v35        ; MRepeats*wave0101*16=wave0101*64
+
+    v_lshrrev_b32_e32 v36, 7, v0         ; wave0011 = (tIdx / 64) / 2
+    v_lshlrev_b32_e32 v36, 6, v36        ; wave0011*64
+
+    v_and_b32_e32 v4, 15, v0             ; load_Ay = (tIdx % 16)
+    v_add_u32 v36, v4, v36               ; wave0011*64 + load_Ay
+    v_add_u32 v35, v4, v35               ; wave0101*64 + load_Ay
+
+    v_lshrrev_b32_e32 v5, 4, v0          ; load_Ax = (tIdx / 16) % 4
+    v_and_b32_e32 v5, 3, v5
+    v_lshlrev_b32_e32 v5, 1, v5          ; 2*load_Ax
+
+    ; v35 is m, v5 is k
+
+    ; to bytes
+    v_lshrrev_b32_e32 v5, 1, v5          ; from vec4fp16 to 2*vec4fp16 indexing
+    ;v_lshlrev_b32_e32 v35, 7, v35       ; lds row stride is 128 bytes
+    ;v_lshlrev_b32_e32 v36, 7, v36
+
+    v_mov_b32 v[v_ldsReadBaseAM], v35
+    v_mov_b32 v[v_ldsReadBaseBM], v36
+    v_mov_b32 v[v_ldsReadBaseAK], v5
+    v_mov_b32 v[v_ldsReadBaseBK], v5
+
+    ; calculate offset for this thread within a tile in global memory
+    v_and_b32            v15, v0, 7     ; v1 = threadIdx.x % 7  (0 to 7)
+    v_lshlrev_b32_e32    v15, 4, v15    ; v1 = v1*16
+
+    v_lshrrev_b32_e32    v16, 3,  v0      ; each 8 threads have common initial offset
+    v_lshlrev_b32_e32    v16, 16, v16     ; 4 * group_id * row_stride
+    v_add_u32            v[v_startOffset], v15, v16          ; start offset
+
+    v_mov_b32            v16, 128*K*2      ; offset to the next 128x64 block
+    v_add_u32            v[v_startOffsetNext], v[v_startOffset], v16          ; start offset
+
+    ; calculate LDS offset for this thread
+    v_lshrrev_b32_e32    v16, 3,  v0      ; each 8 threads have common initial offset
+    v_lshlrev_b32_e32    v16, 2, v16     ; 4 * group_id 
+    v_and_b32            v15, v0, 7     ; v1 = threadIdx.x % 7  (0 to 7)
+
+    v_mov_b32            v[v_ldsWriteBaseM], v16
+    v_mov_b32            v[v_ldsWriteBaseK], v15
+
+    DS_READ_A_COMPUTE
+    DS_READ_B_COMPUTE
+    DS_WRITE_COMPUTE
+
+    v_mov_b32 v15, 1
+    v_lshlrev_b32_e32 v[v_stride], 14, v15
+
+    GLOBAL_READ_64 B v_stagingB0 0 v_startOffset ; first 128x64 block
+    GLOBAL_READ_64 A v_stagingA0 0 v_startOffset
+    s_waitcnt vmcnt(0)
+
+    DS_WRITE ldsA0 v_stagingA0
+    DS_WRITE ldsB0 v_stagingB0
+
+    s_waitcnt lgkmcnt(0)
+    s_barrier
+
+    DS_READ_A 0
+    DS_READ_B 0
+
+    GLOBAL_READ_64 B v_stagingB1 0 v_startOffsetNext ; second 128x64 block, now we can compute 256x256 output
+    GLOBAL_READ_64 A v_stagingA1 0 v_startOffsetNext
+
+    s_waitcnt vmcnt(0)
+    s_barrier
+
+    DS_WRITE ldsA1 v_stagingA1
+    DS_WRITE ldsB1 v_stagingB1
+
+    s_waitcnt lgkmcnt(0)
+    s_barrier
+
+    GLOBAL_READ_64 B v_stagingB0 TILE_SIZE_K*2 v_startOffset; first 128x64 block in the next BIG tile
+    GLOBAL_READ_64 A v_stagingA0 TILE_SIZE_K*2 v_startOffset
+
+    s_waitcnt vmcnt(0)
+    s_barrier
+
+    s_add_u32 s[A], s[A], TILE_SIZE_K*2
+    s_addc_u32 s[A+1], s[A+1], 0
+    s_add_u32 s[B], s[B], TILE_SIZE_K*2
+    s_addc_u32 s[B+1], s[B+1], 0
+
+    s_mov_b32 s9, TILE_SIZE_K ; 1 256x64 tile have been preloaded into memory
+
+1:                                ; %do.body
+                                  ; =>This Inner Loop Header: Depth=2    
+    s_waitcnt lgkmcnt(0)
+    s_barrier
+
+    s_waitcnt vmcnt(12)
+    GLOBAL_READ_64 A v_stagingA1 0 v_startOffsetNext
+
+    RUN_MFMA_0 buffer_idA=0, buffer_idB=0, set=0
+    DS_READ_B 1
+    RUN_MFMA_0 buffer_idA=0, buffer_idB=0, set=1
+    DS_READ_A 1
+    RUN_MFMA_1 buffer_idA=0, buffer_idB=0, set=0
+    DS_WRITE ldsA0 v_stagingA0
+    RUN_MFMA_1 buffer_idA=0, buffer_idB=0, set=1
+    DS_WRITE ldsB0 v_stagingB0
+
+    s_waitcnt vmcnt(12)
+    GLOBAL_READ_64 B v_stagingB1 0 v_startOffsetNext
+
+    s_waitcnt lgkmcnt(MRepeats*KRepeats)
+    s_barrier
+
+    RUN_MFMA_0 buffer_idA=0, buffer_idB=1, set=0
+    RUN_MFMA_0 buffer_idA=0, buffer_idB=1, set=1
+    RUN_MFMA_1 buffer_idA=0, buffer_idB=1, set=0
+    RUN_MFMA_1 buffer_idA=0, buffer_idB=1, set=1
+    DS_READ_A 0
+
+    s_waitcnt vmcnt(12)
+    GLOBAL_READ_64 B v_stagingB0 TILE_SIZE_K*2  v_startOffset; first 128x64 block for the tile
+
+    RUN_MFMA_0 buffer_idA=1, buffer_idB=0, set=0
+    RUN_MFMA_0 buffer_idA=1, buffer_idB=0, set=1
+    DS_WRITE ldsA1 v_stagingA1
+    RUN_MFMA_1 buffer_idA=1, buffer_idB=0, set=0
+    DS_WRITE ldsB1 v_stagingB1
+    RUN_MFMA_1 buffer_idA=1, buffer_idB=0, set=1
+    DS_READ_B 0
+
+    s_waitcnt vmcnt(12)
+    GLOBAL_READ_64 A v_stagingA0 TILE_SIZE_K*2 v_startOffset
+
+    RUN_MFMA_0 buffer_idA=1, buffer_idB=1, set=0
+    RUN_MFMA_0 buffer_idA=1, buffer_idB=1, set=1
+    RUN_MFMA_1 buffer_idA=1, buffer_idB=1, set=0
+    RUN_MFMA_1 buffer_idA=1, buffer_idB=1, set=1
+
+    s_add_u32 s[A], s[A], TILE_SIZE_K*2
+    s_addc_u32 s[A+1], s[A+1], 0
+    s_add_u32 s[B], s[B], TILE_SIZE_K*2
+    s_addc_u32 s[B+1], s[B+1], 0
+    s_add_i32 s9, s9, TILE_SIZE_K
+    s_cmpk_lt_u32 s9, 0x1FC0  ;K - tile_size_k
+
+    s_cbranch_scc1 1b
+; %bb.2:                                ; %cond.end
+
+    s_waitcnt lgkmcnt(0)
+    s_barrier
+
+    s_waitcnt vmcnt(12)
+    GLOBAL_READ_64 A v_stagingA1 0 v_startOffsetNext
+
+    RUN_MFMA_0 buffer_idA=0, buffer_idB=0, set=0  ; 2 buffers and 2 sets of mfmas in each
+    DS_READ_B 1
+    RUN_MFMA_0 buffer_idA=0, buffer_idB=0, set=1
+    DS_READ_A 1
+    RUN_MFMA_1 buffer_idA=0, buffer_idB=0, set=0
+    DS_WRITE ldsA0 v_stagingA0
+    RUN_MFMA_1 buffer_idA=0, buffer_idB=0, set=1
+    DS_WRITE ldsB0 v_stagingB0
+
+    s_waitcnt vmcnt(12)
+    GLOBAL_READ_64 B v_stagingB1 0 v_startOffsetNext
+    RUN_MFMA_0 buffer_idA=0, buffer_idB=1, set=0
+    RUN_MFMA_0 buffer_idA=0, buffer_idB=1, set=1
+    RUN_MFMA_1 buffer_idA=0, buffer_idB=1, set=0
+    RUN_MFMA_1 buffer_idA=0, buffer_idB=1, set=1
+
+    s_waitcnt lgkmcnt(MRepeats*KRepeats)
+    s_barrier
+
+    RUN_MFMA_0 buffer_idA=1, buffer_idB=0, set=0
+    DS_READ_A 0
+    RUN_MFMA_0 buffer_idA=1, buffer_idB=0, set=1
+    DS_WRITE ldsA1 v_stagingA1
+    RUN_MFMA_1 buffer_idA=1, buffer_idB=0, set=0
+    DS_WRITE ldsB1 v_stagingB1
+    RUN_MFMA_1 buffer_idA=1, buffer_idB=0, set=1
+
+    RUN_MFMA_0 buffer_idA=1, buffer_idB=1, set=0
+    DS_READ_B 0
+    RUN_MFMA_0 buffer_idA=1, buffer_idB=1, set=1
+    RUN_MFMA_1 buffer_idA=1, buffer_idB=1, set=0
+    RUN_MFMA_1 buffer_idA=1, buffer_idB=1, set=1
+
+    s_waitcnt lgkmcnt(0)
+    s_barrier
+
+    RUN_MFMA_0 buffer_idA=0, buffer_idB=0, set=0  ; 2 buffers and 2 sets of mfmas in each
+    DS_READ_A 1
+    DS_READ_B 1
+    RUN_MFMA_0 buffer_idA=0, buffer_idB=0, set=1
+    RUN_MFMA_1 buffer_idA=0, buffer_idB=0, set=0
+    RUN_MFMA_1 buffer_idA=0, buffer_idB=0, set=1
+
+    RUN_MFMA_0 buffer_idA=0, buffer_idB=1, set=0
+    RUN_MFMA_0 buffer_idA=0, buffer_idB=1, set=1
+    RUN_MFMA_1 buffer_idA=0, buffer_idB=1, set=0
+    RUN_MFMA_1 buffer_idA=0, buffer_idB=1, set=1
+
+    RUN_MFMA_0 buffer_idA=1, buffer_idB=0, set=0 
+    RUN_MFMA_0 buffer_idA=1, buffer_idB=0, set=1
+    RUN_MFMA_1 buffer_idA=1, buffer_idB=0, set=0
+    RUN_MFMA_1 buffer_idA=1, buffer_idB=0, set=1
+
+    RUN_MFMA_0 buffer_idA=1, buffer_idB=1, set=0
+    RUN_MFMA_0 buffer_idA=1, buffer_idB=1, set=1
+    RUN_MFMA_1 buffer_idA=1, buffer_idB=1, set=0
+    RUN_MFMA_1 buffer_idA=1, buffer_idB=1, set=1
+
+    # store results
+    s_waitcnt vmcnt(0)
+    s_barrier
+
+    ; Wave decomposition
+    v_lshrrev_b32_e32 v1, 6, v0             ; wave_id = threadIdx.x / 64
+    v_and_b32_e32     v2, 1, v1             ; wave_row = wave_id % 2
+    v_lshrrev_b32_e32 v3, 1, v1             ; wave_col = wave_id / 2
+
+    ; thread lane within wave
+    v_and_b32_e32     v4, 63, v0            ; tIdx = threadIdx.x % 64
+    v_and_b32_e32     v5, 15, v4            ; laneCol = tIdx % 16
+    v_lshrrev_b32_e32 v6, 4, v4             ; laneRow4 = (tIdx / 16) * 4
+    v_lshlrev_b32_e32 v6, 2, v6
+
+    s_mov_b32_e32 s5, N                   ; row_stride in elements
+    s_lshl_b32 s8, s5, 2                  ; row_stride in bytes
+    v_mov_b32_e32 v14, s8
+    v_mov_b32_e32 v15, 0
+
+    v_lshlrev_b32_e32 v8, 6, v3           ; wave_col * write_stride
+    v_mov_b32_e32 v12, s2
+    v_lshlrev_b32_e32 v11, 8, v12         ; col = blockIdx.x * 2 * tile_size_mn
+ 
+    v_mov_b32 v100, 128*N*4
+    v_mov_b32 v101, 0
+
+    v_lshlrev_b32_e32 v10, 6, v2          ; wave_row * write_stride
+    v_mov_b32_e32 v17, s3
+    v_lshlrev_b32_e32 v18, 8, v17         ; row = blockIdx.y * 2 * tile_size_mn
+
+    WRITE_256x256_BLOCK
+
+s_endpgm
+
+    .section	.rodata,"a",@progbits
+    .p2align	6, 0x0
+    .amdhsa_kernel gemm_16x16x16
+        .amdhsa_group_segment_fixed_size 65536
+        .amdhsa_private_segment_fixed_size 0
+        .amdhsa_kernarg_size 24
+        .amdhsa_user_sgpr_count 2
+        .amdhsa_user_sgpr_dispatch_ptr 0
+        .amdhsa_user_sgpr_queue_ptr 0
+        .amdhsa_user_sgpr_kernarg_segment_ptr 1
+        .amdhsa_user_sgpr_dispatch_id 0
+        .amdhsa_user_sgpr_kernarg_preload_length 0
+        .amdhsa_user_sgpr_kernarg_preload_offset 0
+        .amdhsa_user_sgpr_private_segment_size 0
+        .amdhsa_uses_dynamic_stack 0
+        .amdhsa_enable_private_segment 0
+        .amdhsa_system_sgpr_workgroup_id_x 1
+        .amdhsa_system_sgpr_workgroup_id_y 1
+        .amdhsa_system_sgpr_workgroup_id_z 0
+        .amdhsa_system_sgpr_workgroup_info 0
+        .amdhsa_system_vgpr_workitem_id 0
+        .amdhsa_next_free_vgpr 484
+        .amdhsa_next_free_sgpr 24
+        .amdhsa_accum_offset 228
+        .amdhsa_reserve_vcc 1
+        .amdhsa_float_round_mode_32 0
+        .amdhsa_float_round_mode_16_64 0
+        .amdhsa_float_denorm_mode_32 3
+        .amdhsa_float_denorm_mode_16_64 3
+        .amdhsa_dx10_clamp 1
+        .amdhsa_ieee_mode 1
+        .amdhsa_fp16_overflow 0
+        .amdhsa_tg_split 0
+        .amdhsa_exception_fp_ieee_invalid_op 0
+        .amdhsa_exception_fp_denorm_src 0
+        .amdhsa_exception_fp_ieee_div_zero 0
+        .amdhsa_exception_fp_ieee_overflow 0
+        .amdhsa_exception_fp_ieee_underflow 0
+        .amdhsa_exception_fp_ieee_inexact 0
+        .amdhsa_exception_int_div_zero 0
+    .end_amdhsa_kernel
+
+.amdgpu_metadata
+---
+amdhsa.kernels:
+  - .agpr_count:     256
+    .args:
+      - .actual_access:  read_only
+        .address_space:  global
+        .name:           A.coerce
+        .offset:         0
+        .size:           8
+        .value_kind:     global_buffer
+      - .actual_access:  read_only
+        .address_space:  global
+        .name:           B.coerce
+        .offset:         8
+        .size:           8
+        .value_kind:     global_buffer
+      - .actual_access:  write_only
+        .address_space:  global
+        .name:           C.coerce
+        .offset:         16
+        .size:           8
+        .value_kind:     global_buffer
+    .group_segment_fixed_size: 65536
+    .kernarg_segment_align: 8
+    .kernarg_segment_size: 24
+    .language:       OpenCL C
+    .language_version:
+      - 2
+      - 0
+    .max_flat_workgroup_size: 256
+    .name:           gemm_16x16x16
+    .private_segment_fixed_size: 0
+    .sgpr_count:     23
+    .sgpr_spill_count: 0
+    .symbol:         gemm_16x16x16.kd
+    .uniform_work_group_size: 1
+    .uses_dynamic_stack: false
+    .vgpr_count:     484
+    .vgpr_spill_count: 0
+    .wavefront_size: 64
+amdhsa.target:   amdgcn-amd-amdhsa--gfx942
+amdhsa.version:
+  - 1
+  - 2
+...
+
+    .end_amdgpu_metadata
+```
+</details>
+
+## Results
+
+![Improved execution pipeline stalls](02_adv_nostalls.png)
+
+The hotspots have shifted to matrix-related computations and ALU, global load is not a problem any longer.
+
+![Improved execution pipeline hotspots](02_adv_hotspots.png)
+
+This new improved GEMM executed in roughly 0.5ms which is ~650 TFLOPs.
+
+```
+Matrix A: 4864 x 8192
+Matrix B: 8192 x 4096
+Execution time: 0.504279 ms
+TFLOPS: 647.295
 ```
