@@ -8,7 +8,7 @@ format:
 
 # Introduction to GEMMs
 
-This document illustrates key concepts of implementing a highly performant GEMM (General Matrix Multiplication) kernel on AMD's MI300 GPU, using a simple example. 
+This document illustrates key concepts of implementing a block GEMM (General Matrix Multiplication) kernel on AMD's MI300 GPU. 
 GEMM is a fundamental building block for many machine learning workloads, including attention mechanisms and Mixture of Experts (MoE) models.
 
 The problem we will address is the standard matrix multiplication: $C = A \cdot B$, where matrix A has dimensions **M x K** and matrix B has dimensions **K x N**. 
@@ -88,8 +88,9 @@ __global__ void matrixMulHIP(s_type * __restrict__ A, s_type* __restrict__ B, fl
 }
 ```
 
-This kernel takes 43.4 ms to complete which is apprx. 7.5 TFLOPs 
-given the dimensions M and N.
+This kernel has a very low compute throughput according `rocprofv3` profiler output. It is stalling 
+on global memory read transactions effecetively starving the rest of the pipeline that needs that data to
+proceed.
 
 Below are the wavestates of a single compute unit. It is clear that GPU spends
 absolute majority of it's cycles stalled on memory transactions waiting for the next
@@ -325,7 +326,7 @@ The amount of compute per loaded byte with tiling depends only on tile size, ass
 4864 × 4096 / (4864 + 4096) ≈ 2224 FLOPs per loaded byte
 ```
 
-This means that even with large tiling, we can approach only ~6% of the **compute efficiency** of the absolute maximum.
+This means that even with large tiling, we can approach only ~6% of the **compute efficiency** of the theoretical maximum.
 
 ##  Utilization considerations
 
@@ -1555,11 +1556,5 @@ The hotspots have shifted to matrix-related computations and ALU, global load is
 
 ![Improved execution pipeline hotspots](02_adv_hotspots.png)
 
-This new improved GEMM executed in roughly 0.5ms which is ~650 TFLOPs.
-
-```
-Matrix A: 4864 x 8192
-Matrix B: 8192 x 4096
-Execution time: 0.504279 ms
-TFLOPS: 647.295
-```
+`rocprofv3` output above shows that we have achieved our kernel to become compute bound 
+where matrix multiplication operations have become the dominant workload. 
