@@ -454,6 +454,19 @@ __launch_bounds__(THREADS_PER_BLOCK, 1)
                                                 float *__restrict__ C
 ```
 
+The below for loop will be unrolled by the compiler at compile time. It is useful
+to save register that our kernel will be allocating at the runtime.
+
+```{cpp}
+template <int Begin, int End, typename Func>
+__device__ __forceinline__ void static_for(Func&& f) {
+    if constexpr (Begin < End) {
+        f(std::integral_constant<int, Begin>{});
+        static_for<Begin + 1, End>(f);
+    }
+}
+```
+
 ## Optimizing Data Flow with Pipelining
 
 As it was discussed earlier to maximize performance, the flow for this kernel uses a **pipeline** or **double buffering** to
@@ -495,6 +508,8 @@ We will try to help compiler to save registers by precomputing as much variables
 as `constexpr`.
 
 ```{cpp}
+constexpr int vector_size = 16;
+
 template <typename T, int src_row_stride, int tile_size_mn, int tile_size_k>
 __device__ void loadDataBlock(T* __restrict__ storage, const s_type* __restrict__ src)
 {
@@ -503,14 +518,12 @@ __device__ void loadDataBlock(T* __restrict__ storage, const s_type* __restrict_
   // Calculate how much data this thread has to load given the size of a TILE
   // we work with 256x1x1 block sizes
   constexpr int type_size = sizeof(T);
-  constexpr int vector_size = 16;
   constexpr int threads_per_group = (tile_size_k*sizeof(s_type)) / vector_size;
 
   // This is how much this thread will load in bytes
-  constexpr int load_size = (tile_size_mn*tile_size_k*2) / (THREADS_PER_BLOCK);
+  constexpr int load_size = (tile_size_mn*tile_size_k*2) / THREADS_PER_BLOCK;
   // how many rows this thread is responsible to load
   constexpr int row_per_thread = load_size / vector_size;
-
 
   // Each group of threads will be loading a full  row_per_thread num of rows.
   int row = (tIdx / threads_per_group) * row_per_thread;
@@ -520,16 +533,18 @@ __device__ void loadDataBlock(T* __restrict__ storage, const s_type* __restrict_
 
   // The two loops below have fixed size, compiler should be
   //  able to vectorize this appropriately.
+  constexpr int loads_per_row = vector_size / type_size;
 
   // Loop over rows this thread will be loading
   for (int r = 0; r < row_per_thread; r++)
   {
     const T* s = reinterpret_cast<const T*>(src + (row + r) * src_row_stride + col);
-    constexpr int loads_per_row = vector_size / type_size;
 
     // How many elements will fit into a vector size, compiler will vectorize this appropriately
     for (int i=0; i < loads_per_row; i++)
- 	  storage[i] = s[i];
+    {
+ 	  storage[r*loads_per_row + i] = s[i];
+    }
   }
 }
 ```
@@ -618,14 +633,13 @@ in LDS and eliminates the conflicts during readback.
 
 ```{cpp}
 template <typename T, const int lds_row_stride, int tile_size_mn, int tile_size_k>
-__device__ __forceinline__ void loadLDSDataBlock(T* lds_storage, T* src)
+__device__ __forceinline__ void LDS_WRITE(T* lds_storage, T* src)
 {
   int tIdx = threadIdx.x;
 
   // Calculate how much data this thread has to load given the size of a TILE
   // we work with 256x1x1 block sizes
   constexpr int type_size = sizeof(T);
-  constexpr int vector_size = 16;
   constexpr int load_size_el = vector_size/sizeof(s_type);
   constexpr int threads_per_group = (tile_size_k*sizeof(s_type)) / vector_size;
 
@@ -646,9 +660,11 @@ __device__ __forceinline__ void loadLDSDataBlock(T* lds_storage, T* src)
     const T* s = src + r*loads_per_row;
     int col_xor = col ^ ((row + r) % (tile_size_k/load_size_el));
 
-    const T* d = lds_storage + (row + r) * lds_row_stride + col_xor*vector_size;
+    T* d = lds_storage + (row + r) * lds_row_stride + col_xor*loads_per_row;
     for (int i=0; i < loads_per_row; i++)
+    {
  	   d[i] = s[i];
+    }
   }
 }
 ```
@@ -755,7 +771,6 @@ to our load vector size. That is more efficient to load from LDS then 64-bit wid
 loads.
 
 ```{cpp}
-
 template <typename T, const int stride, int tile_size_k>
 __device__ inline const T* ldsFetch(const T* ptr, const int x_T, const int y)
 {
@@ -765,35 +780,54 @@ __device__ inline const T* ldsFetch(const T* ptr, const int x_T, const int y)
    int col_xor = col ^ ((y) % (tile_size_k/load_size_el));
    return  ptr + y * stride + col_xor*elements_per_load_vector;
 }
-
-...
-
+ 
 template <typename T, const int r_stride, int tile_size_k,
-    int NRepeats, int MRepeats, int KRepeats >
-__device__ inline void shuffleDataBlock16x16x16(T* dst_regA, T* dst_regB, const T* ldsA, const T* ldsB)
+    int MRepeats, int KRepeats >
+__device__ inline void LDS_READ_A(T* dst_reg,  const T* lds)
 {
     int tIdx = threadIdx.x;
 
     int wave0101 = (tIdx / 64) % 2;
+
+    int load_Ay = (tIdx % 16);
+    int load_Ax = (tIdx / 16) % 4;
+
+    static_for<0, KRepeats>([&] (auto k_c) {
+      static_for<0, MRepeats>([&] (auto m_c) {
+            constexpr int m = m_c.value;
+            constexpr int k = k_c.value;
+
+            const T * data = ldsFetch<T, r_stride, tile_size_k>(lds, 2*load_Ax + 8*k,
+                load_Ay + ((m + MRepeats*wave0101)*16));
+            // this is 128-bit wide LDS read
+            *dst_reg++ = *data;
+            *dst_reg++ = *(data+1);
+      });
+    });
+}
+
+template <typename T, const int r_stride, int tile_size_k,
+    int NRepeats, int KRepeats >
+__device__ inline void LDS_READ_B(T* dst_reg,  const T* lds)
+{
+    int tIdx = threadIdx.x;
+
     int wave0011 = (tIdx / 64) / 2;
 
     int load_Ay = (tIdx % 16);
     int load_Ax = (tIdx / 16) % 4;
 
-    static_for<0, MRepeats>([&] (auto m_c) {
-            constexpr int m = m_c.value;
-            const T * data = ldsFetch<T, r_stride, tile_size_k>(ldsA, 2*load_Ax,
-                load_Ay + ((m + MRepeats*wave0101)*16));
-            *dst_regA++ = *data;
-            *dst_regA++ = *(data+1);
-    });
-
-    static_for<0, NRepeats>([&] (auto n_c) {
+    static_for<0, KRepeats>([&] (auto k_c) {
+      static_for<0, NRepeats>([&] (auto n_c) {
             constexpr int n = n_c.value;
-            const T* data = ldsFetch<T, r_stride, tile_size_k>(ldsB, 2*load_Ax,
+            constexpr int k = k_c.value;
+
+            const T * data = ldsFetch<T, r_stride, tile_size_k>(lds, 2*load_Ax + 8*k,
                 load_Ay + ((n + NRepeats*wave0011)*16));
-            *dst_regB++ = *data;
-            *dst_regB++ = *(data+1);
+            // this is 128-bit wide LDS read
+            *dst_reg++ = *data;
+            *dst_reg++ = *(data+1);
+      });
     });
 }
 ```
@@ -805,7 +839,7 @@ wrapper:
 
 ```{cpp}
 __device__ __forceinline__
-float4vec  run_mfma16x16x16bf16(const float4bf16vec& a, const float4bf16vec& b, float4vec &accum)
+float4vec  run_mfma16x16x16bf16(const float4fp16vec& a, const float4fp16vec& b, float4vec &accum)
 {
     // accum is the first float4vec register; next 3 registers assumed consecutive
     asm volatile(
@@ -816,31 +850,30 @@ float4vec  run_mfma16x16x16bf16(const float4bf16vec& a, const float4bf16vec& b, 
 
     return accum;
 }
-```
 
-And then we can define our mfma compute function based on the layouts that were discussed before
-
-```{cpp}
-template <typename T_IN, typename T_OUT, const int KRepeats,  const int NRepeats, const int MRepeats>
+template <typename T_IN, typename T_OUT, const int KRepeats,  const int NRepeats, const int MRepeats, const int offset>
 __device__  void run_mfma16x16x16fp16(const T_IN* __restrict__ A, const  T_IN* __restrict__ B, T_OUT* __restrict__ out_f)
 {
        static_for<0, MRepeats>([&](auto m) {
-            static_for<0, NRepeats>([&](auto n) {
+         static_for<0, KRepeats>([&](auto k) {
+           static_for<0, NRepeats>([&](auto n) {
                 constexpr int mi = m.value;
                 constexpr int ni = n.value;
-                    
-                out_f[ni + NRepeats * mi] =
-                    run_mfma16x16x16bf16(
-                        A[2 * mi],
-                        B[2 * ni],
-                        out_f[ni + NRepeats * mi]);
+                constexpr int ki = k.value;
 
-                out_f[ni + NRepeats * mi] =
+                out_f[ni + NRepeats * mi + offset] =
                     run_mfma16x16x16bf16(
-                        A[2 * mi + 1],
-                        B[2 * ni + 1],
-                        out_f[ni + NRepeats * mi]);
+                        A[2 * (mi + MRepeats * ki)],
+                        B[2 * (ni + NRepeats * ki)],
+                        out_f[ni + NRepeats * mi + offset]);
+
+                out_f[ni + NRepeats * mi + offset] =
+                    run_mfma16x16x16bf16(
+                        A[2 * (mi + MRepeats * ki) + 1],
+                        B[2 * (ni + NRepeats * ki) + 1],
+                        out_f[ni + NRepeats * mi + offset]);
             });
+        });
     });
 }
 ```
