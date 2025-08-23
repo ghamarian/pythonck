@@ -1,7 +1,0 @@
-streamlit
-matplotlib
-networkx
-numpy
-sympy
-pytest
-build
