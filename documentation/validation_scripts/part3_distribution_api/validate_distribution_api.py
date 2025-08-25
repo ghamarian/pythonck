@@ -13,7 +13,7 @@ import numpy as np
 # Add the project root to the path so we can import our modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 
-from tile_distribution_documentation.validation_scripts.common import (
+from documentation.validation_scripts.common import (
     print_section, print_step, show_result, validate_example,
     explain_concept, show_comparison, run_script_safely, check_imports,
     show_tensor_shape, show_coordinate_transform

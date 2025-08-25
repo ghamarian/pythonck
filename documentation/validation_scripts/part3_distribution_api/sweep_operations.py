@@ -19,10 +19,9 @@ import numpy as np
 # Add the project root to the path so we can import our modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 
-from tile_distribution_documentation.validation_scripts.common import (
+from documentation.validation_scripts.common import (
     print_section, print_step, show_result, validate_example,
-    explain_concept, show_comparison, run_script_safely, check_imports,
-    show_tensor_shape, show_coordinate_transform
+    explain_concept, show_comparison, run_script_safely, check_imports
 )
 
 # Import the actual CK modules
@@ -104,8 +103,10 @@ def demonstrate_basic_sweep():
     
     collected_values = []
     
-    def collect_value(y_indices):
+    def collect_value(*dstr_indices):
         """Function to collect values during sweep."""
+        # Get Y indices from distributed indices using the distribution
+        y_indices = distribution.get_y_indices_from_distributed_indices(list(dstr_indices))
         value = distributed_tensor.get_element(y_indices)
         collected_values.append((y_indices.copy(), value))
         print(f"  Visited Y{y_indices}: value = {value}")
@@ -134,8 +135,10 @@ def demonstrate_sweep_with_computation(distributed_tensor):
     
     print("\n🔢 Computing squares using sweep:")
     
-    def compute_square(y_indices):
+    def compute_square(*dstr_indices):
         """Compute square of each element."""
+        # Get Y indices from distributed indices
+        y_indices = distributed_tensor.tile_distribution.get_y_indices_from_distributed_indices(list(dstr_indices))
         input_value = distributed_tensor.get_element(y_indices)
         output_value = input_value ** 2
         result_tensor.set_element(y_indices, output_value)
@@ -146,7 +149,8 @@ def demonstrate_sweep_with_computation(distributed_tensor):
     
     # Verify results
     print("\n📊 Results verification:")
-    def verify_result(y_indices):
+    def verify_result(*dstr_indices):
+        y_indices = distributed_tensor.tile_distribution.get_y_indices_from_distributed_indices(list(dstr_indices))
         original = distributed_tensor.get_element(y_indices)
         computed = result_tensor.get_element(y_indices)
         expected = original ** 2
@@ -189,7 +193,8 @@ def demonstrate_advanced_sweep_patterns():
     print("\n🎛️ Using TileSweeper for controlled iteration:")
     
     # Create a tile sweeper
-    def process_element(y_indices):
+    def process_element(*dstr_indices):
+        y_indices = distributed_tensor.tile_distribution.get_y_indices_from_distributed_indices(list(dstr_indices))
         value = distributed_tensor.get_element(y_indices)
         print(f"  Processing Y{y_indices}: {value}")
     
@@ -269,11 +274,11 @@ def test_sweep_operations():
                 ys_to_rhs_minor=[0, 0]
             )
             distribution = make_static_tile_distribution(encoding)
-            distributed_tensor = make_static_distributed_tensor(distribution)
+            distributed_tensor = make_static_distributed_tensor(np.float32, distribution)
             
             # Test sweep
             count = 0
-            def count_elements(y_indices):
+            def count_elements(*dstr_indices):
                 nonlocal count
                 count += 1
             
@@ -298,10 +303,10 @@ def test_sweep_operations():
                 ys_to_rhs_minor=[0, 0]
             )
             distribution = make_static_tile_distribution(encoding)
-            distributed_tensor = make_static_distributed_tensor(distribution)
+            distributed_tensor = make_static_distributed_tensor(np.float32, distribution)
             
             # Create sweeper
-            def dummy_func(y_indices):
+            def dummy_func(*dstr_indices):
                 pass
             
             sweeper = make_tile_sweeper(distributed_tensor, dummy_func)
@@ -365,4 +370,4 @@ def main():
 
 
 if __name__ == "__main__":
-    run_script_safely("Sweep Operations", main) 
+    run_script_safely("Sweep Operations", main)
