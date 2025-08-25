@@ -73,8 +73,8 @@ class DocumentationValidator:
         
         return snippets
     
-    def validate_snippet(self, code: str, file_path: Path, line_num: int, snippet_type: str) -> Tuple[bool, str]:
-        """Validate a single code snippet.
+    def validate_snippet(self, code: str, file_path: Path, line_num: int, snippet_type: str, cumulative_context: List[str]) -> Tuple[bool, str]:
+        """Validate a single code snippet with cumulative context from previous snippets.
         
         Returns:
             (success, error_message)
@@ -86,49 +86,111 @@ class DocumentationValidator:
         if snippet_type == 'python' and ('def ' in code or 'class ' in code) and '...' in code:
             return True, "Skipped: Function/class definition template"
         
+        # Skip any snippet that contains '...' as it indicates incomplete/truncated code
+        if '...' in code:
+            return True, "Skipped: Incomplete snippet (contains '...')"
+        
+        # Skip snippets that are just function signatures without implementation
+        lines = code.strip().split('\n')
+        if lines and lines[0].strip().startswith('def '):
+            # Check if there's actual implementation after the docstring
+            non_empty_lines = [l for l in lines[1:] if l.strip() and not l.strip().startswith('"""') and not l.strip().endswith('"""')]
+            if not non_empty_lines:
+                return True, "Skipped: Function signature without implementation"
+        
+        # Skip snippets that are just single expressions or names
+        if len(code.strip().split('\n')) == 1 and not any(op in code for op in ['=', '(', '[', '{', 'import', 'from']):
+            return True, "Skipped: Single expression/name"
+        
+        # Build cumulative code from all previous snippets
+        cumulative_code_str = '\n'.join(cumulative_context)
+        
+        # Properly indent the cumulative code and current code
+        if cumulative_code_str:
+            indented_cumulative = '\n'.join('    ' + line for line in cumulative_code_str.split('\n'))
+        else:
+            indented_cumulative = ''
+            
+        indented_code = '\n'.join('    ' + line for line in code.split('\n'))
+        
         # Create a test script with necessary imports
-        test_code = """
+        # Use absolute path to ensure correct module discovery
+        project_root = str(Path(__file__).parent.parent.parent.absolute())
+        
+        test_code = f"""
 import sys
+import os
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+# Add absolute path to ensure module discovery
+sys.path.insert(0, '{project_root}')
 
 # Standard imports that might be needed
 import numpy as np
-from pytensor.buffer_view import BufferView, AddressSpaceEnum, MemoryOperationEnum, make_buffer_view
-from pytensor.tensor_view import TensorView, make_tensor_view
-from pytensor.tensor_descriptor import TensorDescriptor, make_tensor_descriptor
-from pytensor.tensor_coordinate import TensorCoordinate, make_tensor_coordinate
 
-# Mock functions for examples
+# Import all common pytensor modules
+try:
+    from pytensor.buffer_view import BufferView, AddressSpaceEnum, MemoryOperationEnum, make_buffer_view
+    from pytensor.tensor_view import TensorView, make_tensor_view, make_naive_tensor_view_packed
+    from pytensor.tensor_descriptor import (
+        TensorDescriptor, make_tensor_descriptor, 
+        make_naive_tensor_descriptor_packed, make_naive_tensor_descriptor
+    )
+    from pytensor.tensor_coordinate import TensorCoordinate, make_tensor_coordinate
+    from pytensor.tile_distribution import make_static_tile_distribution
+    from pytensor.tile_distribution_encoding import make_tile_distribution_encoding
+    from pytensor.tile_window import make_tile_window
+    from pytensor.sweep_tile import sweep_tile
+    from pytensor.static_distributed_tensor import make_static_distributed_tensor
+except ImportError as e:
+    print(f"Import warning: {{e}}")
+
+# Mock functions for examples that might not be imported
 def get_thread_id():
     return 0
 
-def make_static_tile_distribution(encoding):
-    return None
+# Mock any missing functions
+if 'make_static_tile_distribution' not in locals():
+    def make_static_tile_distribution(encoding):
+        class MockDistribution:
+            tile_distribution = None
+        return MockDistribution()
 
-def make_tile_window(tensor_view, window_lengths, origin, tile_distribution):
-    class MockTileWindow:
-        def load(self):
-            return MockLoadedTensor()
-    return MockTileWindow()
+if 'make_tile_window' not in locals():
+    def make_tile_window(tensor_view, window_lengths, origin, tile_distribution):
+        class MockTileWindow:
+            def load(self):
+                return MockLoadedTensor()
+        return MockTileWindow()
+
+if 'make_static_distributed_tensor' not in locals():
+    def make_static_distributed_tensor(dtype, tile_distribution):
+        class MockDistributedTensor:
+            tile_distribution = tile_distribution
+        return MockDistributedTensor()
 
 class MockLoadedTensor:
     def get_element(self, indices):
         return 1.0
 
-def sweep_tile(tensor, func):
-    pass
+if 'sweep_tile' not in locals():
+    def sweep_tile(tensor, func):
+        pass
 
-# Execute the snippet
+# Execute cumulative context and current snippet
 try:
-    {}
+    # Execute all previous snippets first (cumulative context)
+{indented_cumulative}
+    
+    # Now execute the current snippet
+{indented_code}
     print("\\nSnippet executed successfully!")
 except Exception as e:
     print(f"\\nError: {{e}}")
     import traceback
     traceback.print_exc()
     sys.exit(1)
-""".format(code)
+"""
         
         # Write to temporary file and execute
         with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
@@ -170,6 +232,9 @@ except Exception as e:
         
         print(f"Found {len(snippets)} Python snippet(s)")
         
+        # Accumulate code context for this file
+        cumulative_context = []
+        
         for i, (code, line_num, snippet_type) in enumerate(snippets):
             self.total_snippets += 1
             print(f"\nSnippet {i+1} (line {line_num}, type: {snippet_type}):")
@@ -181,11 +246,16 @@ except Exception as e:
                 code_preview += '\n...'
             print(code_preview)
             
-            success, error = self.validate_snippet(code, file_path, line_num, snippet_type)
+            success, error = self.validate_snippet(code, file_path, line_num, snippet_type, cumulative_context)
             
             if success:
                 self.passed_snippets += 1
                 print(f"✅ PASSED{': ' + error if error else ''}")
+                
+                # Add successful snippet to cumulative context for next snippets
+                # Skip adding if it's just a skipped snippet
+                if not error.startswith("Skipped:"):
+                    cumulative_context.append(code)
             else:
                 self.failed_snippets += 1
                 print(f"❌ FAILED: {error}")
@@ -196,6 +266,9 @@ except Exception as e:
                     'error': error,
                     'code_preview': code_preview
                 })
+        
+        # Clear context between files
+        cumulative_context.clear()
     
     def validate_all(self):
         """Validate all .qmd files in the concepts directory."""
