@@ -230,22 +230,36 @@ def test_stage2_morton():
     print("- Merge Morton: (y0,x0,y1,x1) → Morton index")
     
     # Apply Stage 2 to DESC1
-    DESC2 = transform_tensor_descriptor(
+    # First split y_in and x_in
+    DESC1_split = transform_tensor_descriptor(
         DESC1,
         transforms=[
             split2,        # Operates on DESC1 dim 1 (y_in) → (y1, y0)
             split2,        # Operates on DESC1 dim 3 (x_in) → (x1, x0)  
-            merge_morton,  # Merges the four 1-bit dims: (y0,x0,y1,x1) → Morton
         ],
         lower_dimension_hidden_idss=[
             [1],           # y_in (from DESC1) 
             [3],           # x_in (from DESC1)
-            [4, 5, 6, 7],  # y0,x0,y1,x1 (new dims after splits start from 4)
         ],
         upper_dimension_hidden_idss=[
-            [4, 5],        # y_in → (y1, y0) - new dims 4,5
-            [6, 7],        # x_in → (x1, x0) - new dims 6,7
-            [1],           # Morton replaces y_in position (dim 1)
+            [1, 4],        # y_in → (y1, y0) at positions 1,4
+            [3, 5],        # x_in → (x1, x0) at positions 3,5
+        ],
+    )
+    
+    # Now merge to create Morton ordering
+    # After splits we have: (Y_blk, y1, X_blk, x1, y0, x0)
+    # We want to merge (y0, x0, y1, x1) → Morton
+    DESC2 = transform_tensor_descriptor(
+        DESC1_split,
+        transforms=[
+            merge_morton,  # Merges: (y0,x0,y1,x1) → Morton
+        ],
+        lower_dimension_hidden_idss=[
+            [4, 5, 1, 3],  # (y0, x0, y1, x1) positions in DESC1_split
+        ],
+        upper_dimension_hidden_idss=[
+            [1],           # Morton replaces position 1
         ],
     )
     
@@ -256,10 +270,20 @@ def test_stage2_morton():
     print("(Y_blk, Morton, X_blk) → Original (Y, X) → Value")
     print("Morton pattern within tile (0,0):")
     
+    # Check DESC2 dimensions once before the loop
+    num_dims = DESC2.get_num_of_top_dimension()
+    print(f"DESC2 actual dimensions: {num_dims}, lengths: {DESC2.get_lengths()}")
+    
     morton_values = []
     for morton_idx in range(16):  # 4×4 = 16 elements
-        # Create coordinate: Y_blk=0, Morton=morton_idx, X_blk=0, ?=0 (for 4 dims)
-        new_coord = MultiIndex(4, [0, morton_idx, 0, 0])
+        if num_dims == 2:
+            # If 2D, it's likely (tile_idx, morton_idx)
+            new_coord = MultiIndex(2, [0, morton_idx])
+        elif num_dims == 3:
+            # If 3D, it's (Y_blk, Morton, X_blk)
+            new_coord = MultiIndex(3, [0, morton_idx, 0])
+        else:
+            raise ValueError(f"Unexpected number of dimensions: {num_dims}")
         
         # Transform to original space
         tensor_coord = make_tensor_coordinate(DESC2, new_coord)
@@ -278,7 +302,10 @@ def test_stage2_morton():
         morton_values.append(value)
         
         if morton_idx < 8:  # Print first 8 for brevity
-            print(f"(0, {morton_idx:2d}, 0) → ({orig_y}, {orig_x}) → {value}")
+            if num_dims == 2:
+                print(f"(0, {morton_idx:2d}) → ({orig_y}, {orig_x}) → {value}")
+            else:
+                print(f"(0, {morton_idx:2d}, 0) → ({orig_y}, {orig_x}) → {value}")
     
     print("...")
     print(f"Complete Morton sequence for tile (0,0): {morton_values}")
@@ -468,4 +495,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main() 
+    main()

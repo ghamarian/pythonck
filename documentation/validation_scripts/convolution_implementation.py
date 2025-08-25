@@ -382,8 +382,8 @@ def create_direct_im2col_descriptor(image, kernel_size=3):
     im2col_descriptor = transform_tensor_descriptor(
         windows_descriptor,
         transforms=[merge_windows, merge_patch],
-        lower_dimension_hidden_idss=[[1, 2], [3, 4]],
-        upper_dimension_hidden_idss=[[5], [6]]
+        lower_dimension_hidden_idss=[[0, 1], [2, 3]],
+        upper_dimension_hidden_idss=[[0], [1]]
     )
     
     print(f"Direct im2col descriptor shape: {im2col_descriptor.get_lengths()}")
@@ -563,4 +563,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main() 
+    main()

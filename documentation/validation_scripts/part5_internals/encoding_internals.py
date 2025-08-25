@@ -15,9 +15,15 @@ Key Concepts:
 
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'code_examples'))
 
-from common_utils import *
+# Add the project root to the path so we can import our modules
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+
+from documentation.validation_scripts.common import (
+    print_section, print_step, show_result, validate_example,
+    explain_concept, run_script_safely, check_imports
+)
+
 from pytensor.tile_distribution_encoding import TileDistributionEncoding
 from pytensor.tile_distribution import make_static_tile_distribution
 import numpy as np
@@ -33,27 +39,31 @@ def demonstrate_encoding_basics():
     print("• How these map to tensor coordinates (X-space)")
     print("• How data is shared across threads (R-space)")
     
-    # Simple 2D example
-    print(f"\n📋 Example: 2x2 thread grid, 2x2 tiles per thread")
+    # Real-world RMSNorm example
+    print(f"\n📋 Example: RMSNorm Distribution Pattern")
     
     encoding = TileDistributionEncoding(
-        rs_lengths=[],                    # No replication
-        hs_lengthss=[[2, 2], [2, 2]],   # 2x2 hierarchical tiles
-        ps_to_rhss_major=[[1], [2]],     # P0→H1, P1→H2  
-        ps_to_rhss_minor=[[0], [0]],     # Use first component
-        ys_to_rhs_major=[1, 1, 2, 2],    # Y mapping to H
-        ys_to_rhs_minor=[0, 1, 0, 1]     # Y component selection
+        rs_lengths=[],  # Empty R sequence
+        hs_lengthss=[
+            [4, 2, 8, 4],  # H for X0: Repeat_M, WarpPerBlock_M, ThreadPerWarp_M, Vector_M
+            [4, 2, 8, 4]   # H for X1: Repeat_N, WarpPerBlock_N, ThreadPerWarp_N, Vector_N
+        ],
+        ps_to_rhss_major=[[1, 2], [1, 2]],  # P maps to H dimensions
+        ps_to_rhss_minor=[[1, 1], [2, 2]],  # P minor mappings
+        ys_to_rhs_major=[1, 1, 2, 2],       # Y maps to H dimensions
+        ys_to_rhs_minor=[0, 3, 0, 3]        # Y minor mappings
     )
     
     print("📐 Encoding Structure:")
-    print(f"  rs_lengths: {encoding.rs_lengths} (replication)")
-    print(f"  hs_lengthss: {encoding.hs_lengthss} (hierarchical tiles)")
-    print(f"  ps_to_rhss_major: {encoding.ps_to_rhss_major} (P→RH major)")
-    print(f"  ps_to_rhss_minor: {encoding.ps_to_rhss_minor} (P→RH minor)")
-    print(f"  ys_to_rhs_major: {encoding.ys_to_rhs_major} (Y→RH major)")
-    print(f"  ys_to_rhs_minor: {encoding.ys_to_rhs_minor} (Y→RH minor)")
+    print(f"  rs_lengths: {encoding.rs_lengths} (no replication)")
+    print(f"  hs_lengthss: {encoding.hs_lengthss}")
+    print(f"    → X0: 4×2×8×4 = 256 elements per dimension")
+    print(f"  ps_to_rhss_major: {encoding.ps_to_rhss_major}")
+    print(f"    → P0 maps to H dimensions 1,2 (warp/thread)")
+    print(f"  ys_to_rhs_major: {encoding.ys_to_rhs_major}")
+    print(f"    → Y maps to different H dimensions than P")
     
-    print("✅ Encoding basics: Mathematical specification created")
+    print("✅ Encoding basics: Real-world specification created")
     
     return encoding
 
@@ -65,14 +75,17 @@ def demonstrate_encoding_to_distribution():
     print("make_static_tile_distribution() takes the mathematical encoding")
     print("and creates the runtime components that implement the transformations.")
     
-    # Create encoding
+    # Create RMSNorm encoding
     encoding = TileDistributionEncoding(
-        rs_lengths=[],                    
-        hs_lengthss=[[2, 2], [2, 2]],   
-        ps_to_rhss_major=[[1], [2]],     
-        ps_to_rhss_minor=[[0], [0]],     
-        ys_to_rhs_major=[1, 1, 2, 2],    
-        ys_to_rhs_minor=[0, 1, 0, 1]     
+        rs_lengths=[],
+        hs_lengthss=[
+            [4, 2, 8, 4],
+            [4, 2, 8, 4]
+        ],
+        ps_to_rhss_major=[[1, 2], [1, 2]],
+        ps_to_rhss_minor=[[1, 1], [2, 2]],
+        ys_to_rhs_major=[1, 1, 2, 2],
+        ys_to_rhs_minor=[0, 3, 0, 3]
     )
     
     print(f"\n🔧 Creating Tile Distribution...")
@@ -185,21 +198,23 @@ def demonstrate_encoding_parameters():
     
     # hs_lengthss  
     print("🔹 hs_lengthss (Hierarchical Lengths):")
-    print("  • Defines tile sizes per dimension")
-    print("  • [[2,2], [2,2]] = 2x2 tiles for both X dimensions")
-    print("  • [[4,4], [4,4]] = 4x4 tiles for both X dimensions")
-    print("  • Controls thread workload size")
+    print("  • Defines GPU hardware hierarchy mapping")
+    print("  • [Repeat, WarpPerBlock, ThreadPerWarp, Vector]")
+    print("  • [[4,2,8,4], [4,2,8,4]] = 4 repeats, 2 warps/block, 8 threads/warp, 4 vector")
+    print("  • Controls thread workload distribution")
     
     # ps_to_rhss mappings
     print("🔹 ps_to_rhss_major/minor (P→RH Mappings):")
-    print("  • Maps partition coordinates to RH space")
-    print("  • [[1], [2]] = P0→H1, P1→H2")
-    print("  • Controls which H dimensions each P dimension affects")
+    print("  • Maps partition (thread) coordinates to RH space")
+    print("  • Major: which RH dimension (0=R, 1=H0, 2=H1)")
+    print("  • Minor: which component within that dimension")
+    print("  • [[1,2], [1,2]] = P0 affects H0,H1, P1 affects H0,H1")
     
     # ys_to_rhs mappings
     print("🔹 ys_to_rhs_major/minor (Y→RH Mappings):")
     print("  • Maps logical tile coordinates to RH space")
-    print("  • [1,1,2,2] = Y0,Y1→H1, Y2,Y3→H2")
+    print("  • Must not overlap with P mappings")
+    print("  • [1,1,2,2] = Y0,Y1→H0, Y2,Y3→H1")
     print("  • Controls how Y coordinates navigate the tile structure")
     
     print("✅ Encoding parameters: Complete specification understood")
@@ -207,76 +222,113 @@ def demonstrate_encoding_parameters():
     return True
 
 def demonstrate_practical_examples():
-    """Show practical encoding examples."""
-    print_step(6, "Practical Encoding Examples")
+    """Show practical encoding examples from real GPU patterns."""
+    print_step(6, "Practical GPU Encoding Patterns")
     
     print("🎯 Real-World Encoding Patterns")
-    print("Let's see how different use cases translate to encodings.")
+    print("Let's see actual GPU kernel patterns translated to encodings.")
     
-    # Example 1: Simple thread distribution
-    print(f"\n📝 Example 1: Simple 2x2 Thread Distribution")
-    print("Use case: 4 threads, each handles 2x2 elements")
+    # Example 1: RMSNorm pattern
+    print(f"\n📝 Example 1: RMSNorm Pattern")
+    print("Use case: Element-wise normalization with complex tiling")
     
-    simple_encoding = TileDistributionEncoding(
-        rs_lengths=[],                    # No sharing
-        hs_lengthss=[[2, 2], [2, 2]],   # 2x2 tiles
-        ps_to_rhss_major=[[1], [2]],     # Standard mapping
-        ps_to_rhss_minor=[[0], [0]],     
-        ys_to_rhs_major=[1, 1, 2, 2],    
-        ys_to_rhs_minor=[0, 1, 0, 1]     
+    rmsnorm_encoding = TileDistributionEncoding(
+        rs_lengths=[],
+        hs_lengthss=[
+            [4, 2, 8, 4],  # M: Repeat=4, WarpPerBlock=2, ThreadPerWarp=8, Vector=4
+            [4, 2, 8, 4]   # N: Repeat=4, WarpPerBlock=2, ThreadPerWarp=8, Vector=4
+        ],
+        ps_to_rhss_major=[[1, 2], [1, 2]],
+        ps_to_rhss_minor=[[1, 1], [2, 2]],
+        ys_to_rhs_major=[1, 1, 2, 2],
+        ys_to_rhs_minor=[0, 3, 0, 3]
     )
     
-    print("  ✅ Result: Clean 2x2 thread grid, no overlap")
+    print("  ✅ Result: Optimized for memory coalescing and warp efficiency")
     
-    # Example 2: With replication
-    print(f"\n📝 Example 2: With Replication for Broadcasting")
-    print("Use case: Share some data across multiple threads")
+    # Example 2: With replication for reduction
+    print(f"\n📝 Example 2: R Sequence Pattern (with replication)")
+    print("Use case: Operations requiring thread cooperation/reduction")
     
-    replicated_encoding = TileDistributionEncoding(
-        rs_lengths=[2],                   # 2-way replication
-        hs_lengthss=[[2, 2], [2, 2]],   
-        ps_to_rhss_major=[[0], [2]],     # P0 affects replication
-        ps_to_rhss_minor=[[0], [0]],     
-        ys_to_rhs_major=[0, 0, 2, 2],    # Y maps to replication too
-        ys_to_rhs_minor=[0, 1, 0, 1]     
+    r_sequence_encoding = TileDistributionEncoding(
+        rs_lengths=[2, 8],  # WarpPerBlock_M=2, ThreadPerWarp_M=8
+        hs_lengthss=[[4, 2, 8, 4]],  # Only N dimension has H
+        ps_to_rhss_major=[[0, 1], [0, 1]],  # P maps to R dimensions
+        ps_to_rhss_minor=[[0, 1], [1, 2]],
+        ys_to_rhs_major=[1, 1],             # Y maps to H dimensions
+        ys_to_rhs_minor=[0, 3]
     )
     
-    print("  ✅ Result: Some data shared between thread pairs")
+    print("  ✅ Result: Enables thread cooperation for reductions")
     
-    # Example 3: Different tile sizes
-    print(f"\n📝 Example 3: Larger Tiles for Better Performance")
-    print("Use case: Each thread handles more work (4x4 tiles)")
+    # Example 3: Matrix multiplication pattern
+    print(f"\n📝 Example 3: GEMM-style Pattern")
+    print("Use case: Matrix multiplication with tile sizes optimized for tensor cores")
     
-    large_tile_encoding = TileDistributionEncoding(
-        rs_lengths=[],                    
-        hs_lengthss=[[4, 4], [4, 4]],   # Larger tiles
-        ps_to_rhss_major=[[1], [2]],     
-        ps_to_rhss_minor=[[0], [0]],     
-        ys_to_rhs_major=[1, 1, 2, 2],    
-        ys_to_rhs_minor=[0, 1, 0, 1]     
+    gemm_encoding = TileDistributionEncoding(
+        rs_lengths=[],
+        hs_lengthss=[
+            [2, 4, 8, 8],  # M: larger tiles for tensor cores
+            [2, 4, 8, 8]   # N: matching tile structure
+        ],
+        ps_to_rhss_major=[[1, 2], [1, 2]],
+        ps_to_rhss_minor=[[1, 2], [1, 2]],  # Different minor pattern
+        ys_to_rhs_major=[1, 1, 2, 2],
+        ys_to_rhs_minor=[0, 3, 0, 3]
     )
     
-    print("  ✅ Result: Better cache utilization, fewer threads needed")
+    print("  ✅ Result: Optimized for tensor core operations")
     
-    print("✅ Practical examples: Common encoding patterns demonstrated")
+    print("✅ Practical examples: Real GPU patterns demonstrated")
     
-    return [simple_encoding, replicated_encoding, large_tile_encoding]
+    return [rmsnorm_encoding, r_sequence_encoding, gemm_encoding]
 
 def test_encoding_internals():
     """Test encoding internal operations."""
     print_step(7, "Testing Encoding Internals")
     
-    def test_encoding_creation():
-        """Test that encodings can be created."""
+    def test_rmsnorm_encoding():
+        """Test RMSNorm encoding creation."""
         try:
             encoding = TileDistributionEncoding(
                 rs_lengths=[],
-                hs_lengthss=[[2, 2], [2, 2]],
-                ps_to_rhss_major=[[1], [2]],
-                ps_to_rhss_minor=[[0], [0]],
+                hs_lengthss=[[4, 2, 8, 4], [4, 2, 8, 4]],
+                ps_to_rhss_major=[[1, 2], [1, 2]],
+                ps_to_rhss_minor=[[1, 1], [2, 2]],
                 ys_to_rhs_major=[1, 1, 2, 2],
-                ys_to_rhs_minor=[0, 1, 0, 1]
+                ys_to_rhs_minor=[0, 3, 0, 3]
             )
+            return True
+        except Exception:
+            return False
+    
+    def test_r_sequence_encoding():
+        """Test R sequence encoding with replication."""
+        try:
+            encoding = TileDistributionEncoding(
+                rs_lengths=[2, 8],
+                hs_lengthss=[[4, 2, 8, 4]],
+                ps_to_rhss_major=[[0, 1], [0, 1]],
+                ps_to_rhss_minor=[[0, 1], [1, 2]],
+                ys_to_rhs_major=[1, 1],
+                ys_to_rhs_minor=[0, 3]
+            )
+            return True
+        except Exception:
+            return False
+    
+    def test_tile_distribution_creation():
+        """Test that tile distributions can be created from encodings."""
+        try:
+            encoding = TileDistributionEncoding(
+                rs_lengths=[],
+                hs_lengthss=[[4, 2, 8, 4], [4, 2, 8, 4]],
+                ps_to_rhss_major=[[1, 2], [1, 2]],
+                ps_to_rhss_minor=[[1, 1], [2, 2]],
+                ys_to_rhs_major=[1, 1, 2, 2],
+                ys_to_rhs_minor=[0, 3, 0, 3]
+            )
+            tile_distribution = make_static_tile_distribution(encoding)
             return True
         except Exception:
             return False
@@ -285,11 +337,11 @@ def test_encoding_internals():
         """Test that encoding has all required fields."""
         encoding = TileDistributionEncoding(
             rs_lengths=[],
-            hs_lengthss=[[2, 2], [2, 2]],
-            ps_to_rhss_major=[[1], [2]],
-            ps_to_rhss_minor=[[0], [0]],
+            hs_lengthss=[[4, 2, 8, 4], [4, 2, 8, 4]],
+            ps_to_rhss_major=[[1, 2], [1, 2]],
+            ps_to_rhss_minor=[[1, 1], [2, 2]],
             ys_to_rhs_major=[1, 1, 2, 2],
-            ys_to_rhs_minor=[0, 1, 0, 1]
+            ys_to_rhs_minor=[0, 3, 0, 3]
         )
         
         required_fields = [
@@ -299,54 +351,11 @@ def test_encoding_internals():
         
         return all(hasattr(encoding, field) for field in required_fields)
     
-    def test_tile_distribution_creation():
-        """Test that tile distributions can be created from encodings."""
-        try:
-            encoding = TileDistributionEncoding(
-                rs_lengths=[],
-                hs_lengthss=[[2, 2], [2, 2]],
-                ps_to_rhss_major=[[1], [2]],
-                ps_to_rhss_minor=[[0], [0]],
-                ys_to_rhs_major=[1, 1, 2, 2],
-                ys_to_rhs_minor=[0, 1, 0, 1]
-            )
-            tile_distribution = make_static_tile_distribution(encoding)
-            return True
-        except Exception:
-            return False
-    
-    def test_different_encodings():
-        """Test that different encoding parameters work."""
-        try:
-            # Test with replication
-            encoding1 = TileDistributionEncoding(
-                rs_lengths=[2],
-                hs_lengthss=[[2, 2], [2, 2]],
-                ps_to_rhss_major=[[0], [2]],
-                ps_to_rhss_minor=[[0], [0]],
-                ys_to_rhs_major=[0, 0, 2, 2],
-                ys_to_rhs_minor=[0, 1, 0, 1]
-            )
-            
-            # Test with larger tiles
-            encoding2 = TileDistributionEncoding(
-                rs_lengths=[],
-                hs_lengthss=[[4, 4], [4, 4]],
-                ps_to_rhss_major=[[1], [2]],
-                ps_to_rhss_minor=[[0], [0]],
-                ys_to_rhs_major=[1, 1, 2, 2],
-                ys_to_rhs_minor=[0, 1, 0, 1]
-            )
-            
-            return True
-        except Exception:
-            return False
-    
     tests = [
-        ("Encoding creation", test_encoding_creation),
-        ("Required fields", test_encoding_has_required_fields),
+        ("RMSNorm encoding", test_rmsnorm_encoding),
+        ("R sequence encoding", test_r_sequence_encoding),
         ("Tile distribution creation", test_tile_distribution_creation),
-        ("Different encodings", test_different_encodings)
+        ("Required fields", test_encoding_has_required_fields)
     ]
     
     results = []
@@ -397,5 +406,5 @@ def main():
     return all_tests_passed
 
 if __name__ == "__main__":
-    success = run_script_safely(main, "Encoding Internals")
-    sys.exit(0 if success else 1) 
+    success = run_script_safely("Encoding Internals", main)
+    sys.exit(0 if success else 1)
