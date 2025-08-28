@@ -45,19 +45,6 @@ EXAMPLES = {
         sequence<0, 3, 0, 3>>{}
     """,
     
-    "Complex Distribution": """
-    tile_distribution_encoding<
-        sequence<1>,                            // 0 R
-        tuple<sequence<16, 4>,                  // H (X0)
-              sequence<16, 4, 4>>,              // H (X1)
-        tuple<sequence<1, 1>,                   // p major
-              sequence<2, 2>>,                  // p minor
-        tuple<sequence<0, 1>,                   // p minor
-              sequence<0, 0>>,                  // p minor
-        sequence<1, 1, 2>,                      // Y major
-        sequence<1, 0, 1>>{}                    // y minor
-    """,
-    
     "Custom Y Dimension Mapping": """
     tile_distribution_encoding<
         sequence<1>,                            // 0 R

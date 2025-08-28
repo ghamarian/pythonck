@@ -1293,8 +1293,17 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
         print(f"DEBUG: In 'data' view mode. encoding found: {bool(encoding_for_data)}")
         print(f"DEBUG: RsLengths: {rs_lengths_for_data}")
         
-        # Calculate data IDs for ALL threads
-        thread_data_ids = calculate_data_ids(hierarchical_structure, encoding_for_data, rs_lengths_for_data)
+        # Extract data IDs from the thread blocks - they're already calculated!
+        for warp_key, warp_data in thread_blocks.items():
+            if isinstance(warp_data, dict):
+                for thread_key, thread_info in warp_data.items():
+                    # Skip metadata entries (those starting with underscore)
+                    if thread_key.startswith('_'):
+                        continue
+                    if isinstance(thread_info, dict):
+                        global_id = thread_info.get('global_id', 0)
+                        data_id = thread_info.get('data_id', 0)
+                        thread_data_ids[global_id] = data_id
         
         # Generate a color palette for data IDs
         unique_data_ids = sorted(set(thread_data_ids.values()))
@@ -1333,8 +1342,28 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
     # Draw the 2D grid of warps
     for m in range(visible_warp_rows):
         for n in range(visible_warp_cols):
-            # Calculate the warp index
-            warp_idx = m * warps_per_block_n + n
+            # Calculate the warp index based on iteration pattern
+            # Check if we need column-major ordering (when P0 maps to H1 first)
+            use_column_major_warps = False
+            
+            # Get encoding from viz_data if available to determine warp ordering
+            encoding_data = viz_data.get('encoding', {})
+            if encoding_data and 'Ps2RHssMajor' in encoding_data:
+                ps2rhs_major = encoding_data.get('Ps2RHssMajor', [])
+                if len(ps2rhs_major) > 0 and isinstance(ps2rhs_major[0], list) and len(ps2rhs_major[0]) >= 1:
+                    # Check if P0 maps to H1 first (column-major pattern)
+                    # Major=1 means H0, Major=2 means H1
+                    first_major = ps2rhs_major[0][0]
+                    if first_major == 2:  # P0 maps to H1 first
+                        use_column_major_warps = True
+                    # else: first_major == 1 means H0 first, which is row-major (default)
+            
+            if use_column_major_warps:
+                # Column-major: iterate down columns first
+                warp_idx = n * warps_per_block_m + m
+            else:
+                # Row-major: iterate across rows first (default)
+                warp_idx = m * warps_per_block_n + n
             
             if warp_idx >= total_warps or warps_shown >= MAX_DISPLAY_WARPS:
                 continue
@@ -1398,6 +1427,14 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
             if cell_width > min_cell_dim_for_text and cell_height > min_cell_dim_for_text:
                 # Draw threads within this warp
                 for thread_key, thread_data in warp_data.items():
+                    # Skip metadata entries (those starting with underscore)
+                    if thread_key.startswith('_'):
+                        continue
+                    
+                    # Now thread_data should be a dictionary
+                    if not isinstance(thread_data, dict):
+                        continue
+                        
                     thread_pos = thread_data.get('position', [0, 0])
                     thread_id = thread_data.get('global_id', 0)
                     
@@ -1865,8 +1902,7 @@ def calculate_data_ids(hierarchical_structure, encoding=None, rs_lengths=None):
     for warp_id, warp_data in thread_blocks.items():
         warp_idx = int(warp_id.replace('Warp', ''))
         
-        # Calculate warp position in the block (row, column)
-        warp_width = warp_per_block[1]  # Number of warps per row
+        # Calculate warp position in the block (row, column) warp_width = warp_per_block[1]  # Number of warps per row
         warp_row = warp_idx // warp_width
         warp_col = warp_idx % warp_width
         
@@ -1874,6 +1910,15 @@ def calculate_data_ids(hierarchical_structure, encoding=None, rs_lengths=None):
         
         # For each thread in the warp
         for thread_id, thread_info in warp_data.items():
+            # Skip metadata entries (those starting with underscore)
+            if thread_id.startswith('_'):
+                continue
+                
+            # Ensure thread_info is a dictionary
+            if not isinstance(thread_info, dict):
+                print(f"DEBUG: Skipping thread {thread_id} - not a dict: {type(thread_info)}")
+                continue
+                
             # Get thread's global ID
             global_id = thread_info.get('global_id')
             

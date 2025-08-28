@@ -1196,7 +1196,14 @@ class TileDistributionPedantic:
         This includes hierarchical structure, occupancy, utilization, etc.
         """
         hierarchical_structure = self.calculate_hierarchical_tile_structure()
-        return {
+        
+        # DEBUG: Check what calculate_hierarchical_tile_structure returned
+        if not isinstance(hierarchical_structure, dict):
+            print(f"ERROR: calculate_hierarchical_tile_structure returned {type(hierarchical_structure)} instead of dict")
+            print(f"Value: {hierarchical_structure}")
+            hierarchical_structure = {}  # Fallback to empty dict
+        
+        result = {
             'tile_shape': self.tile_shape, 
             'thread_mapping': self.thread_mapping,
             'dimensions': self._get_compatible_dimensions_dict(),
@@ -1205,6 +1212,15 @@ class TileDistributionPedantic:
             'hierarchical_structure': hierarchical_structure, 
             'source_code': self.DstrEncode.source_code,
         }
+        
+        # DEBUG: Verify the result is a dict before returning
+        if not isinstance(result, dict):
+            print(f"ERROR: get_visualization_data is about to return {type(result)} instead of dict!")
+            print(f"Value: {result}")
+            # This should never happen, but let's be safe
+            return {'error': 'Unexpected type in get_visualization_data'}
+        
+        return result
 
     def calculate_hierarchical_tile_structure(self) -> typing.Dict[str, typing.Any]:
         """
@@ -1238,28 +1254,9 @@ class TileDistributionPedantic:
             'VectorDimensionYSIndex': -1
         }
 
-        # Determine if our single P tuple should be treated as P1 instead of P0
-        is_p1_pattern = False
-        if (self.NDimPs == 1 and len(self.DstrEncode.Ps2RHssMajor) == 1 and 
-                len(self.DstrEncode.Ps2RHssMinor) == 1):
-            p_major = self.DstrEncode.Ps2RHssMajor[0]
-            p_minor = self.DstrEncode.Ps2RHssMinor[0]
-            
-            # CORRECTED LOGIC: A single P sequence is always P0 by default
-            # Only detect as P1 in the VERY specific case of ThreadPerWarp pattern
-            # Which is just one specific case: major=2, minor=1 (H1[1] which is traditionally ThreadPerWarp_M)
-            if isinstance(p_major, list) and isinstance(p_minor, list):
-                # Only the exact ThreadPerWarp pattern of H1[1] is detected as P1
-                if 2 in p_major and 1 in p_minor and not (1 in p_major and 0 in p_minor):
-                    is_p1_pattern = True
-                    print(f"DEBUG: Detected P1 pattern in single P tuple - specific H1[1] pattern")
-            elif not isinstance(p_major, list) and not isinstance(p_minor, list):
-                # Handle scalar case with same limited detection
-                if p_major == 2 and p_minor == 1:
-                    is_p1_pattern = True
-                    print(f"DEBUG: Detected P1 pattern in single P tuple (scalar case) - H1[1]")
-
-            print(f"DEBUG: P1 pattern detection result: {is_p1_pattern} for P mapping: major={p_major}, minor={p_minor}")
+        # No complex P1 pattern detection needed - we follow simple rules:
+        # NDimPs == 2: P0 = WarpPerBlock, P1 = ThreadPerWarp
+        # NDimPs == 1: P0 = ThreadPerWarp, WarpPerBlock = [1,1]
 
         # Populate DimensionValues from HsLengthss (raw, for annotation)
         # Also resolve variable names to values for HsLengthss for internal use
@@ -1407,98 +1404,95 @@ class TileDistributionPedantic:
                     hierarchical_info['VectorDimensions'] = [last_ys_len]
                     hierarchical_info['VectorDimensionYSIndex'] = self.NDimYs - 1
 
-        # --- Process ThreadPerWarp ---
-        # Default to [1,1] initially
+        # --- Process ThreadPerWarp and WarpPerBlock ---
+        # The rule is simple:
+        # - P0 always controls WarpPerBlock (when NDimPs >= 1)
+        # - P1 always controls ThreadPerWarp (when NDimPs == 2)
+        # - The minor index just tells us which component of H to use
+        # - The major index tells us M vs N dimension
+        
         tpw_m_len = 1
         tpw_n_len = 1
-
-        # If we detected a P1 pattern in a single P tuple, use that as P1
-        # BUT we need to use index 0 since there's only one P dimension in the array
-        p_dim_for_threads = 0 if is_p1_pattern else 1
-        
-        if self.NDimPs >= 2 or is_p1_pattern: # Use P1 for ThreadPerWarp
-            p1_contrib_lens = self._get_lengths_for_p_dim_component(p_dim_for_threads) # Get all lengths P1 maps to
-            if p1_contrib_lens:
-                tpw_m_len = p1_contrib_lens[0] # First component for M-dim
-                if len(p1_contrib_lens) > 1:
-                    tpw_n_len = p1_contrib_lens[1] # Second component for N-dim
-                else:
-                    tpw_n_len = 1 # If P1 maps to only one, N-dim is 1
-            else:
-                # P1 exists but has no valid mappings - keep ThreadPerWarp at [1,1]
-                print(f"DEBUG: P{p_dim_for_threads} exists but no component lengths are mapped to it. Setting ThreadPerWarp=[1,1].")
-                tpw_m_len = 1
-                tpw_n_len = 1
-        elif self.NDimPs == 1 and not is_p1_pattern: # Only P0 exists, special care needed
-            # By default, in Composable Kernels when there's only one P dimension (P0),
-            # it's more often used for WarpPerBlock, not ThreadPerWarp, especially when
-            # mapping to R dimensions or the first components in H-sequences.
-            
-            # Check if this looks like a WarpPerBlock mapping pattern
-            p0_maps_to_warp = False
-            
-            if self.DstrEncode.Ps2RHssMajor and self.DstrEncode.Ps2RHssMinor:
-                p0_major_mappings = self.DstrEncode.Ps2RHssMajor[0] if 0 < len(self.DstrEncode.Ps2RHssMajor) else []
-                p0_minor_mappings = self.DstrEncode.Ps2RHssMinor[0] if 0 < len(self.DstrEncode.Ps2RHssMinor) else []
-                
-                # Check if P0 maps primarily to R-dimensions or early H components
-                r_mappings_count = sum(1 for major in p0_major_mappings if major == 0)
-                first_h_component_mappings = sum(1 for major, minor in zip(p0_major_mappings, p0_minor_mappings) 
-                                                if major > 0 and (minor == 0 or minor == 1))
-                
-                if r_mappings_count > 0 or first_h_component_mappings > 0:
-                    # This looks like a WarpPerBlock mapping
-                    p0_maps_to_warp = True
-            
-            # For the specific case where P0 maps to components related to WarpPerBlock
-            # or we only have a "warp level" example without thread-level distribution
-            # (detected from P0's mapping pattern), set ThreadPerWarp to [1,1]
-            if p0_maps_to_warp:
-                print(f"DEBUG: NDimPs=1 (only P0) and mapping pattern suggests WarpPerBlock. Setting ThreadPerWarp=[1,1]")
-                tpw_m_len = 1
-                tpw_n_len = 1
-            else:
-                # Traditional inference from P0 (rare case, typically P1 does ThreadPerWarp)
-                p0_contrib_lens = self._get_lengths_for_p_dim_component(0)
-                if p0_contrib_lens:
-                    tpw_m_len = p0_contrib_lens[0]
-                    if len(p0_contrib_lens) > 1:
-                        tpw_n_len = p0_contrib_lens[1]
-                    else:
-                        tpw_n_len = 1
-                
-        hierarchical_info['ThreadPerWarp'] = [max(1,tpw_m_len), max(1,tpw_n_len)]
-
-        # --- Process WarpPerBlock ---
         wpb_m_len = 1
-        wpb_n_len = 1 # Often WPB is [M_warps, 1]
-        
-        # We no longer need special handling for P1 patterns since we're treating single P sequences as P0
-        if self.NDimPs >= 1: # INFERENCE for WarpPerBlock using P0 (aligns with tiler.py)
-            # Use P0 by default
-            p_dim_for_warps = 0
-            
-            p0_contrib_lens = self._get_lengths_for_p_dim_component(p_dim_for_warps)
-            if p0_contrib_lens:
-                wpb_m_len = p0_contrib_lens[0] # First component for M-dim
-                if len(p0_contrib_lens) > 1:
-                    wpb_n_len = p0_contrib_lens[1] # Second component for N-dim (less common for WPB)
-                else:
-                    wpb_n_len = 1 # If P0 maps to only one, N-dim is 1 for WPB
-            # If p0_contrib_lens is empty, wpb_m_len/n_len remain 1
-            hierarchical_info['WarpPerBlock'] = [max(1,wpb_m_len), max(1,wpb_n_len)]
-        # else: default [1,1] already set for WarpPerBlock (from initialization if NDimPs = 0)
+        wpb_n_len = 1
 
-        # If WPB is still [1,1] after inference, and we have some P-dims,
-        # apply a more common default for visualization (e.g., 4 warps in M-dim).
-        # This is a heuristic for better visual representation when true inference is hard.
-        if hierarchical_info['WarpPerBlock'] == [1,1] and self.NDimPs >= 1:
-            # Check if ThreadPerWarp looks reasonable (e.g., not just [1,1])
-            tpw_m, tpw_n = hierarchical_info['ThreadPerWarp']
-            # We no longer need to check for is_p1_pattern since we're treating single P as P0
-            if tpw_m * tpw_n > 1: # If TPW is not trivial
-                 print(f"INFO: WPB resulted in [1,1]. Applying common default [4,1] for visualization as NDimPs={self.NDimPs} >= 1 and TPW is non-trivial ({tpw_m}x{tpw_n}).")
-                 hierarchical_info['WarpPerBlock'] = [4, 1]
+        if self.NDimPs >= 1:
+            # P0 controls WarpPerBlock
+            if self.DstrEncode.Ps2RHssMajor[0] and self.DstrEncode.Ps2RHssMinor[0]:
+                p0_majors = self.DstrEncode.Ps2RHssMajor[0]
+                p0_minors = self.DstrEncode.Ps2RHssMinor[0]
+                
+                if not isinstance(p0_majors, list):
+                    p0_majors = [p0_majors]
+                if not isinstance(p0_minors, list):
+                    p0_minors = [p0_minors]
+                
+                # P0 contributes to WarpPerBlock
+                # The key insight: position in the P mapping determines M vs N:
+                # - First component (idx=0) -> M dimension
+                # - Second component (idx=1) -> N dimension
+                # This applies regardless of whether the component comes from R, H0, or H1
+                for idx, (major, minor) in enumerate(zip(p0_majors, p0_minors)):
+                    # Get the length value
+                    length = 1
+                    if major == 0:  # R component
+                        if 0 <= minor < len(self.DstrEncode.RsLengths):
+                            length = self.DstrEncode.RsLengths[minor]
+                    else:  # H component (major > 0)
+                        h_idx = major - 1
+                        if 0 <= h_idx < len(self.DstrEncode.HsLengthss) and 0 <= minor < len(self.DstrEncode.HsLengthss[h_idx]):
+                            length = self.DstrEncode.HsLengthss[h_idx][minor]
+                    
+                    # Assign based on position in P mapping
+                    if idx == 0:  # First component -> M dimension
+                        wpb_m_len *= length
+                    else:  # Second or later component -> N dimension
+                        wpb_n_len *= length
+
+        if self.NDimPs == 2:
+            # P1 controls ThreadPerWarp
+            if self.DstrEncode.Ps2RHssMajor[1] and self.DstrEncode.Ps2RHssMinor[1]:
+                p1_majors = self.DstrEncode.Ps2RHssMajor[1]
+                p1_minors = self.DstrEncode.Ps2RHssMinor[1]
+                
+                if not isinstance(p1_majors, list):
+                    p1_majors = [p1_majors]
+                if not isinstance(p1_minors, list):
+                    p1_minors = [p1_minors]
+                
+                # P1 contributes to ThreadPerWarp
+                # Same position-based logic as P0
+                for idx, (major, minor) in enumerate(zip(p1_majors, p1_minors)):
+                    # Get the length value
+                    length = 1
+                    if major == 0:  # R component
+                        if 0 <= minor < len(self.DstrEncode.RsLengths):
+                            length = self.DstrEncode.RsLengths[minor]
+                    else:  # H component (major > 0)
+                        h_idx = major - 1
+                        if 0 <= h_idx < len(self.DstrEncode.HsLengthss) and 0 <= minor < len(self.DstrEncode.HsLengthss[h_idx]):
+                            length = self.DstrEncode.HsLengthss[h_idx][minor]
+                    
+                    # Assign based on position in P mapping
+                    if idx == 0:  # First component -> M dimension
+                        tpw_m_len *= length
+                    else:  # Second or later component -> N dimension
+                        tpw_n_len *= length
+        elif self.NDimPs == 1:
+            # Only P0 exists, it controls ThreadPerWarp (no warp-level distribution)
+            # Move P0's contribution from WarpPerBlock to ThreadPerWarp
+            tpw_m_len = wpb_m_len
+            tpw_n_len = wpb_n_len
+            wpb_m_len = 1
+            wpb_n_len = 1
+
+        hierarchical_info['ThreadPerWarp'] = [max(1,tpw_m_len), max(1,tpw_n_len)]
+        hierarchical_info['WarpPerBlock'] = [max(1,wpb_m_len), max(1,wpb_n_len)]
+        
+        print(f"DEBUG: Thread hierarchy calculation:")
+        print(f"  NDimPs = {self.NDimPs}")
+        print(f"  ThreadPerWarp = {hierarchical_info['ThreadPerWarp']}")
+        print(f"  WarpPerBlock = {hierarchical_info['WarpPerBlock']}")
 
         # --- Process Repeat --- 
         # Default repeat is [1,1] (set at initialization)
@@ -1594,30 +1588,191 @@ class TileDistributionPedantic:
             tpw_n * wpb_n * repeat_val_n
         ]
 
-        # ThreadBlocks visualization (Placeholder: generic grid, not pedantic P-coords per thread)
+        # ThreadBlocks visualization - respect P dimension component ordering
         thread_blocks_viz = {}
-        # product() helper should be available from earlier in the function
-        num_warps_to_iterate = product(hierarchical_info['WarpPerBlock'])
-        # The max(1, num_warps_to_iterate) handles the zero case later
         
-        threads_m_in_warp = hierarchical_info['ThreadPerWarp'][0]
-        threads_n_in_warp = hierarchical_info['ThreadPerWarp'][1]
-
-        # Ensure threads_m_in_warp and threads_n_in_warp are at least 1
-        threads_m_in_warp = max(1, threads_m_in_warp)
-        threads_n_in_warp = max(1, threads_n_in_warp)
-        num_warps_to_iterate = max(1, num_warps_to_iterate)
-
-        current_global_vis_thread_id = 0
-        for warp_iter_idx in range(num_warps_to_iterate):
-            warp_key = f"Warp{warp_iter_idx}"
+        # Get warp and thread dimensions
+        warps_m = hierarchical_info['WarpPerBlock'][0]
+        warps_n = hierarchical_info['WarpPerBlock'][1]
+        threads_m = hierarchical_info['ThreadPerWarp'][0]
+        threads_n = hierarchical_info['ThreadPerWarp'][1]
+        
+        # Ensure minimum of 1
+        warps_m = max(1, warps_m)
+        warps_n = max(1, warps_n)
+        threads_m = max(1, threads_m)
+        threads_n = max(1, threads_n)
+        
+        # Determine warp iteration order based on P0's mapping pattern
+        warp_row_major = True  # Default
+        
+        if self.NDimPs >= 1 and len(self.DstrEncode.Ps2RHssMajor) >= 1:
+            # Get P0's mappings
+            p0_majors = self.DstrEncode.Ps2RHssMajor[0]
+            if not isinstance(p0_majors, list):
+                p0_majors = [p0_majors]
+            
+            # Analyze P0's mapping pattern (same logic as thread numbering)
+            if len(p0_majors) >= 2:
+                first_major = p0_majors[0]
+                second_major = p0_majors[1]
+                
+                if first_major > second_major:
+                    # Higher dimension first means column-major
+                    warp_row_major = False
+                    print(f"DEBUG: P0 mapping pattern suggests column-major warp iteration (first={first_major}, second={second_major})")
+                else:
+                    # Lower dimension first means row-major
+                    warp_row_major = True
+                    print(f"DEBUG: P0 mapping pattern suggests row-major warp iteration (first={first_major}, second={second_major})")
+            elif p0_majors:
+                # P0 has only one mapping, check which H it maps to
+                first_major = p0_majors[0]
+                if first_major == 1:  # Maps to H0
+                    warp_row_major = True
+                    print(f"DEBUG: P0's single component maps to H0 (major={first_major}) -> row-major warp iteration")
+                elif first_major == 2:  # Maps to H1
+                    warp_row_major = False
+                    print(f"DEBUG: P0's single component maps to H1 (major={first_major}) -> column-major warp iteration")
+                else:
+                    # For other H indices, default to row-major
+                    warp_row_major = True
+                    print(f"DEBUG: P0's single component maps to H{first_major-1} -> defaulting to row-major warp iteration")
+        
+        # Determine thread iteration order based on P's mapping pattern
+        thread_row_major = True  # Default
+        
+        if self.NDimPs >= 2 and len(self.DstrEncode.Ps2RHssMajor) >= 2:
+            # When we have 2 P dimensions, P1 controls threads
+            # Get P1's mappings
+            p1_majors = self.DstrEncode.Ps2RHssMajor[1]
+            if not isinstance(p1_majors, list):
+                p1_majors = [p1_majors]
+            
+            # Analyze P1's mapping pattern
+            if len(p1_majors) >= 2:
+                first_major = p1_majors[0]
+                second_major = p1_majors[1]
+                
+                if first_major > second_major:
+                    # Higher dimension first means column-major
+                    thread_row_major = False
+                    print(f"DEBUG: P1 mapping pattern suggests column-major thread iteration (first={first_major}, second={second_major})")
+                else:
+                    # Lower dimension first means row-major
+                    thread_row_major = True
+                    print(f"DEBUG: P1 mapping pattern suggests row-major thread iteration (first={first_major}, second={second_major})")
+            elif p1_majors:
+                # P1 has only one mapping, check which H it maps to
+                first_major = p1_majors[0]
+                if first_major == 1:  # Maps to H0
+                    thread_row_major = True
+                    print(f"DEBUG: P1's single component maps to H0 (major={first_major}) -> row-major thread iteration")
+                elif first_major == 2:  # Maps to H1
+                    thread_row_major = False
+                    print(f"DEBUG: P1's single component maps to H1 (major={first_major}) -> column-major thread iteration")
+        elif self.NDimPs == 1 and len(self.DstrEncode.Ps2RHssMajor) >= 1:
+            # When we have only 1 P dimension, P0 controls threads
+            # Get P0's mappings
+            p0_majors = self.DstrEncode.Ps2RHssMajor[0]
+            if not isinstance(p0_majors, list):
+                p0_majors = [p0_majors]
+            
+            # Analyze P0's mapping pattern for thread ordering
+            if len(p0_majors) >= 2:
+                first_major = p0_majors[0]
+                second_major = p0_majors[1]
+                
+                if first_major > second_major:
+                    # Higher dimension first means column-major
+                    thread_row_major = False
+                    print(f"DEBUG: P0 mapping pattern suggests column-major thread iteration (first={first_major}, second={second_major})")
+                else:
+                    # Lower dimension first means row-major
+                    thread_row_major = True
+                    print(f"DEBUG: P0 mapping pattern suggests row-major thread iteration (first={first_major}, second={second_major})")
+            elif p0_majors:
+                # P0 has only one mapping, check which H it maps to
+                first_major = p0_majors[0]
+                if first_major == 1:  # Maps to H0
+                    thread_row_major = True
+                    print(f"DEBUG: P0's single component maps to H0 (major={first_major}) -> row-major thread iteration")
+                elif first_major == 2:  # Maps to H1
+                    thread_row_major = False
+                    print(f"DEBUG: P0's single component maps to H1 (major={first_major}) -> column-major thread iteration")
+        
+        # Build warp list with proper iteration order
+        warp_id = 0
+        warp_list = []
+        
+        if warp_row_major:
+            # Row-major: M changes slowly, N changes fast
+            for warp_m_idx in range(warps_m):
+                for warp_n_idx in range(warps_n):
+                    warp_list.append({
+                        'id': warp_id,
+                        'position': [warp_m_idx, warp_n_idx]
+                    })
+                    warp_id += 1
+        else:
+            # Column-major: N changes slowly, M changes fast
+            for warp_n_idx in range(warps_n):
+                for warp_m_idx in range(warps_m):
+                    warp_list.append({
+                        'id': warp_id,
+                        'position': [warp_m_idx, warp_n_idx]
+                    })
+                    warp_id += 1
+        
+        # Now build threads within each warp
+        for warp_info in warp_list:
+            warp_key = f"Warp{warp_info['id']}"
             thread_blocks_viz[warp_key] = {}
-            for tm_idx in range(threads_m_in_warp):
-                for tn_idx in range(threads_n_in_warp):
-                    thread_blocks_viz[warp_key][f"T{current_global_vis_thread_id}"] = {
-                        "position": [tm_idx, tn_idx], "global_id": current_global_vis_thread_id,
-                    }
-                    current_global_vis_thread_id += 1
+            
+            # Store warp metadata
+            thread_blocks_viz[warp_key]['_warp_position'] = warp_info['position']
+            thread_blocks_viz[warp_key]['_warp_id'] = warp_info['id']
+            
+            # Calculate thread IDs within this warp
+            thread_local_id = 0
+            
+            if thread_row_major:
+                # Row-major: M changes slowly, N changes fast
+                for thread_m_idx in range(threads_m):
+                    for thread_n_idx in range(threads_n):
+                        global_thread_id = warp_info['id'] * (threads_m * threads_n) + thread_local_id
+                        
+                        # Calculate data_id based on replication pattern
+                        data_id = self._calculate_thread_data_id(
+                            warp_info['position'], [thread_m_idx, thread_n_idx],
+                            warps_m, warps_n, threads_m, threads_n
+                        )
+                        
+                        thread_blocks_viz[warp_key][f"T{global_thread_id}"] = {
+                            "position": [thread_m_idx, thread_n_idx],
+                            "global_id": global_thread_id,
+                            "data_id": data_id
+                        }
+                        thread_local_id += 1
+            else:
+                # Column-major: N changes slowly, M changes fast
+                for thread_n_idx in range(threads_n):
+                    for thread_m_idx in range(threads_m):
+                        global_thread_id = warp_info['id'] * (threads_m * threads_n) + thread_local_id
+                        
+                        # Calculate data_id based on replication pattern
+                        data_id = self._calculate_thread_data_id(
+                            warp_info['position'], [thread_m_idx, thread_n_idx],
+                            warps_m, warps_n, threads_m, threads_n
+                        )
+                        
+                        thread_blocks_viz[warp_key][f"T{global_thread_id}"] = {
+                            "position": [thread_m_idx, thread_n_idx],
+                            "global_id": global_thread_id,
+                            "data_id": data_id
+                        }
+                        thread_local_id += 1
+        
         hierarchical_info['ThreadBlocks'] = thread_blocks_viz
         
         # Final check for VectorK from tiler.py, if needed by visualizer
@@ -2134,6 +2289,114 @@ class TileDistributionPedantic:
         Corresponds to TileDistribution::GetWarpId() in C++.
         """
         return 0
+    
+    def _calculate_thread_data_id(self, warp_position, thread_position, warps_m, warps_n, threads_m, threads_n):
+        """
+        Calculate data ID for a thread based on P->R mapping and position.
+        
+        When a P component maps to R, threads controlled by that component share data.
+        The key is to understand which P dimension controls which level:
+        - When NDimPs == 2: P0 controls warps, P1 controls threads
+        - When NDimPs == 1: P0 controls threads (no warp-level distribution)
+        """
+        warp_m, warp_n = warp_position
+        thread_m, thread_n = thread_position
+        
+        # Get RsLengths for checking replication
+        rs_lengths = self.DstrEncode.RsLengths if self.DstrEncode.RsLengths else []
+        
+        # Early check: if no replication, each thread gets unique data ID
+        if not rs_lengths or all(r <= 1 for r in rs_lengths):
+            # Calculate global thread ID as data ID
+            global_thread_id = (warp_m * warps_n + warp_n) * (threads_m * threads_n) + (thread_m * threads_n + thread_n)
+            return global_thread_id
+        
+        # Analyze P->R mappings to determine replication pattern
+        replication_components = []
+        
+        # When we have only 1 P dimension, P0 controls threads within the block
+        if self.NDimPs == 1 and len(self.DstrEncode.Ps2RHssMajor) >= 1:
+            p0_majors = self.DstrEncode.Ps2RHssMajor[0]
+            p0_minors = self.DstrEncode.Ps2RHssMinor[0]
+            
+            if not isinstance(p0_majors, list):
+                p0_majors = [p0_majors]
+            if not isinstance(p0_minors, list):
+                p0_minors = [p0_minors]
+            
+            # Check if P0 components map to R
+            for idx, (major, minor) in enumerate(zip(p0_majors, p0_minors)):
+                if major == 0:  # Maps to R
+                    if minor < len(rs_lengths) and rs_lengths[minor] > 1:
+                        # This component causes replication at thread level
+                        if idx == 0:  # First component - M dimension
+                            # Threads with same M position share data
+                            replication_components.append('thread_m')
+                        else:  # Second component - N dimension
+                            # Threads with same N position share data
+                            replication_components.append('thread_n')
+        
+        # When we have 2 P dimensions, P0 controls warps and P1 controls threads
+        elif self.NDimPs >= 2:
+            # Check P0 mapping (controls warps)
+            if len(self.DstrEncode.Ps2RHssMajor) >= 1:
+                p0_majors = self.DstrEncode.Ps2RHssMajor[0]
+                p0_minors = self.DstrEncode.Ps2RHssMinor[0]
+                
+                if not isinstance(p0_majors, list):
+                    p0_majors = [p0_majors]
+                if not isinstance(p0_minors, list):
+                    p0_minors = [p0_minors]
+                
+                # Check if P0 components map to R
+                for idx, (major, minor) in enumerate(zip(p0_majors, p0_minors)):
+                    if major == 0:  # Maps to R
+                        if minor < len(rs_lengths) and rs_lengths[minor] > 1:
+                            # This component causes replication at warp level
+                            if idx == 0:  # First component - M dimension
+                                replication_components.append('warp_m')
+                            else:  # Second component - N dimension
+                                replication_components.append('warp_n')
+            
+            # Check P1 mapping (controls threads)
+            if len(self.DstrEncode.Ps2RHssMajor) >= 2:
+                p1_majors = self.DstrEncode.Ps2RHssMajor[1]
+                p1_minors = self.DstrEncode.Ps2RHssMinor[1]
+                
+                if not isinstance(p1_majors, list):
+                    p1_majors = [p1_majors]
+                if not isinstance(p1_minors, list):
+                    p1_minors = [p1_minors]
+                
+                # Check if P1 components map to R
+                for idx, (major, minor) in enumerate(zip(p1_majors, p1_minors)):
+                    if major == 0:  # Maps to R
+                        if minor < len(rs_lengths) and rs_lengths[minor] > 1:
+                            # This component causes replication at thread level
+                            if idx == 0:  # First component - M dimension
+                                replication_components.append('thread_m')
+                            else:  # Second component - N dimension
+                                replication_components.append('thread_n')
+        
+        # Calculate data ID based on non-replicated dimensions
+        data_id = 0
+        multiplier = 1
+        
+        # Add dimensions that are NOT replicated
+        if 'thread_n' not in replication_components:
+            data_id += thread_n * multiplier
+            multiplier *= threads_n
+        if 'thread_m' not in replication_components:
+            data_id += thread_m * multiplier
+            multiplier *= threads_m
+        if 'warp_n' not in replication_components:
+            data_id += warp_n * multiplier
+            multiplier *= warps_n
+        if 'warp_m' not in replication_components:
+            data_id += warp_m * multiplier
+            multiplier *= warps_m
+        
+        return data_id
 
 
 # Example usage (similar to tiler.py)
