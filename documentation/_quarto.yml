@@ -79,6 +79,10 @@ website:
           contents:
             - text: "Tile Distribution"
               href: concepts/03_tile_distribution.qmd
+            - text: "Space Filling Curve"
+              href: concepts/03_space_filling_curve.qmd
+            - text: "LoadStoreTraits"
+              href: concepts/03_load_store_traits.qmd
             - text: "Tile Window"
               href: concepts/03_tile_window.qmd
             - text: "Sweep Tile"

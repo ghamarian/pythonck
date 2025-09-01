@@ -37,7 +37,6 @@ documentation/**/*.quarto_ipynb
 
 
 # Images and debug files
-*.png
 *.jpg
 *.jpeg
 *.gif

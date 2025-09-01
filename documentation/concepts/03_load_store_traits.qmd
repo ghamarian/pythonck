@@ -1,0 +1,353 @@
+---
+title: "LoadStoreTraits"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-tools: true
+execute:
+  echo: true
+  warning: false
+---
+
+## Overview
+
+`LoadStoreTraits` is a critical optimization component that analyzes tile distributions to determine the most efficient memory access patterns. It automatically identifies the best dimension for vectorization and creates optimized access sequences using space-filling curves.
+
+## Key Concepts
+
+### 1. **Vectorization Selection**
+LoadStoreTraits analyzes tensor dimensions to find the optimal one for vectorized loads/stores, prioritizing:
+- Contiguous memory access (stride = 1)
+- Maximum vector length
+
+### 2. **Space-Filling Curve Integration**
+Automatically creates a space-filling curve that maximizes cache utilization while respecting vectorization constraints.
+
+### 3. **Access Pattern Optimization**
+Manages the trade-off between vector size and number of memory accesses.
+
+## Basic Usage
+
+```{python}
+#| echo: false
+import sys
+sys.path.append('../..')
+```
+
+```{python}
+import numpy as np
+from pytensor.tile_window import LoadStoreTraits
+from pytensor.tile_distribution import (
+    make_tile_distribution_encoding, make_static_tile_distribution
+)
+
+# Create a tile distribution using encoding (same as in debug scripts)
+encoding = make_tile_distribution_encoding(
+    rs_lengths=[],  # No replication
+    hs_lengthss=[[2, 2], [2, 4]],  # Hierarchical: 4x8 tile total
+    ps_to_rhss_major=[[1], [2]],   # P to RH major mappings
+    ps_to_rhss_minor=[[0], [0]],   # P to RH minor mappings  
+    ys_to_rhs_major=[1, 2],         # Y to RH major mappings
+    ys_to_rhs_minor=[1, 1]          # Y to RH minor mappings
+)
+
+# Create the tile distribution from encoding
+tile_dist = make_static_tile_distribution(encoding)
+traits = LoadStoreTraits(tile_dist, np.float32)
+
+# Get actual shape from distribution
+shape = tile_dist.get_lengths()
+print(f"Tile shape: {shape}")
+print(f"Selected vector dimension: {traits.vector_dim_y}")
+print(f"Scalars per vector: {traits.scalar_per_vector}")
+print(f"Total accesses needed: {traits.num_access}")
+```
+
+## Vectorization Selection Algorithm
+
+LoadStoreTraits intelligently selects the best dimension for vectorization:
+
+```{python}
+# Compare different memory layouts using proper encoding
+layouts = [
+    {
+        "name": "Row-major [4×16]",
+        "encoding": make_tile_distribution_encoding(
+            rs_lengths=[],
+            hs_lengthss=[[2, 2], [4, 4]],  # 2x2 * 4x4 = 4x16
+            ps_to_rhss_major=[[1], [2]],
+            ps_to_rhss_minor=[[0], [0]],
+            ys_to_rhs_major=[1, 2],
+            ys_to_rhs_minor=[1, 1]
+        )
+    },
+    {
+        "name": "Column-major [16×4]",
+        "encoding": make_tile_distribution_encoding(
+            rs_lengths=[],
+            hs_lengthss=[[4, 4], [2, 2]],  # 4x4 * 2x2 = 16x4
+            ps_to_rhss_major=[[1], [2]],
+            ps_to_rhss_minor=[[0], [0]],
+            ys_to_rhs_major=[1, 2],
+            ys_to_rhs_minor=[1, 1]
+        )
+    },
+    {
+        "name": "Square [8×8]",
+        "encoding": make_tile_distribution_encoding(
+            rs_lengths=[],
+            hs_lengthss=[[2, 4], [2, 4]],  # 2x4 * 2x4 = 8x8
+            ps_to_rhss_major=[[1], [2]],
+            ps_to_rhss_minor=[[0], [0]],
+            ys_to_rhs_major=[1, 2],
+            ys_to_rhs_minor=[1, 1]
+        )
+    }
+]
+
+print("Vectorization Selection Analysis:")
+print("-" * 60)
+
+for layout in layouts:
+    tile_dist = make_static_tile_distribution(layout["encoding"])
+    traits = LoadStoreTraits(tile_dist, np.float32)
+    
+    # Get shape from distribution
+    shape = tile_dist.get_lengths()
+    
+    print(f"\n{layout['name']}:")
+    print(f"  Shape: {shape}")
+    
+    # Analyze each dimension
+    # Note: LoadStoreTraits analyzes based on the tile distribution's internal structure
+    print(f"  Selected vector dimension: {traits.vector_dim_y}")
+    print(f"  → Vector size: {traits.scalar_per_vector}, "
+          f"Total accesses: {traits.num_access}")
+```
+
+## Memory Access Patterns
+
+LoadStoreTraits creates efficient access patterns using space-filling curves:
+
+```{python}
+# Demonstrate access pattern for a small tile
+encoding = make_tile_distribution_encoding(
+    rs_lengths=[],
+    hs_lengthss=[[2, 3], [2, 4]],  # (2*3=6) x (2*4=8) = 6x8 tile
+    ps_to_rhss_major=[[1], [2]],
+    ps_to_rhss_minor=[[0], [0]],
+    ys_to_rhs_major=[1, 2],
+    ys_to_rhs_minor=[1, 1]
+)
+tile_dist = make_static_tile_distribution(encoding)
+traits = LoadStoreTraits(tile_dist, np.float32)
+
+# Get actual tile shape
+shape = tile_dist.get_lengths()
+print(f"Tile: {shape[0]}×{shape[1]}")
+print(f"Vector dimension: {traits.vector_dim_y}")
+print(f"Scalars per access: {traits.scalars_per_access}")
+print(f"\nAccess sequence (showing first few):")
+
+# Visualize access pattern
+num_accesses_to_show = min(6, traits.num_access)
+for i in range(num_accesses_to_show):
+    access_info = traits.get_vectorized_access_info(i)
+    base = access_info['base_indices']
+    vector_elements = access_info['vector_indices']
+    
+    print(f"\nAccess {i}: Base={base}")
+    print(f"  Loads elements: {vector_elements[:4]}...")  # Show first 4 elements
+    
+    # Show visual representation for first access
+    if i == 0:
+        print("\n  Visual representation of full tile:")
+        for row in range(shape[0]):
+            row_str = "  ["
+            for col in range(shape[1]):
+                # Check if this element is accessed in ANY of the accesses
+                is_accessed = False
+                for j in range(traits.num_access):
+                    info = traits.get_vectorized_access_info(j)
+                    if any(idx[0] == row and idx[1] == col for idx in info['vector_indices']):
+                        is_accessed = True
+                        break
+                row_str += "■" if is_accessed else "□"
+                if col < shape[1] - 1:
+                    row_str += " "
+            row_str += "]"
+            print(row_str)
+        
+        print("\nWhy this access pattern?")
+        print("- The Y-space has shape [3, 4] (from the tile distribution)")
+        print("- LoadStoreTraits vectorizes dimension 1 (4 elements per access)")
+        print("- The space-filling curve traverses dimension 0 first, then dimension 1")
+        print("- This results in accessing rows [0,0], [1,0], [2,0] before moving right")
+        print("- Each access loads 4 contiguous elements in the selected row")
+```
+
+## Performance Analysis
+
+### Comparing Different Layouts
+
+```{python}
+# Compare performance characteristics using hierarchical encodings
+configs = [
+    {
+        "name": "Simple: 8×8",
+        "encoding": make_tile_distribution_encoding(
+            rs_lengths=[],
+            hs_lengthss=[[2, 4], [2, 4]],  # 8x8
+            ps_to_rhss_major=[[1], [2]],
+            ps_to_rhss_minor=[[0], [0]],
+            ys_to_rhs_major=[1, 2],
+            ys_to_rhs_minor=[1, 1]
+        )
+    },
+    {
+        "name": "Medium: 16×16",
+        "encoding": make_tile_distribution_encoding(
+            rs_lengths=[],
+            hs_lengthss=[[4, 4], [4, 4]],  # 16x16
+            ps_to_rhss_major=[[1], [2]],
+            ps_to_rhss_minor=[[0], [0]],
+            ys_to_rhs_major=[1, 2],
+            ys_to_rhs_minor=[1, 1]
+        )
+    },
+    {
+        "name": "Complex: 16×16 with repeat",
+        "encoding": make_tile_distribution_encoding(
+            rs_lengths=[],
+            hs_lengthss=[[2, 2, 2, 2], [2, 2, 2, 2]],  # Complex pattern
+            ps_to_rhss_major=[[1, 2], [1, 2]],
+            ps_to_rhss_minor=[[1, 1], [2, 2]],
+            ys_to_rhs_major=[1, 1, 2, 2],
+            ys_to_rhs_minor=[0, 3, 0, 3]
+        )
+    }
+]
+
+print("Performance Comparison:")
+print("=" * 70)
+
+for config in configs:
+    tile_dist = make_static_tile_distribution(config["encoding"])
+    traits = LoadStoreTraits(tile_dist, np.float32)
+    
+    shape = tile_dist.get_lengths()
+    total_elements = np.prod(shape)
+    bytes_per_access = traits.scalar_per_vector * 4  # float32
+    cache_lines_per_access = bytes_per_access / 64  # 64-byte cache lines
+    
+    print(f"\n{config['name']}:")
+    print(f"  Shape: {shape}")
+    print(f"  Vector size: {traits.scalar_per_vector} elements")
+    print(f"  Total accesses: {traits.num_access}")
+    print(f"  Bytes per access: {bytes_per_access}")
+    print(f"  Cache lines per access: {cache_lines_per_access:.1f}")
+    print(f"  Elements per thread: {total_elements // traits.num_access if traits.num_access > 0 else 0}")
+```
+
+### Memory Access Efficiency
+
+```{python}
+def analyze_access_efficiency(encoding, name):
+    """Analyze memory access efficiency for a given encoding."""
+    tile_dist = make_static_tile_distribution(encoding)
+    traits = LoadStoreTraits(tile_dist, np.float32)
+    
+    # Calculate metrics
+    shape = tile_dist.get_lengths()
+    total_elements = np.prod(shape)
+    elements_per_access = traits.scalar_per_vector
+    memory_bandwidth_utilization = (elements_per_access * 4) / 64 * 100  # % of cache line used
+    
+    print(f"\n{name}:")
+    print(f"  Tile shape: {shape}")
+    print(f"  Vectorization: Dim {traits.vector_dim_y} with {elements_per_access} elements/access")
+    print(f"  Cache line utilization: {memory_bandwidth_utilization:.1f}%")
+    print(f"  Total memory transactions: {traits.num_access}")
+    print(f"  Scalars per access: {traits.scalars_per_access}")
+    
+    return memory_bandwidth_utilization
+
+# Analyze different scenarios
+print("Memory Access Efficiency Analysis:")
+print("-" * 50)
+
+scenarios = [
+    (make_tile_distribution_encoding(
+        rs_lengths=[],
+        hs_lengthss=[[2, 2], [2, 16]],  # 4x32
+        ps_to_rhss_major=[[1], [2]],
+        ps_to_rhss_minor=[[0], [0]],
+        ys_to_rhs_major=[1, 2],
+        ys_to_rhs_minor=[1, 1]
+    ), "Small tile, full vectorization"),
+    
+    (make_tile_distribution_encoding(
+        rs_lengths=[],
+        hs_lengthss=[[4, 4], [4, 4]],  # 16x16
+        ps_to_rhss_major=[[1], [2]],
+        ps_to_rhss_minor=[[0], [0]],
+        ys_to_rhs_major=[1, 2],
+        ys_to_rhs_minor=[1, 1]
+    ), "Square tile, medium vectorization"),
+    
+    (make_tile_distribution_encoding(
+        rs_lengths=[],
+        hs_lengthss=[[2, 2, 2, 2], [2, 2, 2, 2]],  # Complex 16x16
+        ps_to_rhss_major=[[1, 2], [1, 2]],
+        ps_to_rhss_minor=[[1, 1], [2, 2]],
+        ys_to_rhs_major=[1, 1, 2, 2],
+        ys_to_rhs_minor=[0, 3, 0, 3]
+    ), "Complex pattern with repeat blocks")
+]
+
+efficiencies = []
+for encoding, name in scenarios:
+    eff = analyze_access_efficiency(encoding, name)
+    efficiencies.append(eff)
+```
+
+## Integration with Space-Filling Curves
+
+LoadStoreTraits automatically configures space-filling curves for optimal access:
+
+```{python}
+# Show space-filling curve configuration
+encoding = make_tile_distribution_encoding(
+    rs_lengths=[],
+    hs_lengthss=[[2, 2], [3, 4]],  # 4x12 tile
+    ps_to_rhss_major=[[1], [2]],
+    ps_to_rhss_minor=[[0], [0]],
+    ys_to_rhs_major=[1, 2],
+    ys_to_rhs_minor=[1, 1]
+)
+tile_dist = make_static_tile_distribution(encoding)
+traits = LoadStoreTraits(tile_dist, np.float32)
+
+print("LoadStoreTraits → SpaceFillingCurve Configuration:")
+print(f"  Tensor lengths: {traits.sfc_ys.tensor_lengths}")
+print(f"  Dimension access order: {traits.sfc_ys.dim_access_order}")
+print(f"  Scalars per access: {traits.sfc_ys.scalars_per_access}")
+print(f"  Snake curved: {traits.sfc_ys.snake_curved}")
+
+print("\nKey optimization: Vector dimension is moved to end of access order")
+print("This ensures contiguous memory access within each vector load")
+
+# Demonstrate the access order
+print("\nResulting access pattern:")
+for i in range(min(6, traits.num_access)):
+    indices = traits.get_y_indices(i)
+    print(f"  Access {i}: indices={indices}")
+```
+
+## Related Components
+
+- `SpaceFillingCurve`: Used internally for access pattern generation
+- `TileWindow`: Uses LoadStoreTraits for efficient tile access
+- `TileDistribution`: Provides the tensor layout information analyzed by LoadStoreTraits

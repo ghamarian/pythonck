@@ -1,0 +1,435 @@
+---
+title: "Space-Filling Curve"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-tools: true
+execute:
+  echo: true
+  warning: false
+---
+
+
+## Overview
+
+The `SpaceFillingCurve` class provides a way to traverse multi-dimensional tensors in a systematic manner, supporting both scalar and vectorized access patterns. This is particularly useful for optimizing memory access patterns in GPU kernels and understanding how data is accessed in tiled algorithms.
+
+## Key Concepts
+
+### 1. **Tensor Traversal**
+The space-filling curve defines a mapping from a 1D access index to multi-dimensional tensor coordinates.
+
+### 2. **Vectorized Access**
+Supports accessing multiple elements at once (e.g., vector loads) by specifying `scalars_per_access`.
+
+### 3. **Dimension Ordering**
+Allows customizing the order in which dimensions are traversed (e.g., row-major vs column-major).
+
+## API Reference
+
+### Constructor
+
+```python
+SpaceFillingCurve(
+    tensor_lengths: List[int],
+    dim_access_order: List[int], 
+    scalars_per_access: List[int],
+    snake_curved: bool = True
+)
+```
+
+**Parameters:**
+- `tensor_lengths`: Shape of the tensor (e.g., `[4, 6]` for a 4×6 matrix)
+- `dim_access_order`: Order to traverse dimensions (e.g., `[0, 1]` for row-major)
+- `scalars_per_access`: Number of elements accessed per dimension (e.g., `[1, 4]` for vector-4 on dim 1)
+- `snake_curved`: Whether to use snake-like pattern (currently not implemented)
+
+### Methods
+
+#### `get_num_of_access() -> int`
+Returns the total number of accesses needed to cover the entire tensor.
+
+#### `get_index(i_access: int) -> List[int]`
+Converts a 1D access index to multi-dimensional tensor coordinates.
+
+#### `get_forward_step(i_access: int) -> List[int]`
+Returns the step vector from access `i` to access `i+1`.
+
+#### `get_step_between(start: int, end: int) -> List[int]`
+Returns the step vector between any two access indices.
+
+## Examples
+
+### Basic Usage - Scalar Access
+
+```{python}
+import sys
+sys.path.append('..')
+from pytensor.space_filling_curve import SpaceFillingCurve
+
+# Create a simple 2D curve with scalar access
+sfc = SpaceFillingCurve(
+    tensor_lengths=[4, 6],
+    dim_access_order=[0, 1],  # Row-major
+    scalars_per_access=[1, 1], # Scalar access
+    snake_curved=False
+)
+
+print(f"Total accesses needed: {sfc.get_num_of_access()}")
+print("\nFirst 10 access positions:")
+for i in range(10):
+    print(f"  Access {i}: {sfc.get_index(i)}")
+```
+
+### Vectorized Access
+
+```{python}
+# Create curve with vector-4 access on dimension 1
+sfc_vec = SpaceFillingCurve(
+    tensor_lengths=[4, 8],
+    dim_access_order=[0, 1],
+    scalars_per_access=[1, 4],  # Vector-4 on dimension 1
+    snake_curved=False
+)
+
+print(f"Access lengths: {sfc_vec.access_lengths}")
+print(f"Total accesses: {sfc_vec.get_num_of_access()}")
+print("\nAccess pattern:")
+for i in range(sfc_vec.get_num_of_access()):
+    indices = sfc_vec.get_index(i)
+    print(f"  Access {i}: indices={indices} (covers columns {indices[1]} to {indices[1]+3})")
+```
+
+### Column-Major vs Row-Major
+
+```{python}
+# Compare row-major and column-major access patterns
+tensor_shape = [4, 6]
+
+# Row-major
+sfc_row = SpaceFillingCurve(
+    tensor_lengths=tensor_shape,
+    dim_access_order=[0, 1],
+    scalars_per_access=[1, 1],
+    snake_curved=False
+)
+
+# Column-major  
+sfc_col = SpaceFillingCurve(
+    tensor_lengths=tensor_shape,
+    dim_access_order=[1, 0],
+    scalars_per_access=[1, 1],
+    snake_curved=False
+)
+
+print("Row-major access (first 6):")
+for i in range(6):
+    print(f"  {sfc_row.get_index(i)}")
+    
+print("\nColumn-major access (first 6):")
+for i in range(6):
+    print(f"  {sfc_col.get_index(i)}")
+```
+
+### 3D Tensor Access
+
+```{python}
+# 3D tensor with vectorized access on last dimension
+sfc_3d = SpaceFillingCurve(
+    tensor_lengths=[2, 3, 4],      # 2×3×4 tensor
+    dim_access_order=[0, 1, 2],    # Access order
+    scalars_per_access=[1, 1, 2],  # Vector-2 on last dim
+    snake_curved=False
+)
+
+print(f"Access lengths: {sfc_3d.access_lengths}")
+print(f"Total accesses: {sfc_3d.get_num_of_access()}")
+
+print("\nFirst 6 accesses:")
+for i in range(6):
+    indices = sfc_3d.get_index(i)
+    print(f"  Access {i}: {indices}")
+```
+
+## Advanced Usage
+
+### GEMM-Like Tiled Access
+
+```{python}
+# Simulate accessing a 16×32 tile with vector-8 loads
+# Using column-major order for coalesced memory access
+sfc_gemm = SpaceFillingCurve(
+    tensor_lengths=[16, 32],
+    dim_access_order=[1, 0],    # Column-major
+    scalars_per_access=[1, 8],  # Vector-8 loads
+    snake_curved=False
+)
+
+print(f"Tile access properties:")
+print(f"  - Access dimensions: {sfc_gemm.access_lengths}")
+print(f"  - Total accesses: {sfc_gemm.get_num_of_access()}")
+print(f"  - Elements per access: {sfc_gemm.scalar_per_vector}")
+
+# Analyze access pattern
+print("\nFirst column of accesses:")
+for i in range(8):
+    indices = sfc_gemm.get_index(i)
+    print(f"  Access {i}: row {indices[0]}, cols [{indices[1]}:{indices[1]+8}]")
+```
+
+### Understanding Step Patterns with get_step_between
+
+The `get_step_between` method is crucial for understanding memory access patterns and optimizing data locality. It calculates the step vector between any two access indices, helping analyze stride patterns and cache behavior.
+
+```{python}
+# Demonstrate get_step_between for different scenarios
+sfc = SpaceFillingCurve(
+    tensor_lengths=[4, 6],
+    dim_access_order=[0, 1],  # Row-major
+    scalars_per_access=[1, 1],
+    snake_curved=False
+)
+
+print("Step analysis for 4×6 tensor (row-major):")
+print("\n1. Consecutive steps (good locality):")
+for i in range(5):
+    step = sfc.get_step_between(i, i + 1)
+    print(f"  Access {i} → {i+1}: step = {step}")
+
+print("\n2. Steps across rows (cache line jumps):")
+test_pairs = [(5, 6), (11, 12), (17, 18)]
+for start, end in test_pairs:
+    if end < sfc.get_num_of_access():
+        start_idx = sfc.get_index(start)
+        end_idx = sfc.get_index(end)
+        step = sfc.get_step_between(start, end)
+        print(f"  Access {start} {start_idx} → {end} {end_idx}: step = {step}")
+
+print("\n3. Analyzing memory strides:")
+# Calculate stride to access same column in next row
+stride_to_next_row = sfc.get_step_between(0, 6)  # From [0,0] to [1,0]
+print(f"  Stride to next row: {stride_to_next_row}")
+stride_to_next_col = sfc.get_step_between(0, 1)  # From [0,0] to [0,1]
+print(f"  Stride to next column: {stride_to_next_col}")
+```
+
+### Comparing Access Patterns with get_step_between
+
+```{python}
+# Compare row-major vs column-major using step analysis
+tensor_shape = [4, 4]
+
+sfc_row = SpaceFillingCurve(
+    tensor_lengths=tensor_shape,
+    dim_access_order=[0, 1],
+    scalars_per_access=[1, 1],
+    snake_curved=False
+)
+
+sfc_col = SpaceFillingCurve(
+    tensor_lengths=tensor_shape,
+    dim_access_order=[1, 0],
+    scalars_per_access=[1, 1],
+    snake_curved=False
+)
+
+print("Comparing step patterns:")
+print("\nRow-major pattern:")
+for i in range(0, 8, 2):
+    step = sfc_row.get_step_between(i, i + 1)
+    idx_from = sfc_row.get_index(i)
+    idx_to = sfc_row.get_index(i + 1)
+    print(f"  {idx_from} → {idx_to}: step = {step}")
+
+print("\nColumn-major pattern:")
+for i in range(0, 8, 2):
+    step = sfc_col.get_step_between(i, i + 1)
+    idx_from = sfc_col.get_index(i)
+    idx_to = sfc_col.get_index(i + 1)
+    print(f"  {idx_from} → {idx_to}: step = {step}")
+
+# Calculate locality metrics
+def calculate_locality_score(sfc):
+    consecutive = sum(1 for i in range(sfc.get_num_of_access() - 1) 
+                     if abs(sfc.get_step_between(i, i + 1)[0]) + 
+                        abs(sfc.get_step_between(i, i + 1)[1]) == 1)
+    return consecutive / (sfc.get_num_of_access() - 1) * 100
+
+print(f"\nLocality comparison:")
+print(f"  Row-major: {calculate_locality_score(sfc_row):.1f}% sequential steps")
+print(f"  Column-major: {calculate_locality_score(sfc_col):.1f}% sequential steps")
+print("\nConclusion: Row-major has better cache locality for this tensor shape")
+```
+
+### Practical Insights from Step Analysis
+
+The `get_step_between` method helps identify memory access patterns that affect performance:
+
+```{python}
+# Analyze steps with vectorized access
+sfc_vec = SpaceFillingCurve(
+    tensor_lengths=[4, 16],
+    dim_access_order=[0, 1],
+    scalars_per_access=[1, 4],  # Vector-4 access
+    snake_curved=False
+)
+
+print("Vectorized access (vec-4) step analysis:")
+print(f"Access pattern shape: {sfc_vec.access_lengths}")
+
+print("\nConsecutive vector accesses:")
+for i in range(3):
+    start_idx = sfc_vec.get_index(i)
+    end_idx = sfc_vec.get_index(i + 1)
+    step = sfc_vec.get_step_between(i, i + 1)
+    print(f"  Access {i} {start_idx} → {i+1} {end_idx}: step = {step}")
+    print(f"    (Moving {step[1]//4} vector positions)")
+
+# Analyze jumps between rows
+print("\nRow-to-row jumps with vectorization:")
+accesses_per_row = sfc_vec.access_lengths[1]
+for row in range(3):
+    start = row * accesses_per_row + (accesses_per_row - 1)
+    end = (row + 1) * accesses_per_row
+    if end < sfc_vec.get_num_of_access():
+        step = sfc_vec.get_step_between(start, end)
+        print(f"  End of row {row} → Start of row {row+1}: step = {step}")
+```
+
+#### Key Performance Insights:
+
+1. **Sequential Access** (step = [0, 1] or [1, 0]): 
+   - Best for cache utilization
+   - Enables hardware prefetching
+   - Minimizes memory latency
+
+2. **Large Jumps** (|step| > cache line size):
+   - Cause cache misses
+   - Break prefetch patterns
+   - Should be minimized in hot loops
+
+3. **Vectorized Access Benefits**:
+   - Larger `scalars_per_access` = fewer total accesses
+   - But larger steps between accesses
+   - Balance vector width with cache line size
+
+### Handling Non-Divisible Dimensions
+
+```{python}
+# When tensor dimensions aren't evenly divisible by scalars_per_access
+sfc_partial = SpaceFillingCurve(
+    tensor_lengths=[5, 7],
+    dim_access_order=[0, 1],
+    scalars_per_access=[2, 3],
+    snake_curved=False
+)
+
+print(f"Tensor shape: {sfc_partial.tensor_lengths}")
+print(f"Scalars per access: {sfc_partial.scalars_per_access}")
+print(f"Access lengths (with ceiling): {sfc_partial.access_lengths}")
+
+# Show which accesses go beyond tensor bounds
+print("\nBoundary handling:")
+for i in range(sfc_partial.get_num_of_access()):
+    indices = sfc_partial.get_index(i)
+    end_0 = indices[0] + sfc_partial.scalars_per_access[0]
+    end_1 = indices[1] + sfc_partial.scalars_per_access[1]
+    
+    if end_0 > sfc_partial.tensor_lengths[0] or end_1 > sfc_partial.tensor_lengths[1]:
+        print(f"  Access {i}: {indices} - PARTIAL (exceeds bounds)")
+    else:
+        print(f"  Access {i}: {indices} - FULL")
+```
+
+## Visualization
+
+The following images show different access patterns created by the space-filling curve:
+
+### Row-Major vs Column-Major (Scalar Access)
+![Row-Major Scalar Access](./resources/sfc_row_major_scalar.png)
+![Column-Major Scalar Access](./resources/sfc_col_major_scalar.png)
+
+### Vectorized Access Patterns
+![Row-Major Vector-4 Access](./resources/sfc_row_major_vec4.png)
+![Column-Major Vector-4 Access](./resources/sfc_col_major_vec4.png)
+
+### Complex Patterns
+![GEMM Tile Access Pattern](./resources/sfc_gemm_pattern.png)
+![Edge Case: Non-Divisible Dimensions](./resources/sfc_edge_case.png)
+
+## Implementation Notes
+
+1. **Access Length Calculation**: Uses ceiling division to handle cases where tensor dimensions aren't evenly divisible by `scalars_per_access`.
+
+2. **Index Mapping**: The curve maps 1D access indices to N-D coordinates by:
+   - First calculating indices in the reordered dimensions
+   - Then mapping back to original dimension order
+   - Finally applying scalar multiplication for vectorized access
+
+3. **Memory Efficiency**: The access pattern can significantly impact memory bandwidth utilization, especially on GPUs where coalesced access is important.
+
+4. **C++ Implementation**: The Python implementation mirrors the C++ template class `space_filling_curve` from Composable Kernels:
+   ```cpp
+   template<index_t NDimSFC,
+            typename SFCLengths,
+            typename DimAccessOrder,
+            typename ScalarsPerAccess,
+            bool IsSnakeCurved = false>
+   struct space_filling_curve;
+   ```
+   The `get_step_between` method is particularly useful for analyzing memory access patterns in GPU kernels.
+
+## Optimization Example: Choosing Access Patterns
+
+Here's how to use step analysis to choose optimal access patterns:
+
+```{python}
+# Compare different strategies for a 64x64 matrix tile
+strategies = {
+    "Row-major scalar": {"order": [0, 1], "scalars": [1, 1]},
+    "Row-major vec-8": {"order": [0, 1], "scalars": [1, 8]},
+    "Column-major vec-8": {"order": [1, 0], "scalars": [8, 1]},
+    "Tiled 4x4": {"order": [0, 1], "scalars": [4, 4]}
+}
+
+print("Performance analysis for 64x64 matrix:")
+for name, config in strategies.items():
+    sfc = SpaceFillingCurve([64, 64], config["order"], config["scalars"], False)
+    
+    # Count different step types
+    small_steps = 0
+    medium_steps = 0
+    large_steps = 0
+    
+    for i in range(min(100, sfc.get_num_of_access() - 1)):  # Sample first 100 steps
+        step = sfc.get_step_between(i, i + 1)
+        distance = abs(step[0]) + abs(step[1])
+        
+        if distance <= 8:  # Within typical cache line
+            small_steps += 1
+        elif distance <= 64:  # Within L1 cache distance
+            medium_steps += 1
+        else:  # Requires memory fetch
+            large_steps += 1
+    
+    print(f"\n{name}:")
+    print(f"  Total accesses: {sfc.get_num_of_access()}")
+    print(f"  Cache-friendly steps: {small_steps}%")
+    print(f"  Medium jumps: {medium_steps}%")
+    print(f"  Memory jumps: {large_steps}%")
+```
+
+## Common Use Cases
+
+1. **Tiled Matrix Operations**: Accessing matrix tiles in GEMM kernels
+2. **Tensor Contractions**: Systematic traversal of multi-dimensional tensors
+3. **Memory Layout Optimization**: Understanding and optimizing data access patterns
+4. **Vectorized Operations**: Efficiently utilizing SIMD/vector instructions
+
+## Related Classes
+
+- `TileDistribution`: Uses space-filling curves for distributed tensor access
+- `LoadStoreTraits`: Leverages space-filling curves for memory operations
+- `TileWindow`: Implements windowed access using space-filling curve patterns
