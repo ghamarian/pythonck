@@ -8,11 +8,17 @@ format:
 
 ## Overview
 
-TileDistribution is the heart of Composable Kernels' efficient GPU computation. It automatically maps logical coordinates to physical threads and memory locations, eliminating the need for manual thread management. This is the high-level API that GPU programmers actually use.
+Tile Distribution is the heart of Composable Kernels' efficient GPU computation. It automatically maps logical coordinates to physical threads and memory locations, eliminating the need for manual thread management. This is the high-level API that GPU programmers actually use.
 
 The fundamental architecture of tile distribution in CK revolves around a sophisticated coordinate transformation system that maps between multiple coordinate spaces. At its core, the system manages four primary coordinate dimensions: X (the physical tensor dimensions), Y (the tile access pattern dimensions), P (the processing element dimensions representing thread hierarchy), and optionally R (replication dimensions for redundant computation). This multi-dimensional mapping enables the framework to express complex data access patterns in a mathematically rigorous way while maintaining high performance on modern GPU architectures.
 
 The C++ implementation encapsulates this complexity within the `tile_distribution` template class, which combines three essential components: a `PsYs2XsAdaptor` that performs the coordinate transformation from processing and pattern dimensions to physical tensor coordinates, a `Ys2DDescriptor` that linearizes the Y dimensions for efficient register allocation, and a `StaticTileDistributionEncoding` that captures the hierarchical decomposition of work across the GPU's compute resources. This design allows the same high-level code to work efficiently across different tensor sizes and GPU configurations without manual tuning.
+
+## Interactive Exploration
+
+Explore tile distribution concepts interactively:
+
+**[Tile Distribution Visualizer](https://ck.silobrain.com/tile-distribution)** - Interactive visualization of tile distribution structures and GPU memory layouts. Perfect for understanding how data is distributed across parallel processing elements.
 
 ## Complete Tile Distribution System Overview
 
@@ -33,7 +39,7 @@ graph TB
     end
     
     subgraph "GPU Execution"
-        W["Warps<br/>32 threads each"]
+        W["Warps<br/>64 threads each (AMD)"]
         L["Lanes<br/>Thread within warp"]
         REG["Registers<br/>Thread-local storage"]
     end
@@ -55,12 +61,6 @@ graph TB
     style REG fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
 </div>
 ```
-
-## Interactive Exploration
-
-Explore tile distribution concepts interactively:
-
-**[Tile Distribution Visualizer](https://ck.silobrain.com/tile-distribution)** - Interactive visualization of tile distribution structures and GPU memory layouts. Perfect for understanding how data is distributed across parallel processing elements.
 
 ## Coordinate System Architecture
 
@@ -127,51 +127,28 @@ The traditional approach without a tile distribution framework requires programm
 
 TileDistribution elegantly solves these challenges through a systematic approach to work distribution. It automatically assigns work to threads based on a hierarchical decomposition of the problem space, generates memory access patterns that respect GPU hardware constraints, provides a uniform interface that works across different tensor sizes and shapes, and ensures optimal thread cooperation by automatically managing data movement to thread-local registers.
 
-The key insight that makes TileDistribution powerful is its ability to abstract the mapping between logical problem coordinates and physical execution resources. Given a thread's position in the GPU's execution hierarchy (specified by warp ID and lane ID within the warp), TileDistribution computes two critical pieces of information: the global memory addresses that this thread should access, and the specific access pattern that ensures efficient memory transactions. This abstraction is implemented in C++ through the following core structure:
-
-```cpp
-template <typename PsYs2XsAdaptor_,
-          typename Ys2DDescriptor_,
-          typename StaticTileDistributionEncoding_,
-          typename TileDistributionDetail_>
-struct tile_distribution
-{
-    // Core functionality: map thread coordinates to data
-    CK_TILE_HOST_DEVICE static auto _get_partition_index()
-    {
-        if constexpr(NDimP == 1)
-            return array<index_t, 1>{get_lane_id()};
-        else if constexpr(NDimP == 2)
-            return array<index_t, 2>{get_warp_id(), get_lane_id()};
-    }
-    
-    // Calculate which tensor elements this thread accesses
-    template <typename PartitionIndex>
-    CK_TILE_HOST_DEVICE static auto calculate_tile_Ys_index(const PartitionIndex& ps_idx)
-    {
-        return detail::calculate_tile_Ys_index(
-            StaticTileDistributionEncoding{}, ps_idx);
-    }
-};
-```
+The key insight that makes TileDistribution powerful is its ability to abstract the mapping between logical problem coordinates and physical execution resources. Given a thread's position in the GPU's execution hierarchy (specified by warp ID and lane ID within the warp), TileDistribution computes two critical pieces of information: the global memory addresses that this thread should access, and the specific access pattern that ensures efficient memory transactions. 
 
 ## Problem Space Mapping
 
+Very often in GPU programming, we want to do an operation on a matrix which is stored in linear memory. We saw in previous sections that CK tile has a concept of `tensor_view` to specify a matrix with multiple dimensions. GPU is designed for doing operations on 2D matrices. CK tile has utilities to load a subset of this tensor view that is suitable for our gpu depending on how we define our tile distribution encoding to a `tile_window`. This tile window would be a piece of data that we would like to process, hence distributed it to different threads. Below you can see the visual depiction of this.
+
+
 ```{=html}
-<div class="mermaid" style="margin: 0 auto; display: block; width: 60%;">
+<div class="mermaid" style="margin: 0 auto; display: block; width: 30%;">
 
 graph TB
     subgraph "Problem Space (256×256 Matrix)"
-        M["Full Matrix<br/>65,536 elements"]
+        M["Tensor View (full matrix)<br/>65,536 elements"]
         T1["Tile 1<br/>32×32"]
         T2["Tile 2<br/>32×32"]
         TN["Tile N<br/>32×32"]
     end
     
     subgraph "Thread Assignment"
-        W0["Warp 0<br/>32 threads"]
-        W1["Warp 1<br/>32 threads"]
-        L0["Lane 0-31<br/>Individual threads"]
+        W0["Warp 0<br/>64 threads"]
+        W1["Warp 1<br/>64 threads"]
+        L0["Lane 0-63<br/>Individual threads"]
     end
     
     subgraph "Memory Pattern"
@@ -192,12 +169,15 @@ graph TB
 </div>
 ```
 
+Let's see how this works in practice.
+
 ## Creating a TileDistribution
 
-Let's see how to create and use a TileDistribution in practice:
+Let’s examine how to create and use a TileDistribution in practice and how it accesses memory dedicated to each thread. Notice that there are no explicit index calculations; instead, utility functions let us traverse the data already stored in the thread’s registers. We will discuss the underlying concepts in later sections. For now, observe how we can iterate over the elements of a tensor view across different threads while completely abstracting away the index arithmetic.
+
 
 ```{pyodide}
-#| echo: true
+#| echo: true 
 #| output: true
 #| autorun: false
 from pytensor.tile_distribution import make_static_tile_distribution, make_tile_distribution_encoding
@@ -208,8 +188,10 @@ from pytensor.partition_simulation import set_global_thread_position
 from pytensor.tile_window import make_tile_window
 import itertools
 
-MAX_WARPS = 2
-MAX_THREADS = 2
+# NOTE: The following code runs in simulation mode (Python)
+# On actual GPU, thread positions come from hardware warp/lane IDs
+MAX_WARPS = 2     # Simulating 2 warps
+MAX_THREADS = 2   # Simulating 2 threads per warp (64 on real GPU)
 
 
 # Create a tile distribution encoding
@@ -270,8 +252,11 @@ def process_element(*y_indices):
     collected_values.append(value)
 
 
+# SIMULATION MODE: Iterate through simulated thread positions
+# On real GPU, each thread runs independently in parallel
 for warp, thread in itertools.product(range(MAX_WARPS), range(MAX_THREADS)):
 
+    # Simulate thread position (on GPU this comes from hardware)
     set_global_thread_position(warp, thread)
 
     window_origin = [1, 3]  # Small offset from origin
@@ -285,6 +270,8 @@ for warp, thread in itertools.product(range(MAX_WARPS), range(MAX_THREADS)):
     distributed_tensor = tile_window.load(oob_conditional_check=True)
 
     collected_values = []
+    # Get current thread's partition index
+    # On GPU: hardware provides warp_id and thread_id
     warp_id, thread_id = distribution.get_partition_index()
     print(f"Partition index: (warp={warp_id}, thread={thread_id})")
 
@@ -296,6 +283,9 @@ for warp, thread in itertools.product(range(MAX_WARPS), range(MAX_THREADS)):
 ```
 
 C++ equivalent of the above example. This code can be copied and executed as it is.
+
+::: {.callout-note collapse="true"}
+## C++ Code
 
 ```cpp
 // SPDX-License-Identifier: MIT
@@ -363,6 +353,7 @@ struct TileDistributionExample
         auto window_lengths = make_tuple(x0_size, x1_size);
 
         // Get current thread's warp and thread indices
+        // NOTE: In real GPU kernel, these come from hardware registers
         index_t warp_id   = threadIdx.x / get_warp_size();
         index_t thread_id = threadIdx.x % get_warp_size();
 
@@ -474,121 +465,76 @@ int main()
 }
 
 ```
+:::
 
-
-
-
-
-
-Let's see a different tile distribution example with repeating tiles:
-
-```{pyodide}
-#| echo: true
-#| output: true
-#| autorun: false
-
-from pytensor.tile_distribution import make_static_tile_distribution, make_tile_distribution_encoding
-import numpy as np
-from pytensor.tensor_view import make_naive_tensor_view_packed
-from pytensor.sweep_tile import sweep_tile
-from pytensor.partition_simulation import set_global_thread_position
-from pytensor.tile_window import make_tile_window
-import itertools
-
-MAX_WARPS = 2
-MAX_THREADS = 2
-
-
-# Create a tile distribution encoding
-# This defines how a tensor is distributed across threads
-encoding = make_tile_distribution_encoding(
-        rs_lengths=[],
-        hs_lengthss=[
-            [2, 2, 2, 2],
-            [2, 2, 2, 2]
-        ],
-        ps_to_rhss_major=[[1, 2], [1, 2]],
-        ps_to_rhss_minor=[[1, 1], [2, 2]],
-        ys_to_rhs_major=[1, 1, 2, 2],
-        ys_to_rhs_minor=[0, 3, 0, 3]
-    )
-
-# Create the tile distribution from the encoding
-distribution = make_static_tile_distribution(encoding)
-
-print(f"\n-Tile distribution created:")
-print(f" X dimensions: {distribution.ndim_x}")
-print(f"- Y dimensions: {distribution.ndim_y}")
-print(f"- P dimensions: {distribution.ndim_p}")
-print(f"- X lengths: {distribution.get_lengths()}")
-
-
-x0_size = np.prod(distribution.encoding.hs_lengthss[0])  # 2 * 2
-x1_size = np.prod(distribution.encoding.hs_lengthss[1])  # 2 * 2
-
-global_shape = [x0_size + 5, x1_size + 5]  # Add margin for positioning
-global_data = np.zeros(global_shape, dtype=np.int32)
-visualization_canvas = np.zeros(global_shape, dtype=np.int32)
-
-# Create a simple, readable pattern: value = row*100 + col
-# Using 100 multiplier to make the row changes more visible
-for i in range(global_shape[0]):
-    for j in range(global_shape[1]):
-          global_data[i, j] = float(i * 100 + j)
-
-
-global_view = make_naive_tensor_view_packed(
-        data=global_data.flatten(),
-        lengths=global_shape
-    )
-    
-window_lengths = [x0_size, x1_size]
-
-print(f"Global data:\n")
-for i in range(global_shape[0]):
-    for j in range(global_shape[1]):
-        print(f"{global_data[i, j]:.0f}", end="\t")
-    print()
-print()
-    
-
-def process_element(*y_indices):
-    """Process a single element from the sweep."""
-    global collected_values
-    
-    value = distributed_tensor[y_indices]
-    collected_values.append(value)
-
-
-for warp, thread in itertools.product(range(MAX_WARPS), range(MAX_THREADS)):
-
-    set_global_thread_position(warp, thread)
-
-    window_origin = [0, 0]  # Small offset from origin
-    tile_window = make_tile_window(
-            tensor_view=global_view,
-            window_lengths=window_lengths,
-            origin=window_origin,
-            tile_distribution=distribution
-        )
-
-    distributed_tensor = tile_window.load(oob_conditional_check=True)
-
-    collected_values = []
-    warp_id, thread_id = distribution.get_partition_index()
-    print(f"Partition index: (warp={warp_id}, thread={thread_id})")
-
-    sweep_tile(distributed_tensor, process_element)
-    for v in collected_values:
-        print(f"{v:.0f}", end="\t")
-    print()
-    
-```
-    
 
 ## Understanding Thread-to-Data Mapping
 
-The core functionality of TileDistribution is mapping thread IDs to tensor coordinates:
+The core functionality of TileDistribution is mapping thread IDs to tensor coordinates. For now we just use the warp and thread ids for a fictional case where we have two warps and two threads. We see how we can use tile distribution to calculate the starting index for each thread in the tile window.
+
+```{=html}
+<svg viewBox="0 0 600 450" style="margin: 0 auto; display: block; width: 80%;">
+  <!-- Tensor View (outer rectangle) -->
+  <rect x="50" y="50" width="500" height="350" fill="#fee2e2" stroke="#ef4444" stroke-width="3"/>
+  <text x="300" y="30" text-anchor="middle" font-size="16" font-weight="bold">Tensor View (Global Memory)</text>
+  
+  <!-- Origin point -->
+  <circle cx="50" cy="50" r="4" fill="#f59e0b"/>
+  <text x="35" y="45" text-anchor="end" font-size="12">(0,0)</text>
+  
+  <!-- Tile Window (inner rectangle) -->
+  <rect x="175" y="120" width="250" height="220" fill="#e3f2fd" stroke="#1976d2" stroke-width="3"/>
+  <text x="300" y="110" text-anchor="middle" font-size="14" font-weight="bold">Tile Window</text>
+  
+  <!-- Offset arrow from origin to tile window -->
+  <line x1="54" y1="54" x2="171" y2="116" stroke="#f59e0b" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <text x="112" y="85" text-anchor="middle" font-size="12">offset</text>
+  
+  <!-- Width arrow -->
+  <line x1="175" y1="355" x2="425" y2="355" stroke="#666" stroke-width="2" marker-start="url(#arrowhead2)" marker-end="url(#arrowhead2)"/>
+  <text x="300" y="370" text-anchor="middle" font-size="12">width</text>
+  
+  <!-- Height arrow -->
+  <line x1="445" y1="120" x2="445" y2="340" stroke="#666" stroke-width="2" marker-start="url(#arrowhead2)" marker-end="url(#arrowhead2)"/>
+  <text x="460" y="230" text-anchor="middle" font-size="12" transform="rotate(90 460 230)">height</text>
+  
+  <!-- Warp 0 (top, full width) -->
+  <rect x="190" y="140" width="220" height="90" fill="#fff3e0" stroke="#f57c00" stroke-width="2"/>
+  <text x="300" y="160" text-anchor="middle" font-size="12" font-weight="bold">Warp 0</text>
+  
+  <!-- Thread 0 (left half of Warp 0) -->
+  <rect x="200" y="180" width="95" height="40" fill="#e8f5e9" stroke="#388e3c" stroke-width="2"/>
+  <text x="247" y="204" text-anchor="middle" font-size="11">Thread 0</text>
+  
+  <!-- Thread 1 (right half of Warp 0) -->
+  <rect x="305" y="180" width="95" height="40" fill="#e8f5e9" stroke="#388e3c" stroke-width="2"/>
+  <text x="352" y="204" text-anchor="middle" font-size="11">Thread 1</text>
+  
+  <!-- Warp 1 (bottom, full width) -->
+  <rect x="190" y="240" width="220" height="90" fill="#fff3e0" stroke="#f57c00" stroke-width="2"/>
+  <text x="300" y="260" text-anchor="middle" font-size="12" font-weight="bold">Warp 1</text>
+  
+  <!-- Thread 2 (left half of Warp 1) -->
+  <rect x="200" y="280" width="95" height="40" fill="#e8f5e9" stroke="#388e3c" stroke-width="2"/>
+  <text x="247" y="304" text-anchor="middle" font-size="11">Thread 2</text>
+  
+  <!-- Thread 3 (right half of Warp 1) -->
+  <rect x="305" y="280" width="95" height="40" fill="#e8f5e9" stroke="#388e3c" stroke-width="2"/>
+  <text x="352" y="304" text-anchor="middle" font-size="11">Thread 3</text>
+  
+  <!-- Arrow markers -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#f59e0b"/>
+    </marker>
+    <marker id="arrowhead2" markerWidth="10" markerHeight="7" refX="5" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#666"/>
+    </marker>
+  </defs>
+</svg>
+```
+
+We can see in the code below how we can map every element of the tile window to each thread within each warp using tile distribution encoding.
 
 ```{pyodide}
 #| echo: true  
@@ -598,14 +544,15 @@ The core functionality of TileDistribution is mapping thread IDs to tensor coord
 def simulate_thread_access(tile_dist, thread_id):
     """Show which elements a thread accesses"""
     # In GPU: thread_id would come from get_lane_id()
+    # This is SIMULATION code to demonstrate the concept
     
     # For a 1D partition, use thread_id directly
     # For 2D partition, convert to (warp, lane)
     if tile_dist.ndim_p == 1:
         partition_index = [thread_id]
     else:
-        warp_id = thread_id // 32
-        lane_id = thread_id % 32
+        warp_id = thread_id // 2
+        lane_id = thread_id % 2
         partition_index = [warp_id, lane_id]
     
     print(f"\nThread {thread_id}:")
@@ -615,6 +562,18 @@ def simulate_thread_access(tile_dist, thread_id):
     x_coords = tile_dist.calculate_index(partition_index)
     print(f"  Accesses X coordinates: {x_coords.to_list()}")
 
+# Create simple distribution for demonstration
+# This would be created at compile time on real GPU
+simple_encoding = make_tile_distribution_encoding(
+    rs_lengths=[],
+    hs_lengthss=[[2, 2], [2, 2]],
+    ps_to_rhss_major=[[1], [2]],
+    ps_to_rhss_minor=[[0], [0]],
+    ys_to_rhs_major=[1, 2],
+    ys_to_rhs_minor=[1, 1]
+)
+tile_dist = make_static_tile_distribution(simple_encoding)
+
 # Show access pattern for first 4 threads
 for tid in range(4):
     simulate_thread_access(tile_dist, tid)
@@ -623,38 +582,189 @@ for tid in range(4):
 ## Hierarchical Decomposition
 
 ```{=html}
-<div class="mermaid" style="margin: 0 auto; display: block; width: 45%;">
-graph TB
-    subgraph "Level 1: Block Distribution"
-        B["Thread Block<br/>256 threads"]
-        BT1["Block Tile 1<br/>64×64"]
-        BT2["Block Tile 2<br/>64×64"]
-    end
+<svg viewBox="0 0 850 650" style="margin: 0 auto; display: block; width: 95%;">
+  <!-- Title -->
+  <text x="425" y="30" text-anchor="middle" font-size="18" font-weight="bold">Hierarchical Tile Decomposition (AMD GPU with 64-thread warps)</text>
+  
+  <!-- Block Tile (outermost) -->
+  <rect x="50" y="60" width="512" height="512" fill="#e3f2fd" stroke="#1976d2" stroke-width="3"/>
+  <text x="306" y="85" text-anchor="middle" font-size="16" font-weight="bold">Thread Block Tile: 64×64</text>
+  <text x="306" y="105" text-anchor="middle" font-size="14">(256 threads total)</text>
+  
+  <!-- Grid lines to show warp divisions (2x2 grid for 4 warps) -->
+  <line x1="50" y1="316" x2="562" y2="316" stroke="#1976d2" stroke-width="1" stroke-dasharray="3,3" opacity="0.5"/>
+  <line x1="306" y1="60" x2="306" y2="572" stroke="#1976d2" stroke-width="1" stroke-dasharray="3,3" opacity="0.5"/>
+  
+  <!-- Warp Tiles (4 warps shown as 2x2 grid) -->
+  <!-- Warp 0 (top-left) -->
+  <rect x="70" y="120" width="216" height="176" fill="#fff3e0" stroke="#f57c00" stroke-width="2"/>
+  <text x="178" y="145" text-anchor="middle" font-size="14" font-weight="bold">Warp 0: 32×32</text>
+  <text x="178" y="165" text-anchor="middle" font-size="12">(64 threads)</text>
+  
+  <!-- Warp 1 (top-right) -->
+  <rect x="326" y="120" width="216" height="176" fill="#fff3e0" stroke="#f57c00" stroke-width="2"/>
+  <text x="434" y="145" text-anchor="middle" font-size="14" font-weight="bold">Warp 1: 32×32</text>
+  <text x="434" y="165" text-anchor="middle" font-size="12">(64 threads)</text>
+  
+  <!-- Warp 2 (bottom-left) -->
+  <rect x="70" y="336" width="216" height="176" fill="#fff3e0" stroke="#f57c00" stroke-width="2"/>
+  <text x="178" y="361" text-anchor="middle" font-size="14" font-weight="bold">Warp 2: 32×32</text>
+  <text x="178" y="381" text-anchor="middle" font-size="12">(64 threads)</text>
+  
+  <!-- Warp 3 (bottom-right) -->
+  <rect x="326" y="336" width="216" height="176" fill="#fff3e0" stroke="#f57c00" stroke-width="2"/>
+  <text x="434" y="361" text-anchor="middle" font-size="14" font-weight="bold">Warp 3: 32×32</text>
+  <text x="434" y="381" text-anchor="middle" font-size="12">(64 threads)</text>
+  
+  <!-- Thread Tiles within Warp 0 (showing 8x8 grid = 64 threads) -->
+  <!-- Show first 2 rows of 8 threads each -->
+  <!-- Row 1 -->
+  <rect x="85" y="185" width="20" height="20" fill="#e8f5e9" stroke="#388e3c" stroke-width="1"/>
+  <text x="95" y="198" text-anchor="middle" font-size="8">0</text>
+  
+  <rect x="110" y="185" width="20" height="20" fill="#e8f5e9" stroke="#388e3c" stroke-width="1"/>
+  <text x="120" y="198" text-anchor="middle" font-size="8">1</text>
+  
+  <rect x="135" y="185" width="20" height="20" fill="#e8f5e9" stroke="#388e3c" stroke-width="1"/>
+  <text x="145" y="198" text-anchor="middle" font-size="8">2</text>
+  
+  <rect x="160" y="185" width="20" height="20" fill="#e8f5e9" stroke="#388e3c" stroke-width="1"/>
+  <text x="170" y="198" text-anchor="middle" font-size="8">3</text>
+  
+  <rect x="185" y="185" width="20" height="20" fill="#e8f5e9" stroke="#388e3c" stroke-width="1"/>
+  <text x="195" y="198" text-anchor="middle" font-size="8">4</text>
+  
+  <rect x="210" y="185" width="20" height="20" fill="#e8f5e9" stroke="#388e3c" stroke-width="1"/>
+  <text x="220" y="198" text-anchor="middle" font-size="8">5</text>
+  
+  <rect x="235" y="185" width="20" height="20" fill="#e8f5e9" stroke="#388e3c" stroke-width="1"/>
+  <text x="245" y="198" text-anchor="middle" font-size="8">6</text>
+  
+  <rect x="260" y="185" width="20" height="20" fill="#e8f5e9" stroke="#388e3c" stroke-width="1"/>
+  <text x="270" y="198" text-anchor="middle" font-size="8">7</text>
+  
+  <!-- Row 2 -->
+  <rect x="85" y="210" width="20" height="20" fill="#e8f5e9" stroke="#388e3c" stroke-width="1"/>
+  <text x="95" y="223" text-anchor="middle" font-size="8">8</text>
+  
+  <rect x="110" y="210" width="20" height="20" fill="#e8f5e9" stroke="#388e3c" stroke-width="1"/>
+  <text x="120" y="223" text-anchor="middle" font-size="8">9</text>
+  
+  <rect x="135" y="210" width="20" height="20" fill="#e8f5e9" stroke="#388e3c" stroke-width="1"/>
+  <text x="145" y="223" text-anchor="middle" font-size="8">10</text>
+  
+  <rect x="160" y="210" width="20" height="20" fill="#e8f5e9" stroke="#388e3c" stroke-width="1"/>
+  <text x="170" y="223" text-anchor="middle" font-size="8">11</text>
+  
+  <rect x="185" y="210" width="20" height="20" fill="#e8f5e9" stroke="#388e3c" stroke-width="1"/>
+  <text x="195" y="223" text-anchor="middle" font-size="8">12</text>
+  
+  <rect x="210" y="210" width="20" height="20" fill="#e8f5e9" stroke="#388e3c" stroke-width="1"/>
+  <text x="220" y="223" text-anchor="middle" font-size="8">13</text>
+  
+  <rect x="235" y="210" width="20" height="20" fill="#e8f5e9" stroke="#388e3c" stroke-width="1"/>
+  <text x="245" y="223" text-anchor="middle" font-size="8">14</text>
+  
+  <rect x="260" y="210" width="20" height="20" fill="#e8f5e9" stroke="#388e3c" stroke-width="1"/>
+  <text x="270" y="223" text-anchor="middle" font-size="8">15</text>
+  
+  <!-- "..." to indicate more threads -->
+  <text x="178" y="255" text-anchor="middle" font-size="16">...</text>
+  <text x="178" y="275" text-anchor="middle" font-size="11">(48 more threads)</text>
+  
+  <!-- Legend and explanation on the right -->
+  <text x="590" y="100" font-size="14" font-weight="bold">Decomposition:</text>
+  
+  <!-- Block level -->
+  <rect x="580" y="120" width="20" height="20" fill="#e3f2fd" stroke="#1976d2" stroke-width="2"/>
+  <text x="610" y="135" font-size="12">Block: 64×64 = 4,096 elements</text>
+  <text x="610" y="150" font-size="11" fill="#666">256 threads total</text>
+  
+  <!-- Warp level -->
+  <rect x="580" y="170" width="20" height="20" fill="#fff3e0" stroke="#f57c00" stroke-width="2"/>
+  <text x="610" y="185" font-size="12">Warp: 32×32 = 1,024 elements</text>
+  <text x="610" y="200" font-size="11" fill="#666">64 threads per warp (AMD)</text>
+  
+  <!-- Thread level -->
+  <rect x="580" y="220" width="20" height="20" fill="#e8f5e9" stroke="#388e3c" stroke-width="2"/>
+  <text x="610" y="235" font-size="12">Thread: 4×4 = 16 elements</text>
+  <text x="610" y="250" font-size="11" fill="#666">Each thread's tile</text>
+  
+  <!-- Calculation breakdown -->
+  <text x="590" y="290" font-size="14" font-weight="bold">Example Calculation:</text>
+  <text x="580" y="310" font-size="11">• Matrix: 256×256 = 65,536 elements</text>
+  <text x="580" y="330" font-size="11">• Block tile: 64×64 = 4,096 elements</text>
+  <text x="580" y="350" font-size="11">• Blocks needed: 4×4 = 16 blocks</text>
+  <text x="580" y="380" font-size="11">• Per block:</text>
+  <text x="590" y="400" font-size="11">  - 4 warps (256÷64)</text>
+  <text x="590" y="420" font-size="11">  - Each warp: 32×32 = 1,024 elem</text>
+  <text x="590" y="440" font-size="11">  - Each thread: 4×4 = 16 elem</text>
+  
+  <!-- Verification -->
+  <text x="590" y="470" font-size="11" font-weight="bold">Verification:</text>
+  <text x="580" y="490" font-size="11">• Warp: 64 threads × 16 elem = 1,024 </text>
+  <text x="580" y="510" font-size="11">• Block: 4 warps × 1,024 = 4,096 </text>
+  <text x="580" y="530" font-size="11">• Total: 16 blocks × 4,096 = 65,536 </text>
+  
+  <!-- Memory access pattern -->
+  <text x="590" y="560" font-size="11" font-weight="bold">Access Pattern:</text>
+  <text x="580" y="580" font-size="11">• 64 threads access consecutive</text>
+  <text x="580" y="600" font-size="11">  memory for coalescing</text>
+  
+  <!-- Detail view of single thread tile -->
+  <g transform="translate(360, 410)">
+    <rect x="0" y="0" width="80" height="80" fill="#e8f5e9" stroke="#388e3c" stroke-width="2"/>
+    <text x="40" y="-5" text-anchor="middle" font-size="11" font-weight="bold">Thread Tile (4×4)</text>
     
-    subgraph "Level 2: Warp Distribution"
-        W["Warp<br/>32 threads"]
-        WT1["Warp Tile 1<br/>16×16"]
-        WT2["Warp Tile 2<br/>16×16"]
-    end
+    <!-- 4x4 grid inside -->
+    <line x1="20" y1="0" x2="20" y2="80" stroke="#388e3c" stroke-width="0.5"/>
+    <line x1="40" y1="0" x2="40" y2="80" stroke="#388e3c" stroke-width="0.5"/>
+    <line x1="60" y1="0" x2="60" y2="80" stroke="#388e3c" stroke-width="0.5"/>
     
-    subgraph "Level 3: Thread Distribution"
-        T["Thread"]
-        TT["Thread Tile<br/>2×2"]
-    end
+    <line x1="0" y1="20" x2="80" y2="20" stroke="#388e3c" stroke-width="0.5"/>
+    <line x1="0" y1="40" x2="80" y2="40" stroke="#388e3c" stroke-width="0.5"/>
+    <line x1="0" y1="60" x2="80" y2="60" stroke="#388e3c" stroke-width="0.5"/>
     
-    B --> BT1
-    BT1 --> W
-    W --> WT1
-    WT1 --> T
-    T --> TT
+    <!-- Element indices -->
+    <text x="10" y="15" font-size="9" text-anchor="middle">0</text>
+    <text x="30" y="15" font-size="9" text-anchor="middle">1</text>
+    <text x="50" y="15" font-size="9" text-anchor="middle">2</text>
+    <text x="70" y="15" font-size="9" text-anchor="middle">3</text>
     
-    style B fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
-    style W fill:#fff3e0,stroke:#f57c00,stroke-width:2px
-    style T fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
-</div>
+    <text x="10" y="35" font-size="9" text-anchor="middle">4</text>
+    <text x="30" y="35" font-size="9" text-anchor="middle">5</text>
+    <text x="50" y="35" font-size="9" text-anchor="middle">6</text>
+    <text x="70" y="35" font-size="9" text-anchor="middle">7</text>
+    
+    <text x="10" y="55" font-size="9" text-anchor="middle">8</text>
+    <text x="30" y="55" font-size="9" text-anchor="middle">9</text>
+    <text x="50" y="55" font-size="9" text-anchor="middle">10</text>
+    <text x="70" y="55" font-size="9" text-anchor="middle">11</text>
+    
+    <text x="10" y="75" font-size="9" text-anchor="middle">12</text>
+    <text x="30" y="75" font-size="9" text-anchor="middle">13</text>
+    <text x="50" y="75" font-size="9" text-anchor="middle">14</text>
+    <text x="70" y="75" font-size="9" text-anchor="middle">15</text>
+  </g>
+  
+  <!-- Arrow pointing to detail -->
+  <line x1="270" y1="207" x2="360" y2="410" stroke="#666" stroke-width="1" marker-end="url(#arrowhead)"/>
+  
+  <!-- Arrow marker definition -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#666"/>
+    </marker>
+  </defs>
+</svg>
 ```
 
-## Advanced Example: Matrix Multiplication Distribution
+
+Now that we understand what tile distribution encoding specifies, let's dive deeper into different abstractions that it uses. 
+
+## Different Componets of Tile Distribution Encoding
+
+Let's use the following tile distribution encoding in the code block below as a running example to explain different components of tile distribution encoding. This pattern is relatively complex yet very common in CK tile repo as it maps directly to GPU structure.
 
 ```{pyodide}
 #| echo: true
@@ -688,37 +798,107 @@ print(f"Each dimension: 4×2×8×4 = {4*2*8*4} elements")
 print(f"Total tile size: {4*2*8*4}×{4*2*8*4} = {(4*2*8*4)**2} elements")
 ```
 
+The first component is `RsLengths` or replication, which is a list of numbers. We will cover this in detail using a different distribution encoding later. The second component, `HsLengthss`, is a list of lists (hence two s's) that usually has one or two components. The purpose of this component is to define how to convert a tile window into smaller chunks. The first list explains how many splits on the `M` dimension, and the second list, if it exists, is about the `N` dimension. In other words, it starts from slow-changing dimension to fast-changing dimension. So the structure of how many chunks we have for each tile is determined by `HsLengthss`. In this case, our `256x256` is split into `(4x2x8x4)x(4x2x8x4)`.
+
+The next two components `Ps2RHssMajor` and `Ps2RHssMinor` are used together, and they specify the thread and warp arrangements. If the tile distribution has only one dimension, then it is about thread organization, and if it has two dimensions, then the first one explains warp organization and the second one will be thread arrangements. The number in the major list is an index to `RsLengths=0`, `HsLengthss[0]=1` and `HsLengthss[1]=2`, and the number in minor specifies which element of the list.
+
+In the example above, we see the first major, minor pair is `[1, 1]`. The first 1 means `HsLengthss[0]`, and the second 1 means the second component (starting from 0). The second pair is `[2, 1]`, which means the second component of `HsLengthss[1]`. 
+
+The last two components of the encoding, `Ys2RHsMajor` and `Ys2RHsMinor`, are also a major and minor pair that select the component of `RsLengths`, `HsLengthss`. This component specifies the data that each thread will load into its vgprs and process. In this example, in each dimension of `M` and `N` we have two `Y`s and they are `4x4` on each dimension.
+
+One of the best way to visualise this encoding is to look at it like a graph. It is a biparite graph that has edgs from `P` and `Y` nodes to `H` and `R` nodes. `P` symbolises warps and threads, `Y`s the data each thread processes and `H` defines the hierarchies of our tile, `R` will explain the replicaitons. The length of lists of the `Ys2RHsMajor` and `Ps2RHsMajor` shows how many `Y`s and how many `P`s we have. The edges of this bipartite graph is defined using the last two components of the encoding. How to create this graph is depicated in this video below.
+
+
+![Tile distribution encoding depicted in a graph format](resources/encoding-graph.png)
+
+{{< video https://www.youtube.com/watch?v=gl0bgSAN6gc >}}
+
+
+We can depict the tile distirbution in the format below that shows how threads and warps are ordered for our istribution encoding example. Each cell shows where each thread is, int this particular example each cell in the grid has `4x4` elements in it, and that number comes from the fact that we have `Y`s have edges to the last component of `H[0]` and `H[1]` and those numbers are both `4`. The first and third elements of `Ys2RHsMajor` are refering to repetitions. We don't show that in the picture below for space reasons, but this image should be repeated `4x4` times again as suggested by the other two edges from `Y`s to `H`s.
+
+
+![Tile distribution with threads and warps](resources/row-major.png)
+
+```{python}
+gemm_encoding = make_tile_distribution_encoding(
+    rs_lengths=[],  # No replication
+    hs_lengthss=[
+        [4, 2, 8, 4],  # M dimension: Repeat, WarpPerBlock, ThreadPerWarp, Vector
+        [4, 2, 8, 4]   # N dimension: Repeat, WarpPerBlock, ThreadPerWarp, Vector
+    ],
+    ps_to_rhss_major=[[1, 2], [2, 1]],  # 2D thread grid mapping
+    ps_to_rhss_minor=[[1, 1], [2, 2]],
+    ys_to_rhs_major=[1, 1, 2, 2],       # Y dimension mapping
+    ys_to_rhs_minor=[0, 3, 0, 3]
+)
+```
+Great, now we see that our threads and warps are ordered in row major fashion. This comes from the fact that the first edge of both `P` nodes in the graph are towards `H[0]`. Let's see what happens if we swap the numbers in the `Ps2RHssMajor[1]` and instead of `[1, 2]` we will have `[2, 1]`.
+
+![Tile distribution with threads and warps](resources/thread_column_major.png)
+
+
+We can of ocurse do the same with `Ps2RHssMajor[0]` that controls how warps are organised with respect to each other. In the following example both threads and warps are column major.
+```{python}
+gemm_encoding = make_tile_distribution_encoding(
+    rs_lengths=[],  # No replication
+    hs_lengthss=[
+        [4, 2, 8, 4],  # M dimension: Repeat, WarpPerBlock, ThreadPerWarp, Vector
+        [4, 2, 8, 4]   # N dimension: Repeat, WarpPerBlock, ThreadPerWarp, Vector
+    ],
+    ps_to_rhss_major=[[2, 1], [2, 1]],  # 2D thread grid mapping
+    ps_to_rhss_minor=[[1, 1], [2, 2]],
+    ys_to_rhs_major=[1, 1, 2, 2],       # Y dimension mapping
+    ys_to_rhs_minor=[0, 3, 0, 3]
+)
+```
+![Tile distribution with threads and warps](resources/warp-thread-column-major.png)
+
+## Under the hood: `PsYs2XsAdaptor` and `Ys2DDescriptor`
+
+The declarative power of `TileDistributionEncoding` is translated into concrete, high-performance operations by two key components: the `PsYs2XsAdaptor` and the `Ys2DDescriptor`. These are constructed "under the hood" by the `make_static_tile_distribution` function, which effectively "compiles" a high-level `TileDistributionEncoding` into an optimized, low-level execution pipeline.
+
+### `PsYs2XsAdaptor`: From Thread to Global Memory
+
+The `PsYs2XsAdaptor` is a specialized `TensorAdaptor` that maps a thread's identity (`P-space`) and its local data access pattern (`Y-space`) to a physical coordinate in the global tensor (`X-space`). It's the engine that tells each thread which part of the main tensor it is responsible for.
+
+This adaptor is built by creating a pipeline of `merge` and `unmerge` transformations based on the encoding. For instance, `unmerge` operations break down the tensor's physical dimensions (X) into their hierarchical components (H), and `merge` operations then assign ownership of these components to threads (P). This entire transformation pipeline is resolved at compile-time in C++, ensuring that the complex coordinate math has zero runtime cost.
+
+#### How `calculate_index` Works
+
+When a thread needs to determine the starting global tensor coordinate for its tile, it uses this adaptor. The process, as seen in `tile_distribution.py`'s `calculate_index` method, involves:
+
+1.  **Forming the Top-Level Coordinate**: The thread's identity (its `P` coordinates, e.g., `[warp_id, lane_id]`) is combined with a vector of zeros for the `Y` coordinates. This is a key detail: `calculate_index` is designed to find the *origin* of the thread's tile, so the local `Y` coordinates are set to zero (`ps_ys_idx = partition_index + [0] * self.ndim_y`).
+
+2.  **Applying the Transform Pipeline**: This `[P, 0]` vector is fed into the `PsYs2XsAdaptor`. The adaptor applies its internal sequence of `merge` and `unmerge` operations to this vector.
+
+3.  **Producing the Bottom-Level Coordinate**: The output of the pipeline is the final "bottom-level" coordinate, which corresponds to the precise starting `X` coordinate in the global tensor for that thread's tile.
+
+This calculation provides the base address. Iterating through the tile (e.g., with `sweep_tile`) involves starting from this base and applying offsets, which is a separate step managed by the `TileWindow` and its coordinate transformation utilities. This separation of concerns—finding the base with `calculate_index` and iterating locally—is what allows the system to be both flexible and performant.
+
+#### How `calculate_index` Works
+
+When a thread needs to determine the starting global tensor coordinate for its tile, it uses this adaptor. The process, as seen in `tile_distribution.py`'s `calculate_index` method, involves:
+
+1.  **Forming the Top-Level Coordinate**: The thread's identity (its `P` coordinates, e.g., `[warp_id, lane_id]`) is combined with a vector of zeros for the `Y` coordinates. This is a key detail: `calculate_index` is designed to find the *origin* of the thread's tile, so the local `Y` coordinates are set to zero (`ps_ys_idx = partition_index + [0] * self.ndim_y`).
+
+2.  **Applying the Transform Pipeline**: This `[P, 0]` vector is fed into the `PsYs2XsAdaptor`. The adaptor applies its internal sequence of `merge` and `unmerge` operations to this vector.
+
+3.  **Producing the Bottom-Level Coordinate**: The output of the pipeline is the final "bottom-level" coordinate, which corresponds to the precise starting `X` coordinate in the global tensor for that thread's tile.
+
+This calculation provides the base address. Iterating through the tile (e.g., with `sweep_tile`) involves starting from this base and applying offsets, which is a separate step managed by the `TileWindow` and its coordinate transformation utilities. This separation of concerns—finding the base with `calculate_index` and iterating locally—is what allows the system to be both flexible and performant.
+
+![Tile distribution encoding depicted in a graph format](resources/psys2xsadaptor.png)
+
+### `Ys2DDescriptor`: From Local Pattern to Registers
+
+While the adaptor handles the global mapping, the `Ys2DDescriptor` (a `TensorDescriptor`) manages the data once it's local to the thread. Its job is to linearize the multi-dimensional `Y-space` (the thread's internal data layout) into a flat, one-dimensional `D-space` that maps directly to the GPU's register file.
+
+This linearization is crucial for performance. The `LoadStoreTraits` system in C++ analyzes the `Ys2DDescriptor` to find optimal memory access strategies. If it detects that a contiguous block of `D-space` indices corresponds to contiguous addresses in global memory, it can issue efficient vectorized instructions (e.g., `float4` loads). This ensures that data is moved between global memory and registers with the highest possible bandwidth.
+
+![Tile distribution encoding depicted in a graph format](resources/ys2ddescriptor.png)
+
 ## Work Distribution Pattern
 
-```{=html}
-<div class="mermaid" style="margin: 0 auto; display: block; width: 30%;">
-flowchart TB
-    subgraph "Matrix C (128×128)"
-        C["16,384 elements"]
-    end
-    
-    subgraph "Thread Grid (32×32)"
-        TG["1,024 threads"]
-    end
-    
-    subgraph "Per Thread"
-        PT["4×4 tile<br/>16 elements"]
-    end
-    
-    subgraph "Memory Access"
-        MA["Coalesced reads<br/>Efficient writes<br/>No conflicts"]
-    end
-    
-    C --> TG
-    TG --> PT
-    PT --> MA
-    
-    style C fill:#fee2e2,stroke:#ef4444,stroke-width:2px
-    style TG fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
-    style PT fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
-    style MA fill:#d1fae5,stroke:#10b981,stroke-width:2px
-</div>
-```
 
 ## Memory Access Patterns
 
@@ -739,8 +919,8 @@ def analyze_access_pattern(tile_dist, num_threads=8):
         if tile_dist.ndim_p == 1:
             partition_index = [tid]
         else:
-            # For 2D: assume threads are linearized within warps
-            partition_index = [tid // 32, tid % 32]
+            # For 2D: assume threads are linearized within warps (64 per warp)
+            partition_index = [tid // 64, tid % 64]
         
         try:
             # Get X coordinates this thread accesses
@@ -770,9 +950,364 @@ analysis_dist = make_static_tile_distribution(analysis_encoding)
 analyze_access_pattern(analysis_dist)
 ```
 
+## Understanding the PsYs→Xs Adaptor
+
+The PsYs→Xs adaptor is a critical component that transforms coordinates from the thread/pattern space (P,Y) to the physical tensor space (X). This adaptor encapsulates the complex coordinate transformations needed to map each thread's local tile coordinates to the actual global memory locations they need to access.
+
+```{=html}
+<div class="mermaid" style="margin: 0 auto; display: block; width: 70%;">
+graph LR
+    subgraph "Input Coordinates"
+        P["P[warp, lane]<br/>Thread identity"]
+        Y["Y[i, j]<br/>Position in tile"]
+    end
+    
+    subgraph "PsYs→Xs Adaptor"
+        T["Tensor Adaptor<br/>Coordinate Transform"]
+        H["Hierarchical<br/>Decomposition"]
+        M["Merge & Unmerge<br/>Operations"]
+    end
+    
+    subgraph "Output"
+        X["X[row, col]<br/>Global tensor position"]
+    end
+    
+    P --> T
+    Y --> T
+    T --> H
+    H --> M
+    M --> X
+    
+    style T fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
+    style X fill:#d1fae5,stroke:#10b981,stroke-width:2px
+</div>
+```
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+# Demonstrate the PsYs→Xs transformation
+print("🔄 PsYs→Xs Adaptor: The Coordinate Transformer")
+print("=" * 50)
+
+# Create a distribution to demonstrate the adaptor
+adaptor_encoding = make_tile_distribution_encoding(
+    rs_lengths=[],
+    hs_lengthss=[[2, 3], [2, 3]],  # 6x6 total size
+    ps_to_rhss_major=[[1], [2]],
+    ps_to_rhss_minor=[[0], [0]],
+    ys_to_rhs_major=[1, 2],
+    ys_to_rhs_minor=[1, 1]
+)
+adaptor_dist = make_static_tile_distribution(adaptor_encoding)
+
+print(f"Distribution shape: {adaptor_dist.get_lengths()}")
+print(f"Thread dimensions (P): {adaptor_dist.ndim_p}")
+print(f"Pattern dimensions (Y): {adaptor_dist.ndim_y}")
+print()
+
+# Show concrete coordinate transformations
+print("Concrete PsYs→Xs Transformations:")
+print("-" * 50)
+
+# Simulate actual transformations for multiple threads
+from pytensor.partition_simulation import set_global_thread_position
+
+for warp_id in range(2):
+    for lane_id in range(2):
+        set_global_thread_position(warp_id, lane_id)
+        
+        # Get P coordinates for this thread
+        p_coords = adaptor_dist.get_partition_index()
+        print(f"\nThread P{p_coords}:")
+        
+        # Show how Y coordinates map to X for this thread
+        y_lengths = adaptor_dist.get_y_vector_lengths()
+        for y0 in range(min(2, y_lengths[0])):
+            for y1 in range(min(2, y_lengths[1])):
+                # Create combined PsYs coordinate
+                ps_ys_coord = list(p_coords) + [y0, y1]
+                
+                # The adaptor would transform this to X
+                # In actual implementation, this happens via:
+                # 1. Unmerge P into hierarchical components
+                # 2. Combine with Y coordinates
+                # 3. Merge to produce final X coordinates
+                
+                print(f"  P{p_coords} + Y[{y0},{y1}] → X[thread{p_coords[0]*2+p_coords[1]}_y{y0}_{y1}]")
+
+print("\n🔧 Internal Transformation Steps:")
+print("1. Unmerge P → hierarchical indices (h0, h1, ...)")
+print("2. Apply Y coordinates to select within hierarchy")
+print("3. Merge hierarchical indices → final X coordinates")
+print("4. Result: Each thread knows its exact tensor positions")
+
+print("\n💡 The PsYs→Xs Adaptor handles:")
+print("• Hierarchical decomposition of coordinates")
+print("• Mapping from thread space to tensor space")
+print("• Automatic handling of complex access patterns")
+print("• Zero-overhead compile-time transformations")
+```
+
+### PsYs→Xs in Action: Real Example
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+# Show a complete example of PsYs→Xs transformation
+print("📊 Complete PsYs→Xs Example: 8x8 Matrix Distribution")
+print("=" * 55)
+
+# Create a simple 8x8 matrix distribution
+example_encoding = make_tile_distribution_encoding(
+    rs_lengths=[],
+    hs_lengthss=[[2, 2, 2], [2, 2, 2]],  # 8x8 = 2*2*2 per dimension
+    ps_to_rhss_major=[[1], [2]],
+    ps_to_rhss_minor=[[0], [0]],
+    ys_to_rhs_major=[1, 2],
+    ys_to_rhs_minor=[2, 2]
+)
+example_dist = make_static_tile_distribution(example_encoding)
+
+# Create visualization matrix
+matrix_viz = np.zeros((8, 8), dtype=str)
+for i in range(8):
+    for j in range(8):
+        matrix_viz[i, j] = '.'
+
+# Show which elements each thread accesses
+print("Matrix ownership by threads (P coordinates):")
+print("(Each number shows which thread owns that element)")
+print()
+
+# For visualization, show first 4 threads
+thread_colors = ['0', '1', '2', '3']
+for thread_id in range(4):
+    warp_id = thread_id // 2
+    lane_id = thread_id % 2
+    
+    set_global_thread_position(warp_id, lane_id)
+    p_coords = example_dist.get_partition_index()
+    
+    # Mark this thread's elements
+    # In real GPU, this mapping is computed by PsYs→Xs adaptor
+    # For visualization, we'll show the pattern
+    base_row = warp_id * 4
+    base_col = lane_id * 4
+    
+    for dy in range(2):
+        for dx in range(2):
+            row = base_row + dy * 2
+            col = base_col + dx * 2
+            if row < 8 and col < 8:
+                matrix_viz[row, col] = thread_colors[thread_id]
+
+# Print the visualization
+print("    ", end="")
+for j in range(8):
+    print(f"{j:2}", end=" ")
+print()
+print("   " + "-" * 24)
+
+for i in range(8):
+    print(f"{i:2} |", end="")
+    for j in range(8):
+        print(f" {matrix_viz[i, j]}", end=" ")
+    print()
+
+print("\nLegend:")
+for tid in range(4):
+    print(f"  Thread {tid}: P[{tid//2}, {tid%2}]")
+
+print("\n🎯 Key Insights:")
+print("• Each thread owns a distributed set of elements")
+print("• The pattern ensures coalesced memory access")
+print("• PsYs→Xs adaptor computes these mappings automatically")
+print("• No manual index arithmetic needed!")
+```
+
+## The Ys→D Descriptor: From Pattern to Registers
+
+The Ys→D descriptor is the component that linearizes the Y dimensions into a 1D index space (D) for efficient register allocation. This is crucial because while we think in terms of multi-dimensional access patterns (Y), the actual register file is a linear array that needs sequential indices.
+
+```{=html}
+<div class="mermaid" style="margin: 0 auto; display: block; width: 80%;">
+graph TB
+    subgraph "Y-Space (2D Pattern)"
+        Y00["Y[0,0]"]
+        Y01["Y[0,1]"]
+        Y10["Y[1,0]"]
+        Y11["Y[1,1]"]
+    end
+    
+    subgraph "Ys→D Transform"
+        L["Linearization<br/>Row-major order"]
+    end
+    
+    subgraph "D-Space (Linear Registers)"
+        D0["D[0] → r0"]
+        D1["D[1] → r1"]
+        D2["D[2] → r2"]
+        D3["D[3] → r3"]
+    end
+    
+    subgraph "LoadStoreTraits"
+        V["Vectorization<br/>Analysis"]
+        S["Stride Pattern<br/>Detection"]
+    end
+    
+    Y00 --> L
+    Y01 --> L
+    Y10 --> L
+    Y11 --> L
+    
+    L --> D0
+    L --> D1
+    L --> D2
+    L --> D3
+    
+    D0 --> V
+    D1 --> V
+    D2 --> V
+    D3 --> V
+    
+    V --> S
+    
+    style L fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
+    style V fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+</div>
+```
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+print("📊 Ys→D Descriptor: Pattern to Register Mapping")
+print("=" * 50)
+
+# Create a distribution with known Y dimensions
+ys_d_encoding = make_tile_distribution_encoding(
+    rs_lengths=[],
+    hs_lengthss=[[2, 2], [2, 2]],  # 4x4 total
+    ps_to_rhss_major=[[1], [2]],
+    ps_to_rhss_minor=[[0], [0]],
+    ys_to_rhs_major=[1, 2],
+    ys_to_rhs_minor=[1, 1]
+)
+ys_d_dist = make_static_tile_distribution(ys_d_encoding)
+
+# Access the Ys→D descriptor
+ys_to_d = ys_d_dist.ys_to_d_descriptor
+print(f"Y dimensions: {ys_to_d.ndim}")
+print(f"Y lengths: {ys_to_d.get_lengths()}")
+print(f"Total elements (D): {ys_to_d.get_element_space_size()}")
+print()
+
+# Show detailed Y → D mapping with register allocation
+print("Detailed Y → D → Register Mapping:")
+print("-" * 40)
+y_lengths = ys_to_d.get_lengths()
+d_index = 0
+
+# Simulate register allocation
+register_names = ['r0', 'r1', 'r2', 'r3', 'r4', 'r5', 'r6', 'r7']
+vector_registers = ['v0', 'v1']  # For vectorized access
+
+for y0 in range(y_lengths[0]):
+    for y1 in range(y_lengths[1]):
+        reg_name = register_names[d_index] if d_index < len(register_names) else f'r{d_index}'
+        print(f"  Y[{y0},{y1}] → D[{d_index}] → {reg_name}", end="")
+        
+        # Show vectorization opportunity
+        if d_index % 4 == 0 and d_index + 3 < ys_to_d.get_element_space_size():
+            print(f" (can vectorize as {vector_registers[d_index//4]})")
+        else:
+            print()
+        d_index += 1
+
+print("\n🔍 LoadStoreTraits Analysis:")
+print("• Detects contiguous D indices → vector loads")
+print("• Identifies stride patterns → optimized access")
+print("• Determines alignment → proper vector instructions")
+print("• Computes vector width → float4, int4, etc.")
+
+# Show vectorization example
+print("\n📦 Vectorization Example:")
+print("If Y dimensions allow contiguous access:")
+print("  Y[0,0], Y[0,1], Y[0,2], Y[0,3] → D[0,1,2,3]")
+print("  LoadStoreTraits detects: Can use float4 load!")
+print("  Generated instruction: LD.E.128 v0, [address]")
+
+print("\n🔗 Connection to TileWindow:")
+print("• TileWindow uses Ys→D for load() operations")
+print("• LoadStoreTraits analyzes Ys→D for vectorization")
+print("• Each D index maps to a specific register")
+print("• Enables efficient register allocation and reuse")
+
+# Show the complete data flow
+print("\n📈 Complete Data Flow:")
+print("1. TileWindow.load() called")
+print("2. LoadStoreTraits analyzes Ys→D descriptor")
+print("3. Determines vectorization strategy")
+print("4. Issues optimized load instructions")
+print("5. Data placed in registers according to D mapping")
+print("6. Computation accesses via Y coordinates")
+print("7. Hardware translates Y→D→physical registers")
+```
+
+### LoadStoreTraits Integration
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+print("⚡ LoadStoreTraits: Optimizing Memory Access")
+print("=" * 45)
+
+# Demonstrate how LoadStoreTraits analyzes Ys→D patterns
+print("LoadStoreTraits analyzes the Ys→D descriptor to determine:")
+print()
+
+# Example 1: Perfect vectorization
+print("Example 1: Perfect Vectorization Pattern")
+print("  Y layout: [2, 4] (2 rows, 4 columns)")
+print("  D mapping: 0,1,2,3,4,5,6,7")
+print("  Analysis: Contiguous groups of 4")
+print("  Result: Use float4 loads")
+print("  Code: LD.E.128 v0, [addr]; LD.E.128 v1, [addr+16]")
+
+print("\nExample 2: Strided Access Pattern")
+print("  Y layout: [4, 2] (4 rows, 2 columns)")
+print("  D mapping: 0,1,2,3,4,5,6,7")
+print("  Analysis: Groups of 2, can pair")
+print("  Result: Use float2 loads")
+print("  Code: LD.E.64 v0, [addr]; LD.E.64 v1, [addr+8]")
+
+print("\nExample 3: Complex Pattern (from RMSNorm)")
+print("  Y layout: [4, 1, 8, 1] (hierarchical)")
+print("  D mapping: Non-contiguous in memory")
+print("  Analysis: Cannot vectorize efficiently")
+print("  Result: Scalar loads with coalescing")
+print("  Code: LD.E.32 r0-r31, [computed addresses]")
+
+print("\n🎯 LoadStoreTraits Optimizations:")
+print("• Maximizes vector instruction usage")
+print("• Ensures coalesced memory access")
+print("• Minimizes total load/store instructions")
+print("• Adapts to different data layouts automatically")
+```
+
 ## C++ Integration Example
 
 The real power of TileDistribution comes from its C++ implementation:
+
+::: {.callout-note collapse="true"}
+## C++ GEMM Kernel Pattern
+
+::: {.callout-note collapse="true"}
+## C++ Code
 
 ```cpp
 // Real GEMM kernel pattern using TileDistribution
@@ -818,40 +1353,144 @@ __global__ void gemm_kernel(
     // Results written back through another window
 }
 ```
+:::
+:::
 
-## Transformation Pipeline
+## Complete Coordinate Transformation Pipeline
 
 ```{=html}
 <div class="mermaid" style="margin: 0 auto; display: block; width: 100%;">
-graph LR
-    subgraph "Input"
-        TID["Thread ID<br/>(0-1023)"]
+flowchart TB
+    subgraph "Hardware Input"
+        TID["Thread ID<br/>(blockIdx, threadIdx)"]
+        WID["Warp ID = threadIdx.x / 64"]
+        LID["Lane ID = threadIdx.x % 64"]
     end
     
-    subgraph "Stage 1"
-        P["P-coordinates<br/>(warp, lane)"]
+    subgraph "P-Space (Thread Coordinates)"
+        P["P[warp_id, lane_id]<br/>Logical thread position"]
     end
     
-    subgraph "Stage 2"
-        Y["Y-coordinates<br/>(tile position)"]
+    subgraph "Y-Space (Pattern Coordinates)"
+        Y["Y[i, j, k, ...]<br/>Position within tile"]
+        YL["Y-lengths from distribution"]
     end
     
-    subgraph "Stage 3"
-        X["X-coordinates<br/>(tensor indices)"]
+    subgraph "PsYs→Xs Transform"
+        PSYS["Combined (P,Y) coordinates"]
+        ADAPT["Tensor Adaptor<br/>Hierarchical transform"]
     end
     
-    subgraph "Output"
-        ADDR["Memory addresses<br/>Register indices"]
+    subgraph "X-Space (Tensor Coordinates)"
+        X["X[row, col]<br/>Global tensor indices"]
     end
     
-    TID --> P
-    P --> Y
-    Y --> X
+    subgraph "Ys→D Transform"
+        YSD["Y coordinates"]
+        LIN["Linearization"]
+        D["D[0..n]<br/>Register indices"]
+    end
+    
+    subgraph "Memory & Registers"
+        ADDR["Global Memory Addresses"]
+        REG["Register File r0, r1, ..., rN"]
+        VEC["Vector Registers v0, v1, ..."]
+    end
+    
+    TID --> WID
+    TID --> LID
+    WID --> P
+    LID --> P
+    
+    P --> PSYS
+    Y --> PSYS
+    YL --> Y
+    
+    PSYS --> ADAPT
+    ADAPT --> X
+    
+    Y --> YSD
+    YSD --> LIN
+    LIN --> D
+    
     X --> ADDR
+    D --> REG
+    D --> VEC
     
-    style TID fill:#e0e7ff,stroke:#4338ca,stroke-width:2px
-    style ADDR fill:#d1fae5,stroke:#10b981,stroke-width:2px
+    style P fill:#e0e7ff,stroke:#4338ca,stroke-width:2px
+    style ADAPT fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
+    style X fill:#d1fae5,stroke:#10b981,stroke-width:2px
+    style D fill:#fef3c7,stroke:#f59e0b,stroke-width:2px
+    style REG fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
 </div>
+```
+
+### Complete Example: Tracing Through the Pipeline
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+print("🔍 Complete Coordinate Pipeline Example")
+print("=" * 40)
+
+# Create a concrete distribution
+pipeline_encoding = make_tile_distribution_encoding(
+    rs_lengths=[],
+    hs_lengthss=[[2, 2], [2, 2]],
+    ps_to_rhss_major=[[1], [2]],
+    ps_to_rhss_minor=[[0], [0]],
+    ys_to_rhs_major=[1, 2],
+    ys_to_rhs_minor=[1, 1]
+)
+pipeline_dist = make_static_tile_distribution(pipeline_encoding)
+
+# Simulate thread 37 (warp 0, lane 37)
+thread_id = 37
+warp_id = thread_id // 64  # = 0
+lane_id = thread_id % 64   # = 37
+
+print(f"Starting with Thread ID: {thread_id}")
+print(f"  → Warp ID: {warp_id}")
+print(f"  → Lane ID: {lane_id}")
+print()
+
+# Set simulated position
+set_global_thread_position(warp_id, lane_id % 2)  # Simplified for demo
+
+# Stage 1: Thread ID → P coordinates
+p_coords = pipeline_dist.get_partition_index()
+print(f"Stage 1: P coordinates = {p_coords}")
+print()
+
+# Stage 2: P → Y space (pattern within tile)
+y_lengths = pipeline_dist.get_y_vector_lengths()
+print(f"Stage 2: Y lengths = {y_lengths}")
+print("  Each thread handles a tile with these dimensions")
+print()
+
+# Stage 3: PsYs → X (global tensor coordinates)
+print("Stage 3: PsYs → X transformations:")
+for y0 in range(y_lengths[0]):
+    for y1 in range(y_lengths[1]):
+        # In real GPU, PsYs→Xs adaptor computes this
+        print(f"  P{p_coords} + Y[{y0},{y1}] → X[computed]")
+print()
+
+# Stage 4: Y → D (register allocation)
+print("Stage 4: Y → D (register mapping):")
+ys_to_d_desc = pipeline_dist.ys_to_d_descriptor
+d_idx = 0
+for y0 in range(y_lengths[0]):
+    for y1 in range(y_lengths[1]):
+        print(f"  Y[{y0},{y1}] → D[{d_idx}] → register r{d_idx}")
+        d_idx += 1
+
+print("\n📊 Summary for this thread:")
+print(f"• Thread {thread_id} owns a {y_lengths[0]}×{y_lengths[1]} tile")
+print(f"• Maps to {d_idx} registers (r0-r{d_idx-1})")
+print(f"• Accesses global memory at computed X positions")
+print(f"• LoadStoreTraits optimizes the access pattern")
 ```
 
 ## Performance Comparison
