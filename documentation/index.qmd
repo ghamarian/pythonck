@@ -37,6 +37,8 @@ Follow our structured 8-part learning path:
 
 ### **Distribution API** 
 - **[Tile Distribution](concepts/03_tile_distribution.qmd)** - The core API for work assignment
+- **[Space-Filling Curve](concepts/03_space_filling_curve.qmd)** - The mathematical foundation for tile distribution
+- **[LoadStoreTraits](concepts/03_load_store_traits.qmd)** - The optimization component for memory access
 - **[Tile Window](concepts/03_tile_window.qmd)** - Data access gateway with windowing
 - **[Sweep Tile](concepts/03_sweep_tile.qmd)** - Elegant iteration patterns
 
