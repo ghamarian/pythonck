@@ -36,7 +36,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install numpy pandas sympy
+          pip install numpy pandas sympy jupyter
           # Install the local wheel file if it exists
           if [ -f "documentation/pythonck-0.2.0-py3-none-any.whl" ]; then
             pip install documentation/pythonck-0.2.0-py3-none-any.whl
