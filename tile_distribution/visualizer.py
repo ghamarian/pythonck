@@ -1121,7 +1121,7 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
     info_box_width = 0.19
     info_x_spacing = 0.02 # Restored: Horizontal spacing between boxes in a row
     info_y_spacing = 0.01   # Reduced from 0.015 (space between info box rows)
-    info_text_color = 'white'
+    info_text_color = 'black'
     info_edge_color = 'white'
     info_alpha = 0.6
     info_fontsize = 8
@@ -1136,7 +1136,7 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
     ax.add_patch(bs_box)
     ax.text(info_x_start + info_box_width / 2, bs_box_y + info_box_height / 2,
            f"Block: {bs_m_val}M×{bs_n_val}N",
-           fontsize=info_fontsize, ha='center', va='center', color=info_text_color)
+            fontsize=info_fontsize, ha='center', va='center', color=info_text_color, weight='bold')
 
     # Box 1.2: WarpsPerBlock
     wpb_box_x = info_x_start + info_box_width + info_x_spacing
@@ -1148,7 +1148,7 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
     ax.add_patch(wpb_box)
     ax.text(wpb_box_x + info_box_width / 2, bs_box_y + info_box_height / 2,
            f"Warps/Blk: {wpb_m_display_val}M×{wpb_n_display_val}N",  # Updated to show both dimensions
-           fontsize=info_fontsize, ha='center', va='center', color=info_text_color)
+            fontsize=info_fontsize, ha='center', va='center', color=info_text_color, weight='bold')
 
     # Box 2.1: ThreadPerWarp
     tpw_box_y = bs_box_y - info_y_spacing - info_box_height # Y position for the second row of info boxes
@@ -1160,7 +1160,7 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
     ax.add_patch(tpw_box)
     ax.text(info_x_start + info_box_width / 2, tpw_box_y + info_box_height / 2,
            f"Thrd/Warp: {tpw_m_val}R×{tpw_n_val}C",
-           fontsize=info_fontsize, ha='center', va='center', color=info_text_color)
+            fontsize=info_fontsize, ha='center', va='center', color=info_text_color, weight='bold')
 
     # Box 2.2: VectorDimension
     vec_box_x = info_x_start + info_box_width + info_x_spacing
@@ -1172,7 +1172,7 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
     ax.add_patch(vec_box)
     ax.text(vec_box_x + info_box_width / 2, tpw_box_y + info_box_height / 2,
            f"Vector(K): {vec_k_val}",
-           fontsize=info_fontsize, ha='center', va='center', color=info_text_color)
+            fontsize=info_fontsize, ha='center', va='center', color=info_text_color, weight='bold')
     
     # Set up layout dimensions
     # Use maximum layout width for thread area to prevent column cutoff
@@ -1258,7 +1258,8 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
     # Update RepeatM text to better reflect 2D grid structure
     ax.text(0.02 + 0.3/2, repeat_box_actual_y_start + repeat_box_height_val/2, 
            f"Block Structure: {wpb_m_display_val}×{wpb_n_display_val} Warps\nEach Warp: {tpw_m_val}×{tpw_n_val} Threads\nVector Length: {' × '.join(str(v) for v in vector_dimensions) if len(vector_dimensions) > 1 else vec_k_val}", 
-           fontsize=9, ha='center', va='center', color='white')
+           fontsize=9, ha='center', va='center', color='black', weight='bold',
+           bbox=dict(facecolor='white', alpha=0.8, boxstyle='round,pad=0.2'))
     
     # No need to recalculate space - we already have the warp_width
     
@@ -1409,12 +1410,13 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
                 # In data view, use a subtle/smaller warp label
                 ax.text(warp_x + container_width * 0.5, warp_y + warp_height * 0.95, 
                        f"Warp{warp_idx}", ha='center', va='bottom', fontsize=7, 
-                       color='#888888')
+                       color='#333333', weight='bold')
             else:
                 # In thread view, use the full warp label with coordinates
                 ax.text(warp_x + container_width * 0.5, warp_y + warp_height * 0.95, 
                        f"Warp{warp_idx} ({m},{n})", ha='center', va='bottom', fontsize=8, 
-                       color='white', weight='bold')
+                       color='#333333', weight='bold',
+                       bbox=dict(facecolor='white', alpha=0.8, boxstyle='round,pad=0.2'))
             
             # Mark this warp as labeled
             warp_labels[warp_idx] = True
@@ -1476,12 +1478,13 @@ def visualize_hierarchical_tiles(viz_data: Dict[str, Any], figsize=(14, 10), cod
                         else:
                             # Regular thread ID label
                             ax.text(cell_x + cell_width * 0.45, cell_y + cell_height * 0.45, 
-                                   cell_label, ha='center', va='center', fontsize=6, color='white')
+                                   cell_label, ha='center', va='center', fontsize=6, color='black', weight='bold')
             else:
                 # If threads are too small to display individually, just show a count
                 ax.text(warp_x + warp_width * 0.5, warp_y + warp_height * 0.5,
                        f"{threads_per_warp_m}×{threads_per_warp_n}\nthreads", 
-                       ha='center', va='center', fontsize=7, color='white')
+                       ha='center', va='center', fontsize=7, color='black',
+                       bbox=dict(facecolor='white', alpha=0.8, boxstyle='round,pad=0.2'))
                 
             warps_shown += 1
             

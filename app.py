@@ -1342,9 +1342,11 @@ def build_tile_distribution_transformation_graph(encoding_dict: Dict, variables:
                                     break
                 
                 # Create final P dimension outputs
+                p_node_ids = []
                 if ndim_p > 0:
                     for p_idx in range(ndim_p):
                         final_node_id = f"final_P{p_idx}"
+                        p_node_ids.append(final_node_id)
                         output_cluster.node(final_node_id, f"P{p_idx}\\n(thread partition)", 
                                           fillcolor="#66ff66", style="filled,bold")
                         
@@ -1356,9 +1358,11 @@ def build_tile_distribution_transformation_graph(encoding_dict: Dict, variables:
                                 break
                 
                 # Create final Y dimension outputs (they are top dimension IDs, not transforms)
+                y_node_ids = []
                 if ndim_y > 0:
                     for y_idx in range(ndim_y):
                         final_node_id = f"final_Y{y_idx}"
+                        y_node_ids.append(final_node_id)
                         output_cluster.node(final_node_id, f"Y{y_idx}\\n(spatial coord)", 
                                           fillcolor="#66ccff", style="filled,bold")
                         
@@ -1369,6 +1373,18 @@ def build_tile_distribution_transformation_graph(encoding_dict: Dict, variables:
                                        label="Top Dimension", color="blue", style="bold")
                                 break
                 
+                # Add invisible edges to enforce P -> Y ordering
+                ordered_nodes = p_node_ids + y_node_ids
+                
+                # Add invisible edges to enforce order
+                for i in range(len(ordered_nodes) - 1):
+                    dot.edge(ordered_nodes[i], ordered_nodes[i+1], style="invis")
+
+                # Use rank=same to align them vertically
+                if len(ordered_nodes) > 0:
+                    rank_line = "{ rank=same; " + "; ".join(ordered_nodes) + " }"
+                    dot.body.append(rank_line)
+
                 # Add explanation note
                 note_node_id = "explanation_note"
                 note_text = f"X→RH→(P,Y) Transformation Pipeline\\nInput: {ndim_x} X dims → Output: {ndim_p} P dims + {ndim_y} Y dims"
@@ -1519,4 +1535,4 @@ def build_y_to_d_transformation_graph(encoding_dict: Dict, variables: Dict) -> g
     return dot
 
 if __name__ == "__main__":
-    main() 
+    main()
