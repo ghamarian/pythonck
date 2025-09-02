@@ -76,8 +76,6 @@ website:
               contents:
                 - text: "Convolution Implementation"
                   href: concepts/02_convolution_example.qmd
-                - text: "Swizzling Patterns"
-                  href: concepts/02_swizzling_example.qmd
                 - text: "Coordinate Movement"
                   href: concepts/02_coordinate_movement.qmd
                 - text: "LDS index swapping"

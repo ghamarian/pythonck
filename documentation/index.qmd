@@ -32,7 +32,6 @@ Follow our structured 8-part learning path:
 - **[Chaining Adaptors](concepts/02_adaptors.qmd)** - Combining transforms into complex operations
 - **[Complete Descriptors](concepts/02_descriptors.qmd)** - Full tensor specifications with layouts
 - **[Convolution Example](concepts/02_convolution_example.qmd)** - Practical convolution implementation
-- **[Swizzling Example](concepts/02_swizzling_example.qmd)** - Morton ordering and memory patterns
 - **[Advanced Coordinates](concepts/02_coordinate_movement.qmd)** - TensorCoordinate and movement operations
 
 ### **Distribution API** 
