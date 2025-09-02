@@ -1,0 +1,365 @@
+---
+title: "Convolution Implementation with Tensor Descriptors"
+format: live-html
+---
+
+# Introduction
+
+This chapter will demonstrate how LDS index swapping can be implemented using ck_tile api.
+Index swapping or XOR preshuffle is a technique introduced in [LDS and Bank conflics](../hardware/01_lds.qmd)
+to resolve bank conflicts in LDS.
+In this section we will explore how ck_tile interface generalizes XOR preshuffle using coordinates
+transformation.
+
+# Generalization of coordinates transformation
+
+To generalize transformation in LDS ck_tile performs coordinate transformation to
+bring LDS access from the original 2D position among 2 LDS dimentions M and K into 
+transformed M' and K' 2D coordinate. 
+
+The original K coordinate is split on K0 and K1 where K1 is a thread vector size among k
+dimension in elements - `KPack`. And K0 is `KPerBlock/KPack`.
+
+## Step1
+
+```{=html}
+<div class="mermaid">
+graph TB
+    subgraph "3D LDS coordinate [K0, M, K1]"
+        K0["KPerBlock/KPack * MLdsLayer<br/>K0"]
+        M["MPerBlock/MLdsLayer<br/>M"]
+        K1["KPack<br/>K1"]
+    end
+
+    subgraph "XOR Transform"
+        XT["make_xor_transform"]
+    end
+
+    subgraph "Update K0 with XOR transformation"
+        K01["KPerBlock/KPack * MLdsLayer<br/>K0'"]
+        M1["MPerBlock/MLdsLayer<br/>M"]
+        K11["KPack<br/>K1"]
+    end
+
+    K0 --> XT
+    M --> XT
+    K1 --> K11
+
+    XT --> K01
+    XT --> M1
+    
+    style K0 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style K01 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style M fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style M1 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+
+    style K1 fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style K11 fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+</div>
+```
+
+The above transformation updates K0 coordinate (effectively the index of packed elements) using the following
+formula `K0' = K0 ^ (M % (KPerBlock / Kpack * MLdsLayer))`.
+
+The next step in this transformation splits K0' into L and K0'' producing 
+an intermediate 4D coordinate. 
+This is necessery if M coordinate is not a pass through ( i.e. when MLdsLayer > 1). If size of data over K dimensions is
+not sufficiently big to occupy all 32 banks in LDS the remaining banks will be used by the next row. This is typically useful
+for smaller tile sizes and/or data types. L will contribute to M' and K0'' will contribute to the final K'.
+
+## Step2
+
+```{=html}
+<div class="mermaid">
+graph TB
+    subgraph "3D LDS coordinate [K0', M, K1]"
+        K0["KPerBlock/KPack * MLdsLayer<br/>K0'"]
+        M["MPerBlock/MLdsLayer<br/>M"]
+        K1["KPack<br/>K1"]
+    end
+
+    subgraph "Unmerge into 2 components"
+        UM["make_unmerge_transform"]
+    end
+
+    subgraph "4D intermediate transformation space"
+        L["MLdsLayer<br/>L"]
+        M1["MPerBlock/MLdsLayer<br/>M"]
+        K01["KPerBlock/KPack<br/>K0''"]
+        K11["KPack<br/>K1"]
+    end
+
+    K0 --> UM
+    M --> M1
+    K1 --> K11
+
+    UM --> L
+    UM --> K01
+    
+    style K0 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style L fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style K01 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+
+    style M fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style M1 fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+
+    style K1 fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style K11 fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+</div>
+```
+
+As the reader can infer the unmerge transform is done like 
+this `L = K0' / (KPerBlock/KPack)` ,`K0''=K0'/(MLdsLayer)`.
+if `MLdsLayer == 1` then `L=1, K0''=K0'`.
+
+The final step is to merge L,M and K0'',K1 together to produce the final 
+2D coordinates M' and K' in the transformed stace.
+
+## Step3
+
+```{=html}
+<div class="mermaid">
+graph TB
+    subgraph "4D LDS Coordinates [L, M, K0'', K1]"
+        L["MLdsLayer<br/>L"]
+        M1["MPerBlock/MLdsLayer<br/>M"]
+        K0["KPerBlock/KPack<br/>K0''"]
+        K1["KPack<br/>K1"]
+    end
+
+    subgraph "Merge into 1 component"
+        ME0["make_merge_transform"]
+    end
+
+    subgraph "Merge into 1 component"
+        ME1["make_merge_transform"]
+    end
+
+    subgraph "Transformed 2D coordinates [M', K']"
+        M11["MPerBlock<br/>M'"]
+        K01["KPerBlock<br/>K'"]
+    end
+
+    L --> ME0
+    M1 --> ME0
+
+    K0 --> ME1
+    K1 --> ME1
+
+    ME0 --> M11
+    ME1 --> K01    
+
+    style K0 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style K1 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style K01 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+
+    style M1 fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style L fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style M11 fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+
+</div>
+```
+
+## Example
+The  below example demonstrates the sequence of transformations into a 4D tensor, using python and default parameters for
+`kKPerBlock, kKPack, MLdsLayer, kMPerBlock`. 
+
+
+```{pyodide}
+#| echo: false
+#| output: false
+#| autorun: true
+
+# Auto-install pythonck package
+import micropip
+await micropip.install("https://raw.githubusercontent.com/ghamarian/pythonck/master/documentation/pythonck-0.2.0-py3-none-any.whl")
+```
+
+
+```{pyodide}
+#| output: true
+
+"""
+Exact-construct debug using pytensor's C++-equivalent APIs for:
+
+constexpr auto a_lds_block_desc_xk0_mnldslayer_mn_xk1 = transform_tensor_descriptor(
+    a_lds_block_desc_permuted,
+    make_tuple(
+        make_unmerge_transform(make_tuple(number<MLdsLayer>{}, number<kKPerBlock / kKPack>{})),
+        make_pass_through_transform(number<kMPerBlock / MLdsLayer>{}),
+        make_pass_through_transform(number<kKPack>{})),
+    make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}),
+    make_tuple(sequence<0, 2>{}, sequence<1>{}, sequence<3>{}));
+
+This script constructs the full chain:
+  1) a_lds_block_desc_0 (naive)
+  2) a_lds_block_desc_permuted (xor on dims [1,0], pass-through dim 2)
+  3) a_lds_block_desc_xk0_mnldslayer_mn_xk1 (unmerge + pass-throughs with index swap)
+
+It prints the top-dimension lengths and a small sample of index-to-offset mappings
+to validate index placement and order.
+"""
+
+from typing import List
+
+from pytensor.tensor_descriptor import (
+    make_naive_tensor_descriptor,
+    make_unmerge_transform,
+    make_pass_through_transform,
+    make_xor_transform,
+    transform_tensor_descriptor,
+)
+
+
+def get_defaults():
+    try:
+        from tensor_transforms.examples import get_default_variables  # type: ignore
+        vars_ = get_default_variables()["A LDS Block Desc Example"]
+        return (
+            int(vars_["kKPerBlock"]),
+            int(vars_["kKPack"]),
+            int(vars_["MLdsLayer"]),
+            int(vars_["kMPerBlock"]),
+        )
+    except Exception:
+        return 32, 4, 2, 64
+
+
+kKPerBlock, kKPack, MLdsLayer, kMPerBlock = get_defaults()
+
+kKPerBlock_over_kKPack = kKPerBlock // kKPack
+kMPerBlock_over_MLdsLayer = kMPerBlock // MLdsLayer
+
+# 1) a_lds_block_desc_0
+# lengths: [kKPerBlock/kKPack*MLdsLayer, kMPerBlock/MLdsLayer, kKPack]
+# strides: [kKPack, kKPerBlock*MLdsLayer, 1]
+lengths0 = [kKPerBlock_over_kKPack * MLdsLayer, kMPerBlock_over_MLdsLayer, kKPack]
+strides0 = [kKPack, kKPerBlock * MLdsLayer, 1]
+a_lds_block_desc_0 = make_naive_tensor_descriptor(lengths0, strides0)
+
+# 2) a_lds_block_desc_permuted
+# XOR over dims [1,0], pass-through dim 2; upper mapping mirrors lower: [1,0] and [2]
+a_lds_block_desc_permuted = transform_tensor_descriptor(
+        a_lds_block_desc_0,
+        transforms=[
+            make_xor_transform([kMPerBlock_over_MLdsLayer, kKPerBlock_over_kKPack * MLdsLayer]),
+            make_pass_through_transform(kKPack),
+        ],
+        lower_dimension_hidden_idss=[
+            [1, 0],  # sequence<1,0>
+            [2],     # sequence<2>
+        ],
+        upper_dimension_hidden_idss=[
+            [1, 0],  # sequence<1,0>
+            [2],     # sequence<2>
+        ],
+    )
+
+# 3) a_lds_block_desc_xk0_mnldslayer_mn_xk1
+a_lds_block_desc_xk0_mnldslayer_mn_xk1 = transform_tensor_descriptor(
+        a_lds_block_desc_permuted,
+        transforms=[
+            make_unmerge_transform([MLdsLayer, kKPerBlock_over_kKPack]),
+            make_pass_through_transform(kMPerBlock_over_MLdsLayer),
+            make_pass_through_transform(kKPack),
+        ],
+        lower_dimension_hidden_idss=[
+            [0],  # sequence<0>
+            [1],  # sequence<1>
+            [2],  # sequence<2>
+        ],
+        upper_dimension_hidden_idss=[
+            [0, 2],  # sequence<0,2>
+            [1],     # sequence<1>
+            [3],     # sequence<3>
+        ],
+    )
+
+# Show how the index swapping materializes in top-dimension ordering
+print("\nTop-dimension ordering (origin labels):")
+transforms_all = a_lds_block_desc_xk0_mnldslayer_mn_xk1.get_transforms()
+upper_all = a_lds_block_desc_xk0_mnldslayer_mn_xk1.get_upper_dimension_hidden_idss()
+top_hidden = a_lds_block_desc_xk0_mnldslayer_mn_xk1.get_top_dimension_hidden_ids()
+
+# Only the NEW transforms contribute to final top dims.
+prev_tf_count = a_lds_block_desc_permuted.get_num_of_transform()
+new_tf_start = prev_tf_count
+new_tf_end = len(transforms_all)
+
+# Map hidden-id -> human-readable label for the new transforms' outputs
+hidden_to_label = {}
+for i in range(new_tf_start, new_tf_end):
+        tf = transforms_all[i]
+        up_ids = upper_all[i]
+        for j, hid in enumerate(up_ids):
+            label = f"T{(i - new_tf_start)}:{type(tf).__name__}[out{j}]"
+            hidden_to_label[hid] = label
+
+# Reorder by top positions
+labels_by_top_pos = [hidden_to_label.get(hid, f"hid{hid}") for hid in top_hidden]
+for pos, label in enumerate(labels_by_top_pos):
+        print(f"  top[{pos}] <- {label}")
+
+# Assertions on top-dimension ordering
+assert len(labels_by_top_pos) == 4, f"Expected 4 top dims, got {len(labels_by_top_pos)}"
+expected_label_prefixes = [
+        "T0:UnmergeTransform[out0]",      # position 0
+        "T1:PassThroughTransform[out0]",  # position 1
+        "T0:UnmergeTransform[out1]",      # position 2
+        "T2:PassThroughTransform[out0]",  # position 3
+    ]
+for i, exp in enumerate(expected_label_prefixes):
+        assert labels_by_top_pos[i].startswith(exp), (
+            f"Top position {i} expected {exp}, got {labels_by_top_pos[i]}"
+        )
+
+# Report lengths
+print("Descriptor lengths (top dims):")
+print("  a_lds_block_desc_0:                         ", a_lds_block_desc_0.get_lengths())
+print("  a_lds_block_desc_permuted:                  ", a_lds_block_desc_permuted.get_lengths())
+print("  a_lds_block_desc_xk0_mnldslayer_mn_xk1:     ", a_lds_block_desc_xk0_mnldslayer_mn_xk1.get_lengths())
+print(f"a_lds_block_desc_xk0_mnldslayer_mn_xk1=")
+
+# Expected final lengths: [MLdsLayer, kMPerBlock/MLdsLayer, kKPerBlock/kKPack, kKPack]
+expected = [MLdsLayer, kMPerBlock_over_MLdsLayer, kKPerBlock_over_kKPack, kKPack]
+print("Expected final lengths:                       ", expected)
+
+# Assertions on lengths
+assert a_lds_block_desc_0.get_lengths() == lengths0, "Base descriptor lengths mismatch"
+assert a_lds_block_desc_permuted.get_lengths() == lengths0, "Permuted descriptor should preserve lengths"
+assert a_lds_block_desc_xk0_mnldslayer_mn_xk1.get_lengths() == expected, (
+        "Final descriptor lengths do not match expected order/values"
+    )
+
+# Small sample of index-to-offset mapping to validate reordering
+# We also print each transform's lower/upper mappings so you can see the [0,2] impact
+print("\nTransform chain (lower -> upper hidden ids):")
+for i, tf in enumerate(transforms_all):
+        print(f"  TF[{i}] {type(tf).__name__}: lower={a_lds_block_desc_xk0_mnldslayer_mn_xk1.get_lower_dimension_hidden_idss()[i]} upper={upper_all[i]}")
+
+# We test offsets on the final descriptor directly
+desc = a_lds_block_desc_xk0_mnldslayer_mn_xk1
+lens = desc.get_lengths()
+print("\nSample index -> linear offset (final descriptor):")
+max0 = min(lens[0], 3)
+max1 = min(lens[1], 3)
+max2 = min(lens[2], 3)
+max3 = min(lens[3], 3)
+for i0 in range(max0):
+    for i1 in range(max1):
+        for i2 in range(max2):
+            for i3 in range(max3):
+                off = desc.calculate_offset([i0, i1, i2, i3])
+                print(f"  [{i0},{i1},{i2},{i3}] -> {off}")
+
+# Assertions on last-dimension stride (should be contiguous, stride 1)
+if lens[3] >= 2:
+    for i0 in range(min(lens[0], 2)):
+        for i1 in range(min(lens[1], 2)):
+            for i2 in range(min(lens[2], 2)):
+                off0 = desc.calculate_offset([i0, i1, i2, 0])
+                off1 = desc.calculate_offset([i0, i1, i2, 1])
+                assert off1 - off0 == 1, (
+                    f"Last-dim stride should be 1; got {off1 - off0} at (i0,i1,i2)={(i0,i1,i2)}"
+                )
+```

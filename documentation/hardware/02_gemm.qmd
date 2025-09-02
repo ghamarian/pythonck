@@ -1,0 +1,1593 @@
+---
+title: "A block GEMM on MI300"
+format:
+  live-html:
+    mermaid:
+      theme: default
+---
+
+# Introduction to GEMMs
+
+This document illustrates key concepts of implementing a block GEMM (General Matrix Multiplication) kernel on AMD's MI300 GPU. 
+GEMM is a fundamental building block for many machine learning workloads, including attention mechanisms and Mixture of Experts (MoE) models.
+
+The problem we will address is the standard matrix multiplication: $C = A \cdot B$, where matrix A has dimensions **M x K** and matrix B has dimensions **K x N**. 
+The resulting matrix C will have dimensions **M x N**. For simplicity and a better memory access pattern, we will assume matrix B is in a column-major format, which means its shape is logically represented as **N x K**.
+
+***
+
+# Format and Dimensions
+
+The first step in designing our kernel is to select the data format and dimensions.
+
+### Data Format: `bf16`
+
+While `float32` is a common choice, it is often overkill for most AI applications. Its high precision is computationally expensive and can be unnecessary for model convergence. 
+A more suitable and efficient alternative is a half-precision floating-point format. We will use **bfloat16 (`bf16`)**, a format that offers a significant advantage.
+
+Bfloat16 is a 16-bit format that uses the same 8-bit exponent as `float32`. This allows it to have the same dynamic range, which is critical for avoiding overflow and underflow during training. 
+The key difference is that `bf16` uses only 7 bits for the mantissa (versus 23 bits in `float32`), which makes it functionally equivalent to a simple right bit-shift of a 32-bit float: `(float32 >> 16)`.
+
+### Dimensions: M=4864, N=4096
+
+To maximize hardware utilization, we need to choose dimensions that will utilise GPU's resorces well. 
+Let's go with **M = 4864** and **N = 4096**. The rationale behind these particular values will be explained later.
+
+### Input data
+
+Our input will be uniformly distributed random data on the interval [-1, 1].
+```{cpp}
+        initializeMatrix(A.data(), M, K, -1.0, 1.0);
+        initializeMatrix(B.data(), N, K, -1.0, 1.0);
+```
+
+# Simple Matmul
+
+On the AMD **MI300** GPU architecture, each Compute Unit (CU) contains **four SIMD units**.  
+Each SIMD unit can execute a single **wavefront** of 64 threads in parallel.  
+Since there are four wavefronts per CU, a CU can therefore sustain the execution of up 
+to **256 concurrent threads**.
+
+These 256 threads then can be logically grouped into a **thread block**, 
+which is responsible for computing a **sub-block (tile)** of the output matrix `C`.  
+A block of 256 threads can be arranged as a **16×16 thread block**,
+ where each thread computes one element of a **16×16 tile** of the result matrix `C`.  
+Multiple thread blocks are then organized into a **grid**, such that the collection 
+of blocks covers the entire output matrix.
+
+Consider a baseline matrix multiplication kernel where **each thread computes one output element** of `C`.  
+The CUDA/HIP launch configuration can be defined as:
+
+
+```{cpp}
+    dim3 blockSizeRef(16, 16);
+    dim3 gridSizeRef((N + blockSizeRef.x - 1) / blockSizeRef.x,
+                   (M + blockSizeRef.y - 1) / blockSizeRef.y);
+
+    matrixMulHIP<<<gridSizeRef, blockSizeRef, 0, 0>>>(d_A, d_B, d_C);
+```
+
+And the GPU Kernel:
+
+```{cpp}
+__global__ void matrixMulHIP(s_type * __restrict__ A, s_type* __restrict__ B, float* __restrict__ C) {
+    // Calculate global thread coordinates in output matrix C
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+
+    // Boundary check for valid threads (only necessary due to possible overprovisioning of threads)
+    if (row < N && col < N) {
+        float value = 0.0f;
+        // Perform the dot product of row from A and column from B
+        for (int k = 0; k < K; ++k) {
+            value += A[row * K + k] * B[col * K + k];
+        }
+        // Store computed value in output matrix
+        C[row * N + col] = value;
+    }
+}
+```
+
+This kernel has a very low compute throughput according `rocprofv3` profiler output. It is stalling 
+on global memory read transactions effecetively starving the rest of the pipeline that needs that data to
+proceed.
+
+Below are the wavestates of a single compute unit. It is clear that GPU spends
+absolute majority of it's cycles stalled on memory transactions waiting for the next
+portions of matrices A and B to perform compute.
+
+![Naive implementation GPU states](02_naive_stalls.png)
+
+![Naive implementation stalled instructions](02_naive_stalls_instr.png)
+
+In a naïve implementation of matrix multiplication, **pressure on global memory loads** 
+quickly becomes the bottleneck. To see why, let’s examine how a single **16×16 block** 
+of the destination matrix `C` is computed by one block of threads within a compute unit.
+
+Each thread in the block is responsible for computing a single element of `C`. 
+To do so, it loops over the `K` dimension and, in every iteration, fetches **two values** 
+from global memory:  
+- one from a row of `A`  
+- one from a column of `B`  
+
+This means:
+
+- Number of threads in a 16×16 block is 256.  
+- Each thread performs \( 2K \) global loads  
+- **Total global loads** = \( 256 \times 2K = 512K \)  
+- **Total global stores** = 256 (one per output element in `C`)  
+
+---
+
+If we were able to reuse each element of `A` and `B` perfectly (loading each only once), then the unique data required would be:
+
+- Unique `A` elements: \( 16 \times K = 16K \)  
+- Unique `B` elements: \( 16 \times K = 16K \)  
+- **Total unique loads** = \( 16K + 16K = 32K \)  
+- **Total stores** = 256  
+
+- **Naïve kernel**: \( 512K \) global loads + 256 stores  
+- **Ideal reuse**: \( 32K \) global loads + 256 stores  
+
+This illustrates a **16× difference in memory traffic** for the same computation on a small,
+16x16 block. It gets worse if we consider bigger block sizes.
+
+Of course, this is a simplified analysis — in reality, GPUs fetch data in **cache lines** 
+rather than individual elements, and caches may reduce some redundant fetches. 
+However, the relative scale of the difference remains, which is why **global memory 
+bandwidth becomes the dominant bottleneck** in naïve matrix multiplication kernels.
+
+To reduce pressure on memory bandwidth we can employ the technique called tiling.
+
+# What is tiling?
+
+## Cooperative Loading with LDS
+
+In the naïve implementation, threads within the same compute unit (CU) do not 
+cooperate with each other at all. Each thread independently and greedily loads 
+the row elements of `A` and the column elements of `B` that it needs in order to 
+compute its corresponding value in `C`.
+
+However, recall from the previous section that each CU on the MI300 has **64 KB of 
+Local Data Share (LDS)**, which acts as a shared memory space accessible by all 
+threads in that CU. This opens the possibility of **cooperative loading**.
+
+Instead of having every thread repeatedly fetch its own data directly from global memory, 
+we can have all threads **collaboratively preload** a block of data into LDS. 
+Once in LDS, this data can be reused by many threads, reducing redundant global memory 
+fetches.
+
+There is a limitation, though: we cannot preload entire rows or columns of `A` and `B` 
+into LDS, since those may be very large and LDS has a fixed capacity. 
+Instead, the solution is to load **small blocks (tiles)** of data at a time. 
+For example, we can:
+
+- Load a **16×16 tile** from `A` and `B` into LDS  
+- Allow all threads in the CU to reuse the data from that tile to compute their portion of the result  
+- Once done, move the tile window forward along the `K` dimension  
+- Repeat until the entire **16×16 output block** of `C` is computed  
+
+This technique of **tiling with cooperative loading** dramatically reduces global memory 
+traffic and improves GPU efficiency by leveraging fast, on-chip LDS.
+
+```{pyodide}
+#| echo: false
+
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+
+# Full matrix dimensions
+M, N, K = 128, 128, 64
+# Tile dimensions
+TILE_M, TILE_N, TILE_K = 16, 16, 16  # C tile 16x16, A_tile 16xTILE_K, B_tile TILE_Kx16
+num_k_steps = K // TILE_K  # number of steps along K
+
+fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+axes[0].set_title("A tiles (M x K slices)")
+axes[1].set_title("B tiles (K x N slices)")
+axes[2].set_title("C tile (output block)")
+
+for ax in axes:
+    ax.set_xlim(0, max(M,N))
+    ax.set_ylim(0, max(M,N))
+    ax.set_aspect('equal')
+    ax.invert_yaxis()
+    ax.grid(True, linestyle='--', alpha=0.3)
+
+# Draw C_tile (fixed)
+c_rect = patches.Rectangle((0, 0), TILE_M, TILE_N, linewidth=2, edgecolor='red', facecolor='none', label='C_tile')
+axes[2].add_patch(c_rect)
+
+# Draw moving tiles of A and B with arrows
+for step in range(num_k_steps):
+    # A_tile slice moves horizontally along K
+    a_rect = patches.Rectangle((step*TILE_K, 0), TILE_K, TILE_M, linewidth=1, edgecolor='blue', facecolor='blue', alpha=0.3,
+                               label='A_tile' if step==0 else "")
+    axes[0].add_patch(a_rect)
+    if step > 0:
+        axes[0].arrow((step-1)*TILE_K + TILE_K/2, TILE_M/2, TILE_K, 0, head_width=2, head_length=2, fc='blue', ec='blue')
+
+    # B_tile slice moves vertically along K
+    b_rect = patches.Rectangle((0, step*TILE_K), TILE_N, TILE_K, linewidth=1, edgecolor='green', facecolor='green', alpha=0.3,
+                               label='B_tile' if step==0 else "")
+    axes[1].add_patch(b_rect)
+    if step > 0:
+        axes[1].arrow(TILE_N/2, (step-1)*TILE_K + TILE_K/2, 0, TILE_K, head_width=2, head_length=2, fc='green', ec='green')
+
+    # Show accumulation in C_tile (same rectangle each step)
+    axes[2].add_patch(patches.Rectangle((0,0), TILE_M, TILE_N, linewidth=1, edgecolor='orange', facecolor='orange', alpha=0.1))
+
+# Legends
+axes[0].legend()
+axes[1].legend()
+axes[2].legend(['C_tile accumulation'])
+
+plt.show()
+```
+How many elements of matrices A and B need to be loaded with the tiling approach ?
+
+For a thread block computing a `TILE_M × TILE_N` output tile with K-blocking:
+
+- Elements of **A** loaded per block:  
+  $$
+  \text{A\_loads} = \mathrm{TILE\_M} \cdot K
+  $$
+
+- Elements of **B** loaded per block:  
+  $$
+  \text{B\_loads} = \mathrm{TILE\_N} \cdot K
+  $$
+
+- Total outputs produced per block:  
+  $$
+  \text{outputs} = \mathrm{TILE\_M} \cdot \mathrm{TILE\_N}
+  $$
+
+The **average loads per output element** (ignoring C traffic) are:
+
+$$
+\text{loads per output}
+= \frac{\mathrm{TILE\_M}\cdot K + \mathrm{TILE\_N}\cdot K}{\mathrm{TILE\_M} \cdot \mathrm{TILE\_N}}
+= K \left(\frac{1}{\mathrm{TILE\_M}} + \frac{1}{\mathrm{TILE\_N}}\right).
+$$
+
+If elements are `s` bytes wide:
+
+$$
+\text{bytes per output} = s \cdot K \left(\frac{1}{\mathrm{TILE\_M}} + \frac{1}{\mathrm{TILE\_N}}\right).
+$$
+
+To simplify the formula, if we consider a square tile of a size T, to compute one value in C we need:
+
+- Naïve (no tiling) = \(2K\) loads per output.  
+- With tiling = (2K/T).  
+- **Reduction factor = \(T\)**.
+
+Example: \(T=16\)
+
+$$
+\text{loads per output} = \frac{2K}{16} = \frac{K}{8}.
+$$
+
+So compared to the naïve \(2K\), this gives a **16× reduction** in global memory traffic per output element.
+
+### Why this doesn’t mean tiling = global ideal
+Even with perfect reuse *inside* each block, different blocks still need overlapping parts of \(A\) or \(B\). 
+That creates **inter-block duplication** that the block-local tile can’t eliminate. 
+The true **global ideal** (each \(A\) and \(B\) element loaded *once* for the entire GEMM) would give:
+
+$$
+\text{loads per output (global ideal)} = K \!\left(\tfrac{1}{M} + \tfrac{1}{N}\right)
+$$
+
+which is typically **much smaller** than $\tfrac{2K}{T}$ for large $M,N$. It is **unattainable** in practice with 
+independent blocks because you can’t share all data perfectly across the whole grid.
+
+## LDS Usage and Tiling Efficiency
+
+How much space in LDS would this tiling use? Recall that matrices **A** and **B** store data in **bf16** format. For a small 16×16 tile:
+
+- Each matrix contains 16 × 16 = 256 elements.  
+- At 2 bytes per element, each matrix occupies 256 × 2 = 512 bytes.  
+- Total for A and B: 512 × 2 = 1 KB.
+
+We have much more space in LDS, so why not to try a bigger tile size? We can afford 32 KB for each matrix, which allows us to increase the tile size to **256×64**.
+ With this tile size, each compute unit (CU) will output a **256×256 block in C**. With this approach, the number of global memory 
+ reads will be **256 times smaller per element in C** compared to a brute-force approach.
+
+That sounds great, but is there a catch? Tiling, while being very efficient at reducing memory bandwidth pressure, 
+is **quite compute-intensive**. Consider how many computations are required to compute matrix C per byte of loaded data:
+
+- The total number of bytes that matrices A and B contain is (M × K + N × K) × 2.  
+- The total number of floating-point operations (FLOPs) required to compute the whole matrix C is 2 × M × N × K.  
+
+Naturally, the best-case scenario for compute per byte is:
+```
+2 × M × N × K / ((M × K + N × K) × 2) = M × N × K / (M × K + N × K) = M × N / (M + N)
+```
+
+
+Now let’s see how much data we need to load with a tiling approach. For a 256×64 tile iterating over K dimension:
+
+- To compute one 256×256 block in C, each 256×64 tile for A and B must be loaded K/64 times.  
+- This must be repeated over M and N dimensions: M/256 and N/256 times, respectively.  
+- In total, the number of tile loads is 2*M × N × K / (256 × 256 × 64).  
+- Each tile load reads 256 × 64 × 2 bytes, giving a total memory load of M × N × K / 64 bytes.
+
+Now let’s compute the FLOPs required:
+
+- For each 256×256 block, the FLOPs are 256 × 256 × 64 × 2, repeated K/64 times, giving 256 × 256 × 2 × K.  
+- The total number of 256×256 blocks is M/256 × N/256, so total computations are 2 × K × M × N.  
+- Thus, the total compute per loaded byte is 2 × M × N × K / (M × N × K / 64) = 128.
+
+The amount of compute per loaded byte with tiling depends only on tile size, assuming M and N are large enough. For M = 4864 and N = 4096, the **absolute theoretical maximum** is:
+
+```
+4864 × 4096 / (4864 + 4096) ≈ 2224 FLOPs per loaded byte
+```
+
+This means that even with large tiling, we can approach only ~6% of the **compute efficiency** of the theoretical maximum.
+
+##  Utilization considerations
+
+Let’s explain why the input dimensions **M = 4864** and **N = 4096** are convenient choices.
+
+Recall that MI300 has **304 compute units (CUs)**. 
+If we choose a tile size of **256×64**, where the **K dimension** is the one we 
+iterate over, then the output grid size is:
+```
+M / 256 × N / 256 = 4864 / 256 × 4096 / 256 = 19 × 16 = 304
+```
+
+
+This exactly matches the total number of compute units on the GPU.  
+
+That means every CU can be fully occupied with one tile of work, and we don’t 
+need to worry about imbalance or underutilization. It’s always nice to have 
+one less thing to optimize around.
+
+##  Bandwidth considerations
+
+### Tiling Alone Doesn’t Guarantee a Speedup
+
+We discussed that tiling should reduce bandwidth pressure in theory, but a simple tiling scheme won’t always improve GPU runtime. 
+
+Why is that?
+
+In practice, **memory latency** can be more limiting than total bandwidth. Memory traffic flows from HBM → memory bus → GPU L2 (or “infinite cache”) before reaching LDS or registers. 
+The memory bus width on MI300 is 8192 bits, and at peak utilization HBM read bandwidth can reach ~5.2 TB/s. However, if data is not already cached, a global memory fetch may take **hundreds of cycles**. 
+This means the critical issue is not just avoiding redundant loads, but ensuring that memory is **available in registers or LDS in advance for compute**.
+
+This is where **preload** comes in. Memory is preloaded into one buffer while another feeds the compute pipeline. 
+Preloading inevitably increases register and LDS usage, because data must be stored somewhere before it is consumed.
+
+Consider our **256×64 tile size**:
+- Each thread needs to load 64 elements = 128 bytes.  
+- With preload/double buffering, we need two copies: one being consumed, one being prefetched.  
+- Each VGPR is 4 bytes, so storing 256 elements requires 256 / 4 = **64 VGPRs** per lane.  
+
+This number is not huge compared to the hardware maximum of 512 VGPRs per lane, but remember
+that registers are shared across wavefronts. 
+Occupancy may start to drop well before hitting 512 registers, so even moderate 
+prefetching can impact parallelism.
+
+##  Compute considerations
+
+### Matrix Fused Multiply-Add
+
+From our previous discussion, it's clear that the compute-to-memory-access ratio
+ will be a bottleneck. This means that simply optimizing for bandwidth isn't enough; 
+ we need to significantly improve our computational capabilities. 
+ Modern GPUs address this with specialized hardware.
+
+Modern GPUs offer dedicated **matrix (or tensor) cores** for multiplication tasks, 
+which are often an order of magnitude or more performant than generic ALU pipelines. 
+These cores are specifically designed to accelerate matrix operations.
+
+To take full advantage of these specialized cores, programmers can use intrinsic 
+instructions. These are hardware-specific functions that allow for direct access
+to the matrix core pipelines. There are multiple variants of these instructions;
+for our purposes on the MI300, we will use `__builtin_amdgcn_mfma_f32_16x16x16f16`, 
+which is highly efficient and has a low latency of only 16 cycles.
+
+The naming convention for those amdgcn intrinsics is: `__builtin_amdgcn_mfma_<out_type>_MxNxK<in_type>`.
+In out case we will be using 16x16 matrices as intput, and 16x16 matrices as output.
+These instructions work as *accumulate add*, what they effectively do is:
+`D = A*B + C`. It is useful for our purpose, since we need to accumulate results 
+over multiple tiles over K dimension.
+
+mfma instructions run on a wavefront (64 lanes), each lane in a wavefront is responsible to load
+a portion of data for intput matrices, and output a portion of data for the dst matrix.
+
+![In memory layouts for mfma_16x16x16](03_mfma_16x16x16.png)
+
+The above layout should be read in the following way, each thread needs to load 8 bytes (4 elements) of data into mfma instruction via 2 VGPRs.
+Since the format size of the input data is 2 bytes each VGPR will hold 2 input elements.  
+
+*Lane 0* will load 0-3 elements from the row0 of matrix A and col0 of matrix B.  
+*Lane 1* will load 0-3 elements from the row1 of matrix A and col1 of matrix B.  
+...  
+*Lane 15* will load 0-3  elements from the row15 of matrix A and the row15 column of matrix B.  
+*Lane 16* will load 4-7  elements from the row0 of matrix A and the col0 of matrix B.  
+...
+
+From this layout it can be seen why is it beneficial to have matrix B as col major. If cols of matrix B are placed in contigeous memory
+it will be colaleased access to retrieve those, not strided.
+
+Each lane will output 4 elements according to the layouts shown on the image. Lanes 0-15 will fill up the first 4 rows of the output matrix,
+lanes 16-31 will fill up rows 4-7 etc.
+
+### Compute 256x256 tile with mfma
+
+How do we compute 256x256 using mfma instruction that computes only one 16x16 block?
+Recall that input data for A and B is stored in LDS with tile size 256x64 for each.
+To compute the whole block evidently we need to repeat mfma operations over M, N and K
+dimensions to cover the whole 256x256 block. To multiply two 256x64 matrices in 16x16 blocks we need
+to repeat multiplications 4 times over K dimension and 16 times over N and M dimensions.
+
+![Step by step 256x256 mfma_16x16x16](01-animation.gif)
+
+# Implementation
+
+Having covered the key concepts, let's now translate them into an actual code implementation.
+ We will start by declaring a kernel that aligns with our chosen dimensions and thread configuration.
+
+We will use a thread block size of 256, which is a common and efficient choice as it matches the number
+of lanes in a physical Compute Unit (CU) on the target hardware. The `__launch_bounds__` attribute is a useful
+compiler directive that helps apply specific optimizations by informing the compiler of the
+exact number of threads that will be launched.
+
+
+```{cpp}
+#define N 4096
+#define M 4864
+#define K 8192
+
+#define s_type __bf16
+
+#define THREADS_PER_BLOCK 256
+
+template <int tile_size_k, int tile_size_mn>
+__launch_bounds__(THREADS_PER_BLOCK, 1)
+ __global__ void matrixMultiplyKernelAdv16x16x16(s_type *__restrict__ A,
+                                               s_type *__restrict__ B,
+                                                float *__restrict__ C
+```
+
+The below for loop will be unrolled by the compiler at compile time. It is useful
+to save register that our kernel will be allocating at the runtime.
+
+```{cpp}
+template <int Begin, int End, typename Func>
+__device__ __forceinline__ void static_for(Func&& f) {
+    if constexpr (Begin < End) {
+        f(std::integral_constant<int, Begin>{});
+        static_for<Begin + 1, End>(f);
+    }
+}
+```
+
+## Optimizing Data Flow with Pipelining
+
+As it was discussed earlier to maximize performance, the flow for this kernel uses a **pipeline** or **double buffering** to
+keep the compute units continuously fed with data, reducing idle time. 
+This pipeline consists of a series of stages that process data concurrently:
+
+* **Stage 1: Global Memory to Registers:** The first stage involves pre-loading data directly from **global memory** into 
+VGPR (Vector General Purpose Register) registers. This is the slowest part of the pipeline, so we perform this operation as early as possible.
+
+* **Stage 2: Registers to LDS (Shared Memory):** As data is being loaded from global memory, 
+the next stage of the pipeline moves the data from the VGPRs into **LDS (Local Data Share)**,
+or shared memory. This is a crucial intermediate step that makes the data accessible to all
+threads within the workgroup at very low latency.
+
+* **Stage 3: LDS to Registers:** With the data now in fast on-chip LDS, the third stage begins. 
+The data is transferred from LDS back into a different set of VGPR registers, which will serve as the direct input for the compute operations.
+
+* **Stage 4: Computation with MFMA:** The final stage is the core computation. The **MFMA** (Matrix-FMA) intrinsic uses 
+the data from the VGPRs to perform the actual matrix multiplication and accumulation.
+
+By using this pipelined approach, the different stages of data movement and computation happen in parallel. 
+While the current VGPRs are being consumed by the MFMA operation, the next set of data is already being moved 
+from LDS to another set of VGPRs, and the next tile of data is being loaded from global memory into a 
+third set of VGPRs. This overlapping of operations is key to keeping the GPU's powerful compute units fully utilized.
+
+### Load from global memory
+
+From the early discussions for the tile size 256x64 each thread is responsible to load 64 elements of data. 
+The below block of code has coalesced access within a wavefront for a group of `threads_per_group` threads.
+We will split tile size onto 2 128x64 tiles, otherwise we won't be able to afford double buffering.
+
+But first we need to define a data type which is a vector we feed to mfma instructions
+
+```{cpp}
+using float4fp16vec = __attribute__((__vector_size__(4 * sizeof(s_type)))) s_type;
+```
+
+We will try to help compiler to save registers by precomputing as much variables as possible
+as `constexpr`.
+
+```{cpp}
+constexpr int vector_size = 16;
+
+template <typename T, int src_row_stride, int tile_size_mn, int tile_size_k>
+__device__ void loadDataBlock(T* __restrict__ storage, const s_type* __restrict__ src)
+{
+  int tIdx = threadIdx.x;
+
+  // Calculate how much data this thread has to load given the size of a TILE
+  // we work with 256x1x1 block sizes
+  constexpr int type_size = sizeof(T);
+  constexpr int threads_per_group = (tile_size_k*sizeof(s_type)) / vector_size;
+
+  // This is how much this thread will load in bytes
+  constexpr int load_size = (tile_size_mn*tile_size_k*2) / THREADS_PER_BLOCK;
+  // how many rows this thread is responsible to load
+  constexpr int row_per_thread = load_size / vector_size;
+
+  // Each group of threads will be loading a full  row_per_thread num of rows.
+  int row = (tIdx / threads_per_group) * row_per_thread;
+
+  // Column offset to load from in elements
+  int col = (tIdx % threads_per_group) * (vector_size / sizeof(s_type));
+
+  // The two loops below have fixed size, compiler should be
+  //  able to vectorize this appropriately.
+  constexpr int loads_per_row = vector_size / type_size;
+
+  // Loop over rows this thread will be loading
+  for (int r = 0; r < row_per_thread; r++)
+  {
+    const T* s = reinterpret_cast<const T*>(src + (row + r) * src_row_stride + col);
+
+    // How many elements will fit into a vector size, compiler will vectorize this appropriately
+    for (int i=0; i < loads_per_row; i++)
+    {
+ 	  storage[r*loads_per_row + i] = s[i];
+    }
+  }
+}
+```
+
+*Here is a python script that illustrates how each thread loads data. Each thread's load layouts are color-coded:*
+
+<details>
+<summary>Show code</summary>
+
+```{pyodide}
+
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
+import matplotlib.cm as cm
+
+# Hardware and kernel constants
+src_row_stride = 128
+tile_size_mn = 128
+tile_size_k = 64
+THREADS_PER_BLOCK = 256
+
+# Data type sizes in bytes
+s_type_size = 2  # bf16
+vec4bf16_size = 8
+vector_size = 16 # Vector load size in bytes
+
+# Calculate derived constants
+threads_per_group = (tile_size_k * s_type_size) // vector_size
+load_size = (tile_size_mn * tile_size_k * s_type_size) // THREADS_PER_BLOCK
+row_per_thread = load_size // vector_size
+loads_per_row = vector_size // vec4bf16_size
+
+# Create the visualization grid
+plot_grid = np.full((32, 128), -1, dtype=int)
+
+# Collect enough distinct colors for 64 threads
+cmap_list = []
+for name in ["tab20", "tab20b", "tab20c", "Set3"]:
+    cmap_list.append(cm.get_cmap(name).colors)
+
+# Flatten and trim to 64
+all_colors = np.vstack(cmap_list)[:64]
+
+cmap = ListedColormap(all_colors)
+cmap.set_under('white')
+
+# Loop through the first 64 threads
+for tIdx in range(64):
+    # Calculate row and column start for this thread
+    row_offset = (tIdx // threads_per_group) * row_per_thread
+    col_offset = (tIdx % threads_per_group) * (vector_size)
+
+    # Simulate the load loop
+    for r in range(row_per_thread):
+        start_row_in_grid = row_offset + r
+
+        # Calculate the actual column start in the grid
+        start_col_in_grid = col_offset
+
+        # Mark the loaded region on the grid
+        plot_grid[start_row_in_grid, start_col_in_grid:start_col_in_grid + vector_size] = tIdx
+
+# Plot the visualization
+fig, ax = plt.subplots(figsize=(6, 6))
+cax = ax.imshow(plot_grid, cmap=cmap, vmin=-0.5, vmax=63.5)
+
+ax.set_title("Load Pattern for a Tiled GEMM Kernel (64 Threads)\n"
+             "Color represents the thread ID loading the data")
+ax.set_ylabel(f"Row Index")
+
+plt.tight_layout()
+plt.show()
+```
+</details>
+
+### Load into LDS
+
+When storing data from vector registers into LDS, we should consider possible LDS bank conflicts.
+
+- Writes: In this layout, the write pattern is naturally conflict-free.  
+- Reads: Naive reads would result in 4-way LDS bank conflicts.  
+
+To avoid this, we apply an XOR-based reshuffling of column indices, which permutes the data layout 
+in LDS and eliminates the conflicts during readback.
+
+```{cpp}
+template <typename T, const int lds_row_stride, int tile_size_mn, int tile_size_k>
+__device__ __forceinline__ void LDS_WRITE(T* lds_storage, T* src)
+{
+  int tIdx = threadIdx.x;
+
+  // Calculate how much data this thread has to load given the size of a TILE
+  // we work with 256x1x1 block sizes
+  constexpr int type_size = sizeof(T);
+  constexpr int load_size_el = vector_size/sizeof(s_type);
+  constexpr int threads_per_group = (tile_size_k*sizeof(s_type)) / vector_size;
+
+  // This is how much this thread will load in bytes
+  constexpr int load_size = (tile_size_mn*tile_size_k*2) / (THREADS_PER_BLOCK);
+  // how many rows this thread is responsible to load
+  constexpr int row_per_thread = load_size / vector_size;
+
+  // Each group of threads will be loading a full  row_per_thread num of rows.
+  int row = (tIdx / threads_per_group) * row_per_thread;
+
+  // Column offset to store into in elements
+  int col = (tIdx % threads_per_group);
+  constexpr int loads_per_row = vector_size / type_size;
+
+  for (int r = 0; r < row_per_thread; r++)
+  {
+    const T* s = src + r*loads_per_row;
+    int col_xor = col ^ ((row + r) % (tile_size_k/load_size_el));
+
+    T* d = lds_storage + (row + r) * lds_row_stride + col_xor*loads_per_row;
+    for (int i=0; i < loads_per_row; i++)
+    {
+ 	   d[i] = s[i];
+    }
+  }
+}
+```
+
+*This python script visualizes pattern of threads writing into LDS: *
+
+<details>
+<summary>Show code</summary>
+
+```{pyodide}
+
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
+import matplotlib.cm as cm
+
+# Parameters (must match kernel template args)
+tile_size_mn = 128
+tile_size_k = 64
+lds_row_stride = 128
+THREADS_PER_BLOCK = 256
+
+# Data type sizes (assuming bf16)
+s_type_size = 2
+type_size = 8   # sizeof(vec4bf16) = bf16
+vector_size = 16
+load_size_el = vector_size // s_type_size
+threads_per_group = (tile_size_k * s_type_size) // vector_size
+load_size = (tile_size_mn * tile_size_k * 2) // THREADS_PER_BLOCK
+row_per_thread = load_size // vector_size
+loads_per_row = vector_size // type_size
+
+# Create LDS grid
+plot_grid = np.full((tile_size_mn//4, lds_row_stride), -1, dtype=int)
+
+# Distinct colormap for threads
+cmap_list = []
+for name in ["tab20", "tab20b", "tab20c", "Set3"]:
+    cmap_list.append(cm.get_cmap(name).colors)
+all_colors = np.vstack(cmap_list)[:THREADS_PER_BLOCK]
+cmap = ListedColormap(all_colors)
+cmap.set_under('white')
+
+# Simulate writes for first 64 threads
+for tIdx in range(64):
+    row = (tIdx // threads_per_group) * row_per_thread
+    col = (tIdx % threads_per_group)
+
+    for r in range(row_per_thread):
+        col_xor = ((row + r) % (tile_size_k // load_size_el)) ^ col
+        start_row = row + r
+        start_col = col_xor * vector_size
+        plot_grid[start_row, start_col:start_col + vector_size] = tIdx
+
+# Plot
+fig, ax = plt.subplots(figsize=(6, 6))
+cax = ax.imshow(plot_grid, cmap=cmap, vmin=-0.5, vmax=63.5)
+
+ax.set_title("LDS Write Pattern (XOR Swizzled)\nColor = Thread ID")
+ax.set_xlabel("Column Index (elements)")
+ax.set_ylabel("Row Index ")
+plt.colorbar(cax, ax=ax, fraction=0.02, pad=0.04, label="Thread ID")
+
+plt.tight_layout(pad=0)
+plt.show()
+```
+</details>
+
+### Load from LDS
+
+Loading from LDS is a bit trickier. Now when all the threads have cooperatively loaded data into LDS,
+each thread needs to fetch back what it needs to compute matmul.
+
+Recall:
+
+- The logical tile size is **128×64**.  
+- Each thread loads **16 bytes** (i.e. `2 × vec4bf16` elements).  
+- The building block MFMA is **16×16×16 (M×N×K)**.  
+
+Mapping to MFMA:
+
+- Each thread provides input for **2 MFMA instructions** (`2 × vec4bf16`).  
+- Therefore collectively, a wavefront covers a **16×32 region**.  
+- To cover the full tile, we need:  
+  - **2 repeats** over the K dimension  
+  - **8 repeats** over the M and N dimensions  
+
+The VGPR requirement for A and B loads is:
+
+$$
+4 \times 2 \times 8 \times 2 = 128 \;\; \text{VGPRs}
+$$
+
+(where the factors correspond to `[A/B] × [K repeats] × [M/N repeats]`).
+
+Fortunately, we have **4 wavefronts**, so we can split the work such that each 
+wavefront computes a **64×64 block**.  
+- This reduces the VGPR usage to 64 down from 128.  
+- However, since we pipeline computations, we still require **2 buffers**, 
+so the effective register pressure remains 128 VGPRs.
+
+The below loads from LDS compiler should be able to combine into 128-bit wide loads in accordance
+to our load vector size. That is more efficient to load from LDS then 64-bit wide element by element
+loads.
+
+```{cpp}
+template <typename T, const int stride, int tile_size_k>
+__device__ inline const T* ldsFetch(const T* ptr, const int x_T, const int y)
+{
+   constexpr int load_size_el = vector_size/sizeof(s_type);
+   constexpr int elements_per_load_vector = vector_size / sizeof(T);
+   int col = x_T / elements_per_load_vector;
+   int col_xor = col ^ ((y) % (tile_size_k/load_size_el));
+   return  ptr + y * stride + col_xor*elements_per_load_vector;
+}
+ 
+template <typename T, const int r_stride, int tile_size_k,
+    int MRepeats, int KRepeats >
+__device__ inline void LDS_READ_A(T* dst_reg,  const T* lds)
+{
+    int tIdx = threadIdx.x;
+
+    int wave0101 = (tIdx / 64) % 2;
+
+    int load_Ay = (tIdx % 16);
+    int load_Ax = (tIdx / 16) % 4;
+
+    static_for<0, KRepeats>([&] (auto k_c) {
+      static_for<0, MRepeats>([&] (auto m_c) {
+            constexpr int m = m_c.value;
+            constexpr int k = k_c.value;
+
+            const T * data = ldsFetch<T, r_stride, tile_size_k>(lds, 2*load_Ax + 8*k,
+                load_Ay + ((m + MRepeats*wave0101)*16));
+            // this is 128-bit wide LDS read
+            *dst_reg++ = *data;
+            *dst_reg++ = *(data+1);
+      });
+    });
+}
+
+template <typename T, const int r_stride, int tile_size_k,
+    int NRepeats, int KRepeats >
+__device__ inline void LDS_READ_B(T* dst_reg,  const T* lds)
+{
+    int tIdx = threadIdx.x;
+
+    int wave0011 = (tIdx / 64) / 2;
+
+    int load_Ay = (tIdx % 16);
+    int load_Ax = (tIdx / 16) % 4;
+
+    static_for<0, KRepeats>([&] (auto k_c) {
+      static_for<0, NRepeats>([&] (auto n_c) {
+            constexpr int n = n_c.value;
+            constexpr int k = k_c.value;
+
+            const T * data = ldsFetch<T, r_stride, tile_size_k>(lds, 2*load_Ax + 8*k,
+                load_Ay + ((n + NRepeats*wave0011)*16));
+            // this is 128-bit wide LDS read
+            *dst_reg++ = *data;
+            *dst_reg++ = *(data+1);
+      });
+    });
+}
+```
+
+### Run mfma
+
+If intrinsic function in not available for *bf16* format specifically it can be defined as an assembler 
+wrapper:
+
+```{cpp}
+__device__ __forceinline__
+float4vec  run_mfma16x16x16bf16(const float4fp16vec& a, const float4fp16vec& b, float4vec &accum)
+{
+    // accum is the first float4vec register; next 3 registers assumed consecutive
+    asm volatile(
+        "v_mfma_f32_16x16x16_bf16 %0, %1, %2, %0\n"
+        : "+v"(accum)    // first accumulator vector
+        : "v"(a), "v"(b) // input vectors
+    );
+
+    return accum;
+}
+
+template <typename T_IN, typename T_OUT, const int KRepeats,  const int NRepeats, const int MRepeats, const int offset>
+__device__  void run_mfma16x16x16fp16(const T_IN* __restrict__ A, const  T_IN* __restrict__ B, T_OUT* __restrict__ out_f)
+{
+       static_for<0, MRepeats>([&](auto m) {
+         static_for<0, KRepeats>([&](auto k) {
+           static_for<0, NRepeats>([&](auto n) {
+                constexpr int mi = m.value;
+                constexpr int ni = n.value;
+                constexpr int ki = k.value;
+
+                out_f[ni + NRepeats * mi + offset] =
+                    run_mfma16x16x16bf16(
+                        A[2 * (mi + MRepeats * ki)],
+                        B[2 * (ni + NRepeats * ki)],
+                        out_f[ni + NRepeats * mi + offset]);
+
+                out_f[ni + NRepeats * mi + offset] =
+                    run_mfma16x16x16bf16(
+                        A[2 * (mi + MRepeats * ki) + 1],
+                        B[2 * (ni + NRepeats * ki) + 1],
+                        out_f[ni + NRepeats * mi + offset]);
+            });
+        });
+    });
+}
+```
+
+## Clang compiler
+
+Unfortunately, for this logic to be efficient, **all operations — global memory loads, LDS load/store, and register loads for compute — must happen in parallel** so that global memory latency is hidden behind computation.
+
+However, the **order of instructions** as written in heavily inlined code may tempt the compiler to rearrange operations according to its own optimization logic. 
+In theory, this can be controlled using **LLVM scheduling hints**, which allow the compiler to preserve the order of specific types of instructions.
+
+For more details, the reader can refer to the LLVM documentation, particularly:
+
+- `__builtin_amdgcn_sched_barrier`  
+- `__builtin_amdgcn_sched_group_barrier`  
+
+This topic is quite advanced for a simple GEMM introduction, but CK is using exactly those scheduling barriers for global load, lds and mfma to ensure they will run in a specific order for the best performance.
+ **For now, we switch to assembler from HIP** to ensure that instructions are executed in exactly the order we intend them to excute in.
+
+<details>
+<summary>Show ASM code</summary>
+
+```asm
+.text
+.section	.text.
+.global	gemm_16x16x16
+.p2align	8
+.type	gemm_16x16x16,@function
+
+.set N, 4096
+.set M, 4864
+.set K, 8192
+.set TILE_SIZE_MN, 128 ; logical tile is 128x64, actual tile is 256x64
+.set TILE_SIZE_K, 64
+
+.set COL_ELEMENTS, TILE_SIZE_K/4
+.set ROW_ELEMENTS, TILE_SIZE_MN
+.set smem_size, ROW_ELEMENTS * COL_ELEMENTS
+
+.set KRepeats, TILE_SIZE_K/32
+.set MRepeats, TILE_SIZE_MN/32
+.set NRepeats, TILE_SIZE_MN/32
+
+;64 bytes or 16 registers for staging for A and B twice
+.set v_stagingA0,  4
+.set v_stagingA1,  20
+.set v_stagingB0,  36
+.set v_stagingB1,  52
+
+.set v_startOffset   ,   68
+.set v_stride        ,   69
+.set v_k_xor           ,   70
+.set v_ldsReadBaseAM  ,   66
+.set v_ldsReadBaseBM  ,   67
+.set v_startOffsetNext  ,   2   ; next 128x64 block
+.set v_strideAccum      ,   1 
+
+; KRepeats * NRepeats vecfp16 for compute registers
+.set v_compA0, 72
+.set v_compA1, 104
+.set v_compB0, 136
+.set v_compB1, 168
+
+.set v_ldsWriteBaseM  ,   62
+.set v_ldsWriteBaseK  ,   63
+.set v_ldsReadBaseAK  ,   64
+.set v_ldsReadBaseBK  ,   65
+.set v_scratch0  ,   3
+.set v_scratch1  ,   71
+.set v_scratch2  ,   200
+.set v_scratch3  ,   201
+.set v_readA     ,   202
+.set v_readB     ,   210
+.set v_writeAB     ,   218
+
+
+.set A, 16
+.set B, 20
+
+.set ldsA0, 0
+.set ldsB0, 16*1024
+.set ldsA1, 16*1024*2
+.set ldsB1, 16*1024*3
+
+; STRIDE_AB for A and B is K because B is col-major
+
+.macro XOR_K_128 vm vk
+    v_and_b32            v[v_k_xor], v[\vm], 7
+    v_xor_b32            v[v_k_xor], v[v_k_xor], v[\vk]
+.endm
+
+.macro MK_TO_BYTE_OFFSET_SK01 vm vres
+      v_lshlrev_b32_e32 v[v_scratch1], 7, v[\vm] ; row stride is 128 bytes
+      v_lshlrev_b32_e32 v[v_scratch0], 4, v[v_k_xor] ; 16*k'
+      v_add_u32  v[\vres], v[v_scratch1], v[v_scratch0]
+.endm
+
+
+.macro DS_WRITE_COMPUTE
+    .set i, 0
+    .rept 4
+      v_add_u32 v[v_scratch2], v[v_ldsWriteBaseM], i
+      v_and_b32 v[v_scratch3], v[v_scratch2], 7
+      XOR_K_128 vm=v_scratch3, vk=v_ldsWriteBaseK
+      MK_TO_BYTE_OFFSET_SK01 vm=v_ldsWriteBaseM, vres=v_writeAB+i
+      i = i + 1
+    .endr
+.endm
+
+.macro DS_WRITE lds  base
+    .set v_staging, \base
+    .set lds, \lds
+
+    ;.set i,0
+    ;.rept 16
+    ;  v_mov_b32 v[v_staging+i] 0x2a362a36 ;0x3c003c00
+    ;  i = i + 1
+    ;.endr
+
+    .set i, 0
+    .rept 4
+      ds_write_b128 v[v_writeAB+i], v[v_staging+4*i:v_staging+4*i+3] offset:lds + TILE_SIZE_K*i*2
+      i = i + 1
+    .endr
+.endm
+
+
+.macro DS_READ_A_COMPUTE
+  .set mi, 0
+  .set ki, 0
+  .rept KRepeats
+    mi = 0
+    .rept MRepeats
+      v_add_u32  v[v_scratch0],  v[v_ldsReadBaseAM], mi*16
+      v_and_b32  v[v_scratch2], v[v_scratch0], 7 ; scratch2 is now m
+      v_add_u32  v[v_scratch3],  v[v_ldsReadBaseAK], ki*4 ; scratch3 is now k
+
+      XOR_K_128 vm=v_scratch2, vk=v_scratch3
+      v_add_u32  v[v_scratch3],  v[v_ldsReadBaseAM], mi*16
+      MK_TO_BYTE_OFFSET_SK01 vm=v_scratch3, vres=v_readA + MRepeats*ki + mi
+      mi = mi + 1
+    .endr
+    ki = ki + 1
+  .endr
+.endm
+
+.macro DS_READ_A buffer_id
+  .set mi, 0
+  .set ki, 0
+  .rept KRepeats
+    mi = 0
+    .rept MRepeats
+      .set v_start , v_compA0 + 32*\buffer_id + 4*mi + 16*ki
+      .set offst , ldsA0 + (32*1024)*\buffer_id ;+ mi*(16*128) + ki*64
+
+      ;.set i,0
+      ;.rept 4
+      ; v_mov_b32 v[v_start+i] 0x2a362a36 ;0x3c003c00
+      ; i = i + 1
+      ;.endr
+
+      ds_read_b128 v[v_start: v_start+3],  v[v_readA + MRepeats*ki + mi] offset: offst
+      mi = mi + 1
+    .endr
+    ki = ki + 1
+  .endr
+.endm
+
+.macro DS_READ_B_COMPUTE
+  .set ni, 0
+  .set ki, 0
+  .rept KRepeats
+     ni = 0
+     .rept NRepeats
+        v_add_u32  v[v_scratch0],  v[v_ldsReadBaseBM], ni*16
+        v_and_b32  v[v_scratch2], v[v_scratch0], 7 ; scratch2 is now m
+        v_add_u32  v[v_scratch3],  v[v_ldsReadBaseBK], ki*4 ; scratch3 is now k
+
+        XOR_K_128  vm=v_scratch2, vk=v_scratch3
+        v_add_u32  v[v_scratch3],  v[v_ldsReadBaseBM], ni*16
+        MK_TO_BYTE_OFFSET_SK01 vm=v_scratch3, vres=v_readB + NRepeats*ki + ni
+       ni = ni + 1
+     .endr
+     ki = ki + 1
+  .endr
+.endm
+
+.macro DS_READ_B buffer_id
+  .set ni, 0
+  .set ki, 0
+  .rept KRepeats
+     ni = 0
+     .rept NRepeats
+       .set v_start , v_compB0 + 32*\buffer_id + 4*ni + 16*ki
+       .set offst , ldsB0 + (32*1024)*\buffer_id ;+ ni*(16*128) + ki*64
+
+       ;.set i,0
+       ;.rept 4
+       ; v_mov_b32 v[v_start+i] 0x2a362a36 ;0x3c003c00
+       ; i = i + 1
+       ;.endr
+
+       ds_read_b128 v[v_start: v_start+3],  v[v_readB + NRepeats*ki + ni] offset: offst
+       ni = ni + 1
+     .endr
+     ki = ki + 1
+  .endr
+.endm
+
+.macro GLOBAL_READ_64 AB base_reg base_offset vstride
+    .set v_staging, \base_reg
+    .set AB, \AB
+    
+    buffer_load_dwordx4 v[v_staging:v_staging+3], v[\vstride], s[AB:AB+3], 0, offen  offset:\base_offset
+    v_add_u32 v[v_strideAccum], v[v_stride], v[\vstride]
+    
+    .set i, 1
+    .rept 3
+      buffer_load_dwordx4 v[v_staging+4*i:v_staging+4*i+3], v[v_strideAccum], s[AB:AB+3], 0, offen offset:\base_offset
+      v_add_u32 v[v_strideAccum], v[v_stride], v[v_strideAccum]
+      i = i + 1
+    .endr
+.endm
+
+.macro RUN_MFMA_0  buffer_idA, buffer_idB, set
+    .set v_compA , v_compA0 + 32 * \buffer_idA
+    .set v_compB , v_compB0 + 32 * \buffer_idB
+    .set mi, 0
+    .set ni, 0
+    .set ki, 0
+
+    .rept MRepeats/2
+        ki = 0
+        .rept KRepeats
+          ni = 0
+          .rept NRepeats
+              .set idxA , v_compA+2*(MRepeats * ki + mi)*2 + 2*\set
+              .set idxB , v_compB+2*(NRepeats * ki + ni)*2 + 2*\set
+              .set accum , 4*(ni + NRepeats * mi) + 128*\buffer_idA + 64*\buffer_idB
+              v_mfma_f32_16x16x16_bf16 a[accum:accum+3], v[idxA:idxA+1], v[idxB:idxB+1], a[accum:accum+3]
+              ni = ni + 1
+          .endr
+          ki = ki + 1
+        .endr
+        mi = mi + 1
+    .endr
+.endm
+
+.macro RUN_MFMA_1  buffer_idA, buffer_idB, set
+
+    .set v_compA , v_compA0 + 32 * \buffer_idA
+    .set v_compB , v_compB0 + 32 * \buffer_idB
+    .set mi, MRepeats/2
+    .set ni, 0
+    .set ki, 0
+
+    .rept MRepeats/2
+        ki = 0
+        .rept KRepeats
+          ni = 0
+          .rept NRepeats
+              .set idxA , v_compA+2*(MRepeats * ki + mi)*2 + 2*\set
+              .set idxB , v_compB+2*(NRepeats * ki + ni)*2 + 2*\set
+              .set accum , 4*(ni + NRepeats * mi) + 128*\buffer_idA + 64*\buffer_idB
+              v_mfma_f32_16x16x16_bf16 a[accum:accum+3], v[idxA:idxA+1], v[idxB:idxB+1], a[accum:accum+3]
+              ni = ni + 1
+          .endr
+          ki = ki + 1
+        .endr
+        mi = mi + 1
+    .endr
+.endm
+
+.macro WRITE_256x256_BLOCK
+      .set x, 0
+      .rept NRepeats; for x
+        .set y, 0
+
+          ; --- compute output index ---
+          ; pos_col = wave_col * 64 + x*16 + laneCol
+          v_mov_b32_e32 v7, x*16
+          v_add_u32_e32 v7, v7, v5        ; x*16 + laneCol
+          v_add_u32_e32 v7, v7, v8        ; v7 = wave_col * write_stride + x*16 + laneCol
+          v_add_u32_e32 v7, v7, v11       ; v7 = col + pos_col
+
+          .rept MRepeats ; for y
+              v_mov_b32_e32 v134, s0
+              v_mov_b32_e32 v135, s1
+
+              ; pos_row = wave_row * 64 + y*16 + laneRow4
+              v_mov_b32_e32 v9, y*16
+              v_add_u32_e32 v9, v9, v6        ; y*16 + (tIdx / 16) * 4
+              v_add_u32_e32 v9, v9, v10       ; v9 = wave_row * write_stride + y*16 + (tIdx / 16) * 4
+              v_add_u32_e32 v9, v9, v18       ; v9 = pos_row + row
+
+              ; --- offset = (row + pos_row) * row_stride + (col + pos_col) ---
+              v_lshlrev_b32_e32 v20, 12, v9         ; row_offset = (pos_row + row) * row_stride(N)
+              v_add_u32_e32 v20, v20, v7            ; global_index = row_offset + (pos_col + col)
+              v_lshlrev_b32_e32 v20, 2, v20         ; convert float index to byte offset (×4)
+              v_mov_b32_e32 v21, 0
+
+              v_lshl_add_u64 v[134:135],  v[134:135], 0, v[20:21]
+
+              ; bottom pair of 128x128 blocks
+              v_lshl_add_u64 v[136:137],  v[134:135], 0, v[100:101]
+
+                ; --- load from accum ---
+                ; accum_idx  in  floatvec4
+                .set acc_idx, 4*(y * MRepeats + x)
+
+                ; --- write to global memory ---
+                .set i, 0
+                .rept 4
+                    global_store_dword v[134:135],  a[acc_idx + i], off
+                    global_store_dword v[134:135],  a[acc_idx + i + 64], off offset:128*4
+                    v_lshl_add_u64 v[134:135], v[134:135], 0, v[14:15]
+
+                    global_store_dword v[136:137],  a[acc_idx + i + 128], off
+                    global_store_dword v[136:137],  a[acc_idx + i + 192], off offset:128*4
+                    v_lshl_add_u64 v[136:137], v[136:137], 0, v[14:15]
+                    i = i + 1
+                .endr
+                y = y + 1
+        .endr
+        x = x + 1
+    .endr
+.endm
+
+gemm_16x16x16:
+; %bb.0:                                ; %entry
+    s_load_dwordx4 s[4:7], s[0:1], 0x0
+    # blockIdx.x will be in s2
+    # blockIdx.y will be in s3
+    # v0 contains threadIdx.x
+    s_waitcnt vmcnt(0)
+    s_waitcnt lgkmcnt(0)
+
+    s_load_dwordx2 s[0:1], s[0:1], 0x10 ; Load matrix C into s0,s1
+
+    s_waitcnt vmcnt(0)
+    s_waitcnt lgkmcnt(0)
+
+    cnt=0
+    .rept 256
+        v_accvgpr_write_b32 a[cnt], 0
+        cnt = cnt + 1
+    .endr
+
+    s_lshl_b32 s8, s2, 8         ; since blockIdx.x * 2* tile_size
+    s_lshl_b32 s9, s8, 14        ; * K * 2
+    s_add_u32    s[B], s6, s9
+    s_addc_u32   s[B+1],  s7, 0
+    s_mov_b32 s[B+2], N*K*2 ; size
+    s_mov_b32 s[B+3], 0x00020000 ; flags
+    s_waitcnt lgkmcnt(0)
+
+    s_lshl_b32 s8, s3, 8         ; since blockIdx.y * 2 * tile_size
+    s_lshl_b32 s9, s8, 14        ; * K * 2
+    s_add_u32    s[A], s4, s9
+    s_addc_u32   s[A+1], s5, 0
+    s_mov_b32 s[A+2], M*K*2 ; size
+    s_mov_b32 s[A+3], 0x00020000 ; flags
+    s_waitcnt lgkmcnt(0)
+
+    s_waitcnt vmcnt(0)
+  
+    v_lshrrev_b32_e32 v35, 6, v0         ; wave0101 = (tIdx / 64) % 2
+    v_and_b32_e32 v35, 1, v35
+    v_lshlrev_b32_e32 v35, 6, v35        ; MRepeats*wave0101*16=wave0101*64
+
+    v_lshrrev_b32_e32 v36, 7, v0         ; wave0011 = (tIdx / 64) / 2
+    v_lshlrev_b32_e32 v36, 6, v36        ; wave0011*64
+
+    v_and_b32_e32 v4, 15, v0             ; load_Ay = (tIdx % 16)
+    v_add_u32 v36, v4, v36               ; wave0011*64 + load_Ay
+    v_add_u32 v35, v4, v35               ; wave0101*64 + load_Ay
+
+    v_lshrrev_b32_e32 v5, 4, v0          ; load_Ax = (tIdx / 16) % 4
+    v_and_b32_e32 v5, 3, v5
+    v_lshlrev_b32_e32 v5, 1, v5          ; 2*load_Ax
+
+    ; v35 is m, v5 is k
+
+    ; to bytes
+    v_lshrrev_b32_e32 v5, 1, v5          ; from vec4fp16 to 2*vec4fp16 indexing
+    ;v_lshlrev_b32_e32 v35, 7, v35       ; lds row stride is 128 bytes
+    ;v_lshlrev_b32_e32 v36, 7, v36
+
+    v_mov_b32 v[v_ldsReadBaseAM], v35
+    v_mov_b32 v[v_ldsReadBaseBM], v36
+    v_mov_b32 v[v_ldsReadBaseAK], v5
+    v_mov_b32 v[v_ldsReadBaseBK], v5
+
+    ; calculate offset for this thread within a tile in global memory
+    v_and_b32            v15, v0, 7     ; v1 = threadIdx.x % 7  (0 to 7)
+    v_lshlrev_b32_e32    v15, 4, v15    ; v1 = v1*16
+
+    v_lshrrev_b32_e32    v16, 3,  v0      ; each 8 threads have common initial offset
+    v_lshlrev_b32_e32    v16, 16, v16     ; 4 * group_id * row_stride
+    v_add_u32            v[v_startOffset], v15, v16          ; start offset
+
+    v_mov_b32            v16, 128*K*2      ; offset to the next 128x64 block
+    v_add_u32            v[v_startOffsetNext], v[v_startOffset], v16          ; start offset
+
+    ; calculate LDS offset for this thread
+    v_lshrrev_b32_e32    v16, 3,  v0      ; each 8 threads have common initial offset
+    v_lshlrev_b32_e32    v16, 2, v16     ; 4 * group_id 
+    v_and_b32            v15, v0, 7     ; v1 = threadIdx.x % 7  (0 to 7)
+
+    v_mov_b32            v[v_ldsWriteBaseM], v16
+    v_mov_b32            v[v_ldsWriteBaseK], v15
+
+    DS_READ_A_COMPUTE
+    DS_READ_B_COMPUTE
+    DS_WRITE_COMPUTE
+
+    v_mov_b32 v15, 1
+    v_lshlrev_b32_e32 v[v_stride], 14, v15
+
+    GLOBAL_READ_64 B v_stagingB0 0 v_startOffset ; first 128x64 block
+    GLOBAL_READ_64 A v_stagingA0 0 v_startOffset
+    s_waitcnt vmcnt(0)
+
+    DS_WRITE ldsA0 v_stagingA0
+    DS_WRITE ldsB0 v_stagingB0
+
+    s_waitcnt lgkmcnt(0)
+    s_barrier
+
+    DS_READ_A 0
+    DS_READ_B 0
+
+    GLOBAL_READ_64 B v_stagingB1 0 v_startOffsetNext ; second 128x64 block, now we can compute 256x256 output
+    GLOBAL_READ_64 A v_stagingA1 0 v_startOffsetNext
+
+    s_waitcnt vmcnt(0)
+    s_barrier
+
+    DS_WRITE ldsA1 v_stagingA1
+    DS_WRITE ldsB1 v_stagingB1
+
+    s_waitcnt lgkmcnt(0)
+    s_barrier
+
+    GLOBAL_READ_64 B v_stagingB0 TILE_SIZE_K*2 v_startOffset; first 128x64 block in the next BIG tile
+    GLOBAL_READ_64 A v_stagingA0 TILE_SIZE_K*2 v_startOffset
+
+    s_waitcnt vmcnt(0)
+    s_barrier
+
+    s_add_u32 s[A], s[A], TILE_SIZE_K*2
+    s_addc_u32 s[A+1], s[A+1], 0
+    s_add_u32 s[B], s[B], TILE_SIZE_K*2
+    s_addc_u32 s[B+1], s[B+1], 0
+
+    s_mov_b32 s9, TILE_SIZE_K ; 1 256x64 tile have been preloaded into memory
+
+1:                                ; %do.body
+                                  ; =>This Inner Loop Header: Depth=2    
+    s_waitcnt lgkmcnt(0)
+    s_barrier
+
+    s_waitcnt vmcnt(12)
+    GLOBAL_READ_64 A v_stagingA1 0 v_startOffsetNext
+
+    RUN_MFMA_0 buffer_idA=0, buffer_idB=0, set=0
+    DS_READ_B 1
+    RUN_MFMA_0 buffer_idA=0, buffer_idB=0, set=1
+    DS_READ_A 1
+    RUN_MFMA_1 buffer_idA=0, buffer_idB=0, set=0
+    DS_WRITE ldsA0 v_stagingA0
+    RUN_MFMA_1 buffer_idA=0, buffer_idB=0, set=1
+    DS_WRITE ldsB0 v_stagingB0
+
+    s_waitcnt vmcnt(12)
+    GLOBAL_READ_64 B v_stagingB1 0 v_startOffsetNext
+
+    s_waitcnt lgkmcnt(MRepeats*KRepeats)
+    s_barrier
+
+    RUN_MFMA_0 buffer_idA=0, buffer_idB=1, set=0
+    RUN_MFMA_0 buffer_idA=0, buffer_idB=1, set=1
+    RUN_MFMA_1 buffer_idA=0, buffer_idB=1, set=0
+    RUN_MFMA_1 buffer_idA=0, buffer_idB=1, set=1
+    DS_READ_A 0
+
+    s_waitcnt vmcnt(12)
+    GLOBAL_READ_64 B v_stagingB0 TILE_SIZE_K*2  v_startOffset; first 128x64 block for the tile
+
+    RUN_MFMA_0 buffer_idA=1, buffer_idB=0, set=0
+    RUN_MFMA_0 buffer_idA=1, buffer_idB=0, set=1
+    DS_WRITE ldsA1 v_stagingA1
+    RUN_MFMA_1 buffer_idA=1, buffer_idB=0, set=0
+    DS_WRITE ldsB1 v_stagingB1
+    RUN_MFMA_1 buffer_idA=1, buffer_idB=0, set=1
+    DS_READ_B 0
+
+    s_waitcnt vmcnt(12)
+    GLOBAL_READ_64 A v_stagingA0 TILE_SIZE_K*2 v_startOffset
+
+    RUN_MFMA_0 buffer_idA=1, buffer_idB=1, set=0
+    RUN_MFMA_0 buffer_idA=1, buffer_idB=1, set=1
+    RUN_MFMA_1 buffer_idA=1, buffer_idB=1, set=0
+    RUN_MFMA_1 buffer_idA=1, buffer_idB=1, set=1
+
+    s_add_u32 s[A], s[A], TILE_SIZE_K*2
+    s_addc_u32 s[A+1], s[A+1], 0
+    s_add_u32 s[B], s[B], TILE_SIZE_K*2
+    s_addc_u32 s[B+1], s[B+1], 0
+    s_add_i32 s9, s9, TILE_SIZE_K
+    s_cmpk_lt_u32 s9, 0x1FC0  ;K - tile_size_k
+
+    s_cbranch_scc1 1b
+; %bb.2:                                ; %cond.end
+
+    s_waitcnt lgkmcnt(0)
+    s_barrier
+
+    s_waitcnt vmcnt(12)
+    GLOBAL_READ_64 A v_stagingA1 0 v_startOffsetNext
+
+    RUN_MFMA_0 buffer_idA=0, buffer_idB=0, set=0  ; 2 buffers and 2 sets of mfmas in each
+    DS_READ_B 1
+    RUN_MFMA_0 buffer_idA=0, buffer_idB=0, set=1
+    DS_READ_A 1
+    RUN_MFMA_1 buffer_idA=0, buffer_idB=0, set=0
+    DS_WRITE ldsA0 v_stagingA0
+    RUN_MFMA_1 buffer_idA=0, buffer_idB=0, set=1
+    DS_WRITE ldsB0 v_stagingB0
+
+    s_waitcnt vmcnt(12)
+    GLOBAL_READ_64 B v_stagingB1 0 v_startOffsetNext
+    RUN_MFMA_0 buffer_idA=0, buffer_idB=1, set=0
+    RUN_MFMA_0 buffer_idA=0, buffer_idB=1, set=1
+    RUN_MFMA_1 buffer_idA=0, buffer_idB=1, set=0
+    RUN_MFMA_1 buffer_idA=0, buffer_idB=1, set=1
+
+    s_waitcnt lgkmcnt(MRepeats*KRepeats)
+    s_barrier
+
+    RUN_MFMA_0 buffer_idA=1, buffer_idB=0, set=0
+    DS_READ_A 0
+    RUN_MFMA_0 buffer_idA=1, buffer_idB=0, set=1
+    DS_WRITE ldsA1 v_stagingA1
+    RUN_MFMA_1 buffer_idA=1, buffer_idB=0, set=0
+    DS_WRITE ldsB1 v_stagingB1
+    RUN_MFMA_1 buffer_idA=1, buffer_idB=0, set=1
+
+    RUN_MFMA_0 buffer_idA=1, buffer_idB=1, set=0
+    DS_READ_B 0
+    RUN_MFMA_0 buffer_idA=1, buffer_idB=1, set=1
+    RUN_MFMA_1 buffer_idA=1, buffer_idB=1, set=0
+    RUN_MFMA_1 buffer_idA=1, buffer_idB=1, set=1
+
+    s_waitcnt lgkmcnt(0)
+    s_barrier
+
+    RUN_MFMA_0 buffer_idA=0, buffer_idB=0, set=0  ; 2 buffers and 2 sets of mfmas in each
+    DS_READ_A 1
+    DS_READ_B 1
+    RUN_MFMA_0 buffer_idA=0, buffer_idB=0, set=1
+    RUN_MFMA_1 buffer_idA=0, buffer_idB=0, set=0
+    RUN_MFMA_1 buffer_idA=0, buffer_idB=0, set=1
+
+    RUN_MFMA_0 buffer_idA=0, buffer_idB=1, set=0
+    RUN_MFMA_0 buffer_idA=0, buffer_idB=1, set=1
+    RUN_MFMA_1 buffer_idA=0, buffer_idB=1, set=0
+    RUN_MFMA_1 buffer_idA=0, buffer_idB=1, set=1
+
+    RUN_MFMA_0 buffer_idA=1, buffer_idB=0, set=0 
+    RUN_MFMA_0 buffer_idA=1, buffer_idB=0, set=1
+    RUN_MFMA_1 buffer_idA=1, buffer_idB=0, set=0
+    RUN_MFMA_1 buffer_idA=1, buffer_idB=0, set=1
+
+    RUN_MFMA_0 buffer_idA=1, buffer_idB=1, set=0
+    RUN_MFMA_0 buffer_idA=1, buffer_idB=1, set=1
+    RUN_MFMA_1 buffer_idA=1, buffer_idB=1, set=0
+    RUN_MFMA_1 buffer_idA=1, buffer_idB=1, set=1
+
+    # store results
+    s_waitcnt vmcnt(0)
+    s_barrier
+
+    ; Wave decomposition
+    v_lshrrev_b32_e32 v1, 6, v0             ; wave_id = threadIdx.x / 64
+    v_and_b32_e32     v2, 1, v1             ; wave_row = wave_id % 2
+    v_lshrrev_b32_e32 v3, 1, v1             ; wave_col = wave_id / 2
+
+    ; thread lane within wave
+    v_and_b32_e32     v4, 63, v0            ; tIdx = threadIdx.x % 64
+    v_and_b32_e32     v5, 15, v4            ; laneCol = tIdx % 16
+    v_lshrrev_b32_e32 v6, 4, v4             ; laneRow4 = (tIdx / 16) * 4
+    v_lshlrev_b32_e32 v6, 2, v6
+
+    s_mov_b32_e32 s5, N                   ; row_stride in elements
+    s_lshl_b32 s8, s5, 2                  ; row_stride in bytes
+    v_mov_b32_e32 v14, s8
+    v_mov_b32_e32 v15, 0
+
+    v_lshlrev_b32_e32 v8, 6, v3           ; wave_col * write_stride
+    v_mov_b32_e32 v12, s2
+    v_lshlrev_b32_e32 v11, 8, v12         ; col = blockIdx.x * 2 * tile_size_mn
+ 
+    v_mov_b32 v100, 128*N*4
+    v_mov_b32 v101, 0
+
+    v_lshlrev_b32_e32 v10, 6, v2          ; wave_row * write_stride
+    v_mov_b32_e32 v17, s3
+    v_lshlrev_b32_e32 v18, 8, v17         ; row = blockIdx.y * 2 * tile_size_mn
+
+    WRITE_256x256_BLOCK
+
+s_endpgm
+
+    .section	.rodata,"a",@progbits
+    .p2align	6, 0x0
+    .amdhsa_kernel gemm_16x16x16
+        .amdhsa_group_segment_fixed_size 65536
+        .amdhsa_private_segment_fixed_size 0
+        .amdhsa_kernarg_size 24
+        .amdhsa_user_sgpr_count 2
+        .amdhsa_user_sgpr_dispatch_ptr 0
+        .amdhsa_user_sgpr_queue_ptr 0
+        .amdhsa_user_sgpr_kernarg_segment_ptr 1
+        .amdhsa_user_sgpr_dispatch_id 0
+        .amdhsa_user_sgpr_kernarg_preload_length 0
+        .amdhsa_user_sgpr_kernarg_preload_offset 0
+        .amdhsa_user_sgpr_private_segment_size 0
+        .amdhsa_uses_dynamic_stack 0
+        .amdhsa_enable_private_segment 0
+        .amdhsa_system_sgpr_workgroup_id_x 1
+        .amdhsa_system_sgpr_workgroup_id_y 1
+        .amdhsa_system_sgpr_workgroup_id_z 0
+        .amdhsa_system_sgpr_workgroup_info 0
+        .amdhsa_system_vgpr_workitem_id 0
+        .amdhsa_next_free_vgpr 484
+        .amdhsa_next_free_sgpr 24
+        .amdhsa_accum_offset 228
+        .amdhsa_reserve_vcc 1
+        .amdhsa_float_round_mode_32 0
+        .amdhsa_float_round_mode_16_64 0
+        .amdhsa_float_denorm_mode_32 3
+        .amdhsa_float_denorm_mode_16_64 3
+        .amdhsa_dx10_clamp 1
+        .amdhsa_ieee_mode 1
+        .amdhsa_fp16_overflow 0
+        .amdhsa_tg_split 0
+        .amdhsa_exception_fp_ieee_invalid_op 0
+        .amdhsa_exception_fp_denorm_src 0
+        .amdhsa_exception_fp_ieee_div_zero 0
+        .amdhsa_exception_fp_ieee_overflow 0
+        .amdhsa_exception_fp_ieee_underflow 0
+        .amdhsa_exception_fp_ieee_inexact 0
+        .amdhsa_exception_int_div_zero 0
+    .end_amdhsa_kernel
+
+.amdgpu_metadata
+---
+amdhsa.kernels:
+  - .agpr_count:     256
+    .args:
+      - .actual_access:  read_only
+        .address_space:  global
+        .name:           A.coerce
+        .offset:         0
+        .size:           8
+        .value_kind:     global_buffer
+      - .actual_access:  read_only
+        .address_space:  global
+        .name:           B.coerce
+        .offset:         8
+        .size:           8
+        .value_kind:     global_buffer
+      - .actual_access:  write_only
+        .address_space:  global
+        .name:           C.coerce
+        .offset:         16
+        .size:           8
+        .value_kind:     global_buffer
+    .group_segment_fixed_size: 65536
+    .kernarg_segment_align: 8
+    .kernarg_segment_size: 24
+    .language:       OpenCL C
+    .language_version:
+      - 2
+      - 0
+    .max_flat_workgroup_size: 256
+    .name:           gemm_16x16x16
+    .private_segment_fixed_size: 0
+    .sgpr_count:     23
+    .sgpr_spill_count: 0
+    .symbol:         gemm_16x16x16.kd
+    .uniform_work_group_size: 1
+    .uses_dynamic_stack: false
+    .vgpr_count:     484
+    .vgpr_spill_count: 0
+    .wavefront_size: 64
+amdhsa.target:   amdgcn-amd-amdhsa--gfx942
+amdhsa.version:
+  - 1
+  - 2
+...
+
+    .end_amdgpu_metadata
+```
+</details>
+
+## Results
+
+![Improved execution pipeline stalls](02_adv_nostalls.png)
+
+The hotspots have shifted to matrix-related computations and ALU, global load is not a problem any longer.
+
+![Improved execution pipeline hotspots](02_adv_hotspots.png)
+
+`rocprofv3` output above shows that we have achieved our kernel to become compute bound 
+where matrix multiplication operations have become the dominant workload. 

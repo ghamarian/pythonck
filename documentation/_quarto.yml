@@ -51,6 +51,11 @@ website:
             - index.qmd
             - text: "Quick Start Tutorial"
               href: concepts/00_introduction_motivation.qmd
+        - section: "GPU Hardware"
+          contents:
+            - hardware/00_gpu_basics.qmd
+            - hardware/01_lds.qmd
+            - hardware/02_gemm.qmd
         - section: "Foundation"
           contents:
             - text: "Buffer Views"
@@ -75,6 +80,8 @@ website:
                   href: concepts/02_swizzling_example.qmd
                 - text: "Coordinate Movement"
                   href: concepts/02_coordinate_movement.qmd
+                - text: "LDS index swapping"
+                  href: concepts/02_lds_index_swapping.qmd
         - section: "Distribution API"
           contents:
             - text: "Tile Distribution"
