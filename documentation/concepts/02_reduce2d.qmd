@@ -1,0 +1,361 @@
+---
+title: "Reduce-2D Kernel"
+format: live-html
+---
+
+## Overview
+
+The `ck_tile::Reduce` kernel implements a hierarchical reduction over exactly one merged "kept" dimension (M) and one merged "reduced" dimension (N) derived from an arbitrary-rank input tensor. It reduces over a user-specified set of axes while keeping the others intact.
+
+**Running Example**:
+Throughout this document, we use an input tensor with NHWC layout where:
+
+- **Input shape**: `(N, H, W, C)` 
+- **Reduce dimensions**: `{1, 2}` (H and W)
+- **Kept dimensions**: `{0, 3}` (N and C)
+- **Result**: Output tensor with shape `(N, C)` containing reduced values
+
+The Reduce-2D kernel is structured as a pipeline of three intra-block stages:
+
+1. **Thread-level accumulation** (`BlockReduce2d`)
+2. **Intra-warp shuffle reduction** (`BlockReduce2dSync`)  
+3. **Cross-warp shared-memory reduction** (`BlockReduce2dCrossWarpSync`)
+
+A final store writes the reduced tile to global memory.
+
+## Problem Decomposition
+
+Given:
+
+- Input tensor **X** with shape `(d0, d1, ..., d_{R-1})`
+- **Kept dimensions**: `kept_dim` (e.g. `{0, 3}` → N and C)  
+- **Reduce dimensions**: `reduce_dims` (e.g. `{1, 2}` → H and W)
+
+We transform X tensor into a 2D logical view:
+
+- **M axis** = merged kept dims (outer)
+- **N axis** = merged reduction dims (inner)
+
+**Result Y** has shape of the kept dims and newly calculated strides. However, for the reduction part the Y tensor view is transformed into 1D.
+
+
+## Core Types and Policy
+
+### Key Abstractions
+
+**Reduce2dShape** encodes:
+
+- `Block_M`, `Block_N`
+- Thread tile sizes: `ThreadTile_M`, `ThreadTile_N`
+- Warps along M and N: `WarpPerBlock_M`, `WarpPerBlock_N`
+- Elements handled per warp: `Warp_M`, `Warp_N`
+
+For the running example:
+
+- `Block_M = 128, Block_N = 128` - Each block processes a 128 × 128 tile
+- `ThreadTile_M = 8, ThreadTile_N = 8` - Each thread processes an 8 × 8 sub-tile
+- `WarpPerBlock_M = 4, WarpPerBlock_N = 1` - 4 warps along M dimension, 1 warp along N dimension
+- `Warp_M = 32, Warp_N = 128` - Each warp processes a 32 × 128 tile
+
+The `BlockSize = 256`, i.e. 256 threads per block. Hence, we get 256 threads in a block / (4 * 1) warps in a block -> 64 threads per warp. 
+
+**Reduce<Problem, Policy>** orchestrates:
+
+- Tensor view transformation & padding
+- Tile window traversal
+- Hierarchical reduction stages
+- Vectorization constraints
+
+**Reduce2dDefaultPolicy** supplies:
+
+- Static tile distribution for loading X tiles
+- Accessors to stage objects
+- Shared memory (LDS) size computation for cross-warp stage
+
+## Tensor View Transformation Pipeline
+
+**Input Tensor X**
+
+1. **Original descriptor**: `(N, H, W, C)` with explicit strides.
+2. **Extract**:
+   - `kept_lens = (len(N), len(C))`
+   - `reduce_lens = (len(H), len(W))`
+3. **Merge transforms**:
+   - `kept_merge_transform(kept_lens)` → M
+   - `reduce_merge_transform(reduce_lens)` → N
+4. **Apply** `transform_tensor_view` → produce 2D `[M, N]`
+5. **Pad** to block tile multiples: `(Block_M, Block_N)`
+6. **Create tile window**:
+   - X window slides along N in chunks of `Block_N`
+   - Each block owns a distinct `Block_M` slice of M
+
+**Output Tensor Y**
+
+The transformation is simple with all dimensions merged into a single dimension.
+
+
+
+## Tile Distribution Encoding
+
+**Input Tensor Distribution**:
+
+The tile distribution encoding for the input tensor is as follows:
+
+```cpp
+tile_distribution_encoding<
+                sequence<>,
+                tuple<
+                    sequence<S::Repeat_M, S::WarpPerBlock_M, S::ThreadPerWarp_M, S::ThreadTile_M>,
+                    sequence<S::Repeat_N, S::WarpPerBlock_N, S::ThreadPerWarp_N, S::ThreadTile_N>>,
+                tuple<sequence<1, 2>, sequence<1, 2>>,
+                tuple<sequence<1, 1>, sequence<2, 2>>,
+                sequence<1, 1, 2, 2>,
+                sequence<0, 3, 0, 3>>
+``` 
+Substituting the values for the running example gives us:
+
+```cpp
+tile_distribution_encoding<
+                sequence<>, // No replication
+                tuple<
+                    sequence<1, 4, 4, 8>, // H0 (rows): [1x4x4x8] = 128 elements
+                    sequence<1, 1, 16, 8>>, // H1 (columns): [1x1x16x8] = 128 elements
+                tuple<sequence<1, 2>, sequence<1, 2>>, // P→RH major mapping
+                tuple<sequence<1, 1>, sequence<2, 2>>, // P→RH minor mapping
+                sequence<1, 1, 2, 2>, // Y→RH major mapping (4 Y dimensions)
+                sequence<0, 3, 0, 3>> // Y→RH minor mapping 
+``` 
+The distribution can be simply visualized through this diagram:
+
+![](02_reduce2d_input_tile_distribution.png)
+
+`P0[0]→H0[1]`, `P0[1]→H1[1]`, `P1[0]→H0[2]`, `P1[1]→H1[2]`
+
+From this distribution we can observe:
+
+- `Y1 = 8` and `Y3 = 8`, this mapping denotes that each thread processes `8 x 8` tile (and loads this tile into threads registers). So each tile handles 8 rows x 8 columns = 64 elements 
+- `Y0 = 1` and `Y2 = 1`, which means there is no repetition
+- `P0` denotes the warps per block mapping 
+- `P0[0] = 4` and `P0[1] = 1`, here we need to remember that the right most index is the continuous dimension. Therefore, `P0[1] = 1` means we have one warp per block in the continuous dimension (`N`) and `P0[0] = 4` means we have four warps per block in the next dimension (`M`).
+- `P1` denotes the threads per warp mapping
+- `P1[0] = 4` and `P1[1] = 16`, same as `P0` right most index is the continuous dimension. Therefore, `P1[1] = 16` means we have sixteen threads per warp in the continuous dimension (`N`) and `P0[0] = 4` means we have four threads per warp in the next dimension (`M`).
+
+These distribution for `Block_M = 128, Block_N = 128` would look like:
+![](02_reduce2d_input_tile_distribution_layout.png)
+
+
+
+
+**Output Tensor Distribution**: The output tensor's distribution is not independent; it is constructed from the input tensor's distribution. The transformation is performed by `make_reduce_tile_distribution_encoding`, which takes the input's static tile distribution encoding and a list of reduction dimensions.
+
+This function produces a new distribution encoding for the output tensor, where the specified reduction dimensions are collapsed (i.e., removed from the output shape).
+
+```{mermaid}
+graph TD
+    A["Block Tile"] --> B["Warp 0<br/>M slice"]
+    A --> C["Warp 1<br/>M slice"] 
+    A --> D["..."]
+    A --> E["Warp W<br/>M slice"]
+    
+    B --> F["Thread 0"]
+    B --> G["Thread 1"]
+    B --> H["..."]
+    B --> I["Thread 31"]
+    
+    F --> J["Element(s)<br/>per thread"]
+```
+
+## Stage 1: Thread-Level Accumulation (BlockReduce2d)
+
+Each thread:
+1. Iterates over its assigned fragment of the loaded tile (possibly >1 element along M and/or N depending on `ThreadTile_*` and repeat factors)
+2. Applies `reduce_func(acc, x_ij)` locally in registers
+3. Produces a per-thread partial buffer shaped as the reduced-version of its input fragment (N dimension collapsed)
+
+**Result**: A register-resident tensor `y_compute` with only M-related indexing left.
+
+```cpp
+// Pseudo-code for thread-level accumulation
+for (auto repeat_m : repeat_M_range) {
+    for (auto repeat_n : repeat_N_range) {
+        auto x_fragment = load_thread_tile(repeat_m, repeat_n);
+        
+        for (auto n_elem : N_elements) {
+            for (auto m_elem : M_elements) {
+                acc[m_elem] = reduce_func(acc[m_elem], x_fragment[m_elem][n_elem]);
+            }
+        }
+    }
+}
+```
+
+## Stage 2: Intra-Warp Reduction (BlockReduce2dSync)
+
+**Goal**: Combine per-thread partials inside each warp for dimensions mapped to lane indices.
+
+**Mechanism**: Uses warp shuffle operations (tree-style or butterfly) across threads where the tile distribution encodes that dimension as "thread-parallel". Only dimensions whose fragments reside across lanes (vs. repeats) are reduced here.
+
+```{mermaid}
+graph LR
+    A["Thread 0<br/>Partial"] --> E["Warp Shuffle<br/>Operations"]
+    B["Thread 1<br/>Partial"] --> E
+    C["..."] --> E
+    D["Thread 31<br/>Partial"] --> E
+    E --> F["Warp Result"]
+```
+
+After this stage each warp has a consolidated partial result per its M slice.
+
+## Stage 3: Cross-Warp Reduction (BlockReduce2dCrossWarpSync)
+
+Needed only if more than one warp contributes to the same logical M output element.
+
+**Steps**:
+1. Lane 0 of each warp writes its reduced per-thread buffer to shared memory (LDS)
+2. Block-wide sync
+3. All threads (or a subset) cooperatively load the warp partials
+4. Perform final accumulation over the warp dimension
+5. Overwrite `y_compute` with the cross-warp final
+
+```{mermaid}
+graph TD
+    A["Warp 0 Lane 0"] --> D["Shared Memory<br/>(LDS)"]
+    B["Warp 1 Lane 0"] --> D
+    C["Warp N Lane 0"] --> D
+    D --> E["Block Sync"]
+    E --> F["Cooperative Load"]
+    F --> G["Final Accumulation"]
+    G --> H["Final Result"]
+```
+
+**Shared memory size formula** (simplified):
+```
+LDS_size = num_warps × thread_buf_size
+```
+where `thread_buf_size` = per-thread reduced buffer length.
+
+## Final Store
+
+After Stage 3:
+- `y_compute` holds the fully reduced tile (vectorizable along M if alignment allows)
+- Stored into the transformed Y view (`y_window`), which maps back to the merged kept axis
+- Strides for Y are re-derived to allow correct placement in original kept-dimension layout
+
+## Vectorization Rules
+
+Two independent vector size choices:
+
+**Input vector size**:
+- Limited by: 16-byte alignment / element size AND `ThreadTile_N`
+- Disabled (→1) if innermost reduction axis isn't the last physical axis (non-unit stride)
+
+**Output vector size**:
+- Min of 16-byte alignment factor and `ThreadTile_M`
+
+This ensures:
+- Coalesced loads on contiguous reduction axis
+- Safe packs per thread along non-reduced dimension
+
+```cpp
+// Simplified logic
+auto input_vector_size = min(
+    16 / sizeof(DataType),
+    ThreadTile_N,
+    is_contiguous ? max_vector : 1
+);
+
+auto output_vector_size = min(
+    16 / sizeof(DataType), 
+    ThreadTile_M
+);
+```
+
+## High-Level Kernel Pseudocode
+
+```cpp
+template<typename Problem, typename Policy>
+void reduce_kernel() {
+    // Stage 0: Setup and load
+    auto x_window = make_tile_window(x_view, block_work_idx);
+    auto y_window = make_tile_window(y_view, block_work_idx);
+    
+    // Stage 1: Thread-level accumulation  
+    auto x_tile = load_tile(x_window);
+    auto y_compute = block_reduce_2d(x_tile);
+    
+    // Stage 2: Intra-warp reduction
+    y_compute = block_reduce_2d_sync(y_compute);
+    
+    // Stage 3: Cross-warp reduction (if needed)
+    if constexpr (requires_cross_warp_reduction) {
+        y_compute = block_reduce_2d_cross_warp_sync(y_compute);
+    }
+    
+    // Final store
+    store_tile(y_window, y_compute);
+}
+```
+
+## Example Parameterization
+
+From `reduce.cpp`:
+
+```cpp
+using Reduce2dShape = Reduce2dShape<
+    256,    // Block_M 
+    256,    // Block_N
+    8,      // ThreadTile_M
+    8,      // ThreadTile_N  
+    4,      // WarpPerBlock_M
+    1,      // WarpPerBlock_N
+    1,      // Repeat_M
+    4       // Repeat_N
+>;
+```
+
+**Interpretation**:
+- 4 warps along M; 1 warp along N
+- Each warp covers 32 rows × 128 columns before per-thread partitioning
+- Thread-level tiles shape MxN subdivides warp tile
+- Vector widths (load/store) = 8 (subject to alignment and stride checks)
+
+## Edge Cases & Constraints
+
+**IsSupportedArgument**:
+- `y_continuous_dim % ThreadTile_N == 0` (mapping correctness)
+- Last input stride must be 1 (contiguous tail for vector loads)
+- Padding ensures full tiles even when M or N not multiples of block tile sizes
+- Identity element fills padded regions (must not affect sum)
+
+## Memory & Synchronization Summary
+
+| Stage | Storage | Sync Needed | Primitive |
+|-------|---------|-------------|-----------|
+| Thread accumulate | Registers | None | Plain loop |
+| Warp reduce | Registers via shuffles | Implicit (warp-synchronous) | `__shfl_*` |
+| Cross-warp reduce | Shared memory + registers | `block_sync_lds()` | LDS + loop |
+
+## Visualization: Overall Dataflow
+
+```{mermaid}
+graph TD
+    A["Input Tensor X"] --> B["Transform to 2D [M,N]"]
+    B --> C["Load Tile to Registers"]
+    C --> D["Stage 1: Thread Accumulation"]
+    D --> E["Stage 2: Warp Shuffle Reduction"]
+    E --> F{"Multiple Warps<br/>per Output?"}
+    F -->|Yes| G["Stage 3: Cross-Warp<br/>LDS Reduction"]
+    F -->|No| H["Final Store"]
+    G --> H
+    H --> I["Output Tensor Y"]
+```
+
+## Extensibility Notes
+
+**To change reduction op**: Supply a `ReduceOp` functor with `GetIdentityValue<ComputeDataType>()` and `operator()`.
+
+**To alter tile shape**: Redefine `Reduce2dShape` (Block sizes, warp decomposition, thread tile).
+
+**To disable Stage 3**: Ensure only one warp maps to each output M element (`WarpPerBlock_M == 1` or mapping collapses warp dimension).
+
+**Alternative cross-warp strategies**: (e.g. tree) can plug in by replacing `GetBlockReduce2dCrossWarpSync()` in the policy.

@@ -74,6 +74,8 @@ website:
               href: concepts/02_descriptors.qmd
             - section: "Examples"
               contents:
+                - text: "Reduce 2D"
+                  href: concepts/02_reduce2d.qmd
                 - text: "Convolution Implementation"
                   href: concepts/02_convolution_example.qmd
                 - text: "Swizzling Patterns"
