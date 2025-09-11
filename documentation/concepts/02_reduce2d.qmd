@@ -5,7 +5,7 @@ format: live-html
 
 ## Overview
 
-The `ck_tile::Reduce` kernel implements a hierarchical reduction over exactly one merged "kept" dimension (M) and one merged "reduced" dimension (N) derived from an arbitrary-rank input tensor. It reduces over a user-specified set of axes while keeping the others intact.
+The `ck_tile::Reduce` kernel implements a 2D reduction operation that efficiently reduces data along specified dimensions of an arbitrary-rank input tensor. The kernel transforms the input into a logical 2D view with one "kept" dimension (M) and one "reduced" dimension (N), then applies a hierarchical reduction.
 
 **Running Example**:
 Throughout this document, we use an input tensor with NHWC layout where:
@@ -17,153 +17,168 @@ Throughout this document, we use an input tensor with NHWC layout where:
 
 The Reduce-2D kernel is structured as a pipeline of three intra-block stages:
 
-1. **Thread-level accumulation** (`BlockReduce2d`)
-2. **Intra-warp shuffle reduction** (`BlockReduce2dSync`)  
-3. **Cross-warp shared-memory reduction** (`BlockReduce2dCrossWarpSync`)
+```{=html}
+<div class="mermaid">
+flowchart LR
+    T1["Stage 1: Thread-Level<br/>Each thread accumulates its assigned elements"]
+    T2["Stage 2: Warp-Level<br/>Threads within warps combine via shuffle ops"]
+    T3["Stage 3: Block-Level<br/>Warps combine results via shared memory"]
+
+    T1 --> T2 --> T3
+</div>
+```
+
+1. **Thread-level accumulation** (`BlockReduce2d`): Individual threads process their assigned data tiles
+2. **Intra-warp shuffle reduction** (`BlockReduce2dSync`): Threads within each warp combine results using warp shuffle  
+3. **Cross-warp shared-memory reduction** (`BlockReduce2dCrossWarpSync`): Warps coordinate through shared memory to produce final block results
 
 A final store writes the reduced tile to global memory.
 
-## Problem Decomposition
+## Problem Decomposition and Tensor Transformation
 
-Given:
+### Dimensional Merging
 
-- Input tensor **X** with shape `(d0, d1, ..., d_{R-1})`
-- **Kept dimensions**: `kept_dim` (e.g. `{0, 3}` → N and C)  
-- **Reduce dimensions**: `reduce_dims` (e.g. `{1, 2}` → H and W)
+The kernel transforms an arbitrary-rank input tensor into a 2D logical view through merging dimensions:
 
-We transform X tensor into a 2D logical view:
+**Input tensor X**: `(N, H, W, C)` → **2D view**: `(M, N)` where:
 
-- **M axis** = merged kept dims (outer)
-- **N axis** = merged reduction dims (inner)
+- **M dimension** = merged kept dimensions
+- **N dimension** = merged reduction dimensions
 
-**Result Y** has shape of the kept dims and newly calculated strides. However, for the reduction part the Y tensor view is transformed into 1D.
+### Tensor View Pipeline
 
-
-## Core Types and Policy
-
-### Key Abstractions
-
-**Reduce2dShape** encodes:
-
-- `Block_M`, `Block_N`
-- Thread tile sizes: `ThreadTile_M`, `ThreadTile_N`
-- Warps along M and N: `WarpPerBlock_M`, `WarpPerBlock_N`
-- Elements handled per warp: `Warp_M`, `Warp_N`
-
-For the running example:
-
-- `Block_M = 128, Block_N = 128` - Each block processes a 128 × 128 tile
-- `ThreadTile_M = 8, ThreadTile_N = 8` - Each thread processes an 8 × 8 sub-tile
-- `WarpPerBlock_M = 4, WarpPerBlock_N = 1` - 4 warps along M dimension, 1 warp along N dimension
-- `Warp_M = 32, Warp_N = 128` - Each warp processes a 32 × 128 tile
-
-The `BlockSize = 256`, i.e. 256 threads per block. Hence, we get 256 threads in a block / (4 * 1) warps in a block -> 64 threads per warp. 
-
-**Reduce<Problem, Policy>** orchestrates:
-
-- Tensor view transformation & padding
-- Tile window traversal
-- Hierarchical reduction stages
-- Vectorization constraints
-
-**Reduce2dDefaultPolicy** supplies:
-
-- Static tile distribution for loading X tiles
-- Accessors to stage objects
-- Shared memory (LDS) size computation for cross-warp stage
-
-## Tensor View Transformation Pipeline
-
-**Input Tensor X**
-
-1. **Original descriptor**: `(N, H, W, C)` with explicit strides.
-2. **Extract**:
+1. **Dimension extraction:**
    - `kept_lens = (len(N), len(C))`
    - `reduce_lens = (len(H), len(W))`
-3. **Merge transforms**:
+
+2. **Merge transformations:**
    - `kept_merge_transform(kept_lens)` → M
    - `reduce_merge_transform(reduce_lens)` → N
-4. **Apply** `transform_tensor_view` → produce 2D `[M, N]`
-5. **Pad** to block tile multiples: `(Block_M, Block_N)`
-6. **Create tile window**:
-   - X window slides along N in chunks of `Block_N`
-   - Each block owns a distinct `Block_M` slice of M
 
-**Output Tensor Y**
+3. **Apply** `transform_tensor_view` → produce 2D `[M, N]`
 
-The transformation is simple with all dimensions merged into a single dimension.
+4. **Block-level padding:** Pad to block tile multiples `(Block_M, Block_N) = (128, 128)`
+
+5. **Tile window setup:** Each block processes a `Block_M × Block_N` tile, sliding along the N dimension
 
 
+## Core Architecture Components
 
-## Tile Distribution Encoding
+**Block Shape Configuration**
 
-**Input Tensor Distribution**:
-
-The tile distribution encoding for the input tensor is as follows:
+The kernel's performance characteristics are determined by the `Reduce2dShape` configuration:
 
 ```cpp
+// Example configuration
+using BlockWarps = sequence<4, 1>;    // 4 warps along M, 1 warp along N
+using BlockTile  = sequence<128, 128>; // 128×128 elements per block
+using WarpTile   = sequence<32, 128>;  // 32×128 elements per warp  
+using ThreadTile     = sequence<8, 8>;     // 8×8 elements per thread
+
+```
+
+**Key parameters:**
+
+- `Block_M = 128`, `Block_N = 128`: Each block processes a 128×128 tile
+- `ThreadTile_M = 8`, `ThreadTile_N = 8`: Each thread handles an 8×8 sub-tile
+- `WarpPerBlock_M = 4`, `WarpPerBlock_N = 1`: 4 warps along M, 1 along N
+- `BlockSize = 256`: Total threads per block (4 warps × 64 threads/warp)
+
+### Policy Architecture
+
+The `Reduce2dDefaultPolicy` provides the algorithmic framework:
+
+- **Tile distribution encoding**: Defines how data maps to GPU execution hierarchy
+- **Stage object factories**: Creates reduction operators for each pipeline stage
+- **Memory management**: Computes shared memory requirements for cross-warp coordination
+
+## Input Tensor Distribution Encoding
+
+The tile distribution encoding specifies how the 2D logical tensor maps onto the GPU's execution hierarchy. This encoding is needed for achieving desired pattern of memory access and parallelization.
+
+Distribution Structure:
+```cpp
 tile_distribution_encoding<
-                sequence<>,
-                tuple<
-                    sequence<S::Repeat_M, S::WarpPerBlock_M, S::ThreadPerWarp_M, S::ThreadTile_M>,
-                    sequence<S::Repeat_N, S::WarpPerBlock_N, S::ThreadPerWarp_N, S::ThreadTile_N>>,
-                tuple<sequence<1, 2>, sequence<1, 2>>,
-                tuple<sequence<1, 1>, sequence<2, 2>>,
-                sequence<1, 1, 2, 2>,
-                sequence<0, 3, 0, 3>>
+    sequence<>,                                    // No replication dimensions
+    tuple<
+        sequence<Repeat_M, WarpPerBlock_M, ThreadPerWarp_M, ThreadTile_M>,  // M dimension hierarchy
+        sequence<Repeat_N, WarpPerBlock_N, ThreadPerWarp_N, ThreadTile_N>>, // N dimension hierarchy  
+    tuple<sequence<1, 2>, sequence<1, 2>>,         // P→H mapping (major)
+    tuple<sequence<1, 1>, sequence<2, 2>>,         // P→H mapping (minor)
+    sequence<1, 1, 2, 2>,                          // Y→H mapping (major)
+    sequence<0, 3, 0, 3>>                          // Y→H mapping (minor)
 ``` 
-Substituting the values for the running example gives us:
+
+Concrete Example Values
+
+For our running example with `BlockTile = (128, 128)`, `WarpTile = (32, 128)`, `ThreadTile = (8, 8)`:
 
 ```cpp
 tile_distribution_encoding<
                 sequence<>, // No replication
                 tuple<
-                    sequence<1, 4, 4, 8>, // H0 (rows): [1x4x4x8] = 128 elements
-                    sequence<1, 1, 16, 8>>, // H1 (columns): [1x1x16x8] = 128 elements
+                    sequence<1, 4, 4, 8>,  // M hierarchy: [Repeat=1, Warps=4, Threads=4, Elements=8] = 128
+                    sequence<1, 1, 16, 8>>, // N hierarchy: [Repeat=1, Warps=1, Threads=16, Elements=8] = 128
                 tuple<sequence<1, 2>, sequence<1, 2>>, // P→RH major mapping
                 tuple<sequence<1, 1>, sequence<2, 2>>, // P→RH minor mapping
                 sequence<1, 1, 2, 2>, // Y→RH major mapping (4 Y dimensions)
                 sequence<0, 3, 0, 3>> // Y→RH minor mapping 
 ``` 
-The distribution can be simply visualized through this diagram:
+
+Distribution Encoding Visualization
 
 ![](02_reduce2d_input_tile_distribution.png)
 
 `P0[0]→H0[1]`, `P0[1]→H1[1]`, `P1[0]→H0[2]`, `P1[1]→H1[2]`
 
-From this distribution we can observe:
 
-- `Y1 = 8` and `Y3 = 8`, this mapping denotes that each thread processes `8 x 8` tile (and loads this tile into threads registers). So each tile handles 8 rows x 8 columns = 64 elements 
-- `Y0 = 1` and `Y2 = 1`, which means there is no repetition
-- `P0` denotes the warps per block mapping 
-- `P0[0] = 4` and `P0[1] = 1`, here we need to remember that the right most index is the continuous dimension. Therefore, `P0[1] = 1` means we have one warp per block in the continuous dimension (`N`) and `P0[0] = 4` means we have four warps per block in the next dimension (`M`).
-- `P1` denotes the threads per warp mapping
-- `P1[0] = 4` and `P1[1] = 16`, same as `P0` right most index is the continuous dimension. Therefore, `P1[1] = 16` means we have sixteen threads per warp in the continuous dimension (`N`) and `P0[0] = 4` means we have four threads per warp in the next dimension (`M`).
+The distribution creates a 4-level hierarchy:
 
-These distribution for `Block_M = 128, Block_N = 128` would look like:
+- **Y1 Y3 dimensions**: `ThreadTile_M = 8`, `ThreadTile_N = 8` - Each thread's register tile. Each thread processes 64 elements.
+- **Y0 Y2 dimensions (repeat)**: `Repeat_M = 1`, `Repeat_N = 1` - No additional looping
+- **P1 dimensions**: `ThreadPerWarp_M = 4`, `ThreadPerWarp_N = 16` - Thread organization within warps.This implies, 16 threads in the N dimension and 4 threads in the M dimension per warp.
+- **P0 dimensions**: `WarpPerBlock_M = 4`, `WarpPerBlock_N = 1` - Warp organization within blocks. This implies, 1 warp in the N dimension and 4 warps in the M dimension per block.
+
+Key Distribution Properties
+
+- **Thread assignment**: Each thread processes a dedicated 8×8 register tile (64 elements)
+- **Warp layout**: 4 warps distributed along M dimension
+
+**Mapping Semantics**: The encoding defines relationships between parallel dimensions (P) and hierarchical dimensions (H):
+
+- `P0[0] → H0[1]` warp mapping along M dimension
+- `P0[1] → H1[1]` warp mapping along N dimension
+- `P1[0] → H0[2]` thread mapping within warps along M dimension 
+- `P1[1] → H1[2]` thread mapping within warps along N dimension 
+
+
+Distribution for `Block_M = 128, Block_N = 128` would look like:
 ![](02_reduce2d_input_tile_distribution_layout.png)
 
 
+## Output Tensor Distribution
 
+The output tensor’s distribution is not independent; it is constructed from the input tensor’s distribution. The transformation is performed by `make_reduce_tile_distribution_encoding`, which takes the input’s static tile distribution encoding and a list of reduction dimensions.
 
-**Output Tensor Distribution**: The output tensor's distribution is not independent; it is constructed from the input tensor's distribution. The transformation is performed by `make_reduce_tile_distribution_encoding`, which takes the input's static tile distribution encoding and a list of reduction dimensions.
+This function produces a new distribution encoding for the output tensor, where the specified reduction dimensions are collapsed into the replication dimension.
 
-This function produces a new distribution encoding for the output tensor, where the specified reduction dimensions are collapsed (i.e., removed from the output shape).
+```cpp
+// In BlockReduce2d::MakeYBlockTile()
+constexpr auto reduce_dims = sequence<1>{}; // Reduce along N dimension
 
-```{mermaid}
-graph TD
-    A["Block Tile"] --> B["Warp 0<br/>M slice"]
-    A --> C["Warp 1<br/>M slice"] 
-    A --> D["..."]
-    A --> E["Warp W<br/>M slice"]
-    
-    B --> F["Thread 0"]
-    B --> G["Thread 1"]
-    B --> H["..."]
-    B --> I["Thread 31"]
-    
-    F --> J["Element(s)<br/>per thread"]
+constexpr auto output_dstr = 
+    make_static_tile_distribution(
+        detail::make_reduce_tile_distribution_encoding(
+            input_tensor.get_tile_distribution().get_static_tile_distribution_encoding(),
+            reduce_dims));
+
+auto y_tensor = make_static_distributed_tensor<ComputeDataType>(output_dstr);
+
 ```
+
+The resulting distribution looks like:
+
+
 
 ## Stage 1: Thread-Level Accumulation (BlockReduce2d)
 
