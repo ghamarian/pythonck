@@ -1249,7 +1249,7 @@ class TileDistributionPedantic:
         hierarchical_info = {
             'BlockSize': [], 'ThreadPerWarp': [1, 1], 'WarpPerBlock': [1, 1], 
             'VectorDimensions': [1], 'Repeat': [1, 1], 'ThreadBlocks': {},
-            'TileName': self.encoding_input_dict.get('_tile_name', "Pedantic Tile Distribution"),
+            'TileName': self.encoding_input_dict.get('_tile_name', "Tile Distribution"),
             'DimensionValues': [],
             'VectorDimensionYSIndex': -1
         }
