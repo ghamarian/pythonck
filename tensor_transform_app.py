@@ -308,7 +308,7 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
     dot.attr(comment=var_comment)
     
     vars_display = ", ".join(f"{k}={v}" for k, v in sorted(variables.items())[:5])
-    dot.node("title", f"Upper → Lower Graph - Variables: {vars_display}", shape="note", style="filled", fillcolor="lightyellow")
+    dot.node("title", f"Lower → Upper Graph - Variables: {vars_display}", shape="note", style="filled", fillcolor="lightyellow")
 
     if not descriptors:
         return dot
@@ -1140,7 +1140,7 @@ def build_backward_transformation_graph_from_pytensor(descriptors, variables):
     dot.attr(comment=var_comment)
     
     vars_display = ", ".join(f"{k}={v}" for k, v in sorted(variables.items())[:5])
-    dot.node("backward_title", f"Backward Graph - Variables: {vars_display}", shape="note", style="filled", fillcolor="lightblue")
+    dot.node("backward_title", f"Upper → Lower Graph - Variables: {vars_display}", shape="note", style="filled", fillcolor="lightblue")
 
     if not descriptors:
         return dot
@@ -1766,13 +1766,14 @@ def main():
                 st.success("Graphs updated with new variable values!")
             
             # Always display both graphs vertically
-            st.subheader("Upper → Lower Transformation Graph")
-            st.caption("Shows how logical dimensions (upper) transform to physical memory layout (lower)")
+            st.subheader("Lower → Upper Transformation Graph")
+            st.caption("Shows how physical memory layout (lower) transforms back to logical dimensions (upper)")
             dot_forward = build_transformation_graph_from_pytensor(descriptors, st.session_state.variables)
             st.graphviz_chart(dot_forward)
             
-            st.subheader("Lower → Upper Transformation Graph")
-            st.caption("Shows how physical memory layout (lower) transforms back to logical dimensions (upper)")
+            st.subheader("Upper → Lower Transformation Graph")
+            st.caption("Shows how logical dimensions (upper) transform to physical memory layout (lower)")
+            dot_forward = build_transformation_graph_from_pytensor(descriptors, st.session_state.variables)
             dot_backward = build_backward_transformation_graph_from_pytensor(descriptors, st.session_state.variables)
             st.graphviz_chart(dot_backward)
                     

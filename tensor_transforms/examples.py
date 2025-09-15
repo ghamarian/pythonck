@@ -18,22 +18,6 @@ transform_tensor_descriptor(
     make_tuple(sequence<0>{}, sequence<1>{})
 )
 """,
-        "Complex Nested Merge": """
-transform_tensor_descriptor(
-    input_desc,
-    make_tuple(
-        make_merge_transform(
-            make_tuple(
-                make_pass_through_transform(number<A>{}),
-                make_merge_transform(make_tuple(number<B>{}, number<C>{}))
-            )
-        ),
-        make_pass_through_transform(number<D>{})
-    ),
-    make_tuple(sequence<0, 1, 2>{}, sequence<3>{}),
-    make_tuple(sequence<0>{}, sequence<1>{})
-)
-""",
         "All Pass-Through": """
 transform_tensor_descriptor(
     input_desc,
