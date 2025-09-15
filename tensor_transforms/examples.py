@@ -332,6 +332,18 @@ transform_tensor_descriptor(
     make_tuple(make_unmerge_transform(lengths)),
     make_tuple(sequence<0>{}),
     make_tuple(typename arithmetic_sequence_gen<0, N, 1>::type{}))
+""",
+        "Simple Naive Packed Only": """
+constexpr auto simple_packed_desc = make_naive_tensor_descriptor_packed(
+    make_tuple(number<A>{}, number<B>{}, number<C>{}, number<D>{})
+);
+""",
+        "Simple Naive Regular (with Strides)": """
+constexpr auto simple_strided_desc = make_naive_tensor_descriptor(
+    make_tuple(number<M>{}, number<N>{}, number<K>{}),
+    make_tuple(number<StrideM>{}, number<StrideN>{}, number<StrideK>{}),
+    number<VectorSize>{},
+    number<Offset>{});
 """
     }
     return examples
@@ -435,5 +447,21 @@ def get_default_variables() -> Dict[str, Dict[str, int]]:
             # Demo of list variable - 'lengths' will show as list control in webapp
             'N': 3,
             'lengths': [2, 4, 8],  # This will be editable as a list in the UI
+        },
+        "Simple Naive Packed Only": {
+            'A': 2,
+            'B': 3,
+            'C': 4,
+            'D': 5,
+        },
+        "Simple Naive Regular (with Strides)": {
+            'M': 4,
+            'N': 8,
+            'K': 16,
+            'StrideM': 128,  # N * K
+            'StrideN': 16,   # K
+            'StrideK': 1,    # Column-major layout
+            'VectorSize': 1,
+            'Offset': 0,
         },
     } 

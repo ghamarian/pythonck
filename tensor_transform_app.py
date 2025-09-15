@@ -198,9 +198,20 @@ def display_variable_controls():
             if 'description' in var_info:
                 display_name += f" ({var_info['description']})"
             
+            # Determine appropriate min_value based on variable name
+            if var_name.lower() in ['offset', 'vectorsize', 'vector_size', 'guaranteed_last_dim_vector_length', 'guaranteed_last_dim_vector_stride']:
+                # These variables can be 0 or negative (-1 for "not specified")
+                min_val = -1
+            elif 'stride' in var_name.lower():
+                # Strides can be 0 (though unusual)
+                min_val = 0
+            else:
+                # Most dimension sizes should be at least 1
+                min_val = 1
+            
             value = st.number_input(
                 display_name,
-                min_value=1,
+                min_value=min_val,
                 value=current_value,
                 key=f"var_{var_name}"
             )
@@ -442,13 +453,26 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
     else:
         print(f"DEBUG: Using non-packed path, creating {max_input_dim} input dimensions")
         
+        # Check if first descriptor is a regular naive descriptor with EmbedTransform
+        first_desc_str = descriptors[0].strip() if descriptors else ""
+        is_regular_naive = ("make_naive_tensor_descriptor" in first_desc_str and 
+                           "make_naive_tensor_descriptor_packed" not in first_desc_str)
+        
         # Create all input nodes within the input cluster
         with dot.subgraph(name='cluster_input') as input_cluster:
             for k in range(max_input_dim):
                 node_id = f"input_d{k}"
-                prev_stage_output_nodes[k] = node_id
                 
-                print(f"DEBUG: Created input {node_id} mapped to index {k}")
+                # For regular naive descriptors with EmbedTransform, the inputs start at index 1
+                # The output (linear address) is at index 0
+                if is_regular_naive and len(descriptors) == 1:
+                    # Map input dimension k to hidden dimension k+1 for EmbedTransform
+                    prev_stage_output_nodes[k + 1] = node_id
+                    print(f"DEBUG: Created input {node_id} mapped to hidden index {k + 1} (for EmbedTransform)")
+                else:
+                    # Normal mapping for other descriptors
+                    prev_stage_output_nodes[k] = node_id
+                    print(f"DEBUG: Created input {node_id} mapped to index {k}")
                 
                 # Get dimension length - for unmerge transforms, calculate required input size
                 try:
@@ -582,21 +606,47 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                 lower_indices = new_lower_idss[i]
                 upper_indices = new_upper_idss[i]
                 
-                print(f"DEBUG: Transform {i} - lower_indices: {lower_indices}, upper_indices: {upper_indices}")
+                print(f"DEBUG: Transform {i} - upper_indices (inputs): {upper_indices}, lower_indices (outputs): {lower_indices}")
                 print(f"DEBUG: Transform {i} type: {transform.__class__.__name__}")
                 print(f"DEBUG: prev_stage_output_nodes keys: {list(prev_stage_output_nodes.keys())}")
                 
+                # Extra debug for UnmergeTransform in naive packed
+                if (isinstance(transform, pytensor.tensor_descriptor.UnmergeTransform) and 
+                    stage_idx == 0 and is_first_naive_packed):
+                    print(f"DEBUG: UnmergeTransform for naive packed - expecting {num_logical_dims} outputs")
+                    print(f"DEBUG: UnmergeTransform lengths: {transform.lengths if hasattr(transform, 'lengths') else 'N/A'}")
+                
                 # Get input symbols for this transform
-                input_symbols = []
-                for idx in lower_indices:
-                    if idx in prev_stage_output_nodes:
-                        prev_node_id = prev_stage_output_nodes[idx]
-                        if prev_node_id in current_formulas:
-                            input_symbols.append(current_formulas[prev_node_id])
+                # Special handling for EmbedTransform
+                if isinstance(transform, pytensor.tensor_descriptor.EmbedTransform):
+                    # EmbedTransform: upper_indices are the inputs, lower_indices are the outputs
+                    input_symbols = []
+                    print(f"DEBUG: EmbedTransform collecting inputs from upper_indices: {upper_indices}")
+                    for idx in upper_indices:
+                        if idx in prev_stage_output_nodes:
+                            prev_node_id = prev_stage_output_nodes[idx]
+                            if prev_node_id in current_formulas:
+                                input_symbols.append(current_formulas[prev_node_id])
+                                print(f"DEBUG: Added symbol from node {prev_node_id}: {current_formulas[prev_node_id]}")
+                            else:
+                                input_symbols.append(sp.Symbol(f"d_{idx}"))
+                                print(f"DEBUG: Added default symbol for index {idx}: d_{idx}")
                         else:
                             input_symbols.append(sp.Symbol(f"d_{idx}"))
-                    else:
-                        input_symbols.append(sp.Symbol(f"d_{idx}"))
+                            print(f"DEBUG: Index {idx} not in prev_stage_output_nodes, added default: d_{idx}")
+                    print(f"DEBUG: EmbedTransform collected {len(input_symbols)} input symbols")
+                else:
+                    # For other transforms, lower_indices are the inputs
+                    input_symbols = []
+                    for idx in lower_indices:
+                        if idx in prev_stage_output_nodes:
+                            prev_node_id = prev_stage_output_nodes[idx]
+                            if prev_node_id in current_formulas:
+                                input_symbols.append(current_formulas[prev_node_id])
+                            else:
+                                input_symbols.append(sp.Symbol(f"d_{idx}"))
+                        else:
+                            input_symbols.append(sp.Symbol(f"d_{idx}"))
 
                 try:
                     # Apply the transform - use correct directional terminology  
@@ -611,52 +661,28 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                             merged_input = sum(input_symbols) if len(input_symbols) > 1 else sp.Symbol("merged")
                             output_formulas = transform.sympy_calculate_upper([merged_input])
                     elif isinstance(transform, pytensor.tensor_descriptor.EmbedTransform):
-                        # EmbedTransform direction depends on the context:
-                        # - For the first (naive) descriptor: multi-dimensional coordinates -> linear address  
-                        # - For decomposition: linear address -> multi-dimensional coordinates
-                        
-                        # Check if this is the first naive descriptor
-                        is_first_descriptor = (stage_idx == 0)
-                        first_desc_str = descriptors[0].strip() if descriptors else ""
-                        is_naive_first = "make_naive_tensor_descriptor" in first_desc_str
-                        
-                        if is_first_descriptor and is_naive_first:
-                            # First descriptor: combines coordinates into linear address
-                            # Multiple inputs → single output: use calculate_upper_index
-                            expected_input_dims = len(transform.lengths)
-                            
-                            # Create input symbols for each coordinate
-                            coordinate_symbols = []
-                            for dim_idx in range(expected_input_dims):
-                                if dim_idx in prev_stage_output_nodes:
-                                    # Use the input node's formula
-                                    input_node = prev_stage_output_nodes[dim_idx]
-                                    coordinate_symbols.append(current_formulas[input_node])
-                                else:
-                                    coordinate_symbols.append(sp.Symbol(f"d{dim_idx}"))
-                            
-                            try:
-                                output_formulas = transform.sympy_calculate_upper(coordinate_symbols)
-                                print(f"DEBUG: EmbedTransform.sympy_calculate_upper({coordinate_symbols}) -> {output_formulas}")
-                            except Exception as embed_error:
-                                print(f"DEBUG: EmbedTransform.sympy_calculate_upper failed: {embed_error}")
-                                # Fallback: create simple sum
-                                output_formulas = [sum(coordinate_symbols)]
-                        else:
-                            # Decomposition case: linear address -> coordinates
-                            # Single input → multiple outputs: use calculate_lower_index
-                            if input_symbols:
-                                single_input = input_symbols[0]
+                        # EmbedTransform: combines multiple coordinates into linear address using strides
+                        # Multiple inputs → single output
+                        try:
+                            # EmbedTransform expects input_symbols to match its dimension count
+                            print(f"DEBUG: EmbedTransform ndim={transform.ndim}, input_symbols={len(input_symbols)}")
+                            output_formulas = transform.sympy_calculate_lower(input_symbols)
+                            print(f"DEBUG: EmbedTransform.sympy_calculate_lower({input_symbols}) -> {output_formulas}")
+                        except Exception as embed_error:
+                            print(f"DEBUG: EmbedTransform.sympy_calculate_lower failed: {embed_error}")
+                            # Fallback: create linear combination with strides
+                            if hasattr(transform, 'strides') and hasattr(transform, 'lengths'):
+                                # Create proper input symbols if needed
+                                if len(input_symbols) != len(transform.strides):
+                                    print(f"DEBUG: Adjusting input symbols from {len(input_symbols)} to {len(transform.strides)}")
+                                    input_symbols = [sp.Symbol(f"d{i}") for i in range(len(transform.strides))]
+                                
+                                linear_addr = sp.Integer(0)
+                                for sym, stride in zip(input_symbols, transform.strides):
+                                    linear_addr += sym * stride
+                                output_formulas = [linear_addr]
                             else:
-                                single_input = sp.Symbol("d0")
-                            
-                            try:
-                                output_formulas = transform.sympy_calculate_lower([single_input])
-                                print(f"DEBUG: EmbedTransform.sympy_calculate_lower([{single_input}]) -> {len(output_formulas)} outputs")
-                            except Exception as embed_error:
-                                print(f"DEBUG: EmbedTransform.sympy_calculate_lower failed: {embed_error}")
-                                # Fallback: create coordinate symbols
-                                output_formulas = [sp.Symbol(f"coord{i}") for i in range(len(upper_indices))]
+                                output_formulas = [sum(input_symbols)]
                     elif isinstance(transform, pytensor.tensor_descriptor.MergeTransform):
                         # Regular merge handling - hierarchical merge complexity was removed
                         # MergeTransform: upper (multiple) → lower (single)
@@ -692,16 +718,36 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                     # Create output nodes for this transform
                     print(f"DEBUG: Transform {i} has {len(output_formulas)} output formulas for {len(upper_indices)} upper indices")
                     
+                    # Determine output indices based on transform type
+                    if isinstance(transform, pytensor.tensor_descriptor.EmbedTransform):
+                        # EmbedTransform outputs to lower_indices
+                        output_indices = lower_indices
+                    else:
+                        # Other transforms output to upper_indices
+                        output_indices = upper_indices
+                    
                     # For final stage, only create nodes for dimensions that actually exist in the final output
                     if is_final_stage:
-                        # Filter upper_indices to only include those within the final output dimension count
-                        filtered_upper_indices = [idx for idx in upper_indices if idx < final_output_dims]
-                        print(f"DEBUG: Final stage filtering upper_indices {upper_indices} to {filtered_upper_indices}")
+                        # Filter output_indices to only include those within the final output dimension count
+                        filtered_output_indices = [idx for idx in output_indices if idx < final_output_dims]
+                        print(f"DEBUG: Final stage filtering output_indices {output_indices} to {filtered_output_indices}")
                     else:
-                        filtered_upper_indices = upper_indices
+                        filtered_output_indices = output_indices
+                    
+                    # Special handling for UnmergeTransform in naive packed descriptors
+                    # The output indices use hidden dimension IDs that may not start from 0
+                    if (isinstance(transform, pytensor.tensor_descriptor.UnmergeTransform) and 
+                        stage_idx == 0 and is_first_naive_packed and
+                        len(descriptors) == 1):  # Only for simple naive packed without subsequent transforms
+                        print(f"DEBUG: UnmergeTransform in simple naive packed - remapping indices")
+                        print(f"DEBUG: Original output_indices: {output_indices}")
+                        # For simple naive packed, map outputs to logical indices 0,1,2,3...
+                        if len(output_formulas) == num_logical_dims:
+                            filtered_output_indices = list(range(num_logical_dims))
+                            print(f"DEBUG: Remapped to logical indices: {filtered_output_indices}")
                     
                     # Create output nodes for each formula within the stage cluster
-                    for j, output_idx in enumerate(filtered_upper_indices):
+                    for j, output_idx in enumerate(filtered_output_indices):
                         if j < len(output_formulas):
                             # Use the actual stage number for node naming
                             node_id = f"s{actual_stage_num}_t{i}_d{output_idx}"
@@ -745,18 +791,15 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                             print(f"DEBUG: Added DOT node {node_id} with label {formula_str}")
                             
                             # Create edges from input nodes to this output node
-                            # Special handling for EmbedTransform in naive descriptors
-                            if (isinstance(transform, pytensor.tensor_descriptor.EmbedTransform) and 
-                                stage_idx == 0 and "make_naive_tensor_descriptor" in descriptors[0]):
-                                # For naive descriptor EmbedTransform, connect all input dimensions
-                                expected_input_dims = len(transform.lengths)
-                                for dim_idx in range(expected_input_dims):
-                                    if dim_idx in prev_stage_output_nodes:
+                            if isinstance(transform, pytensor.tensor_descriptor.EmbedTransform):
+                                # EmbedTransform: edges from upper_indices (inputs)
+                                for input_idx in upper_indices:
+                                    if input_idx in prev_stage_output_nodes:
                                         transform_name = transform.__class__.__name__.replace('Transform', '')
-                                        dot.edge(prev_stage_output_nodes[dim_idx], node_id, 
+                                        dot.edge(prev_stage_output_nodes[input_idx], node_id, 
                                                label=transform_name)
                             else:
-                                # Standard edge creation for other transforms
+                                # Other transforms: edges from lower_indices (inputs)
                                 for input_idx in lower_indices:
                                     if input_idx in prev_stage_output_nodes:
                                         transform_name = transform.__class__.__name__.replace('Transform', '')
@@ -775,24 +818,28 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                     
                     st.warning(f"Failed to generate formula for transform {transform}: {error_msg}")
                     # Create error nodes with actual stage number
-                    for j, output_idx in enumerate(upper_indices):
+                    # Determine output indices based on transform type
+                    if isinstance(transform, pytensor.tensor_descriptor.EmbedTransform):
+                        error_output_indices = lower_indices
+                    else:
+                        error_output_indices = upper_indices
+                    
+                    for j, output_idx in enumerate(error_output_indices):
                         node_id = f"s{actual_stage_num}_t{i}_d{output_idx}"
                         stage_output_nodes[output_idx] = node_id
                         next_formulas[node_id] = sp.Symbol(f"d{output_idx}")
                         stage_cluster.node(node_id, f"d{output_idx}", fillcolor="#ffcccc")
                         
                         # Create edges for error case - use same logic as successful case
-                        if (isinstance(transform, pytensor.tensor_descriptor.EmbedTransform) and 
-                            stage_idx == 0 and "make_naive_tensor_descriptor" in descriptors[0]):
-                            # For naive descriptor EmbedTransform, connect all input dimensions
-                            expected_input_dims = len(transform.lengths)
-                            for dim_idx in range(expected_input_dims):
-                                if dim_idx in prev_stage_output_nodes:
+                        if isinstance(transform, pytensor.tensor_descriptor.EmbedTransform):
+                            # EmbedTransform: edges from upper_indices (inputs)
+                            for input_idx in upper_indices:
+                                if input_idx in prev_stage_output_nodes:
                                     transform_name = transform.__class__.__name__.replace('Transform', '')
-                                    dot.edge(prev_stage_output_nodes[dim_idx], node_id, 
+                                    dot.edge(prev_stage_output_nodes[input_idx], node_id, 
                                            label=transform_name)
                         else:
-                            # Standard edge creation for other transforms
+                            # Other transforms: edges from lower_indices (inputs)
                             for input_idx in lower_indices:
                                 if input_idx in prev_stage_output_nodes:
                                     transform_name = transform.__class__.__name__.replace('Transform', '')
@@ -801,9 +848,11 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
         
         # Update for next stage
         if stage_output_nodes:
-            # Merge new stage outputs with existing nodes instead of replacing
-            # This preserves access to original inputs and previous stage outputs
+            # Merge new stage outputs with existing nodes
             prev_stage_output_nodes.update(stage_output_nodes)
+            
+            # For naive packed descriptors with proper index remapping, 
+            # the UnmergeTransform outputs should now cover all logical dimensions
             current_formulas.update(next_formulas)
             print(f"DEBUG: Stage {stage_idx} completed, merged stage outputs with existing nodes")
             print(f"DEBUG: Available nodes for next stage: {list(prev_stage_output_nodes.keys())}")
@@ -931,7 +980,8 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
         
         # FIXED: For multi-stage examples, only look at the FINAL stage transforms
         # not all accumulated transforms in the descriptor
-        max_transform_output_dim = final_output_dims - 1
+        # Initialize to -1 so that if no user transforms found, we use descriptor dimensions
+        max_transform_output_dim = -1
         if len(pytensor_descriptors) > 1:
             # Multi-stage: only consider the final stage's expected output dimensions
             final_stage_idx = len(pytensor_descriptors) - 1
@@ -945,7 +995,10 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                         output_sequences = parsed_desc['output_sequences']
                         for seq in output_sequences:
                             if seq:  # Non-empty sequence
-                                max_transform_output_dim = max(max_transform_output_dim, max(seq))
+                                if max_transform_output_dim == -1:
+                                    max_transform_output_dim = max(seq)
+                                else:
+                                    max_transform_output_dim = max(max_transform_output_dim, max(seq))
                         print(f"DEBUG: Multi-stage final output sequences: {output_sequences}, max output dim: {max_transform_output_dim}")
                 except Exception as e:
                     print(f"DEBUG: Failed to parse final stage output sequences: {e}")
@@ -970,20 +1023,52 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                                 final_upper_idss = all_upper_idss[-final_stage_transform_count:] if final_stage_transform_count > 0 else []
                                 for upper_ids in final_upper_idss:
                                     if upper_ids:
-                                        max_transform_output_dim = max(max_transform_output_dim, max(upper_ids))
+                                        if max_transform_output_dim == -1:
+                                            max_transform_output_dim = max(upper_ids)
+                                        else:
+                                            max_transform_output_dim = max(max_transform_output_dim, max(upper_ids))
                                 print(f"DEBUG: Single-stage final transforms output to max dim: {max_transform_output_dim}")
                         except:
                             # Fallback to all transforms
                             for upper_ids in all_upper_idss:
                                 if upper_ids:
-                                    max_transform_output_dim = max(max_transform_output_dim, max(upper_ids))
+                                    if max_transform_output_dim == -1:
+                                        max_transform_output_dim = max(upper_ids)
+                                    else:
+                                        max_transform_output_dim = max(max_transform_output_dim, max(upper_ids))
+                    elif "make_naive_tensor_descriptor" in desc_str:
+                        # For naive descriptors, handle differently
+                        if "make_naive_tensor_descriptor_packed" in desc_str:
+                            # Packed: UnmergeTransform outputs to logical dimensions
+                            # Leave max_transform_output_dim as -1 to use descriptor dimensions
+                            print(f"DEBUG: Naive packed descriptor detected, will use descriptor dimension count: {final_output_dims}")
+                        else:
+                            # Regular: Look at the actual transform outputs (lower_indices for EmbedTransform)
+                            # EmbedTransform should output to dimension 0 only
+                            for lower_ids in all_lower_idss:
+                                if lower_ids:
+                                    for idx in lower_ids:
+                                        if max_transform_output_dim == -1:
+                                            max_transform_output_dim = idx
+                                        else:
+                                            max_transform_output_dim = max(max_transform_output_dim, idx)
+                            print(f"DEBUG: Regular naive descriptor detected, max transform output: {max_transform_output_dim}")
                     else:
-                        # Non-transform descriptor, use all
+                        # Non-transform descriptor, use all transforms
                         for upper_ids in all_upper_idss:
                             if upper_ids:
-                                max_transform_output_dim = max(max_transform_output_dim, max(upper_ids))
+                                if max_transform_output_dim == -1:
+                                    max_transform_output_dim = max(upper_ids)
+                                else:
+                                    max_transform_output_dim = max(max_transform_output_dim, max(upper_ids))
         
-        actual_final_output_dims = max(final_output_dims, max_transform_output_dim + 1)
+        # Determine actual output dimensions
+        # If max_transform_output_dim is -1, we found no user-specified transforms (e.g., naive descriptors)
+        if max_transform_output_dim == -1:
+            actual_final_output_dims = final_output_dims
+        else:
+            # Use the maximum of descriptor dimensions and transform output dimensions
+            actual_final_output_dims = max(final_output_dims, max_transform_output_dim + 1)
         
         # Debug the final descriptor issue
         print(f"DEBUG: Creating {actual_final_output_dims} final output nodes (descriptor dims: {final_output_dims}, max transform output: {max_transform_output_dim})")
@@ -1007,7 +1092,14 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                 final_node_id = f"forward_output_d{k}"
                 
                 try:
-                    if k < final_output_dims and hasattr(final_descriptor, 'get_length'):
+                    # Special handling for regular naive descriptors with EmbedTransform
+                    if (actual_final_output_dims == 1 and k == 0 and len(descriptors) == 1 and
+                        "make_naive_tensor_descriptor" in descriptors[0] and
+                        "make_naive_tensor_descriptor_packed" not in descriptors[0]):
+                        # Single output is the linear address from EmbedTransform
+                        element_space_size = final_descriptor.get_element_space_size()
+                        dim_label = f"linear_address ({element_space_size})"
+                    elif k < final_output_dims and hasattr(final_descriptor, 'get_length'):
                         dim_length = final_descriptor.get_length(k)
                         dim_label = f"out{k} ({dim_length})"
                     else:
@@ -1029,6 +1121,12 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                     print(f"DEBUG: Created final output node {final_node_id} with no incoming connection (dimension {k} not in prev_stage_output_nodes)")
                     # This can happen when transforms create new dimensions or when there's a mismatch
                     # between the number of outputs from the last stage and the final descriptor's dimensions
+            
+            # Add invisible edges between output nodes to enforce ordering
+            for k in range(actual_final_output_dims - 1):
+                current_node = f"forward_output_d{k}"
+                next_node = f"forward_output_d{k+1}"
+                dot.edge(current_node, next_node, style="invis")
 
 
     
@@ -1620,6 +1718,12 @@ def build_backward_transformation_graph_from_pytensor(descriptors, variables):
                     print(f"DEBUG BACKWARD: Created final output node {final_node_id} with no incoming connection (dimension {k} not in prev_stage_output_nodes)")
                     # This can happen when transforms create new dimensions or when there's a mismatch
                     # between the number of outputs from the last stage and the final descriptor's dimensions
+            
+            # Add invisible edges between output nodes to enforce ordering
+            for k in range(actual_output_dims - 1):
+                current_node = f"backward_output_d{k}"
+                next_node = f"backward_output_d{k+1}"
+                dot.edge(current_node, next_node, style="invis")
 
     return dot
 
