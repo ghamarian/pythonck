@@ -338,6 +338,22 @@ constexpr auto simple_packed_desc = make_naive_tensor_descriptor_packed(
     make_tuple(number<A>{}, number<B>{}, number<C>{}, number<D>{})
 );
 """,
+        "Merge Consecutive Dimensions (6D → 3D)": """
+constexpr auto packed_6d_desc = make_naive_tensor_descriptor_packed(
+    make_tuple(number<D0>{}, number<D1>{}, number<D2>{}, number<D3>{}, number<D4>{}, number<D5>{})
+);
+
+constexpr auto merged_3d_desc = transform_tensor_descriptor(
+    packed_6d_desc,
+    make_tuple(
+        make_merge_transform(make_tuple(number<D0>{}, number<D1>{})),
+        make_merge_transform(make_tuple(number<D2>{}, number<D3>{})),
+        make_merge_transform(make_tuple(number<D4>{}, number<D5>{}))
+    ),
+    make_tuple(sequence<0, 1>{}, sequence<2, 3>{}, sequence<4, 5>{}),
+    make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{})
+);
+""",
         "Simple Naive Regular (with Strides)": """
 constexpr auto simple_strided_desc = make_naive_tensor_descriptor(
     make_tuple(number<M>{}, number<N>{}, number<K>{}),
@@ -453,6 +469,14 @@ def get_default_variables() -> Dict[str, Dict[str, int]]:
             'B': 3,
             'C': 4,
             'D': 5,
+        },
+        "Merge Consecutive Dimensions (6D → 3D)": {
+            'D0': 2,
+            'D1': 3,
+            'D2': 4,
+            'D3': 5,
+            'D4': 6,
+            'D5': 7,
         },
         "Simple Naive Regular (with Strides)": {
             'M': 4,

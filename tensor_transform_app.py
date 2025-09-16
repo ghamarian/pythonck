@@ -506,6 +506,11 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
     
     # Process each descriptor as a separate stage
     actual_stage_num = 1  # Track actual stage numbers starting from 1
+    last_stage_outputs = prev_stage_output_nodes.copy()  # Track only the most recent stage's outputs
+    
+    # For multi-stage descriptors, track the dimension mapping from previous stage
+    previous_stage_dim_map = {}  # Maps logical dimension index to node ID
+    
     for stage_idx, tensor_desc in enumerate(pytensor_descriptors):
         print(f"DEBUG: Processing stage_idx={stage_idx}")
         stage_output_nodes = {}
@@ -606,9 +611,10 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                 lower_indices = new_lower_idss[i]
                 upper_indices = new_upper_idss[i]
                 
-                print(f"DEBUG: Transform {i} - upper_indices (inputs): {upper_indices}, lower_indices (outputs): {lower_indices}")
-                print(f"DEBUG: Transform {i} type: {transform.__class__.__name__}")
-                print(f"DEBUG: prev_stage_output_nodes keys: {list(prev_stage_output_nodes.keys())}")
+                print(f"DEBUG: Stage {stage_idx}, Transform {i} type: {transform.__class__.__name__}")
+                print(f"DEBUG:   lower_indices (dimension inputs): {lower_indices}")
+                print(f"DEBUG:   upper_indices (dimension outputs): {upper_indices}")
+                print(f"DEBUG:   Available from prev stage: {list(last_stage_outputs.keys()) if stage_idx > 0 else 'Initial inputs'}")
                 
                 # Extra debug for UnmergeTransform in naive packed
                 if (isinstance(transform, pytensor.tensor_descriptor.UnmergeTransform) and 
@@ -737,13 +743,14 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                     # Special handling for UnmergeTransform in naive packed descriptors
                     # The output indices use hidden dimension IDs that may not start from 0
                     if (isinstance(transform, pytensor.tensor_descriptor.UnmergeTransform) and 
-                        stage_idx == 0 and is_first_naive_packed and
-                        len(descriptors) == 1):  # Only for simple naive packed without subsequent transforms
-                        print(f"DEBUG: UnmergeTransform in simple naive packed - remapping indices")
+                        stage_idx == 0 and is_first_naive_packed):
+                        print(f"DEBUG: UnmergeTransform in naive packed - remapping indices")
                         print(f"DEBUG: Original output_indices: {output_indices}")
-                        # For simple naive packed, map outputs to logical indices 0,1,2,3...
-                        if len(output_formulas) == num_logical_dims:
-                            filtered_output_indices = list(range(num_logical_dims))
+                        # For naive packed (even in multi-stage), map outputs to logical indices 0,1,2,3...
+                        # This ensures the next stage can find these outputs
+                        if hasattr(transform, 'lengths') and transform.lengths:
+                            num_outputs = len(transform.lengths)
+                            filtered_output_indices = list(range(num_outputs))
                             print(f"DEBUG: Remapped to logical indices: {filtered_output_indices}")
                     
                     # Create output nodes for each formula within the stage cluster
@@ -751,7 +758,16 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                         if j < len(output_formulas):
                             # Use the actual stage number for node naming
                             node_id = f"s{actual_stage_num}_t{i}_d{output_idx}"
-                            stage_output_nodes[output_idx] = node_id
+                            
+                            # For multi-stage examples with UnmergeTransform in stage 0,
+                            # use sequential logical indices to ensure proper mapping to next stage
+                            if (stage_idx == 0 and len(pytensor_descriptors) > 1 and 
+                                isinstance(transform, pytensor.tensor_descriptor.UnmergeTransform)):
+                                # Use sequential index j instead of output_idx for storage key
+                                stage_output_nodes[j] = node_id
+                                print(f"DEBUG: UnmergeTransform output {j} -> node {node_id}")
+                            else:
+                                stage_output_nodes[output_idx] = node_id
                             
                             print(f"DEBUG: Creating node {node_id} for stage {stage_idx} transform {i}")
                             
@@ -790,21 +806,35 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                             stage_cluster.node(node_id, label, fillcolor="#c0ffc0")
                             print(f"DEBUG: Added DOT node {node_id} with label {formula_str}")
                             
-                            # Create edges from input nodes to this output node
-                            if isinstance(transform, pytensor.tensor_descriptor.EmbedTransform):
-                                # EmbedTransform: edges from upper_indices (inputs)
-                                for input_idx in upper_indices:
-                                    if input_idx in prev_stage_output_nodes:
-                                        transform_name = transform.__class__.__name__.replace('Transform', '')
-                                        dot.edge(prev_stage_output_nodes[input_idx], node_id, 
-                                               label=transform_name)
-                            else:
-                                # Other transforms: edges from lower_indices (inputs)
-                                for input_idx in lower_indices:
-                                    if input_idx in prev_stage_output_nodes:
-                                        transform_name = transform.__class__.__name__.replace('Transform', '')
-                                        dot.edge(prev_stage_output_nodes[input_idx], node_id, 
-                                               label=transform_name)
+                        # Create edges from input nodes to this output node
+                        # Use last_stage_outputs to only connect to the most recent stage
+                        print(f"DEBUG: Creating edges for transform {i} ({transform.__class__.__name__})")
+                        print(f"DEBUG: last_stage_outputs keys: {list(last_stage_outputs.keys())}")
+                        print(f"DEBUG: lower_indices (inputs for non-Embed): {lower_indices}")
+                        print(f"DEBUG: upper_indices (outputs for non-Embed): {upper_indices}")
+                        
+                        if isinstance(transform, pytensor.tensor_descriptor.EmbedTransform):
+                            # EmbedTransform: upper_indices are the inputs, lower_indices are the outputs
+                            for input_idx in upper_indices:
+                                if input_idx in last_stage_outputs:
+                                    source_node = last_stage_outputs[input_idx]
+                                    transform_name = transform.__class__.__name__.replace('Transform', '')
+                                    dot.edge(source_node, node_id, 
+                                           label=transform_name)
+                                    print(f"DEBUG: Created edge from {source_node} to {node_id}")
+                                else:
+                                    print(f"DEBUG: Input index {input_idx} not found in last_stage_outputs")
+                        else:
+                            # Other transforms: lower_indices are the inputs, upper_indices are the outputs
+                            for input_idx in lower_indices:
+                                if input_idx in last_stage_outputs:
+                                    source_node = last_stage_outputs[input_idx]
+                                    transform_name = transform.__class__.__name__.replace('Transform', '')
+                                    dot.edge(source_node, node_id, 
+                                           label=transform_name)
+                                    print(f"DEBUG: Created edge from {source_node} to {node_id}")
+                                else:
+                                    print(f"DEBUG: Input index {input_idx} not found in last_stage_outputs")
                     
                 except Exception as e:
                     # Provide more helpful error messages for common issues
@@ -826,7 +856,14 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                     
                     for j, output_idx in enumerate(error_output_indices):
                         node_id = f"s{actual_stage_num}_t{i}_d{output_idx}"
-                        stage_output_nodes[output_idx] = node_id
+                        
+                        # For multi-stage examples with UnmergeTransform in stage 0,
+                        # use sequential logical indices to ensure proper mapping to next stage
+                        if (stage_idx == 0 and len(pytensor_descriptors) > 1 and 
+                            isinstance(transform, pytensor.tensor_descriptor.UnmergeTransform)):
+                            stage_output_nodes[j] = node_id
+                        else:
+                            stage_output_nodes[output_idx] = node_id
                         next_formulas[node_id] = sp.Symbol(f"d{output_idx}")
                         stage_cluster.node(node_id, f"d{output_idx}", fillcolor="#ffcccc")
                         
@@ -834,30 +871,34 @@ def build_transformation_graph_from_pytensor(descriptors, variables):
                         if isinstance(transform, pytensor.tensor_descriptor.EmbedTransform):
                             # EmbedTransform: edges from upper_indices (inputs)
                             for input_idx in upper_indices:
-                                if input_idx in prev_stage_output_nodes:
+                                if input_idx in last_stage_outputs:
                                     transform_name = transform.__class__.__name__.replace('Transform', '')
-                                    dot.edge(prev_stage_output_nodes[input_idx], node_id, 
+                                    dot.edge(last_stage_outputs[input_idx], node_id, 
                                            label=transform_name)
                         else:
                             # Other transforms: edges from lower_indices (inputs)
                             for input_idx in lower_indices:
-                                if input_idx in prev_stage_output_nodes:
+                                if input_idx in last_stage_outputs:
                                     transform_name = transform.__class__.__name__.replace('Transform', '')
-                                    dot.edge(prev_stage_output_nodes[input_idx], node_id, 
+                                    dot.edge(last_stage_outputs[input_idx], node_id, 
                                            label=transform_name)
         
         # Update for next stage
         if stage_output_nodes:
-            # Merge new stage outputs with existing nodes
+            # Update prev_stage_output_nodes with all outputs (for final connections)
             prev_stage_output_nodes.update(stage_output_nodes)
+            
+            # Replace last_stage_outputs with only this stage's outputs (for next stage connections)
+            last_stage_outputs = stage_output_nodes.copy()
             
             # For naive packed descriptors with proper index remapping, 
             # the UnmergeTransform outputs should now cover all logical dimensions
             current_formulas.update(next_formulas)
-            print(f"DEBUG: Stage {stage_idx} completed, merged stage outputs with existing nodes")
-            print(f"DEBUG: Available nodes for next stage: {list(prev_stage_output_nodes.keys())}")
+            print(f"DEBUG: Stage {stage_idx} completed, updated last_stage_outputs with {len(stage_output_nodes)} nodes")
+            print(f"DEBUG: stage_output_nodes mapping: {stage_output_nodes}")
+            print(f"DEBUG: Last stage outputs for next stage: {list(last_stage_outputs.keys())}")
             
-
+            
             
             # Increment actual stage number only when we actually process a stage
             actual_stage_num += 1
@@ -1395,6 +1436,7 @@ def build_backward_transformation_graph_from_pytensor(descriptors, variables):
     
     # Process descriptors in REVERSE order for backward graph
     actual_stage_num = len(pytensor_descriptors)
+    last_stage_outputs = prev_stage_output_nodes.copy()  # Track only the most recent stage's outputs
     for stage_idx in range(len(pytensor_descriptors) - 1, -1, -1):
         tensor_desc = pytensor_descriptors[stage_idx]
         print(f"DEBUG BACKWARD: Processing stage_idx={stage_idx} in reverse")
@@ -1541,7 +1583,17 @@ def build_backward_transformation_graph_from_pytensor(descriptors, variables):
                 for j, output_idx in enumerate(backward_output_indices):
                     if j < len(output_formulas):
                         node_id = f"back_s{actual_stage_num}_t{i}_d{output_idx}"
-                        stage_output_nodes[output_idx] = node_id
+                        
+                        # For multi-stage examples, ensure consistent index mapping
+                        # In backward graph, the last stage (processed first) might need special handling
+                        if (stage_idx == len(pytensor_descriptors) - 1 and len(pytensor_descriptors) > 1 and
+                            isinstance(transform, pytensor.tensor_descriptor.MergeTransform)):
+                            # For MergeTransform outputs in the last stage (first in backward),
+                            # use sequential indices
+                            stage_output_nodes[j] = node_id
+                            print(f"DEBUG BACKWARD: MergeTransform output {j} -> node {node_id}")
+                        else:
+                            stage_output_nodes[output_idx] = node_id
                         
                         print(f"DEBUG BACKWARD: Creating node {node_id} for stage {stage_idx} transform {i}")
                         
@@ -1581,10 +1633,12 @@ def build_backward_transformation_graph_from_pytensor(descriptors, variables):
                         print(f"DEBUG BACKWARD: Added DOT node {node_id} with label {formula_str}")
                         
                         # Create edges FROM input nodes TO this output node (normal left-to-right flow)
+                        # Use last_stage_outputs to only connect to the most recent stage
                         for input_idx in backward_input_indices:
-                            if input_idx in prev_stage_output_nodes:
+                            logical_idx = hidden_to_logical.get(input_idx, input_idx)
+                            if logical_idx in last_stage_outputs:
                                 transform_name = f"{transform.__class__.__name__.replace('Transform', '')}⁻¹"
-                                dot.edge(prev_stage_output_nodes[input_idx], node_id, 
+                                dot.edge(last_stage_outputs[logical_idx], node_id, 
                                        label=transform_name, color="blue")
                 
             except Exception as e:
@@ -1592,23 +1646,35 @@ def build_backward_transformation_graph_from_pytensor(descriptors, variables):
                 # Create error nodes
                 for j, output_idx in enumerate(backward_output_indices):
                     node_id = f"back_s{actual_stage_num}_t{i}_d{output_idx}"
-                    stage_output_nodes[output_idx] = node_id
+                    
+                    # For multi-stage examples, ensure consistent index mapping
+                    if (stage_idx == len(pytensor_descriptors) - 1 and len(pytensor_descriptors) > 1 and
+                        isinstance(transform, pytensor.tensor_descriptor.MergeTransform)):
+                        stage_output_nodes[j] = node_id
+                    else:
+                        stage_output_nodes[output_idx] = node_id
                     next_formulas[node_id] = sp.Symbol(f"back_d{output_idx}")
                     dot.node(node_id, f"back_d{output_idx}", fillcolor="#ffcccc")
                     
                     # Create edges for error case
                     for input_idx in backward_input_indices:
-                        if input_idx in prev_stage_output_nodes:
+                        logical_idx = hidden_to_logical.get(input_idx, input_idx) if 'hidden_to_logical' in locals() else input_idx
+                        if logical_idx in last_stage_outputs:
                             transform_name = f"{transform.__class__.__name__.replace('Transform', '')}⁻¹"
-                            dot.edge(prev_stage_output_nodes[input_idx], node_id, 
+                            dot.edge(last_stage_outputs[logical_idx], node_id, 
                                    label=transform_name, color="red")
         
         # Update for next stage (going backwards)
         if stage_output_nodes:
+            # Update prev_stage_output_nodes with all outputs (for final connections)
             prev_stage_output_nodes.update(stage_output_nodes)
+            
+            # Replace last_stage_outputs with only this stage's outputs (for next stage connections)
+            last_stage_outputs = stage_output_nodes.copy()
+            
             current_formulas.update(next_formulas)
-            print(f"DEBUG BACKWARD: Stage {stage_idx} completed, merged stage outputs with existing nodes")
-            print(f"DEBUG BACKWARD: Available nodes for next stage: {list(prev_stage_output_nodes.keys())}")
+            print(f"DEBUG BACKWARD: Stage {stage_idx} completed, updated last_stage_outputs with {len(stage_output_nodes)} nodes")
+            print(f"DEBUG BACKWARD: Last stage outputs for next stage: {list(last_stage_outputs.keys())}")
             actual_stage_num -= 1
         else:
             print(f"DEBUG BACKWARD: Stage {stage_idx} completed with no output nodes")
