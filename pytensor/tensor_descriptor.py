@@ -1646,18 +1646,18 @@ def transform_tensor_descriptor_for_visualization(
 ) -> TensorDescriptor:
     """
     Create a new tensor descriptor by applying transforms - VISUALIZATION VERSION.
-    
+
     This version preserves nested transform structures and uses multi-stage approach
     to maintain hierarchical information needed for proper graph visualization.
-    
+
     Used by: tensor_transform_app.py, parser, and other visualization components.
-    
+
     Args:
         input_descriptor: The input tensor descriptor
         transforms: List or tuple of transforms to apply
         lower_dimension_hidden_idss: Lower dimension indices for each transform
         upper_dimension_hidden_idss: Upper dimension indices for each transform
-        
+
     Returns:
         A new TensorDescriptor with the transforms applied (preserving nested structures)
     """
@@ -1668,35 +1668,90 @@ def transform_tensor_descriptor_for_visualization(
         lower_dimension_hidden_idss = list(lower_dimension_hidden_idss)
     if isinstance(upper_dimension_hidden_idss, tuple):
         upper_dimension_hidden_idss = list(upper_dimension_hidden_idss)
-    
+
     # Validate input
     if len(transforms) != len(lower_dimension_hidden_idss) or len(transforms) != len(upper_dimension_hidden_idss):
         raise ValueError("Number of transforms must match number of dimension index lists")
-    
+
     # Use transforms directly (no nested transforms exist in this simplified version)
     flattened_transforms = transforms
-    
+
+    # IMPORTANT: Map dimension indices to hidden indices
+    # The sequences in lower_dimension_hidden_idss refer to OUTPUT dimensions of input_descriptor
+    # We need to map them to the actual hidden indices
+    old_top_hidden_ids = input_descriptor.get_top_dimension_hidden_ids()
+
+    # Map lower dimension indices (these refer to output dims of input descriptor)
+    mapped_lower_idss = []
+    for dim_indices in lower_dimension_hidden_idss:
+        if isinstance(dim_indices, list):
+            # Map each dimension index to its hidden index
+            mapped = []
+            for idx in dim_indices:
+                if idx < len(old_top_hidden_ids):
+                    mapped.append(old_top_hidden_ids[idx])
+                else:
+                    # If index is out of bounds, keep it as-is (shouldn't happen)
+                    mapped.append(idx)
+            mapped_lower_idss.append(mapped)
+        else:
+            mapped_lower_idss.append(dim_indices)
+
     # Combine transforms from input descriptor and new transforms
     all_transforms = input_descriptor.get_transforms() + flattened_transforms
-    
-    # Combine dimension mappings
-    all_lower_idss = input_descriptor.get_lower_dimension_hidden_idss() + lower_dimension_hidden_idss
-    all_upper_idss = input_descriptor.get_upper_dimension_hidden_idss() + upper_dimension_hidden_idss
-    
-    # Collect all unique output dimension indices from all transforms
-    all_output_indices = set()
-    for upper_ids in upper_dimension_hidden_idss:
-        all_output_indices.update(upper_ids)
-    
-    # Sort them to create the final top dimension IDs
-    top_dimension_hidden_ids = sorted(list(all_output_indices)) if all_output_indices else input_descriptor.get_top_dimension_hidden_ids()
-    
+
+    # Combine dimension mappings (use mapped lower indices)
+    all_lower_idss = input_descriptor.get_lower_dimension_hidden_idss() + mapped_lower_idss
+
+    # For upper dimension indices, we need to generate new hidden indices
+    # Starting from the maximum hidden index we've seen so far
+    existing_transforms = input_descriptor.get_transforms()
+    existing_upper_idss = input_descriptor.get_upper_dimension_hidden_idss()
+
+    # Find the maximum hidden index used so far
+    max_hidden_idx = 0
+    for transform_upper_ids in existing_upper_idss:
+        if transform_upper_ids:
+            max_hidden_idx = max(max_hidden_idx, max(transform_upper_ids))
+    # Also check the top dimension hidden IDs
+    if old_top_hidden_ids:
+        max_hidden_idx = max(max_hidden_idx, max(old_top_hidden_ids))
+
+    # Generate new hidden indices for the new transforms' upper dimensions
+    mapped_upper_idss = []
+    next_hidden_idx = max_hidden_idx + 1
+
+    for upper_dim_indices in upper_dimension_hidden_idss:
+        if isinstance(upper_dim_indices, list):
+            mapped = []
+            for _ in upper_dim_indices:
+                mapped.append(next_hidden_idx)
+                next_hidden_idx += 1
+            mapped_upper_idss.append(mapped)
+        else:
+            mapped_upper_idss.append(upper_dim_indices)
+
+    all_upper_idss = input_descriptor.get_upper_dimension_hidden_idss() + mapped_upper_idss
+
+    # The final top dimension hidden IDs are determined by the upper dimension mappings
+    # of the last set of transforms
+    final_top_hidden_ids = []
+
+    # Collect all upper hidden indices from the new transforms
+    for upper_ids in mapped_upper_idss:
+        if isinstance(upper_ids, list):
+            final_top_hidden_ids.extend(upper_ids)
+
+    # If no new upper dimensions, keep the input's top dimension IDs
+    if not final_top_hidden_ids:
+        final_top_hidden_ids = input_descriptor.get_top_dimension_hidden_ids()
+
     # Create new tensor descriptor
     return TensorDescriptor(
         transforms=all_transforms,
         lower_dimension_hidden_idss=all_lower_idss,
         upper_dimension_hidden_idss=all_upper_idss,
-        top_dimension_hidden_ids=top_dimension_hidden_ids,
+        top_dimension_hidden_ids=final_top_hidden_ids,
         element_space_size=input_descriptor.get_element_space_size(),
         guaranteed_vector_lengths=input_descriptor.guaranteed_vector_lengths,
         guaranteed_vector_strides=input_descriptor.guaranteed_vector_strides
