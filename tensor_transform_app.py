@@ -1494,6 +1494,9 @@ def build_backward_transformation_graph_from_pytensor(descriptors, variables):
         print(f"DEBUG BACKWARD: Stage {stage_idx} proceeding, using actual stage number {actual_stage_num}")
         
         # Process transforms in REVERSE order for backward direction
+        # Track output indices cumulatively for multi-transform stages
+        cumulative_output_idx = 0
+        
         for i in range(len(new_transforms) - 1, -1, -1):
             transform = new_transforms[i]
             if i >= len(new_lower_idss) or i >= len(new_upper_idss):
@@ -1506,28 +1509,29 @@ def build_backward_transformation_graph_from_pytensor(descriptors, variables):
             backward_input_indices = new_upper_idss[i]  # These are our inputs for backward
             backward_output_indices = new_lower_idss[i]  # These are our outputs for backward
             
-            print(f"DEBUG BACKWARD: Transform {i} - backward_input_indices: {backward_input_indices}, backward_output_indices: {backward_output_indices}")
             print(f"DEBUG BACKWARD: Transform {i} type: {transform.__class__.__name__}")
-            print(f"DEBUG BACKWARD: prev_stage_output_nodes keys: {list(prev_stage_output_nodes.keys())}")
+            print(f"DEBUG BACKWARD:   backward_input_indices (from upper): {backward_input_indices}")
+            print(f"DEBUG BACKWARD:   backward_output_indices (to lower): {backward_output_indices}")
+            print(f"DEBUG BACKWARD:   last_stage_outputs keys: {list(last_stage_outputs.keys())}")
+            print(f"DEBUG BACKWARD:   prev_stage_output_nodes keys: {list(prev_stage_output_nodes.keys())}")
             
             # Get input symbols for this backward transform
-            # FIXED: Map hidden dimension IDs to logical indices
-            top_dim_ids = tensor_desc.get_top_dimension_hidden_ids()
-            hidden_to_logical = {hidden_id: logical_idx for logical_idx, hidden_id in enumerate(top_dim_ids)}
-            
             input_symbols = []
             for idx in backward_input_indices:
-                # Map hidden dimension ID to logical index
-                logical_idx = hidden_to_logical.get(idx, idx)
-                
-                if logical_idx in prev_stage_output_nodes:
-                    prev_node_id = prev_stage_output_nodes[logical_idx]
+                # For backward graph, use last_stage_outputs for input connections
+                if idx in last_stage_outputs:
+                    prev_node_id = last_stage_outputs[idx]
                     if prev_node_id in current_formulas:
                         input_symbols.append(current_formulas[prev_node_id])
+                        print(f"DEBUG BACKWARD: Found input symbol for idx {idx} from node {prev_node_id}")
                     else:
-                        input_symbols.append(sp.Symbol(f"back_d_{idx}"))
+                        # Fallback to creating a symbol
+                        input_symbols.append(sp.Symbol(f"out{idx}"))
+                        print(f"DEBUG BACKWARD: Created fallback symbol out{idx} for idx {idx}")
                 else:
-                    input_symbols.append(sp.Symbol(f"back_d_{idx}"))
+                    # Create a symbol for missing input
+                    input_symbols.append(sp.Symbol(f"out{idx}"))
+                    print(f"DEBUG BACKWARD: Index {idx} not in last_stage_outputs, created symbol out{idx}")
 
             try:
                 # Apply the transform - use correct directional terminology
@@ -1582,17 +1586,17 @@ def build_backward_transformation_graph_from_pytensor(descriptors, variables):
                 # Create output nodes for each formula
                 for j, output_idx in enumerate(backward_output_indices):
                     if j < len(output_formulas):
-                        node_id = f"back_s{actual_stage_num}_t{i}_d{output_idx}"
-                        
-                        # For multi-stage examples, ensure consistent index mapping
-                        # In backward graph, the last stage (processed first) might need special handling
-                        if (stage_idx == len(pytensor_descriptors) - 1 and len(pytensor_descriptors) > 1 and
-                            isinstance(transform, pytensor.tensor_descriptor.MergeTransform)):
-                            # For MergeTransform outputs in the last stage (first in backward),
-                            # use sequential indices
-                            stage_output_nodes[j] = node_id
-                            print(f"DEBUG BACKWARD: MergeTransform output {j} -> node {node_id}")
+                        # For multi-transform stages in backward, use cumulative indexing
+                        # This ensures each transform's outputs get unique indices
+                        if len(new_transforms) > 1 and stage_idx == len(pytensor_descriptors) - 1:
+                            # Multiple transforms in the last stage (first in backward)
+                            # Use cumulative index to ensure unique storage keys
+                            storage_idx = cumulative_output_idx + j
+                            node_id = f"back_s{actual_stage_num}_t{i}_d{storage_idx}"
+                            stage_output_nodes[storage_idx] = node_id
+                            print(f"DEBUG BACKWARD: Transform {i} output {j} -> storage idx {storage_idx}")
                         else:
+                            node_id = f"back_s{actual_stage_num}_t{i}_d{output_idx}"
                             stage_output_nodes[output_idx] = node_id
                         
                         print(f"DEBUG BACKWARD: Creating node {node_id} for stage {stage_idx} transform {i}")
@@ -1635,34 +1639,50 @@ def build_backward_transformation_graph_from_pytensor(descriptors, variables):
                         # Create edges FROM input nodes TO this output node (normal left-to-right flow)
                         # Use last_stage_outputs to only connect to the most recent stage
                         for input_idx in backward_input_indices:
-                            logical_idx = hidden_to_logical.get(input_idx, input_idx)
-                            if logical_idx in last_stage_outputs:
+                            if input_idx in last_stage_outputs:
+                                source_node = last_stage_outputs[input_idx]
                                 transform_name = f"{transform.__class__.__name__.replace('Transform', '')}⁻¹"
-                                dot.edge(last_stage_outputs[logical_idx], node_id, 
+                                dot.edge(source_node, node_id, 
                                        label=transform_name, color="blue")
+                                print(f"DEBUG BACKWARD: Created edge from {source_node} to {node_id}")
+                            else:
+                                print(f"DEBUG BACKWARD: Input index {input_idx} not found in last_stage_outputs for edge creation")
+                
+                # Update cumulative index for next transform
+                if len(new_transforms) > 1 and stage_idx == len(pytensor_descriptors) - 1:
+                    cumulative_output_idx += len(output_formulas)
+                    print(f"DEBUG BACKWARD: Updated cumulative_output_idx to {cumulative_output_idx}")
                 
             except Exception as e:
                 st.warning(f"Failed to generate backward formula for transform {transform}: {e}")
                 # Create error nodes
                 for j, output_idx in enumerate(backward_output_indices):
-                    node_id = f"back_s{actual_stage_num}_t{i}_d{output_idx}"
-                    
-                    # For multi-stage examples, ensure consistent index mapping
-                    if (stage_idx == len(pytensor_descriptors) - 1 and len(pytensor_descriptors) > 1 and
-                        isinstance(transform, pytensor.tensor_descriptor.MergeTransform)):
-                        stage_output_nodes[j] = node_id
+                    if len(new_transforms) > 1 and stage_idx == len(pytensor_descriptors) - 1:
+                        storage_idx = cumulative_output_idx + j
+                        node_id = f"back_s{actual_stage_num}_t{i}_d{storage_idx}"
+                        stage_output_nodes[storage_idx] = node_id
+                        next_formulas[node_id] = sp.Symbol(f"out{storage_idx}")
                     else:
+                        node_id = f"back_s{actual_stage_num}_t{i}_d{output_idx}"
                         stage_output_nodes[output_idx] = node_id
-                    next_formulas[node_id] = sp.Symbol(f"back_d{output_idx}")
-                    dot.node(node_id, f"back_d{output_idx}", fillcolor="#ffcccc")
+                        next_formulas[node_id] = sp.Symbol(f"out{output_idx}")
+                    # Use appropriate label based on whether cumulative indexing was used
+                    if len(new_transforms) > 1 and stage_idx == len(pytensor_descriptors) - 1:
+                        dot.node(node_id, f"out{storage_idx}", fillcolor="#ffcccc")
+                    else:
+                        dot.node(node_id, f"out{output_idx}", fillcolor="#ffcccc")
                     
                     # Create edges for error case
                     for input_idx in backward_input_indices:
-                        logical_idx = hidden_to_logical.get(input_idx, input_idx) if 'hidden_to_logical' in locals() else input_idx
-                        if logical_idx in last_stage_outputs:
+                        if input_idx in last_stage_outputs:
                             transform_name = f"{transform.__class__.__name__.replace('Transform', '')}⁻¹"
-                            dot.edge(last_stage_outputs[logical_idx], node_id, 
+                            dot.edge(last_stage_outputs[input_idx], node_id, 
                                    label=transform_name, color="red")
+                
+                # Update cumulative index for error case
+                if len(new_transforms) > 1 and stage_idx == len(pytensor_descriptors) - 1:
+                    cumulative_output_idx += len(backward_output_indices)
+                    print(f"DEBUG BACKWARD: Updated cumulative_output_idx to {cumulative_output_idx} (error case)")
         
         # Update for next stage (going backwards)
         if stage_output_nodes:
@@ -1674,6 +1694,7 @@ def build_backward_transformation_graph_from_pytensor(descriptors, variables):
             
             current_formulas.update(next_formulas)
             print(f"DEBUG BACKWARD: Stage {stage_idx} completed, updated last_stage_outputs with {len(stage_output_nodes)} nodes")
+            print(f"DEBUG BACKWARD: stage_output_nodes mapping: {stage_output_nodes}")
             print(f"DEBUG BACKWARD: Last stage outputs for next stage: {list(last_stage_outputs.keys())}")
             actual_stage_num -= 1
         else:
@@ -1792,6 +1813,133 @@ def build_backward_transformation_graph_from_pytensor(descriptors, variables):
                 dot.edge(current_node, next_node, style="invis")
 
     return dot
+
+def test_coordinate_roundtrip(tensor_desc, variables, test_coord):
+    """Test if a coordinate roundtrips correctly through forward and backward transformations."""
+    import sympy as sp
+    
+    results = []
+    results.append(f"Testing coordinate: {test_coord}")
+    results.append(f"Number of dimensions: {len(test_coord)}")
+    results.append("")
+    
+    try:
+        # Get all transforms
+        all_transforms = tensor_desc.get_transforms()
+        all_lower_idss = tensor_desc.get_lower_dimension_hidden_idss()
+        all_upper_idss = tensor_desc.get_upper_dimension_hidden_idss()
+        
+        results.append(f"Number of transforms: {len(all_transforms)}")
+        results.append("")
+        
+        # Create symbols for input coordinates
+        coord_symbols = [sp.Symbol(f'c{i}') for i in range(len(test_coord))]
+        coord_values = {coord_symbols[i]: test_coord[i] for i in range(len(test_coord))}
+        
+        # Apply forward transforms
+        results.append("=== FORWARD TRANSFORMATION (Upper → Lower) ===")
+        current_coords = {i: coord_symbols[i] for i in range(len(test_coord))}
+        
+        for t_idx, (transform, lower_ids, upper_ids) in enumerate(zip(all_transforms, all_lower_idss, all_upper_idss)):
+            transform_type = transform.__class__.__name__
+            results.append(f"\nTransform {t_idx}: {transform_type}")
+            results.append(f"  Input indices (lower): {lower_ids}")
+            results.append(f"  Output indices (upper): {upper_ids}")
+            
+            # Get input values for this transform
+            input_syms = []
+            for lid in lower_ids:
+                if lid in current_coords:
+                    input_syms.append(current_coords[lid])
+                else:
+                    input_syms.append(sp.Symbol(f'x{lid}'))
+            
+            # Apply transform
+            try:
+                if hasattr(transform, 'sympy_calculate_upper'):
+                    output_syms = transform.sympy_calculate_upper(input_syms)
+                else:
+                    output_syms = input_syms  # Pass through
+                
+                # Update current coordinates with outputs
+                for uid, out_sym in zip(upper_ids, output_syms):
+                    current_coords[uid] = out_sym
+                    # Evaluate with actual values
+                    evaluated = out_sym.subs(coord_values) if isinstance(out_sym, sp.Basic) else out_sym
+                    results.append(f"  Output d{uid} = {out_sym} = {evaluated}")
+                    
+            except Exception as e:
+                results.append(f"  Error: {e}")
+        
+        results.append("\n=== FINAL COORDINATES ===")
+        final_coords = {}
+        for idx, sym in current_coords.items():
+            evaluated = sym.subs(coord_values) if isinstance(sym, sp.Basic) else sym
+            final_coords[idx] = evaluated
+            results.append(f"d{idx} = {evaluated}")
+        
+        # Now try backward transformation
+        results.append("\n=== BACKWARD TRANSFORMATION (Lower → Upper) ===")
+        results.append("Starting from final coordinates and going backward...")
+        
+        # Apply transforms in reverse
+        backward_coords = current_coords.copy()
+        
+        for t_idx in range(len(all_transforms) - 1, -1, -1):
+            transform = all_transforms[t_idx]
+            lower_ids = all_lower_idss[t_idx]
+            upper_ids = all_upper_idss[t_idx]
+            
+            transform_type = transform.__class__.__name__
+            results.append(f"\nReverse Transform {t_idx}: {transform_type}⁻¹")
+            
+            # For backward, upper are inputs, lower are outputs
+            input_syms = []
+            for uid in upper_ids:
+                if uid in backward_coords:
+                    input_syms.append(backward_coords[uid])
+                else:
+                    input_syms.append(sp.Symbol(f'y{uid}'))
+            
+            # Apply inverse transform
+            try:
+                if hasattr(transform, 'sympy_calculate_lower'):
+                    output_syms = transform.sympy_calculate_lower(input_syms)
+                else:
+                    output_syms = input_syms  # Pass through
+                
+                # Update coordinates
+                for lid, out_sym in zip(lower_ids, output_syms):
+                    backward_coords[lid] = out_sym
+                    evaluated = out_sym.subs(coord_values) if isinstance(out_sym, sp.Basic) else out_sym
+                    results.append(f"  Output d{lid} = {evaluated}")
+                    
+            except Exception as e:
+                results.append(f"  Error: {e}")
+        
+        results.append("\n=== ROUNDTRIP VERIFICATION ===")
+        results.append("Original coordinates vs. roundtrip results:")
+        success = True
+        for i in range(len(test_coord)):
+            if i in backward_coords:
+                evaluated = backward_coords[i].subs(coord_values) if isinstance(backward_coords[i], sp.Basic) else backward_coords[i]
+                match = "✓" if evaluated == test_coord[i] else "✗"
+                results.append(f"  d{i}: {test_coord[i]} → {evaluated} {match}")
+                if evaluated != test_coord[i]:
+                    success = False
+            else:
+                results.append(f"  d{i}: {test_coord[i]} → MISSING ✗")
+                success = False
+        
+        if success:
+            results.append("\n✓ SUCCESS: Coordinate roundtrip verification passed!")
+        else:
+            results.append("\n✗ FAILURE: Coordinates did not roundtrip correctly!")
+        
+        return "\n".join(results)
+    except Exception as e:
+        import traceback
+        return f"Error testing coordinate: {e}\n{traceback.format_exc()}"
 
 def main():
     """Main function for the Streamlit app."""
@@ -1943,9 +2091,70 @@ def main():
             
             st.subheader("Upper → Lower Transformation Graph")
             st.caption("Shows how logical dimensions (upper) transform to physical memory layout (lower)")
-            dot_forward = build_transformation_graph_from_pytensor(descriptors, st.session_state.variables)
             dot_backward = build_backward_transformation_graph_from_pytensor(descriptors, st.session_state.variables)
             st.graphviz_chart(dot_backward)
+            
+            # Add coordinate testing section
+            st.markdown("---")
+            st.header("Coordinate Transformation Verification")
+            st.caption("Test specific coordinates through forward and backward transformations")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.subheader("Test Coordinate Input")
+                
+                # Create pytensor descriptor for testing
+                parser = TensorTransformParser()
+                try:
+                    # Get the last descriptor (with all transforms applied)
+                    last_desc_str = descriptors[-1] if descriptors else ""
+                    descriptor_registry = {}
+                    
+                    # Build all descriptors in sequence
+                    test_descriptors = []
+                    for i, desc_str in enumerate(descriptors):
+                        parser.descriptor_registry = descriptor_registry
+                        tensor_desc = parser.create_pytensor_descriptor(desc_str, st.session_state.variables)
+                        test_descriptors.append(tensor_desc)
+                        if i < len(['desc_0', 'desc_1', 'desc_2', 'desc_3']):
+                            descriptor_registry[['desc_0', 'desc_1', 'desc_2', 'desc_3'][i]] = tensor_desc
+                    
+                    if test_descriptors:
+                        final_desc = test_descriptors[-1]
+                        num_dims = final_desc.get_num_of_dimension()
+                        
+                        # Input fields for test coordinate
+                        test_coord = []
+                        for i in range(num_dims):
+                            try:
+                                dim_length = final_desc.get_length(i)
+                                max_val = dim_length - 1 if isinstance(dim_length, int) else 10
+                            except:
+                                max_val = 10
+                            
+                            coord_val = st.number_input(
+                                f"Dimension {i} (0-{max_val})",
+                                min_value=0,
+                                max_value=max_val,
+                                value=min(i, max_val),
+                                key=f"test_coord_{i}"
+                            )
+                            test_coord.append(coord_val)
+                        
+                        if st.button("Test Coordinate Transformation"):
+                            st.session_state.test_coord = test_coord
+                            st.session_state.test_result = test_coordinate_roundtrip(final_desc, st.session_state.variables, test_coord)
+                    
+                except Exception as e:
+                    st.error(f"Failed to create test descriptor: {e}")
+            
+            with col2:
+                st.subheader("Transformation Results")
+                if hasattr(st.session_state, 'test_result'):
+                    st.code(st.session_state.test_result)
+                else:
+                    st.info("Enter a coordinate and click 'Test Coordinate Transformation' to see results")
                     
         except Exception as e:
             st.error(f"Failed to build graphs: {e}")
