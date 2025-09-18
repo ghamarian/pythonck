@@ -18,7 +18,7 @@ The C++ implementation encapsulates this complexity within the `tile_distributio
 
 Explore tile distribution concepts interactively:
 
-**[Tile Distribution Visualizer](https://ck.silobrain.com/tile-distribution)** - Interactive visualization of tile distribution structures and GPU memory layouts. Perfect for understanding how data is distributed across parallel processing elements.
+**[Tile Distribution Visualizer](https://tiledistribution.streamlit.app)** - Interactive visualization of tile distribution structures and GPU memory layouts. Perfect for understanding how data is distributed across parallel processing elements.
 
 ## Complete Tile Distribution System Overview
 
@@ -814,11 +814,12 @@ One of the best way to visualise this encoding is to look at it like a graph. It
 {{< video https://www.youtube.com/watch?v=gl0bgSAN6gc >}}
 
 
-We can depict the tile distirbution in the format below that shows how threads and warps are ordered for our istribution encoding example. Each cell shows where each thread is, int this particular example each cell in the grid has `4x4` elements in it, and that number comes from the fact that we have `Y`s have edges to the last component of `H[0]` and `H[1]` and those numbers are both `4`. The first and third elements of `Ys2RHsMajor` are refering to repetitions. We don't show that in the picture below for space reasons, but this image should be repeated `4x4` times again as suggested by the other two edges from `Y`s to `H`s.
+We can depict the tile distirbution in the format below that shows how threads and warps are ordered for our distribution encoding example. Each cell shows where each thread is, in this particular example each cell in the grid has `4x4` elements in it, and that number comes from the fact that we have `Y`s have edges to the last component of `H[0]` and `H[1]` and those numbers are both `4`. The first and third elements of `Ys2RHsMajor` are refering to repetitions. We don't show that in the picture below for space reasons, but this image should be repeated `4x4` times again as suggested by the other two edges from `Y`s to `H`s.
 
 
 ![Tile distribution with threads and warps](resources/row-major.png)
 
+Great, now we see that our threads and warps are ordered in row major fashion. This comes from the fact that the first edge of both `P` nodes in the graph are towards `H[0]`. Let's see what happens if we swap the numbers in the `Ps2RHssMajor[1]` and instead of `[1, 2]` we will have `[2, 1]`.
 ```{python}
 gemm_encoding = make_tile_distribution_encoding(
     rs_lengths=[],  # No replication
@@ -832,12 +833,11 @@ gemm_encoding = make_tile_distribution_encoding(
     ys_to_rhs_minor=[0, 3, 0, 3]
 )
 ```
-Great, now we see that our threads and warps are ordered in row major fashion. This comes from the fact that the first edge of both `P` nodes in the graph are towards `H[0]`. Let's see what happens if we swap the numbers in the `Ps2RHssMajor[1]` and instead of `[1, 2]` we will have `[2, 1]`.
 
 ![Tile distribution with threads and warps](resources/thread_column_major.png)
 
 
-We can of ocurse do the same with `Ps2RHssMajor[0]` that controls how warps are organised with respect to each other. In the following example both threads and warps are column major.
+We can of course do the same with `Ps2RHssMajor[0]` that controls how warps are organised with respect to each other. In the following example both threads and warps are column major.
 ```{python}
 gemm_encoding = make_tile_distribution_encoding(
     rs_lengths=[],  # No replication
@@ -862,18 +862,6 @@ The declarative power of `TileDistributionEncoding` is translated into concrete,
 The `PsYs2XsAdaptor` is a specialized `TensorAdaptor` that maps a thread's identity (`P-space`) and its local data access pattern (`Y-space`) to a physical coordinate in the global tensor (`X-space`). It's the engine that tells each thread which part of the main tensor it is responsible for.
 
 This adaptor is built by creating a pipeline of `merge` and `unmerge` transformations based on the encoding. For instance, `unmerge` operations break down the tensor's physical dimensions (X) into their hierarchical components (H), and `merge` operations then assign ownership of these components to threads (P). This entire transformation pipeline is resolved at compile-time in C++, ensuring that the complex coordinate math has zero runtime cost.
-
-#### How `calculate_index` Works
-
-When a thread needs to determine the starting global tensor coordinate for its tile, it uses this adaptor. The process, as seen in `tile_distribution.py`'s `calculate_index` method, involves:
-
-1.  **Forming the Top-Level Coordinate**: The thread's identity (its `P` coordinates, e.g., `[warp_id, lane_id]`) is combined with a vector of zeros for the `Y` coordinates. This is a key detail: `calculate_index` is designed to find the *origin* of the thread's tile, so the local `Y` coordinates are set to zero (`ps_ys_idx = partition_index + [0] * self.ndim_y`).
-
-2.  **Applying the Transform Pipeline**: This `[P, 0]` vector is fed into the `PsYs2XsAdaptor`. The adaptor applies its internal sequence of `merge` and `unmerge` operations to this vector.
-
-3.  **Producing the Bottom-Level Coordinate**: The output of the pipeline is the final "bottom-level" coordinate, which corresponds to the precise starting `X` coordinate in the global tensor for that thread's tile.
-
-This calculation provides the base address. Iterating through the tile (e.g., with `sweep_tile`) involves starting from this base and applying offsets, which is a separate step managed by the `TileWindow` and its coordinate transformation utilities. This separation of concerns—finding the base with `calculate_index` and iterating locally—is what allows the system to be both flexible and performant.
 
 #### How `calculate_index` Works
 

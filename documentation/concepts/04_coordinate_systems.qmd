@@ -176,6 +176,9 @@ print("\nP-space concept: Each thread has unique partition coordinates")
 
 **File**: `include/ck_tile/core/container/multi_index.hpp`
 
+<details>
+<summary>Click to show C++ code</summary>
+
 ```cpp
 #include <ck_tile/core/container/multi_index.hpp>
 #include <ck_tile/core/numeric/tuple.hpp>
@@ -247,16 +250,23 @@ static_assert(matmul_p_space::total_threads == 64);
 static_assert(matmul_p_space::ndim_p == 3);
 ```
 
+</details>
+
 ### Python vs C++ P-Space Differences
 
 #### 1. **Thread ID Source**
 - **C++**: Hardware intrinsics provide real thread IDs
-  ```cpp
+  <details>
+<summary>Click to show C++ code</summary>
+
+```cpp
   // Actual GPU hardware values
   const index_t thread_x = threadIdx.x;     // 0-31 within warp
   const index_t warp_id = threadIdx.x / 32; // Warp number
   const index_t block_id = blockIdx.x;      // Block number
   ```
+
+</details>
   - Direct access to GPU hardware thread hierarchy
   - Zero-overhead coordinate calculation
   - Compile-time thread organization validation
@@ -274,7 +284,10 @@ static_assert(matmul_p_space::ndim_p == 3);
 
 #### 2. **Coordinate Structure**
 - **C++**: Template-encoded dimensions
-  ```cpp
+  <details>
+<summary>Click to show C++ code</summary>
+
+```cpp
   // P-space structure encoded in types
   using p_space = multi_index<4, 2, 8>;  // Compile-time sizes
   static_assert(p_space::size() == 3);   // 3D P-space
@@ -285,6 +298,8 @@ static_assert(matmul_p_space::ndim_p == 3);
   );
   ```
 
+</details>
+
 - **Python**: Runtime lists
   ```python
   # Runtime coordinate representation
@@ -293,11 +308,16 @@ static_assert(matmul_p_space::ndim_p == 3);
 
 #### 3. **Performance Characteristics**
 - **C++**: Zero-overhead abstractions
-  ```cpp
+  <details>
+<summary>Click to show C++ code</summary>
+
+```cpp
   // This entire calculation often compiles to single instruction
   const auto p_coord = tile_distribution.calculate_p_coord();
   const auto work_offset = p_coord.at(number<0>{}) * work_per_thread;
   ```
+
+</details>
   - Compile-time coordinate resolution
   - Hardware thread IDs mapped directly to memory addresses
   - No runtime overhead for coordinate calculations
@@ -378,6 +398,9 @@ print("\n✅ Y-space concept: Each thread's work is organized in logical tiles")
 ### C++ Implementation Reference
 
 **File**: `include/ck_tile/core/container/multi_index.hpp`
+
+<details>
+<summary>Click to show C++ code</summary>
 
 ```cpp
 #include <ck_tile/core/container/multi_index.hpp>
@@ -482,11 +505,16 @@ static_assert(attention_y::elements_per_thread == 256);
 static_assert(attention_y::ndim_y == 4);
 ```
 
+</details>
+
 ### Python vs C++ Y-Space Differences
 
 #### 1. **Iteration Pattern**
 - **C++**: Compile-time loop unrolling
-  ```cpp
+  <details>
+<summary>Click to show C++ code</summary>
+
+```cpp
   // No runtime loops - everything unrolled at compile time
   static_for<0, 2, 1>{}([&](auto y0) {
       static_for<0, 2, 1>{}([&](auto y1) {
@@ -496,6 +524,8 @@ static_assert(attention_y::ndim_y == 4);
       });
   });
   ```
+
+</details>
   - Zero runtime overhead for Y-space iteration
   - All loops unrolled into straight-line code
   - Perfect instruction-level parallelism
@@ -514,7 +544,10 @@ static_assert(attention_y::ndim_y == 4);
 
 #### 2. **Coordinate Representation**
 - **C++**: Compile-time multi_index
-  ```cpp
+  <details>
+<summary>Click to show C++ code</summary>
+
+```cpp
   // Y-coordinates known at compile time
   constexpr auto y_coord = make_multi_index(number<0>{}, number<1>{});
   static_assert(y_coord.size() == 2);
@@ -524,6 +557,8 @@ static_assert(attention_y::ndim_y == 4);
                                         y_coord.at(number<1>{})>();
   ```
 
+</details>
+
 - **Python**: Runtime lists
   ```python
   # Runtime coordinate representation
@@ -532,7 +567,10 @@ static_assert(attention_y::ndim_y == 4);
 
 #### 3. **Memory Access Pattern**
 - **C++**: Optimal register usage
-  ```cpp
+  <details>
+<summary>Click to show C++ code</summary>
+
+```cpp
   // Each Y-space element typically maps to a register
   sweep_tile(distributed_tensor, [&](auto y_coord) {
       // Compiler assigns each element to optimal register
@@ -540,6 +578,8 @@ static_assert(attention_y::ndim_y == 4);
       auto reg_value = distributed_tensor(y_coord);
   });
   ```
+
+</details>
   - Y-space elements stored in registers
   - Zero memory bandwidth for intermediate values
   - Perfect cache locality through compile-time optimization
@@ -580,6 +620,9 @@ print("\n✅ X-space concept: Maps to actual tensor element positions")
 ### C++ Implementation Reference
 
 **File**: `include/ck_tile/core/tensor/tensor_descriptor.hpp`
+
+<details>
+<summary>Click to show C++ code</summary>
 
 ```cpp
 #include <ck_tile/core/tensor/tensor_descriptor.hpp>
@@ -699,11 +742,16 @@ using conv_x_space = x_space_descriptor<number<32>, number<256>, number<224>, nu
 static_assert(conv_x_space::ndim_x == 4);
 ```
 
+</details>
+
 ### Python vs C++ X-Space Differences
 
 #### 1. **Coordinate Resolution**
 - **C++**: Compile-time and runtime coordinate handling
-  ```cpp
+  <details>
+<summary>Click to show C++ code</summary>
+
+```cpp
   // Compile-time coordinates (fastest)
   constexpr auto x_coord = make_multi_index(number<3>{}, number<4>{});
   constexpr auto offset = tensor_desc.calculate_offset(x_coord);
@@ -713,6 +761,8 @@ static_assert(conv_x_space::ndim_x == 4);
   const auto x_dynamic = make_multi_index(row, col);
   const auto offset_dynamic = tensor_desc.calculate_offset(x_dynamic);
   ```
+
+</details>
   - Compile-time coordinates enable aggressive optimization
   - Runtime coordinates provide flexibility for dynamic access
   - Hybrid approaches possible for partially-known coordinates
@@ -729,7 +779,10 @@ static_assert(conv_x_space::ndim_x == 4);
 
 #### 2. **Memory Layout Control**
 - **C++**: Multiple layout options with compile-time specification
-  ```cpp
+  <details>
+<summary>Click to show C++ code</summary>
+
+```cpp
   // Row-major layout (C-style)
   auto row_major_desc = make_naive_tensor_descriptor_packed(
       make_tuple(number<M>{}, number<N>{})
@@ -752,6 +805,8 @@ static_assert(conv_x_space::ndim_x == 4);
   );
   ```
 
+</details>
+
 - **Python**: Simplified row-major model
   ```python
   # Only basic row-major layout
@@ -760,7 +815,10 @@ static_assert(conv_x_space::ndim_x == 4);
 
 #### 3. **Bounds Checking and Safety**
 - **C++**: Configurable safety levels
-  ```cpp
+  <details>
+<summary>Click to show C++ code</summary>
+
+```cpp
   // Debug mode: Compile-time and runtime checks
   #ifdef DEBUG
       static_assert(x_coord.at(number<0>{}) < tensor_lengths.at(number<0>{}));
@@ -770,6 +828,8 @@ static_assert(conv_x_space::ndim_x == 4);
   // Release mode: Bounds checking disabled for performance
   // Undefined behavior for out-of-bounds access
   ```
+
+</details>
   - Compile-time bounds checking when coordinates are known
   - Runtime bounds checking configurable
   - Zero overhead in optimized builds
@@ -883,6 +943,9 @@ print("\n✅ R-space concept: Manages data sharing across threads")
 ### C++ Implementation Reference
 
 **File**: `include/ck_tile/core/tile/tile_distribution.hpp`
+
+<details>
+<summary>Click to show C++ code</summary>
 
 ```cpp
 #include <ck_tile/core/tile/tile_distribution.hpp>
@@ -1032,11 +1095,16 @@ using complex_replication = r_space_definition<2, 2, 4>;
 static_assert(complex_replication::replication_factor == 16);
 ```
 
+</details>
+
 ### Python vs C++ R-Space Differences
 
 #### 1. **Thread Cooperation Mechanisms**
 - **C++**: Hardware-aware cooperation primitives
-  ```cpp
+  <details>
+<summary>Click to show C++ code</summary>
+
+```cpp
   // Warp-level operations (32 threads)
   DataType result = __shfl_down_sync(0xFFFFFFFF, value, 16);
   
@@ -1049,6 +1117,8 @@ static_assert(complex_replication::replication_factor == 16);
   __device__ DataType* global_buffer;
   atomicAdd(&global_buffer[blockIdx.x], contribution);
   ```
+
+</details>
   - Direct access to GPU hardware cooperation features
   - Zero-overhead synchronization primitives
   - Optimal memory hierarchy utilization
@@ -1067,7 +1137,10 @@ static_assert(complex_replication::replication_factor == 16);
 
 #### 2. **Data Sharing Patterns**
 - **C++**: Efficient hardware-specific sharing
-  ```cpp
+  <details>
+<summary>Click to show C++ code</summary>
+
+```cpp
   // Shared memory (fast, block-local)
   __shared__ float lds_buffer[1024];
   
@@ -1077,6 +1150,8 @@ static_assert(complex_replication::replication_factor == 16);
   // Global memory (slow, device-wide)
   __device__ float* global_shared;
   ```
+
+</details>
   - Multiple memory hierarchy levels
   - Hardware-optimized data movement
   - Latency and bandwidth characteristics known
@@ -1090,7 +1165,10 @@ static_assert(complex_replication::replication_factor == 16);
 
 #### 3. **Reduction Operations**
 - **C++**: Hardware-accelerated reductions
-  ```cpp
+  <details>
+<summary>Click to show C++ code</summary>
+
+```cpp
   // Warp-level reduction (single instruction)
   float sum = warp_reduce_sum(local_value);
   
@@ -1100,6 +1178,8 @@ static_assert(complex_replication::replication_factor == 16);
   // Device-level reduction (cooperative groups)
   float global_sum = device_reduce_sum(local_value);
   ```
+
+</details>
   - Hardware reduction instructions
   - Optimized reduction trees
   - Minimal synchronization overhead
@@ -1146,6 +1226,9 @@ print("\n✅ D-space concept: Converts 2D coordinates to memory addresses")
 ### C++ Implementation Reference
 
 **File**: `include/ck_tile/core/tensor/tensor_descriptor.hpp`
+
+<details>
+<summary>Click to show C++ code</summary>
 
 ```cpp
 #include <ck_tile/core/tensor/tensor_descriptor.hpp>
@@ -1311,11 +1394,16 @@ using col_major_matrix = d_space_descriptor<
 static_assert(col_major_matrix::is_column_major == true);
 ```
 
+</details>
+
 ### Python vs C++ D-Space Differences
 
 #### 1. **Linearization Performance**
 - **C++**: Compile-time offset calculation
-  ```cpp
+  <details>
+<summary>Click to show C++ code</summary>
+
+```cpp
   // Compile-time linearization (zero runtime cost)
   constexpr auto x_coord = make_multi_index(number<3>{}, number<4>{});
   constexpr auto offset = tensor_desc.calculate_offset(x_coord);
@@ -1325,6 +1413,8 @@ static_assert(col_major_matrix::is_column_major == true);
   const auto dynamic_offset = tensor_desc.calculate_offset(runtime_coord);
   // Optimized with unrolled loops, no function call overhead
   ```
+
+</details>
   - Compile-time calculation when coordinates are known
   - Optimized runtime calculation for dynamic coordinates
   - Zero function call overhead
@@ -1340,7 +1430,10 @@ static_assert(col_major_matrix::is_column_major == true);
 
 #### 2. **Memory Layout Control**
 - **C++**: Multiple specialized layout types
-  ```cpp
+  <details>
+<summary>Click to show C++ code</summary>
+
+```cpp
   // Row-major descriptor
   auto row_major = make_naive_tensor_descriptor_packed(shape);
   
@@ -1352,6 +1445,8 @@ static_assert(col_major_matrix::is_column_major == true);
   
   // Each type optimizes for different access patterns
   ```
+
+</details>
   - Hardware-specific layout optimizations
   - Cache-friendly blocked patterns
   - Vectorization-friendly alignments
@@ -1367,7 +1462,10 @@ static_assert(col_major_matrix::is_column_major == true);
 
 #### 3. **Memory Coalescing Awareness**
 - **C++**: Hardware coalescing optimization
-  ```cpp
+  <details>
+<summary>Click to show C++ code</summary>
+
+```cpp
   // Ensure consecutive threads access consecutive memory
   const index_t tid = threadIdx.x;
   const auto x_coord = make_multi_index(tid / 32, tid % 32);  // Coalesced pattern
@@ -1377,6 +1475,8 @@ static_assert(col_major_matrix::is_column_major == true);
   // Vectorized loads/stores when possible
   auto vector_data = tensor_view.template get_vectorized<4>(d_offset);
   ```
+
+</details>
   - Direct control over memory access patterns
   - Hardware-aware access optimization
   - Vectorization opportunities identified

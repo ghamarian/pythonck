@@ -91,6 +91,9 @@ The **transformation chains** are automatically constructed from the encoding pa
 
 The C++ implementation leverages advanced template metaprogramming techniques:
 
+<details>
+<summary>Click to show C++ code</summary>
+
 ```cpp
 // From ck_tile/core/tensor/tile_distribution_encoding.hpp
 template <typename RsLengths_,    // Replication dimension lengths
@@ -117,6 +120,8 @@ struct tile_distribution_encoding
     };
 };
 ```
+
+</details>
 
 ## Encoding Structure Deep Dive
 
@@ -152,6 +157,9 @@ print("\nEncoding created successfully!")
 ## C++ Template Implementation
 
 The encoding system is implemented as a C++ template struct that leverages compile-time computation for maximum performance:
+
+<details>
+<summary>Click to show C++ code</summary>
 
 ```cpp
 // From include/ck_tile/core/tensor/tile_distribution_encoding.hpp
@@ -192,6 +200,8 @@ struct tile_distribution_encoding
 };
 ```
 
+</details>
+
 ### Key C++ Features Used
 
 1. **Template Metaprogramming**: All parameters are types, not values, enabling compile-time optimization
@@ -231,6 +241,9 @@ The decomposition typically follows a pattern like `sequence<RepeatCount, WarpCo
 
 In the transformation pipeline, each H-dimension group generates `coord_transform_enum::unmerge` operations that break down abstract dimensions into their hierarchical components:
 
+<details>
+<summary>Click to show C++ code</summary>
+
 ```cpp
 // Example from block GEMM implementation
 constexpr auto hs_lengthss = tuple<
@@ -238,6 +251,8 @@ constexpr auto hs_lengthss = tuple<
     sequence<KIterPerWarp>          // K-dimension decomposition
 >;
 ```
+
+</details>
 
 ### P-Dimensions: Partition Mapping
 
@@ -253,6 +268,9 @@ This mapping enables flexible work distribution strategies. For instance, in a t
 
 The P-dimension mapping directly influences memory access patterns and computational efficiency:
 
+<details>
+<summary>Click to show C++ code</summary>
+
 ```cpp
 // P-dimension retrieval in tile_distribution
 CK_TILE_HOST_DEVICE static auto _get_partition_index()
@@ -263,6 +281,8 @@ CK_TILE_HOST_DEVICE static auto _get_partition_index()
         return array<index_t, 2>{get_warp_id(), get_lane_id()};
 }
 ```
+
+</details>
 
 ### Y-Dimensions: Logical View Mapping
 
@@ -396,6 +416,9 @@ flowchart LR
 
 The transformation chain is built using C++ template metaprogramming to create a compile-time pipeline:
 
+<details>
+<summary>Click to show C++ code</summary>
+
 ```cpp
 // Building the transformation chain in make_static_tile_distribution
 template <typename Encoding>
@@ -424,9 +447,14 @@ CK_TILE_HOST_DEVICE auto make_ps_ys_to_xs_adaptor(const Encoding& encoding)
 }
 ```
 
+</details>
+
 ### How Transforms Work in C++
 
 Each transform is a compile-time object that knows how to convert coordinates:
+
+<details>
+<summary>Click to show C++ code</summary>
 
 ```cpp
 // Example: Replicate transform implementation
@@ -452,6 +480,8 @@ struct replicate_transform
     }
 };
 ```
+
+</details>
 
 **🔗 The P+Y → X Transformation Chain**
 
@@ -482,6 +512,9 @@ The descriptor handles the linearization of Y coordinates to memory addresses.
 ### C++ Implementation of Y→D Descriptor
 
 The Y→D descriptor is responsible for converting multi-dimensional Y coordinates into linear memory offsets:
+
+<details>
+<summary>Click to show C++ code</summary>
 
 ```cpp
 // Y to D descriptor implementation
@@ -537,9 +570,14 @@ struct static_distributed_tensor
 };
 ```
 
+</details>
+
 ### Memory Layout Optimization
 
 The descriptor enables efficient register allocation:
+
+<details>
+<summary>Click to show C++ code</summary>
 
 ```cpp
 // Optimized layout for vector operations
@@ -553,6 +591,8 @@ struct make_ys_to_d_descriptor_for_gemm
         sequence<N * VectorSize, VectorSize, 1>>;
 };
 ```
+
+</details>
 
 ### Y to D Linearization Details
 

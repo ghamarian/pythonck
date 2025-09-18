@@ -566,4 +566,64 @@ def make_reduce_tile_distribution_encoding(in_encoding: TileDistributionEncoding
         ps_to_rhss_minor=ps_to_rhss_minor_out,
         ys_to_rhs_major=ys_to_rhs_major_out,
         ys_to_rhs_minor=ys_to_rhs_minor_out
-    ) 
+    )
+
+def make_slice_tile_distribution_encoding(in_encoding: TileDistributionEncoding,
+                                        slices: Dict[int, int]) -> Tuple[TileDistributionEncoding, List[int], List[int]]:
+    """
+    Creates a sliced tile distribution by taking a subset of H components.
+    `slices` is a dict mapping x_dim index to the number of components to keep.
+    Returns the new encoding, plus the y_origins and y_lengths for the slice.
+    """
+    hs_lengthss_out = []
+    for i, h_lengths in enumerate(in_encoding.hs_lengthss):
+        if i in slices:
+            hs_lengthss_out.append(h_lengths[:slices[i]])
+        else:
+            hs_lengthss_out.append(list(h_lengths))
+
+    rs_lengths_out = list(in_encoding.rs_lengths)
+
+    ps_to_rhss_major_out = []
+    ps_to_rhss_minor_out = []
+    for p_majors, p_minors in zip(in_encoding.ps_to_rhss_major, in_encoding.ps_to_rhss_minor):
+        new_p_majors, new_p_minors = [], []
+        for rh_major, rh_minor in zip(p_majors, p_minors):
+            if rh_major == 0:
+                new_p_majors.append(rh_major)
+                new_p_minors.append(rh_minor)
+            else:
+                x_dim = rh_major - 1
+                if x_dim < len(hs_lengthss_out) and rh_minor < len(hs_lengthss_out[x_dim]):
+                    new_p_majors.append(rh_major)
+                    new_p_minors.append(rh_minor)
+        if new_p_majors:
+            ps_to_rhss_major_out.append(new_p_majors)
+            ps_to_rhss_minor_out.append(new_p_minors)
+    
+    ys_to_rhs_major_out = []
+    ys_to_rhs_minor_out = []
+    for rh_major, rh_minor in zip(in_encoding.ys_to_rhs_major, in_encoding.ys_to_rhs_minor):
+        if rh_major == 0:
+            ys_to_rhs_major_out.append(rh_major)
+            ys_to_rhs_minor_out.append(rh_minor)
+        else:
+            x_dim = rh_major - 1
+            if x_dim < len(hs_lengthss_out) and rh_minor < len(hs_lengthss_out[x_dim]):
+                ys_to_rhs_major_out.append(rh_major)
+                ys_to_rhs_minor_out.append(rh_minor)
+
+    final_encoding = TileDistributionEncoding(
+        rs_lengths=rs_lengths_out,
+        hs_lengthss=hs_lengthss_out,
+        ps_to_rhss_major=ps_to_rhss_major_out,
+        ps_to_rhss_minor=ps_to_rhss_minor_out,
+        ys_to_rhs_major=ys_to_rhs_major_out,
+        ys_to_rhs_minor=ys_to_rhs_minor_out
+    )
+
+    # For this simplified visualization, origins are all 0 as we slice from the beginning.
+    sliced_y_origins = [0] * final_encoding.ndim_y
+    sliced_y_lengths = final_encoding.detail.ys_lengths
+    
+    return final_encoding, sliced_y_origins, sliced_y_lengths 

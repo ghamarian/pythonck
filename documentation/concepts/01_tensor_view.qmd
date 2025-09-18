@@ -87,6 +87,9 @@ for i in range(3):
 
 **File**: `include/ck_tile/core/tensor/tensor_view.hpp`
 
+<details>
+<summary>Click to show C++ code</summary>
+
 ```cpp
 #include <ck_tile/core/tensor/tensor_view.hpp>
 
@@ -116,6 +119,8 @@ __device__ void example_tensor_creation()
     tensor.set_element(make_tuple(2, 1), 99.0f);
 }
 ```
+
+</details>
 
 ## Flow & Layouts: From Coordinates to Memory
 
@@ -349,6 +354,9 @@ graph TB
 
 ### C++ Advanced Features
 
+<details>
+<summary>Click to show C++ code</summary>
+
 ```cpp
 __device__ void advanced_tensor_operations()
 {
@@ -376,6 +384,8 @@ __device__ void advanced_tensor_operations()
     auto vec4 = tensor.get_vectorized_elements<float4>(coord, 0);
 }
 ```
+
+</details>
 
 ## Performance Considerations
 

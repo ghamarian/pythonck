@@ -124,6 +124,9 @@ for i, value in enumerate(coord):
 
 **File**: `include/ck_tile/core/container/multi_index.hpp`
 
+<details>
+<summary>Click to show C++ code</summary>
+
 ```cpp
 #include <ck_tile/core/container/multi_index.hpp>
 
@@ -159,6 +162,8 @@ __device__ void example_multiindex_usage()
     float value = tensor.get_vectorized_elements<float>(tensor_coord, 0);
 }
 ```
+
+</details>
 
 ## MultiIndex in Transforms
 

@@ -21,6 +21,7 @@ graph TB
         TV["TensorView<br/>Data source"]
         TD["TileDistribution<br/>Thread mapping"]
         TW["TileWindow<br/>Access gateway"]
+        LT["LoadStoreTraits<br/>Access optimizer"]
         DT["DistributedTensor<br/>Register storage"]
     end
     
@@ -34,11 +35,13 @@ graph TB
         Coal["Coalescing<br/>Adjacent access"]
         Vec["Vectorization<br/>Multi-element ops"]
         Bank["Bank conflict<br/>avoidance"]
+        SFC["Space-filling<br/>curve traversal"]
     end
     
     TV --> TW
     TD --> TW
-    TW --> DT
+    TW --> LT
+    LT --> DT
     
     TW --> Load
     Load --> Compute
@@ -46,11 +49,12 @@ graph TB
     
     Load --> Coal
     Load --> Vec
+    Load --> SFC
     Store --> Bank
     
     style TW fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
+    style LT fill:#fff3e0,stroke:#f57c00,stroke-width:2px
     style DT fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
-    style Coal fill:#fff3e0,stroke:#f57c00,stroke-width:2px
 </div>
 ```
 
@@ -73,10 +77,11 @@ sys.path.insert(0, '/home/aghamari/github/composable_kernel/visualisation')
 
 # Import the actual CK modules
 from pytensor.tile_distribution import make_static_tile_distribution, make_tile_distribution_encoding
-from pytensor.tile_window import make_tile_window, TileWindowWithStaticDistribution
+from pytensor.tile_window import make_tile_window, TileWindowWithStaticDistribution, LoadStoreTraits
 from pytensor.tensor_view import make_tensor_view
 from pytensor.tensor_descriptor import make_naive_tensor_descriptor_packed
 from pytensor.static_distributed_tensor import make_static_distributed_tensor
+from pytensor.space_filling_curve import SpaceFillingCurve
 ```
 
 ## What is a TileWindow?
@@ -86,6 +91,9 @@ The fundamental challenge in GPU programming lies in the gap between logical ten
 TileWindow implements a distribution-aware windowing mechanism that transforms abstract coordinate mappings into concrete memory access patterns. The abstraction understands not just which data elements each thread needs, but also how to access them in a way that maximizes memory bandwidth utilization. This involves sophisticated techniques such as memory coalescing, where adjacent threads access adjacent memory locations, and vectorization, where multiple elements are loaded or stored in a single transaction.
 
 The C++ implementation of TileWindow reveals its sophisticated architecture:
+
+<details>
+<summary>Click to show C++ code</summary>
 
 ```cpp
 // From ck_tile/core/tensor/tile_window.hpp
@@ -135,6 +143,141 @@ struct tile_window_with_static_distribution
 };
 ```
 
+</details>
+
+## LoadStoreTraits - The Access Pattern Engine
+
+Behind every efficient TileWindow operation lies LoadStoreTraits, a sophisticated analysis engine that determines the optimal way to access memory. This component bridges the gap between the logical distribution pattern and the physical memory subsystem, analyzing the distribution to find opportunities for vectorization and coalescing.
+
+LoadStoreTraits performs several critical analyses:
+- **Vector dimension identification**: Finds which Y dimension has stride 1 for optimal vectorization
+- **Access pattern calculation**: Determines the number and order of memory operations
+- **Space-filling curve construction**: Creates an optimal traversal order for cache efficiency
+
+Let's explore how LoadStoreTraits analyzes a distribution:
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+# Create a distribution to analyze
+encoding = make_tile_distribution_encoding(
+    rs_lengths=[],
+    hs_lengthss=[[4, 2], [4, 2]],  # 8x8 total
+    ps_to_rhss_major=[[1], [2]],
+    ps_to_rhss_minor=[[0], [0]],
+    ys_to_rhs_major=[1, 2],
+    ys_to_rhs_minor=[1, 1]  # Each thread handles 2x2
+)
+distribution = make_static_tile_distribution(encoding)
+
+# Create LoadStoreTraits to analyze access patterns
+traits = LoadStoreTraits(distribution, np.float32)
+
+print("LoadStoreTraits Analysis:")
+print(f"  Y dimensions: {traits.ndim_y}")
+print(f"  Vector dimension Y: {traits.vector_dim_y}")
+print(f"  Scalars per vector: {traits.scalar_per_vector}")
+print(f"  Scalars per access: {traits.scalars_per_access}")
+print(f"  Total accesses needed: {traits.num_access}")
+
+# Explain the significance
+print("\n📊 What this means:")
+print(f"- Each thread manages a {distribution.get_y_vector_lengths()} tile")
+print(f"- Dimension Y{traits.vector_dim_y} has stride 1 (best for vectorization)")
+print(f"- Can load/store {traits.scalar_per_vector} elements in one instruction")
+print(f"- Needs {traits.num_access} memory operations total")
+
+# Show what get_index() returns for different access indices
+print("\nAccess Pattern (get_index() results):")
+print("Access # → Y indices → What it accesses")
+print("-" * 40)
+for i in range(min(4, traits.num_access)):
+    y_indices = traits.get_y_indices(i)
+    print(f"  {i} → {y_indices} → Element at Y{y_indices}")
+```
+
+## Space-Filling Curves for Memory Access
+
+One of the most sophisticated aspects of TileWindow is its use of space-filling curves to determine the order in which memory is accessed. This isn't just about iterating through elements - it's about doing so in a way that maximizes cache utilization and minimizes memory latency.
+
+A space-filling curve is a continuous curve that visits every point in a multi-dimensional space exactly once. In the context of TileWindow, it determines the order in which a thread accesses its assigned elements. The "snake" pattern is particularly effective because it minimizes the distance between consecutive accesses, keeping data in cache longer.
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+# Let's examine the space-filling curve in detail
+y_lengths = distribution.ys_to_d_descriptor.get_lengths()
+print(f"Y space dimensions: {y_lengths} (total {np.prod(y_lengths)} elements)")
+
+# Create and analyze the space-filling curve
+sfc = traits.sfc_ys
+print(f"\nSpace-Filling Curve Properties:")
+print(f"  Tensor lengths: {sfc.tensor_lengths}")
+print(f"  Dimension access order: {sfc.dim_access_order}")
+print(f"  Scalars per access: {sfc.scalars_per_access}")
+print(f"  Snake curved: {sfc.snake_curved}")
+print(f"  Number of accesses: {sfc.get_num_of_access()}")
+
+# Trace the access pattern
+print("\nAccess Pattern Visualization:")
+print("(showing order of Y-space traversal)")
+access_grid = np.full(y_lengths, -1)
+for i in range(sfc.get_num_of_access()):
+    indices = sfc.get_index(i)
+    if len(indices) == 2:
+        access_grid[indices[0], indices[1]] = i
+print(access_grid)
+
+print("\n💡 Why Snake Patterns Matter:")
+print("- Consecutive accesses are spatially close")
+print("- Better cache line utilization")
+print("- Reduced memory controller pressure")
+print("- Improved prefetcher effectiveness")
+```
+
+## Understanding get_vectorized_access_info()
+
+The `get_vectorized_access_info()` method is crucial for understanding how TileWindow achieves its impressive performance. This method returns detailed information about how to perform vectorized memory operations, including which elements to access together and along which dimension.
+
+This information is used by the GPU to:
+- Generate vector load/store instructions (e.g., ld.global.v4.f32)
+- Ensure memory coalescing across threads
+- Minimize the total number of memory transactions
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+# Detailed analysis of vectorized access information
+print("Vectorized Access Information:")
+print("=" * 40)
+
+for i_access in range(min(3, traits.num_access)):
+    access_info = traits.get_vectorized_access_info(i_access)
+    
+    print(f"\nAccess #{i_access}:")
+    print(f"  Base Y indices: {access_info['base_indices']}")
+    print(f"  Vector dimension: {access_info['vector_dim']}")
+    print(f"  Vector size: {access_info['vector_size']}")
+    print(f"  Elements accessed:")
+    for j, idx in enumerate(access_info['vector_indices']):
+        print(f"    [{j}] → Y{idx}")
+    
+    # Explain what happens at the hardware level
+    if i_access == 0:
+        print("\n  🔧 Hardware execution:")
+        print(f"  - Issues a vector{access_info['vector_size']} load instruction")
+        print(f"  - Fetches {access_info['vector_size']} consecutive elements")
+        print(f"  - All in a single memory transaction!")
+
+# Demonstrate how this maps to memory
+print("\n🔄 Memory Access Pattern:")
+print("One vectorized load fetches multiple consecutive elements")
+print("along the dimension with stride 1 for perfect coalescing!")
+```
+
 ## TileWindow Data Flow
 
 ```{=html}
@@ -169,6 +312,55 @@ flowchart LR
 </div>
 ```
 
+## TileWindow Internals: Precomputation
+
+One of the key optimizations in TileWindow is the precomputation of coordinate transformations. Rather than calculating complex coordinate mappings during each load/store operation, TileWindow precomputes these transformations during construction. This eliminates redundant calculations and enables the compiler to optimize the access patterns aggressively.
+
+The precomputation phase:
+- Analyzes the distribution pattern to identify access sequences
+- Calculates all coordinate transformations upfront
+- Stores them in a compact format for efficient runtime access
+- Enables incremental coordinate updates for sliding windows
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+# Create a tensor and window to see precomputation in action
+data = np.arange(64, dtype=np.float32).reshape(8, 8)
+tensor_view = make_tensor_view(data, make_naive_tensor_descriptor_packed([8, 8]))
+
+# Create window at origin (2, 2) with size 4x4
+window = make_tile_window(
+    tensor_view=tensor_view,
+    window_lengths=[4, 4],
+    origin=[2, 2],
+    tile_distribution=distribution
+)
+
+print("TileWindow Configuration:")
+print(f"  Window origin: {window.window_origin}")
+print(f"  Window size: {window.window_lengths}")
+print(f"  Number of coordinate bundles: {window.num_coord}")
+print(f"  Precomputed coordinates: {len(window.pre_computed_coords)}")
+
+# Show what the window covers
+print(f"\nWindow covers global positions:")
+print(f"  Row range: [{window.window_origin[0]}, {window.window_origin[0] + window.window_lengths[0]})")
+print(f"  Col range: [{window.window_origin[1]}, {window.window_origin[1] + window.window_lengths[1]})")
+
+print("\n💡 Precomputation Benefits:")
+print("- Zero overhead during load/store operations")
+print("- Enables aggressive compiler optimizations")
+print("- Supports efficient window movement")
+print("- Reduces register pressure")
+
+# Visualize what data the window covers
+window_data = data[2:6, 2:6]  # The 4x4 window starting at (2,2)
+print("\nData covered by the window:")
+print(window_data)
+```
+
 ## Creating and Using TileWindow
 
 Let's explore how to create and use a TileWindow in practice:
@@ -177,64 +369,79 @@ Let's explore how to create and use a TileWindow in practice:
 #| echo: true
 #| output: true
 
-import numpy as np
-from pytensor.tile_window import make_tile_window
-from pytensor.tensor_view import make_naive_tensor_view_packed
-from pytensor.tile_distribution import make_static_tile_distribution, make_tile_distribution_encoding
+# Show how threads map to this data
+print("Thread-to-element mapping:")
+print("Thread (P coords) → Window position → Global position → Value")
+print("-" * 60)
 
-# Create a tensor
-data = np.arange(64, dtype=np.float32)
-print("Original tensor (8x8):")
-print(data.reshape(8, 8))
-
-# Create a tensor view
-tensor_view = make_naive_tensor_view_packed(data, lengths=[8, 8])
-
-# Create a tile distribution encoding for a 4x4 window
-# Each thread will handle a 1x1 tile within the window
-encoding = make_tile_distribution_encoding(
-    rs_lengths=[],  # No replication
-    hs_lengthss=[[4], [4]],  # 4x4 hierarchical structure
-    ps_to_rhss_major=[[1], [2]],  # P dimensions map to H dimensions
-    ps_to_rhss_minor=[[0], [0]],
-    ys_to_rhs_major=[1, 2],  # Y dimensions map to H dimensions
-    ys_to_rhs_minor=[0, 0]
-)
-tile_dist = make_static_tile_distribution(encoding)
-
-# Create a tile window at position (2, 2)
-window = make_tile_window(
-    tensor_view=tensor_view,
-    window_lengths=[4, 4],
-    origin=[2, 2],
-    tile_distribution=tile_dist
-)
-
-print(f"\nTileWindow created:")
-print(f"- Window size: {window.window_lengths}")
-print(f"- Window origin: {window.window_origin}")
-print(f"- Covers elements from (2,2) to (5,5)")
+# This simulates what happens on the GPU
+p_lengths = [2, 2]  # 2x2 threads from our distribution
+for p0 in range(p_lengths[0]):
+    for p1 in range(p_lengths[1]):
+        # P coordinates (thread identity)
+        p_coords = [p0, p1]
+        
+        # This thread handles a 2x2 sub-tile (from our Y dimensions)
+        print(f"\nThread P{p_coords}:")
+        
+        # Each thread accesses multiple elements (Y dimensions)
+        y_lengths = distribution.get_y_vector_lengths()
+        for y0 in range(y_lengths[0]):
+            for y1 in range(y_lengths[1]):
+                # Calculate actual position
+                # In real GPU, this is done by the PsYs→Xs adaptor
+                window_pos = [p0 * y_lengths[0] + y0, p1 * y_lengths[1] + y1]
+                global_pos = [window.window_origin[0] + window_pos[0],
+                             window.window_origin[1] + window_pos[1]]
+                value = data[global_pos[0], global_pos[1]]
+                print(f"  Y[{y0},{y1}] → window[{window_pos[0]},{window_pos[1]}] → global{global_pos} = {value}")
 ```
 
-## Understanding Window Coordinates
+## The Load Operation Deep Dive
+
+The load operation is where all the sophisticated analysis comes together. When you call `window.load()`, a carefully orchestrated sequence of operations occurs:
+
+1. **Distributed tensor creation**: Automatically creates a distributed tensor sized for the distribution
+2. **Coordinate calculation**: Uses precomputed coordinates for efficiency
+3. **Vectorized access**: Groups elements for vector loads based on LoadStoreTraits analysis
+4. **Memory coalescing**: Ensures adjacent threads access adjacent memory
+5. **Boundary handling**: Manages edge cases automatically
 
 ```{pyodide}
 #| echo: true
 #| output: true
 
-# Visualize what data the window covers
-window_data = data[2:6, 2:6]  # The 4x4 window starting at (2,2)
-print("Data covered by the window:")
-print(window_data)
+# Load data from the window
+distributed_tensor = window.load()
 
-# Show how threads map to this data
-print("\nThread-to-element mapping:")
-print("Thread (i,j) -> Element value")
-for i in range(4):
-    for j in range(4):
-        thread_id = i * 4 + j
-        element = window_data[i, j]
-        print(f"Thread ({i},{j}) -> {element}")
+print("Load Operation Analysis:")
+print(f"  Created distributed tensor: {type(distributed_tensor).__name__}")
+print(f"  Data type: {distributed_tensor.data_type}")
+print(f"  Elements per thread: {distributed_tensor.get_num_of_elements()}")
+
+# Show what each thread loaded
+print("\n🧵 Thread Data (showing first thread's data):")
+y_lengths = distribution.get_y_vector_lengths()
+print(f"Thread P[0,0] loaded a {y_lengths[0]}x{y_lengths[1]} tile:")
+for y0 in range(y_lengths[0]):
+    for y1 in range(y_lengths[1]):
+        y_indices = [y0, y1]
+        value = distributed_tensor.get_element(y_indices)
+        # Calculate global position for verification
+        global_pos = [
+            window.window_origin[0] + y0,
+            window.window_origin[1] + y1
+        ]
+        expected = data[global_pos[0], global_pos[1]]
+        match = "✓" if abs(value - expected) < 1e-6 else "✗"
+        print(f"  Y{y_indices} = {value} (from global{global_pos}, expected {expected}) {match}")
+
+print("\n✅ Load operation automatically:")
+print("- Created distributed tensor of correct size")
+print("- Calculated optimal access pattern via LoadStoreTraits")
+print("- Used vectorization where possible")
+print("- Ensured memory coalescing across threads")
+print("- Handled all coordinate transformations")
 ```
 
 ## Load Operation Architecture
@@ -285,39 +492,132 @@ One of TileWindow's key features is generating optimal memory access patterns:
 #| echo: true
 #| output: true
 
-def analyze_window_access_pattern(window, num_threads=16):
+def analyze_window_access_pattern(window, distribution, num_threads=4):
     """Analyze how threads access memory through the window"""
     print("Memory Access Pattern Analysis")
     print("=" * 50)
     
-    # Simulate first wave of accesses
-    print("\nFirst access wave (threads 0-7):")
-    print("Thread | Window Coord | Global Coord | Linear Addr")
+    # Get distribution info
+    y_lengths = distribution.get_y_vector_lengths()
+    
+    print(f"Each thread handles: {y_lengths[0]}x{y_lengths[1]} elements")
+    print(f"Window total size: {window.window_lengths}")
+    
+    # Simulate access pattern
+    print("\nThread access pattern (first 4 threads):")
+    print("Thread | First access | Access pattern")
     print("-" * 50)
     
     origin = window.window_origin
     
-    for tid in range(min(8, num_threads)):
-        # Thread position in window
-        local_i = tid // 4
-        local_j = tid % 4
+    for tid in range(min(4, num_threads)):
+        # Thread position in P-space
+        p0 = tid // 2
+        p1 = tid % 2
         
-        # Global position
-        global_i = origin[0] + local_i
-        global_j = origin[1] + local_j
+        # First element this thread accesses
+        first_global_i = origin[0] + p0 * y_lengths[0]
+        first_global_j = origin[1] + p1 * y_lengths[1]
         
-        # Linear address
-        linear_addr = global_i * 8 + global_j  # 8 is tensor width
+        # Linear address (assuming row-major layout)
+        linear_addr = first_global_i * 8 + first_global_j  # 8 is tensor width
         
-        print(f"  {tid:2d}   | ({local_i},{local_j})        | ({global_i},{global_j})        | {linear_addr:3d}")
+        print(f"  P[{p0},{p1}] | ({first_global_i},{first_global_j}) addr={linear_addr:3d} | ", end="")
+        
+        # Show access pattern
+        if y_lengths[1] > 1:
+            print(f"Accesses {y_lengths[1]} consecutive addresses")
+        else:
+            print("Single element access")
     
-    # Check coalescing
+    # Coalescing analysis
     print("\nCoalescing Analysis:")
-    print("✓ Threads 0-3 access addresses 18-21 (consecutive)")
-    print("✓ Threads 4-7 access addresses 26-29 (consecutive)")
-    print("✓ Perfect coalescing within each warp!")
+    print("✓ Threads in same warp access consecutive memory regions")
+    print("✓ LoadStoreTraits ensures optimal access ordering")
+    print("✓ Vectorization reduces total memory transactions")
 
-analyze_window_access_pattern(window)
+analyze_window_access_pattern(window, distribution)
+```
+
+## Window Movement and Updates
+
+TileWindow supports efficient window movement for sliding window algorithms. The precomputed coordinate system makes updates extremely efficient:
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+# Demonstrate window movement
+print("Window Movement Example:")
+print(f"Original window origin: {window.window_origin}")
+
+# Move window by (1, 1)
+window.move([1, 1])
+print(f"After move([1, 1]): {window.window_origin}")
+
+# Set new origin directly
+window.set_window_origin([0, 4])
+print(f"After set_window_origin([0, 4]): {window.window_origin}")
+
+# Load from new position
+new_data = window.load()
+print(f"\nData from new window position:")
+print(f"  First element (Y[0,0]): {new_data.get_element([0, 0])}")
+print(f"  Expected from global[0,4]: {data[0, 4]}")
+
+# Show the efficiency of movement
+print("\n💡 Window Movement Efficiency:")
+print("- Precomputed coordinates enable O(1) updates")
+print("- No need to recalculate distributions")
+print("- Perfect for sliding window algorithms")
+print("- Supports convolution, pooling, and similar operations")
+
+# Reset for next examples
+window.set_window_origin([2, 2])
+```
+
+## Store Operations with Vectorization
+
+Store operations use the same sophisticated analysis as loads. The LoadStoreTraits ensures that stores are just as efficient as loads, with the same vectorization and coalescing benefits:
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+# Create output data and window
+output_data = np.zeros_like(data)
+output_view = make_tensor_view(output_data, make_naive_tensor_descriptor_packed([8, 8]))
+output_window = make_tile_window(
+    tensor_view=output_view,
+    window_lengths=[4, 4],
+    origin=[2, 2],
+    tile_distribution=distribution
+)
+
+# Create a distributed tensor with computed values
+result_tensor = make_static_distributed_tensor(np.float32, distribution)
+y_lengths = distribution.get_y_vector_lengths()
+for y0 in range(y_lengths[0]):
+    for y1 in range(y_lengths[1]):
+        # Simple computation: multiply by 2
+        original_value = distributed_tensor.get_element([y0, y1])
+        result_tensor.set_element([y0, y1], original_value * 2)
+
+# Store results
+output_window.store(result_tensor)
+
+print("Store Operation Results:")
+print(f"Original window data (portion):")
+print(data[2:4, 2:4])
+print(f"\nStored results (portion):")
+print(output_data[2:4, 2:4])
+
+print("\n✅ Store operation features:")
+print("- Uses same LoadStoreTraits analysis as load")
+print("- Automatic vectorization matching load pattern")
+print("- Coalesced memory writes")
+print("- Space-filling curve ensures cache-friendly access")
+print("- Boundary checking handled automatically")
 ```
 
 ## Advanced Window Operations
@@ -345,6 +645,12 @@ def sliding_window_demo(tensor_shape, window_size, stride):
 # Create sliding windows
 positions = sliding_window_demo(tensor_shape=[8, 8], window_size=4, stride=2)
 print(f"\nTotal windows: {len(positions)}")
+
+print("\n💡 Sliding Window Benefits:")
+print("- Precomputed coordinates make sliding O(1)")
+print("- Perfect for convolution operations")
+print("- Enables efficient pooling layers")
+print("- Supports overlapping computations")
 ```
 
 ### Overlapping Windows
@@ -389,6 +695,101 @@ def create_overlapping_windows(tensor_shape, window_size, overlap):
 windows = create_overlapping_windows([8, 8], window_size=3, overlap=1)
 ```
 
+## Complete Load-Compute-Store Pipeline
+
+Here's a complete example showing how all components work together:
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+def matrix_operation_with_tilewindow(input_matrix, operation_func, window_size=[4, 4]):
+    """
+    Demonstrates complete load-compute-store pipeline with TileWindow.
+    
+    This simulates how GPU kernels process data in tiles.
+    """
+    rows, cols = input_matrix.shape
+    output_matrix = np.zeros_like(input_matrix)
+    
+    # Create tensor views
+    input_view = make_tensor_view(
+        input_matrix, 
+        make_naive_tensor_descriptor_packed(list(input_matrix.shape))
+    )
+    output_view = make_tensor_view(
+        output_matrix,
+        make_naive_tensor_descriptor_packed(list(output_matrix.shape))
+    )
+    
+    # Create distribution for window
+    encoding = make_tile_distribution_encoding(
+        rs_lengths=[],
+        hs_lengthss=[[2, 2], [2, 2]],  # 4x4 window with 2x2 per thread
+        ps_to_rhss_major=[[1], [2]],
+        ps_to_rhss_minor=[[0], [0]],
+        ys_to_rhs_major=[1, 2],
+        ys_to_rhs_minor=[1, 1]
+    )
+    dist = make_static_tile_distribution(encoding)
+    
+    # Process in tiles
+    tiles_processed = 0
+    for row_start in range(0, rows, window_size[0]):
+        for col_start in range(0, cols, window_size[1]):
+            # Create windows at current position
+            input_window = make_tile_window(
+                input_view, window_size, [row_start, col_start], dist
+            )
+            output_window = make_tile_window(
+                output_view, window_size, [row_start, col_start], dist
+            )
+            
+            # Load → Compute → Store pipeline
+            print(f"\nProcessing tile at ({row_start}, {col_start}):")
+            
+            # Load phase
+            tile_data = input_window.load()
+            print("  ✓ Load: Data loaded with optimal access pattern")
+            
+            # Compute phase
+            result = make_static_distributed_tensor(np.float32, dist)
+            y_lens = dist.get_y_vector_lengths()
+            for y0 in range(y_lens[0]):
+                for y1 in range(y_lens[1]):
+                    value = tile_data.get_element([y0, y1])
+                    result.set_element([y0, y1], operation_func(value))
+            print("  ✓ Compute: Applied operation to all elements")
+            
+            # Store phase
+            output_window.store(result)
+            print("  ✓ Store: Results written with vectorized stores")
+            
+            tiles_processed += 1
+    
+    return output_matrix, tiles_processed
+
+# Test the pipeline
+test_matrix = np.arange(64, dtype=np.float32).reshape(8, 8)
+result_matrix, num_tiles = matrix_operation_with_tilewindow(
+    test_matrix,
+    lambda x: x ** 2  # Square each element
+)
+
+print(f"\nPipeline Summary:")
+print(f"  Input matrix shape: {test_matrix.shape}")
+print(f"  Tiles processed: {num_tiles}")
+print(f"  Sample input: {test_matrix[0:2, 0:2]}")
+print(f"  Sample output: {result_matrix[0:2, 0:2]}")
+
+print("\n🚀 This demonstrates the pattern used in every GPU kernel:")
+print("1. Create tile windows for input/output")
+print("2. Load tile data into distributed tensor")
+print("3. Compute on distributed data") 
+print("4. Store results back through tile window")
+print("\nAll with automatic optimization via LoadStoreTraits!")
+```
+
 ## Computation Architecture
 
 ```{=html}
@@ -422,6 +823,9 @@ graph TB
 ## C++ Usage Example
 
 The real power of TileWindow comes from its C++ implementation:
+
+<details>
+<summary>Click to show C++ code</summary>
 
 ```cpp
 // Complete example: Matrix multiplication using TileWindow
@@ -487,7 +891,7 @@ __global__ void gemm_kernel_with_windows(
         a_window.set_window_origin(make_tuple(0, k));
         b_window.set_window_origin(make_tuple(k, 0));
         
-        // Load tiles
+        // Load tiles - LoadStoreTraits ensures optimal pattern
         a_window.load(a_reg);
         b_window.load(b_reg);
         
@@ -495,9 +899,40 @@ __global__ void gemm_kernel_with_windows(
         gemm(a_reg, b_reg, c_reg);
     }
     
-    // Store result
+    // Store result - using same optimized pattern
     c_window.store(c_reg);
 }
+```
+
+</details>
+
+## Performance Characteristics
+
+```{=html}
+<div class="mermaid">
+graph LR
+    subgraph "Memory Access Optimization"
+        V["Vectorization<br/>4x fewer transactions"]
+        C["Coalescing<br/>32x bandwidth efficiency"]
+        P["Precomputation<br/>Zero overhead addressing"]
+        S["Space-filling<br/>Optimal cache usage"]
+    end
+    
+    subgraph "Hardware Utilization"
+        BW["Memory Bandwidth<br/>Near 100% utilization"]
+        L["Latency Hiding<br/>Overlapped operations"]
+        R["Register Reuse<br/>Minimal spills"]
+    end
+    
+    V --> BW
+    C --> BW
+    P --> L
+    S --> R
+    
+    style V fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style C fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style BW fill:#d1fae5,stroke:#10b981,stroke-width:3px
+</div>
 ```
 
 ## Load-Compute-Store Pipeline
@@ -635,6 +1070,7 @@ def recommend_window_size(tensor_shape, available_registers, elements_per_thread
         print(f"Optimal choice: {optimal}x{optimal}")
         print(f"  - Uses {optimal*optimal*elements_per_thread} registers per thread")
         print(f"  - Achieves {(optimal*optimal)/max_window_elements*100:.1f}% register utilization")
+        print(f"  - LoadStoreTraits will optimize access patterns")
     
     return recommended
 
@@ -666,6 +1102,7 @@ def optimize_access_pattern(window_shape, thread_block_shape):
     if elements_per_row % threads_per_row == 0:
         print("\n✓ Perfect coalescing possible!")
         print(f"  Each thread loads {elements_per_row // threads_per_row} consecutive elements")
+        print("  LoadStoreTraits will automatically vectorize these accesses")
         access_pattern = "row-major coalesced"
     else:
         print("\n⚠ Partial coalescing")
@@ -678,6 +1115,7 @@ def optimize_access_pattern(window_shape, thread_block_shape):
         if elements_per_row % (threads_per_row * vec_size) == 0:
             print(f"\nVectorization: Use float{vec_size} for optimal loads")
             print(f"  {elements_per_row // (threads_per_row * vec_size)} vector loads per thread")
+            print(f"  Space-filling curve ensures cache-friendly order")
             break
     
     return access_pattern
@@ -689,14 +1127,58 @@ optimize_access_pattern(
 )
 ```
 
+### 3. Choose Distribution for Memory Access
+
+```{pyodide}
+#| echo: true
+#| output: true
+
+# Example: Different distributions create different access patterns
+def create_and_analyze_distribution(name, hs_lengthss, ys_to_rhs_minor):
+    """Create distribution and analyze its access pattern."""
+    encoding = make_tile_distribution_encoding(
+        rs_lengths=[],
+        hs_lengthss=hs_lengthss,
+        ps_to_rhss_major=[[1], [2]],
+        ps_to_rhss_minor=[[0], [0]],
+        ys_to_rhs_major=[1, 2],
+        ys_to_rhs_minor=ys_to_rhs_minor
+    )
+    dist = make_static_tile_distribution(encoding)
+    traits = LoadStoreTraits(dist, np.float32)
+    
+    print(f"\n{name} Distribution:")
+    print(f"  Hierarchical structure: {hs_lengthss}")
+    print(f"  Y→RH minor mapping: {ys_to_rhs_minor}")
+    print(f"  Vector dimension: Y{traits.vector_dim_y}")
+    print(f"  Scalars per vector: {traits.scalar_per_vector}")
+    print(f"  Access efficiency: {traits.scalar_per_vector}x vectorization")
+    print(f"  Space-filling curve: {'Snake' if traits.sfc_ys.snake_curved else 'Linear'}")
+
+# Compare different distributions
+create_and_analyze_distribution(
+    "Optimized for Vectorization",
+    [[2, 4], [2, 4]],  # 4-element vectors possible
+    [1, 1]  # Both Y dims use inner hierarchy
+)
+
+create_and_analyze_distribution(
+    "Less Optimal",
+    [[4, 2], [4, 2]],  # Only 2-element vectors
+    [1, 1]
+)
+```
+
 ## Summary
 
 TileWindow provides:
 
-- **Automatic optimization**: Generates optimal memory access patterns
+- **Automatic optimization**: Generates optimal memory access patterns through LoadStoreTraits
 - **Distribution awareness**: Works seamlessly with TileDistribution
+- **Space-filling curves**: Optimal traversal order for cache efficiency
+- **Vectorization**: Automatic multi-element operations
+- **Precomputation**: Zero-overhead coordinate transformations
 - **Flexible windowing**: Supports various access patterns and window configurations
-- **Zero overhead**: Compile-time optimization in C++
 - **Safety**: Automatic boundary handling
 
 Key benefits:
@@ -705,5 +1187,6 @@ Key benefits:
 2. **Productivity**: Eliminates manual memory management code
 3. **Correctness**: Automatic boundary checking and handling
 4. **Composability**: Integrates cleanly with other CK abstractions
+5. **Intelligence**: LoadStoreTraits analyzes and optimizes every access
 
-The TileWindow abstraction is essential for building high-performance GPU kernels, providing a clean interface for complex memory access patterns while maintaining peak performance.
+The TileWindow abstraction is essential for building high-performance GPU kernels, providing a clean interface for complex memory access patterns while maintaining peak performance. The sophisticated analysis performed by LoadStoreTraits ensures that every memory operation is as efficient as possible, while the space-filling curve traversal maximizes cache utilization.

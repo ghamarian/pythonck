@@ -52,6 +52,9 @@ Before threads can process data, they need to know who they are and what work th
 
 In GPU hardware, threads are organized hierarchically:
 
+<details>
+<summary>Click to show C++ code</summary>
+
 ```cpp
 // CUDA/HIP thread identification
 __device__ void get_thread_coordinates()
@@ -75,9 +78,14 @@ __device__ void get_thread_coordinates()
 }
 ```
 
+</details>
+
 ### C++ Thread Mapping in CK
 
 Composable Kernel abstracts thread identification into partition indices:
+
+<details>
+<summary>Click to show C++ code</summary>
 
 ```cpp
 // From tile_partition.hpp
@@ -105,6 +113,8 @@ struct tile_partition
     }
 };
 ```
+
+</details>
 
 ```{=html}
 <div class="mermaid">
@@ -395,6 +405,9 @@ The thread mapping directly affects memory access efficiency.
 
 Here's how CK implements efficient memory access patterns:
 
+<details>
+<summary>Click to show C++ code</summary>
+
 ```cpp
 // Coalesced memory access pattern
 template <typename DataType, index_t VectorSize>
@@ -435,9 +448,14 @@ __device__ void load_tile_window(DistributedTensor& dist_tensor,
 }
 ```
 
+</details>
+
 ### Memory Access Optimization Techniques
 
 CK uses several techniques to optimize memory access:
+
+<details>
+<summary>Click to show C++ code</summary>
 
 ```cpp
 // 1. Vector loads for maximum bandwidth
@@ -462,6 +480,8 @@ __device__ void prefetch_next_tile(const float* src, index_t offset)
     __builtin_prefetch(src + offset, 0, 3);
 }
 ```
+
+</details>
 
 ### Coalesced Memory Access
 
@@ -545,6 +565,9 @@ The structured thread mapping provides several memory efficiency benefits:
 ### Complete C++ Kernel Example
 
 Here's a complete example showing how thread mapping works in a real CK kernel:
+
+<details>
+<summary>Click to show C++ code</summary>
 
 ```cpp
 // RMSNorm kernel using CK's thread mapping
@@ -637,6 +660,8 @@ __global__ void rmsnorm_kernel(const DataType* __restrict__ x,
     });
 }
 ```
+
+</details>
 
 ### Key Thread Mapping Concepts in Action
 

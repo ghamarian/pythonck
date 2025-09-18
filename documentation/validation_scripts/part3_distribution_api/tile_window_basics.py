@@ -22,8 +22,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 
 from documentation.validation_scripts.common import (
     print_section, print_step, show_result, validate_example,
-    explain_concept, show_comparison, run_script_safely, check_imports,
-    show_tensor_shape, show_coordinate_transform
+    explain_concept, show_comparison, run_script_safely, check_imports
 )
 
 # Import the actual CK modules
@@ -442,4 +441,4 @@ def main():
 
 
 if __name__ == "__main__":
-    run_script_safely("TileWindow Basics", main) 
+    run_script_safely("TileWindow Basics", main)

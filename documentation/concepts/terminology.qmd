@@ -34,10 +34,15 @@ The coordinate space representing processing elements in the GPU hierarchy.
 - **Values**: Hardware thread indices
 
 **C++ Example**:
+<details>
+<summary>Click to show C++ example code</summary>
+
 ```cpp
 // Get current thread's P coordinates
 auto p_idx = Distribution::_get_partition_index();
 ```
+
+</details>
 
 ### Y-Space (Yield Space)
 The coordinate space representing the logical access pattern within each tile.
@@ -47,10 +52,15 @@ The coordinate space representing the logical access pattern within each tile.
 - **Values**: Indices within the tile
 
 **C++ Example**:
+<details>
+<summary>Click to show C++ example code</summary>
+
 ```cpp
 // Iterate over Y-space
 sweep_tile(tensor, [](auto y_idx) { /*...*/ });
 ```
+
+</details>
 
 ### X-Space (Physical Tensor Space)
 The coordinate space representing actual positions in the tensor.
@@ -60,10 +70,15 @@ The coordinate space representing actual positions in the tensor.
 - **Values**: Physical tensor coordinates
 
 **C++ Example**:
+<details>
+<summary>Click to show C++ example code</summary>
+
 ```cpp
 // Calculate X coordinates from P+Y
 auto x_idx = distribution.calculate_index(p_idx);
 ```
+
+</details>
 
 ### R-Space (Replication Space)
 The coordinate space representing data replication patterns.
@@ -73,6 +88,9 @@ The coordinate space representing data replication patterns.
 - **Values**: Replication indices
 
 **C++ Example**:
+<details>
+<summary>Click to show C++ example code</summary>
+
 ```cpp
 // R-dimensions in encoding
 using Encoding = tile_distribution_encoding<
@@ -80,6 +98,8 @@ using Encoding = tile_distribution_encoding<
     /*...*/
 >;
 ```
+
+</details>
 
 ### D-Space (Data Space)
 The linearized coordinate space for thread-local storage.
@@ -89,10 +109,15 @@ The linearized coordinate space for thread-local storage.
 - **Values**: Linear memory offsets
 
 **C++ Example**:
+<details>
+<summary>Click to show C++ example code</summary>
+
 ```cpp
 // Y-to-D descriptor linearizes storage
 auto d_idx = ys_to_d_descriptor.calculate_offset(y_idx);
 ```
+
+</details>
 
 ## Dimension Types
 
@@ -107,12 +132,17 @@ The hierarchical decomposition of tensor dimensions, capturing how work is divid
   - Vector: 4 elements per operation
 
 **C++ Example**:
+<details>
+<summary>Click to show C++ example code</summary>
+
 ```cpp
 using HsLengthss = tuple<
     sequence<4, 2, 8, 4>,  // H0: M dimension
     sequence<4, 2, 8, 4>   // H1: N dimension
 >;
 ```
+
+</details>
 
 ### RH-Dimensions (R + H Dimensions Combined)
 The combined space of R and H dimensions, used internally for coordinate transformations.
@@ -170,11 +200,16 @@ A performance degradation that occurs when multiple threads in a warp access dif
 The technique of loading/storing multiple elements in a single memory transaction.
 
 **C++ Example**:
+<details>
+<summary>Click to show C++ example code</summary>
+
 ```cpp
 // Vector load of 4 elements
 using float4 = vector_type<float, 4>::type;
 float4 data = tensor_view.template get_vectorized_elements<4>(x_idx);
 ```
+
+</details>
 
 ## Distribution Components
 
@@ -269,6 +304,9 @@ Rate of operation completion, often measured in operations per second.
 ## Usage Examples
 
 ### Creating a Distribution
+<details>
+<summary>Click to show C++ code</summary>
+
 ```cpp
 // Define encoding
 using MyEncoding = tile_distribution_encoding<
@@ -285,7 +323,12 @@ using MyEncoding = tile_distribution_encoding<
 auto distribution = make_static_tile_distribution(MyEncoding{});
 ```
 
+</details>
+
 ### Using Tile Window
+<details>
+<summary>Click to show C++ code</summary>
+
 ```cpp
 // Create window
 auto window = make_tile_window(
@@ -300,6 +343,8 @@ auto tile = window.load();
 sweep_tile(tile, compute_func);
 window.store(tile);
 ```
+
+</details>
 
 ## Related Documentation
 

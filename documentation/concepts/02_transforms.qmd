@@ -16,7 +16,7 @@ The transformation engine is built from individual transform types that each han
 
 Explore transformation concepts interactively:
 
-**[Tensor Transform Visualizer](https://ck.silobrain.com/tensor-transform/)** - Explore tensor descriptor transformations with visual graphs and mathematical formulas. See how data layouts change through various transformations.
+**[Tensor Transform Visualizer](https://tensortransform.streamlit.app)** - Explore tensor descriptor transformations with visual graphs and mathematical formulas. See how data layouts change through various transformations.
 
 ## What Are Transforms?
 

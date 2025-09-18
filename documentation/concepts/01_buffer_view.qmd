@@ -4,6 +4,8 @@ format:
   live-html:
     mermaid:
       theme: default
+    code-fold: true
+    code-tools: true
 ---
 
 # Overview
@@ -79,9 +81,14 @@ Note: The data  pointers for creating the buffer views should match the address 
 
 ### Type System
 - **C++**: Strong compile-time typing
-  ```cpp
+  <details>
+<summary>Click to show C++ code</summary>
+
+```cpp
   buffer_view<float*, address_space_enum::global>  // Type encodes everything
   ```
+
+</details>
 - **Python**: Dynamic typing with runtime checks
   ```python
   BufferView  # Generic class, properties stored as members
@@ -129,6 +136,9 @@ print(f"Data: {data}")
 
 **File**: `include/ck_tile/core/tensor/buffer_view.hpp`
 
+<details>
+<summary>Click to show C++ code</summary>
+
 ```cpp
 #include <ck_tile/core/tensor/buffer_view.hpp>
 #include <ck_tile/core/numeric/integral_constant.hpp>
@@ -164,7 +174,12 @@ __device__ void example_buffer_creation()
 }
 ```
 
+</details>
+
 ### Zero Value Mode
+<details>
+<summary>Click to show C++ code</summary>
+
 ```cpp
 // Basic buffer view creation with automatic zero for invalid elements
 void basic_creation_example() {
@@ -177,7 +192,12 @@ void basic_creation_example() {
 }
 ```
 
+</details>
+
 ### Custom Value Mode
+<details>
+<summary>Click to show C++ code</summary>
+
 ```cpp
 void custom_invalid_value_example() {
     constexpr size_t buffer_size = 8;
@@ -189,6 +209,8 @@ void custom_invalid_value_example() {
         data, buffer_size, custom_invalid);
 }
 ```
+
+</details>
 
 # Get Operations
 
@@ -316,6 +338,9 @@ print(f"Value with invalid flag: {value_invalid}")
 
 ## C++ Get Operations
 
+<details>
+<summary>Click to show C++ code</summary>
+
 ```cpp
 __device__ void example_get_operations()
 {
@@ -342,8 +367,13 @@ __device__ void example_get_operations()
 }
 ```
 
+</details>
+
 ### Custom Value Return Mode for OOB & Invalid Access
- ```cpp
+ <details>
+<summary>Click to show C++ code</summary>
+
+```cpp
 void scalar_get_operations_example() {
 
     // Create data array
@@ -365,6 +395,8 @@ void scalar_get_operations_example() {
     printf("Out of bounds: %.1f\n", oob_value.get(0));
 }
 ```
+
+</details>
 
 NOTE: Partial Out Of Bound (OOB) access during vector reads will return 'junk' values for the OOB access. Zero or custom invalid value is only returned for complete invalid/OOB access, i.e. when the first address of the vector is invalid.
 
@@ -424,6 +456,9 @@ print("After vectorized update:", data)
 
 ## C++ Update Operations
 
+<details>
+<summary>Click to show C++ code</summary>
+
 ```cpp
 void scalar_set_operations_example() {
         
@@ -450,6 +485,8 @@ void scalar_set_operations_example() {
     buffer_view.template set<float2>(0, 5, true, pair_values);
 }
 ```
+
+</details>
 
 # Atomic Operations
 
@@ -499,6 +536,9 @@ print(f"atomic_max(1, 250) - new data: {data}")
 
 ## C++ Atomic Operations
 
+<details>
+<summary>Click to show C++ code</summary>
+
 ```cpp
 __device__ void example_atomic_operations()
 {
@@ -524,6 +564,8 @@ __device__ void example_atomic_operations()
     __syncthreads();
 }
 ```
+
+</details>
 
 # Summary
 
