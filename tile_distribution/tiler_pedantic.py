@@ -1405,34 +1405,34 @@ class TileDistributionPedantic:
                     hierarchical_info['VectorDimensionYSIndex'] = self.NDimYs - 1
 
         # --- Process ThreadPerWarp and WarpPerBlock ---
-        # The rule is simple:
-        # - P0 always controls WarpPerBlock (when NDimPs >= 1)
-        # - P1 always controls ThreadPerWarp (when NDimPs == 2)
-        # - The minor index just tells us which component of H to use
-        # - The major index tells us M vs N dimension
-        
+        # FIXED LOGIC:
+        # - P0 controls WarpPerBlock (when NDimPs == 2) or ThreadPerWarp (when NDimPs == 1)
+        # - P1 controls ThreadPerWarp (when NDimPs == 2)
+        # - The MAJOR index (which H-sequence) determines M vs N dimension:
+        #   * major == 0 (R) or major == 1 (H0) -> contributes to M dimension (rows)
+        #   * major == 2 (H1) -> contributes to N dimension (cols)
+        # - The minor index just tells us which component within that H-sequence
+        # - The ORDER in Ps2RHss* only affects thread iteration order, NOT dimensions
+
         tpw_m_len = 1
         tpw_n_len = 1
         wpb_m_len = 1
         wpb_n_len = 1
 
         if self.NDimPs >= 1:
-            # P0 controls WarpPerBlock
+            # P0 controls WarpPerBlock (for 2 P dims) or will be moved to ThreadPerWarp (for 1 P dim)
             if self.DstrEncode.Ps2RHssMajor[0] and self.DstrEncode.Ps2RHssMinor[0]:
                 p0_majors = self.DstrEncode.Ps2RHssMajor[0]
                 p0_minors = self.DstrEncode.Ps2RHssMinor[0]
-                
+
                 if not isinstance(p0_majors, list):
                     p0_majors = [p0_majors]
                 if not isinstance(p0_minors, list):
                     p0_minors = [p0_minors]
-                
+
                 # P0 contributes to WarpPerBlock
-                # The key insight: position in the P mapping determines M vs N:
-                # - First component (idx=0) -> M dimension
-                # - Second component (idx=1) -> N dimension
-                # This applies regardless of whether the component comes from R, H0, or H1
-                for idx, (major, minor) in enumerate(zip(p0_majors, p0_minors)):
+                # FIXED: Use the MAJOR index to determine M vs N, not the position
+                for major, minor in zip(p0_majors, p0_minors):
                     # Get the length value
                     length = 1
                     if major == 0:  # R component
@@ -1442,11 +1442,12 @@ class TileDistributionPedantic:
                         h_idx = major - 1
                         if 0 <= h_idx < len(self.DstrEncode.HsLengthss) and 0 <= minor < len(self.DstrEncode.HsLengthss[h_idx]):
                             length = self.DstrEncode.HsLengthss[h_idx][minor]
-                    
-                    # Assign based on position in P mapping
-                    if idx == 0:  # First component -> M dimension
+
+                    # Assign based on MAJOR index (which H-sequence), not position
+                    # Convention: H0 (major=1) -> M dimension, H1 (major=2) -> N dimension
+                    if major == 0 or major == 1:  # R or H0 -> M dimension
                         wpb_m_len *= length
-                    else:  # Second or later component -> N dimension
+                    else:  # H1 or higher -> N dimension
                         wpb_n_len *= length
 
         if self.NDimPs == 2:
@@ -1454,15 +1455,15 @@ class TileDistributionPedantic:
             if self.DstrEncode.Ps2RHssMajor[1] and self.DstrEncode.Ps2RHssMinor[1]:
                 p1_majors = self.DstrEncode.Ps2RHssMajor[1]
                 p1_minors = self.DstrEncode.Ps2RHssMinor[1]
-                
+
                 if not isinstance(p1_majors, list):
                     p1_majors = [p1_majors]
                 if not isinstance(p1_minors, list):
                     p1_minors = [p1_minors]
-                
+
                 # P1 contributes to ThreadPerWarp
-                # Same position-based logic as P0
-                for idx, (major, minor) in enumerate(zip(p1_majors, p1_minors)):
+                # FIXED: Use the MAJOR index to determine M vs N, not the position
+                for major, minor in zip(p1_majors, p1_minors):
                     # Get the length value
                     length = 1
                     if major == 0:  # R component
@@ -1472,11 +1473,12 @@ class TileDistributionPedantic:
                         h_idx = major - 1
                         if 0 <= h_idx < len(self.DstrEncode.HsLengthss) and 0 <= minor < len(self.DstrEncode.HsLengthss[h_idx]):
                             length = self.DstrEncode.HsLengthss[h_idx][minor]
-                    
-                    # Assign based on position in P mapping
-                    if idx == 0:  # First component -> M dimension
+
+                    # Assign based on MAJOR index (which H-sequence), not position
+                    # Convention: H0 (major=1) -> M dimension, H1 (major=2) -> N dimension
+                    if major == 0 or major == 1:  # R or H0 -> M dimension
                         tpw_m_len *= length
-                    else:  # Second or later component -> N dimension
+                    else:  # H1 or higher -> N dimension
                         tpw_n_len *= length
         elif self.NDimPs == 1:
             # Only P0 exists, it controls ThreadPerWarp (no warp-level distribution)
